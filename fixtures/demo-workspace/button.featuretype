@@ -1,0 +1,28 @@
+<title>Button</title>
+
+<intent>
+  Trigger a primary or secondary action from the current screen.
+</intent>
+
+<guidance>
+  Keep the example surface small and direct. Use the setup block for imports and helpers.
+</guidance>
+
+<setup lang="ts">
+import { Button } from "./components"
+</setup>
+
+<examples>
+  <example id="primary" title="Primary action">
+    <Button tone="primary">Save</Button>
+  </example>
+
+  <example id="danger" title="Danger action">
+    <Button tone="danger">Delete</Button>
+  </example>
+</examples>
+
+<anti-patterns>
+  Do not use this as the final confirmation step for destructive flows.
+</anti-patterns>
+

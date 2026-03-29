@@ -1,0 +1,23 @@
+{
+  "name": "featuretype",
+  "private": true,
+  "packageManager": "pnpm@9.15.4",
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "test": "turbo run test",
+    "check-types": "turbo run check-types",
+    "lint": "turbo run lint"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.10",
+    "@types/node": "^22.13.10",
+    "mocha": "^11.1.0",
+    "react": "^19.0.0",
+    "tsup": "^8.4.0",
+    "tsx": "^4.19.3",
+    "turbo": "^2.4.0",
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.8"
+  }
+}

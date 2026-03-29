@@ -1,0 +1,26 @@
+<intent>
+  Single-select combobox for toolbar filter controls.
+</intent>
+
+<setup lang="ts">
+import { useState } from "react"
+import { SingleSelectCombobox } from "./components"
+</setup>
+
+<recipe id="broken-controlled" intent="broken recipe for diagnostics">
+  function BrokenControlledCombobox() {
+    const [value, setValue] = useState("updated-desc")
+    return (
+      <SingleSelectCombobox
+        ariaLabel="Sort repos"
+        placeholder="Sort"
+        selectedValue={value}
+        onValueChange={setValue}
+        options={[
+          { label: "Recently updated", value: "updated-desc" },
+          { label: "Name A-Z", value: "name-asc" },
+        ]}
+      />
+    )
+  }
+</recipe>

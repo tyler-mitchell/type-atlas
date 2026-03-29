@@ -1,0 +1,29 @@
+{
+  "name": "@featuretype/language-server",
+  "version": "0.0.0",
+  "private": true,
+  "bin": {
+    "featuretype-language-server": "./bin/featuretype-language-server.cjs"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "bin",
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs --dts --outDir dist",
+    "check-types": "tsc --noEmit -p tsconfig.json",
+    "lint": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@featuretype/service": "workspace:*",
+    "@volar/language-server": "2.4.28",
+    "volar-service-typescript": "0.0.65"
+  },
+  "devDependencies": {
+    "@volar/test-utils": "2.4.28",
+    "vscode-uri": "^3.0.8"
+  }
+}

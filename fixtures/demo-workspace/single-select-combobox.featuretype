@@ -1,0 +1,93 @@
+<intent>
+  Single-select combobox for toolbar filter controls.
+  Owns: popup open state, keyboard navigation, option filtering.
+  Caller provides: value, onValueChange, options array (stable reference).
+</intent>
+
+<anatomy>
+  SingleSelectCombobox
+    > ComboboxTrigger        — button that opens the popup
+    > ComboboxContent        — popover container
+      > ComboboxInput        — optional search input
+      > ComboboxOption[]     — selectable items
+</anatomy>
+
+<setup lang="ts">
+import { useState } from "react"
+import { SingleSelectCombobox } from "./components"
+</setup>
+
+<recipe id="minimal-controlled" intent="controlled single-select with local state">
+  function MinimalControlledCombobox() {
+    const [value, setValue] = useState("updated-desc")
+    return (
+      <SingleSelectCombobox
+        ariaLabel="Sort repos"
+        placeholder="Sort"
+        value={value}
+        onValueChange={setValue}
+        options={[
+          { label: "Recently updated", value: "updated-desc" },
+          { label: "Name A-Z", value: "name-asc" },
+        ]}
+      />
+    )
+  }
+</recipe>
+
+<showcase id="toolbar-composition" title="In-App Filter Toolbars" controls>
+  function ToolbarShowcase({
+    size,
+    variant,
+  }: {
+    size: "sm" | "md"
+    variant: "default" | "muted"
+  }) {
+    const [value, setValue] = useState("updated-desc")
+    return (
+      <div data-size={size} data-variant={variant}>
+        <SingleSelectCombobox
+          ariaLabel="Repo filters"
+          placeholder="Filter"
+          value={value}
+          onValueChange={setValue}
+          options={[
+            { label: "Recently updated", value: "updated-desc" },
+            { label: "Name A-Z", value: "name-asc" },
+          ]}
+        />
+      </div>
+    )
+  }
+</showcase>
+
+<constraints>
+  - Do NOT pass options as an inline array literal in app code.
+  - Do NOT wrap in an extra div for positioning.
+  - Do NOT use for multi-select.
+</constraints>
+
+<related>
+  multi-select-combobox    — use when multiple selections are needed
+  popover                  — underlying positioning primitive
+  repo-toolbar-select      — higher-level wrapper, check first
+</related>
+
+<tokens>
+  --combobox-trigger-height: var(--control-height-sm)
+  --combobox-popup-max-height: 280px
+</tokens>
+
+<decisions>
+  2026-03-28: chose controlled-only API.
+</decisions>
+
+<checklist>
+  [x] Trigger accessible via keyboard
+  [ ] Screen reader announces selected value
+  [ ] RTL layout verified
+</checklist>
+
+<status phase="active" reviewed="2026-03-28">
+  open: should ComboboxInput be a separate export or built-in?
+</status>

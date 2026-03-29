@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.turbo/
+.vscode-test/
+coverage/
+*.vsix
+*.tsbuildinfo
+.env
+.env.*

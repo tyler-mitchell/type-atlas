@@ -1,0 +1,12 @@
+<title>Broken Button</title>
+
+<setup lang="ts">
+import { Button } from "./components"
+</setup>
+
+<examples>
+  <example id="broken-tone" title="Broken tone">
+    <Button tone="destructive">Delete</Button>
+  </example>
+</examples>
+

@@ -1,0 +1,47 @@
+{
+  "name": "featuretype-language-features",
+  "version": "0.0.0",
+  "private": true,
+  "displayName": "FeatureType Language Features",
+  "description": "First-class .featuretype authoring with embedded TSX diagnostics powered by Volar.js.",
+  "publisher": "featuretype-local",
+  "categories": ["Programming Languages"],
+  "main": "./dist/extension.js",
+  "engines": {
+    "vscode": "^1.82.0"
+  },
+  "activationEvents": [
+    "onLanguage:featuretype"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "featuretype",
+        "aliases": ["FeatureType", ".featuretype"],
+        "extensions": [".featuretype"],
+        "configuration": "./language-configuration.json"
+      }
+    ]
+  },
+  "scripts": {
+    "build": "tsx scripts/build.ts --minify",
+    "watch": "tsx scripts/build.ts --watch",
+    "check-types": "tsc --noEmit -p tsconfig.json",
+    "lint": "tsc --noEmit -p tsconfig.json",
+    "pack": "rm -f dist/featuretype-language-features.vsix && pnpm run build && vsce package --no-dependencies --out dist/featuretype-language-features.vsix",
+    "test": "pnpm run build"
+  },
+  "dependencies": {
+    "@volar/language-server": "2.4.28",
+    "@volar/vscode": "2.4.28",
+    "vscode-languageclient": "^9.0.1",
+    "vscode-uri": "^3.0.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "@types/vscode": "^1.82.0",
+    "@vscode/vsce": "^3.2.2",
+    "esbuild": "^0.25.2",
+    "vscode": "^1.1.37"
+  }
+}

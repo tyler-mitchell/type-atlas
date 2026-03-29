@@ -1,0 +1,33 @@
+{
+  "name": "@featuretype/service",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm,cjs --dts",
+    "check-types": "tsc --noEmit -p tsconfig.json",
+    "lint": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@featuretype/core": "workspace:*",
+    "@volar/language-core": "2.4.28",
+    "@volar/language-service": "2.4.28",
+    "@volar/typescript": "2.4.28",
+    "vscode-languageserver-protocol": "^3.17.5",
+    "vscode-uri": "^3.0.8"
+  }
+}
