@@ -13,6 +13,8 @@ The goal is to understand:
 
 This note should be preferred over the earlier high-level Volar section when making architecture or implementation decisions.
 
+For ongoing day-to-day extension work, prefer [`../implementation/featuretype-precedent-grounding.md`](../implementation/featuretype-precedent-grounding.md) as the implementation-facing guardrail document, and use this note as the broader research base behind it.
+
 ## Repos Reviewed
 
 Research date: March 28, 2026.

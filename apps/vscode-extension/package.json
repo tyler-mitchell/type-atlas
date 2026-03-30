@@ -21,6 +21,32 @@
         "extensions": [".featuretype"],
         "configuration": "./language-configuration.json"
       }
+    ],
+    "grammars": [
+      {
+        "language": "featuretype",
+        "scopeName": "source.featuretype",
+        "path": "./syntaxes/featuretype.tmLanguage.json",
+        "embeddedLanguages": {
+          "source.ts": "typescript",
+          "source.tsx": "typescriptreact",
+          "meta.tag.tsx": "jsx-tags",
+          "meta.tag.without-attributes.tsx": "jsx-tags",
+          "meta.tag.attributes.tsx": "typescriptreact",
+          "meta.embedded.expression.tsx": "typescriptreact"
+        },
+        "unbalancedBracketScopes": [
+          "meta.tag.featuretype",
+          "punctuation.definition.tag.begin.featuretype",
+          "punctuation.definition.tag.end.featuretype"
+        ]
+      }
+    ],
+    "snippets": [
+      {
+        "language": "featuretype",
+        "path": "./languages/featuretype.code-snippets"
+      }
     ]
   },
   "scripts": {

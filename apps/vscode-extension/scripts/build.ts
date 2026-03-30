@@ -1,9 +1,12 @@
 import { context } from "esbuild";
+import { generateSyntaxAssets } from "./generateSyntaxAssets";
 
 const watchMode = process.argv.includes("--watch");
 const minify = process.argv.includes("--minify");
 
 async function main() {
+  await generateSyntaxAssets();
+
   const buildContext = await context({
     entryPoints: {
       extension: "./src/extension.ts",

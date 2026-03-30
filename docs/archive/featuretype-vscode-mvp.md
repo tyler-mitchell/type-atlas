@@ -6,6 +6,8 @@ Prove that `.featuretype` can be a first-class authored language surface in VS C
 
 The MVP is no longer centered on a narrow `<examples>` shape. The current foundation treats `.featuretype` as a registry-driven authored document format where top-level and nested blocks can evolve over time without rewriting the language architecture.
 
+For the ongoing precedent and anti-drift rules future agents should follow while extending this foundation, see [`./featuretype-precedent-grounding.md`](./featuretype-precedent-grounding.md).
+
 ## What Is True Now
 
 The repo currently ships a working Volar-based VS Code extension that:
@@ -15,6 +17,7 @@ The repo currently ships a working Volar-based VS Code extension that:
 - emits virtual TypeScript files for authored code-bearing blocks such as `<recipe>` and `<showcase>`
 - maps TypeScript diagnostics back to the original `.featuretype` source
 - surfaces FeatureType structural diagnostics, document symbols, hover, and code actions from the same schema
+- ships syntax highlighting, embedded TS and TSX coloring, and snippets for `.featuretype`
 - works in VS Code Insiders and exposes its virtual files and service plugins through Volar Labs
 
 ## Upstream Shape Followed
@@ -88,6 +91,7 @@ Current responsibilities:
 - start the bundled server through `@volar/vscode`
 - resolve the active TypeScript SDK with `getTsdk(...)`
 - expose Volar Labs integration with `createLabsInfo(...)`
+- contribute a generated TextMate grammar plus language configuration and snippets
 - package the client and server into a self-contained VSIX
 
 ## Registry-Driven `.featuretype` Foundation
@@ -164,6 +168,22 @@ Today that means:
 
 `<setup>` is prepended into every generated service script, which lets authored code blocks share imports and helpers while still mapping diagnostics back into the original document.
 
+## Syntax Highlighting And Adjacent Editor Assets
+
+The extension now ships a TextMate grammar at [`apps/vscode-extension/syntaxes/featuretype.tmLanguage.json`](/Users/tylermitchell/Projects/featuretype/apps/vscode-extension/syntaxes/featuretype.tmLanguage.json) that is generated from the default block schema by [`apps/vscode-extension/scripts/generateSyntaxAssets.ts`](/Users/tylermitchell/Projects/featuretype/apps/vscode-extension/scripts/generateSyntaxAssets.ts).
+
+That generation step keeps the editor surface aligned with the language model:
+
+- known `.featuretype` block tags are highlighted from the same registry used by the parser
+- attributes and block metadata are tokenized consistently
+- text sections such as checklists, bullet constraints, anatomy connectors, labels, and token declarations receive light structural highlighting
+- embedded `<setup>`, `<recipe>`, `<showcase>`, and legacy `<example>` regions inherit TypeScript or TSX coloring through `embeddedLanguages`
+
+Adjacent editor assets now include:
+
+- [`apps/vscode-extension/language-configuration.json`](/Users/tylermitchell/Projects/featuretype/apps/vscode-extension/language-configuration.json) for comments, indentation, folding markers, and bracket behavior
+- [`apps/vscode-extension/languages/featuretype.code-snippets`](/Users/tylermitchell/Projects/featuretype/apps/vscode-extension/languages/featuretype.code-snippets) for full document, setup, recipe, and showcase scaffolds
+
 ## What Is Validated
 
 The MVP is currently proven in three layers.
@@ -201,6 +221,12 @@ Observed live signals:
   - `recipe_broken_controlled` for the broken top-level recipe document
   - `recipe_minimal_controlled` and `showcase_toolbar_composition` for [`fixtures/demo-workspace/single-select-combobox.featuretype`](/Users/tylermitchell/Projects/featuretype/fixtures/demo-workspace/single-select-combobox.featuretype)
   - the custom `featuretype` service plugin alongside the TypeScript plugins
+
+An additional live syntax pass was validated in a fresh VS Code Insiders profile on March 29, 2026:
+
+- the exthost log at [`/tmp/featuretype-vscode-insiders-user-syntax/logs/20260329T002214/window1/exthost/exthost.log`](/tmp/featuretype-vscode-insiders-user-syntax/logs/20260329T002214/window1/exthost/exthost.log#L5) shows activation on `onLanguage:featuretype`
+- the packaged VSIX included the shipped grammar and snippet assets
+- a live screenshot at [`/tmp/featuretype-syntax-highlighting.png`](/tmp/featuretype-syntax-highlighting.png) shows block tags, attributes, structural text sections, and embedded TypeScript or TSX coloring working together in the editor
 
 ## Commands
 

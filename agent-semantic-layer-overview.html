@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Semantic Intelligence Layer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0c0c0b;
+    --bg2: #131312;
+    --bg3: #1a1a18;
+    --border: rgba(255,255,255,0.07);
+    --border-mid: rgba(255,255,255,0.12);
+    --text: #e8e6e0;
+    --muted: #6b6a64;
+    --accent: #c8f564;
+    --accent2: #64c8f5;
+    --accent3: #f5a364;
+    --red: #f56464;
+    --mono: 'DM Mono', monospace;
+    --serif: 'Instrument Serif', serif;
+    --sans: 'Geist', sans-serif;
+  }
+
+  html { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 15px; line-height: 1.6; }
+
+  body { max-width: 860px; margin: 0 auto; padding: 80px 40px 120px; }
+
+  /* Header */
+  .header { margin-bottom: 80px; }
+  .eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; color: var(--muted); text-transform: uppercase; margin-bottom: 20px; display: flex; align-items: center; gap: 12px; }
+  .eyebrow::before { content: ''; display: block; width: 24px; height: 1px; background: var(--muted); }
+  h1 { font-family: var(--serif); font-size: clamp(36px, 6vw, 58px); font-weight: 400; line-height: 1.1; color: var(--text); margin-bottom: 24px; }
+  h1 em { font-style: italic; color: var(--accent); }
+  .subtitle { font-size: 16px; color: var(--muted); max-width: 560px; line-height: 1.7; }
+
+  /* Divider */
+  hr { border: none; border-top: 1px solid var(--border); margin: 56px 0; }
+
+  /* Section */
+  .section { margin-bottom: 64px; }
+  .section-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em; color: var(--muted); text-transform: uppercase; margin-bottom: 20px; }
+  h2 { font-family: var(--serif); font-size: 26px; font-weight: 400; color: var(--text); margin-bottom: 16px; line-height: 1.25; }
+  p { color: rgba(232,230,224,0.75); margin-bottom: 14px; font-size: 15px; line-height: 1.75; }
+  p:last-child { margin-bottom: 0; }
+
+  /* Problem cards */
+  .problem-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--border); border: 1px solid var(--border); margin-top: 28px; }
+  .problem-card { background: var(--bg2); padding: 24px; }
+  .problem-card .label { font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 10px; }
+  .problem-card .heading { font-size: 14px; color: var(--text); font-weight: 500; margin-bottom: 8px; }
+  .problem-card .body { font-size: 13px; color: var(--muted); line-height: 1.6; }
+
+  /* Stack diagram */
+  .stack { margin-top: 28px; border: 1px solid var(--border); overflow: hidden; }
+  .stack-layer { display: flex; align-items: stretch; border-bottom: 1px solid var(--border); }
+  .stack-layer:last-child { border-bottom: none; }
+  .stack-tag { font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: 0.08em; width: 120px; flex-shrink: 0; padding: 16px 20px; border-right: 1px solid var(--border); display: flex; align-items: center; background: var(--bg); }
+  .stack-content { padding: 16px 24px; flex: 1; display: flex; align-items: center; gap: 16px; background: var(--bg2); }
+  .stack-content .name { font-size: 13px; font-weight: 500; color: var(--text); min-width: 180px; }
+  .stack-content .desc { font-size: 12px; color: var(--muted); line-height: 1.5; }
+  .stack-layer.highlight .stack-content { background: rgba(200, 245, 100, 0.04); }
+  .stack-layer.highlight .stack-tag { color: var(--accent); }
+  .stack-layer.highlight .name { color: var(--accent); }
+
+  /* Tool table */
+  .tool-list { margin-top: 24px; display: flex; flex-direction: column; gap: 1px; background: var(--border); border: 1px solid var(--border); }
+  .tool-row { display: grid; grid-template-columns: 200px 1fr 80px; background: var(--bg2); }
+  .tool-row.header { background: var(--bg); }
+  .tool-row > div { padding: 12px 16px; font-size: 12px; border-right: 1px solid var(--border); }
+  .tool-row > div:last-child { border-right: none; }
+  .tool-row.header > div { font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; }
+  .tool-name { font-family: var(--mono); color: var(--accent2); font-size: 12px; }
+  .tool-desc { color: rgba(232,230,224,0.65); line-height: 1.5; }
+  .tool-cost { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .tool-cost.low { color: var(--accent); }
+  .tool-cost.mid { color: var(--accent3); }
+  .tool-cost.high { color: var(--red); }
+
+  /* Diagnostic format */
+  .code-block { background: var(--bg); border: 1px solid var(--border); padding: 24px; font-family: var(--mono); font-size: 12px; line-height: 1.8; overflow-x: auto; margin-top: 24px; }
+  .c-tag { color: var(--muted); }
+  .c-attr { color: var(--accent3); }
+  .c-val { color: var(--accent2); }
+  .c-text { color: rgba(232,230,224,0.8); }
+  .c-scope-new { color: var(--accent); }
+  .c-scope-base { color: var(--muted); }
+  .c-comment { color: #3d3d38; font-style: italic; }
+
+  /* Comparison */
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--border); border: 1px solid var(--border); margin-top: 28px; }
+  .compare-col { background: var(--bg2); padding: 28px; }
+  .compare-col .col-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+  .compare-col.human .col-label { color: var(--accent2); }
+  .compare-col.agent .col-label { color: var(--accent); }
+  .compare-item { font-size: 13px; color: rgba(232,230,224,0.7); margin-bottom: 10px; padding-left: 16px; position: relative; line-height: 1.5; }
+  .compare-item::before { content: '—'; position: absolute; left: 0; color: var(--muted); }
+
+  /* Prior art */
+  .prior-art { display: flex; flex-direction: column; gap: 1px; background: var(--border); border: 1px solid var(--border); margin-top: 24px; }
+  .prior-row { display: grid; grid-template-columns: 120px 1fr 1fr; background: var(--bg2); }
+  .prior-row.header { background: var(--bg); }
+  .prior-row > div { padding: 12px 16px; font-size: 12px; border-right: 1px solid var(--border); }
+  .prior-row > div:last-child { border-right: none; }
+  .prior-row.header > div { font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; }
+  .prior-name { font-weight: 500; color: var(--text); }
+  .prior-does { color: rgba(232,230,224,0.6); line-height: 1.5; }
+  .prior-gap { color: var(--muted); line-height: 1.5; font-style: italic; }
+
+  /* Footer */
+  .footer { margin-top: 100px; padding-top: 32px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  .footer-left { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .footer-right { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+
+  @media (max-width: 640px) {
+    body { padding: 48px 24px 80px; }
+    .problem-grid { grid-template-columns: 1fr; }
+    .compare { grid-template-columns: 1fr; }
+    .tool-row { grid-template-columns: 1fr; }
+    .tool-row > div { border-right: none; border-bottom: 1px solid var(--border); }
+    .prior-row { grid-template-columns: 1fr; }
+    .prior-row > div { border-right: none; border-bottom: 1px solid var(--border); }
+    .stack-content { flex-direction: column; gap: 4px; align-items: flex-start; }
+    .stack-content .name { min-width: unset; }
+  }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="eyebrow">project overview</div>
+  <h1>Agent <em>semantic</em><br>intelligence layer</h1>
+  <p class="subtitle">A language-server-backed MCP server that gives code agents the same semantic understanding of a codebase that a human developer has in their editor — types, diagnostics, hover information, references, and code actions — without requiring per-library plugins or editor infrastructure.</p>
+</header>
+
+<hr>
+
+<div class="section">
+  <div class="section-label">01 — problem</div>
+  <h2>The feedback gap</h2>
+  <p>Human developers receive continuous, ambient semantic feedback while editing. Type errors appear inline. Hover reveals inferred types and documentation. Go-to-definition traces through generated and imported types. This signal is passive, zero-cost, and spatially attached to the code.</p>
+  <p>Code agents operate in a polling model. They write files, then explicitly invoke tools to discover what went wrong. The feedback loop is coarser, later, and requires the agent to correlate diagnostic output back to decisions it made — consuming inference time and context window on the correlation step rather than the fix.</p>
+
+  <div class="problem-grid">
+    <div class="problem-card">
+      <div class="label">human model</div>
+      <div class="heading">Subscription — signal arrives passively</div>
+      <div class="body">Diagnostics, types, and hover information update continuously as the developer types. Zero explicit cost per signal.</div>
+    </div>
+    <div class="problem-card">
+      <div class="label">agent model (current)</div>
+      <div class="heading">Polling — agent must ask explicitly</div>
+      <div class="body">Agent writes a file, invokes tsc or a lint script, parses stdout. Each check has cold-start cost. Signal is delayed and structurally disconnected from the code that caused it.</div>
+    </div>
+    <div class="problem-card">
+      <div class="label">missing capability</div>
+      <div class="heading">No baseline disambiguation</div>
+      <div class="body">Agents cannot distinguish errors they introduced from pre-existing technical debt without manually snapshotting state before and after — which no current tooling does automatically.</div>
+    </div>
+    <div class="problem-card">
+      <div class="label">missing capability</div>
+      <div class="heading">No speculative analysis</div>
+      <div class="body">Agents cannot ask "what would break if I make this change" without actually making the change. Editors can simulate edits against in-memory documents. Agents write to disk and discover consequences reactively.</div>
+    </div>
+  </div>
+</div>
+
+<hr>
+
+<div class="section">
+  <div class="section-label">02 — architecture</div>
+  <h2>Stack</h2>
+  <p>A thin MCP server acts as an LSP client, translating agent tool calls into LSP requests directed at a Volar language server. Volar handles document sync, TypeScript integration, and the full language intelligence surface. The agent never speaks to the language server directly.</p>
+
+  <div class="stack">
+    <div class="stack-layer">
+      <div class="stack-tag">consumer</div>
+      <div class="stack-content">
+        <div class="name">Codex / Claude Code agent</div>
+        <div class="desc">Issues MCP tool calls. Reads structured diagnostic snapshots and semantic query results back into context window.</div>
+      </div>
+    </div>
+    <div class="stack-layer highlight">
+      <div class="stack-tag">mcp layer</div>
+      <div class="stack-content">
+        <div class="name">MCP server — LSP adapter</div>
+        <div class="desc">Thin bridge. Translates tool calls into LSP requests. Formats LSP responses into agent-readable diagnostic markup. Manages baseline snapshot diffing. No language intelligence of its own.</div>
+      </div>
+    </div>
+    <div class="stack-layer highlight">
+      <div class="stack-tag">language server</div>
+      <div class="stack-content">
+        <div class="name">Volar language server</div>
+        <div class="desc">Handles document sync lifecycle, TypeScript integration via tsserver, virtual document composition for framework file formats, incremental diagnostics, and the full LSP capability surface.</div>
+      </div>
+    </div>
+    <div class="stack-layer">
+      <div class="stack-tag">compiler</div>
+      <div class="stack-content">
+        <div class="name">tsserver / TypeScript compiler API</div>
+        <div class="desc">ts.createSemanticDiagnosticsBuilderProgram. Incremental recheck on file change. Resolves node_modules .d.ts files, project references, path aliases, and generated type artifacts.</div>
+      </div>
+    </div>
+    <div class="stack-layer">
+      <div class="stack-tag">filesystem</div>
+      <div class="stack-content">
+        <div class="name">Project files + node_modules + generated types</div>
+        <div class="desc">Source .ts/.tsx files. All imported library .d.ts files resolved automatically — no per-library configuration. routeTree.gen.ts kept fresh by a watcher started at session boot via Codex hooks.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr>
+
+<div class="section">
+  <div class="section-label">03 — tool surface</div>
+  <h2>Agent tool API</h2>
+  <p>Tools are designed around agent access patterns — file-oriented and range-based rather than cursor-relative. The cost ladder principle from cx applies: start with the cheapest query that answers the question, escalate only when needed.</p>
+
+  <div class="tool-list">
+    <div class="tool-row header">
+      <div>tool</div>
+      <div>description</div>
+      <div>cost</div>
+    </div>
+    <div class="tool-row">
+      <div class="tool-name">get_diagnostics(file?)</div>
+      <div class="tool-desc">Returns current error and warning state. Scoped to a file or full project. Includes baseline/new scope tags, causal chains, and available fixes. Reads from daemon cache — near-zero latency.</div>
+      <div class="tool-cost low">low</div>
+    </div>
+    <div class="tool-row">
+      <div class="tool-name">get_type_at(file, line, col)</div>
+      <div class="tool-desc">Returns the inferred type and JSDoc at a position. Hover equivalent. Resolves through generics, declaration merging, and imported library types including full .d.ts chains.</div>
+      <div class="tool-cost low">low</div>
+    </div>
+    <div class="tool-row">
+      <div class="tool-name">get_signature(file, line, col)</div>
+      <div class="tool-desc">Returns the active overload signature, parameter names, types, and documentation at a function call site. Prevents import and parameter misuse before a write.</div>
+      <div class="tool-cost low">low</div>
+    </div>
+    <div class="tool-row">
+      <div class="tool-name">get_code_actions(file, line, col)</div>
+      <div class="tool-desc">Returns compiler-known repairs at a diagnostic location — add import, narrow type, implement interface members. Deterministic fixes the agent can apply without synthesizing a solution.</div>
+      <div class="tool-cost mid">mid</div>
+    </div>
+    <div class="tool-row">
+      <div class="tool-name">get_definition(file, line, col)</div>
+      <div class="tool-desc">Resolves a symbol to its declaration site. Follows through re-exports, type aliases, declaration merging, and generated types — not just naive file search.</div>
+      <div class="tool-cost mid">mid</div>
+    </div>
+    <div class="tool-row">
+      <div class="tool-name">get_references(file, line, col)</div>
+      <div class="tool-desc">Returns all usage sites of a symbol across the project. Type-aware — not regex. The pre-flight check for any rename or signature change.</div>
+      <div class="tool-cost mid">mid</div>
+    </div>
+    <div class="tool-row">
+      <div class="tool-name">get_enriched_file(file)</div>
+      <div class="tool-desc">Returns source with diagnostic annotations and inferred types woven inline. The closest analog to the human's annotated editor view. Highest token cost, highest information density.</div>
+      <div class="tool-cost high">high</div>
+    </div>
+    <div class="tool-row">
+      <div class="tool-name">snapshot_baseline()</div>
+      <div class="tool-desc">Records current diagnostic state as the baseline. Subsequent get_diagnostics calls tag new errors as scope=new and pre-existing errors as scope=baseline. Enables clean disambiguation.</div>
+      <div class="tool-cost low">low</div>
+    </div>
+  </div>
+</div>
+
+<hr>
+
+<div class="section">
+  <div class="section-label">04 — diagnostic format</div>
+  <h2>Snapshot markup</h2>
+  <p>Structured XML-like format optimized for agent consumption. Token-efficient while preserving causal chains, scope disambiguation, and fix options. The <code style="font-family: var(--mono); font-size: 12px; color: var(--accent2);">scope</code> attribute is the most important field — it tells the agent which errors it introduced versus which were pre-existing.</p>
+
+  <div class="code-block"><span class="c-tag">&lt;diagnostic-snapshot</span> <span class="c-attr">session</span>=<span class="c-val">"s_4f2a"</span> <span class="c-attr">baseline-errors</span>=<span class="c-val">"3"</span> <span class="c-attr">new-errors</span>=<span class="c-val">"2"</span><span class="c-tag">&gt;</span>
+
+  <span class="c-tag">&lt;error</span> <span class="c-attr">id</span>=<span class="c-val">"e1"</span> <span class="c-attr">scope</span>=<span class="c-scope-new">"new"</span> <span class="c-attr">file</span>=<span class="c-val">"routes/user/$id.tsx"</span> <span class="c-attr">line</span>=<span class="c-val">"23"</span> <span class="c-attr">code</span>=<span class="c-val">"TS2345"</span> <span class="c-attr">fixable</span>=<span class="c-val">"true"</span><span class="c-tag">&gt;</span>
+    <span class="c-tag">&lt;message&gt;</span><span class="c-text">Argument of type 'string | undefined' is not assignable to parameter of type 'string'</span><span class="c-tag">&lt;/message&gt;</span>
+    <span class="c-tag">&lt;chain&gt;</span>
+      <span class="c-tag">&lt;because&gt;</span><span class="c-text">params.id typed as string | undefined by RouteParams&lt;'/user/$id'&gt;</span><span class="c-tag">&lt;/because&gt;</span>
+      <span class="c-tag">&lt;because&gt;</span><span class="c-text">getUser() requires string — undefined not accepted</span><span class="c-tag">&lt;/because&gt;</span>
+    <span class="c-tag">&lt;/chain&gt;</span>
+    <span class="c-tag">&lt;fix</span> <span class="c-attr">type</span>=<span class="c-val">"narrowing"</span><span class="c-tag">&gt;</span><span class="c-text">if (!params.id) return notFound()</span><span class="c-tag">&lt;/fix&gt;</span>
+    <span class="c-tag">&lt;fix</span> <span class="c-attr">type</span>=<span class="c-val">"assertion"</span><span class="c-tag">&gt;</span><span class="c-text">params.id! — only if id guaranteed by route</span><span class="c-tag">&lt;/fix&gt;</span>
+  <span class="c-tag">&lt;/error&gt;</span>
+
+  <span class="c-tag">&lt;error</span> <span class="c-attr">id</span>=<span class="c-val">"e2"</span> <span class="c-attr">scope</span>=<span class="c-scope-new">"new"</span> <span class="c-attr">file</span>=<span class="c-val">"routes/user/$id.tsx"</span> <span class="c-attr">line</span>=<span class="c-val">"31"</span> <span class="c-attr">code</span>=<span class="c-val">"TS2339"</span> <span class="c-attr">fixable</span>=<span class="c-val">"false"</span> <span class="c-attr">related</span>=<span class="c-val">"e1"</span><span class="c-tag">&gt;</span>
+    <span class="c-tag">&lt;message&gt;</span><span class="c-text">Property 'profile' does not exist on type 'UserData | null'</span><span class="c-tag">&lt;/message&gt;</span>
+    <span class="c-tag">&lt;note&gt;</span><span class="c-text">Likely resolves if e1 is fixed — downstream of same null</span><span class="c-tag">&lt;/note&gt;</span>
+  <span class="c-tag">&lt;/error&gt;</span>
+
+  <span class="c-tag">&lt;warning</span> <span class="c-attr">id</span>=<span class="c-val">"w1"</span> <span class="c-attr">scope</span>=<span class="c-scope-base">"baseline"</span> <span class="c-attr">file</span>=<span class="c-val">"components/Avatar.tsx"</span> <span class="c-attr">line</span>=<span class="c-val">"8"</span> <span class="c-attr">code</span>=<span class="c-val">"TS2532"</span><span class="c-tag">&gt;</span>
+    <span class="c-tag">&lt;message&gt;</span><span class="c-text">Object is possibly undefined</span><span class="c-tag">&lt;/message&gt;</span>
+    <span class="c-tag">&lt;note&gt;</span><span class="c-text">Pre-existing — do not fix in this task</span><span class="c-tag">&lt;/note&gt;</span>
+  <span class="c-tag">&lt;/warning&gt;</span>
+
+<span class="c-tag">&lt;/diagnostic-snapshot&gt;</span></div>
+</div>
+
+<hr>
+
+<div class="section">
+  <div class="section-label">05 — agent integration</div>
+  <h2>Lifecycle via Codex hooks</h2>
+  <p>The language server is started and stopped via <code style="font-family: var(--mono); font-size: 12px; color: var(--accent2);">hooks.json</code> at session boundaries. The baseline snapshot is taken automatically at <code style="font-family: var(--mono); font-size: 12px; color: var(--accent2);">SessionStart</code> so every subsequent diagnostic call has scope disambiguation without the agent having to think about it. The route tree watcher is also started here to keep generated types fresh.</p>
+
+  <div class="code-block"><span class="c-comment">// .codex/hooks.json</span>
+{
+  <span class="c-attr">"hooks"</span>: {
+    <span class="c-attr">"SessionStart"</span>: [{
+      <span class="c-attr">"hooks"</span>: [{
+        <span class="c-attr">"type"</span>: <span class="c-val">"command"</span>,
+        <span class="c-attr">"command"</span>: <span class="c-val">"node .codex/hooks/session-start.js"</span>,
+        <span class="c-attr">"statusMessage"</span>: <span class="c-val">"Starting language intelligence..."</span>,
+        <span class="c-attr">"timeout"</span>: <span class="c-val">20</span>
+      }]
+    }],
+    <span class="c-attr">"Stop"</span>: [{
+      <span class="c-attr">"hooks"</span>: [{
+        <span class="c-attr">"type"</span>: <span class="c-val">"command"</span>,
+        <span class="c-attr">"command"</span>: <span class="c-val">"node .codex/hooks/session-stop.js"</span>,
+        <span class="c-attr">"timeout"</span>: <span class="c-val">10</span>
+      }]
+    }]
+  }
+}
+
+<span class="c-comment">// session-start.js — starts MCP server, warms Volar, snapshots baseline</span>
+<span class="c-text">await startMcpServer();        </span><span class="c-comment">// spawns Volar language server</span>
+<span class="c-text">await startRouteTreeWatcher(); </span><span class="c-comment">// keeps routeTree.gen.ts fresh</span>
+<span class="c-text">await snapshotBaseline();      </span><span class="c-comment">// records pre-existing error state</span></div>
+</div>
+
+<hr>
+
+<div class="section">
+  <div class="section-label">06 — comparison</div>
+  <h2>Human editor vs agent</h2>
+
+  <div class="compare">
+    <div class="compare-col human">
+      <div class="col-label">Human in VS Code</div>
+      <div class="compare-item">Diagnostics arrive passively, no tool call needed</div>
+      <div class="compare-item">Types shown inline via hover at zero cost</div>
+      <div class="compare-item">Go-to-definition resolves through generated types</div>
+      <div class="compare-item">Code actions offered at the error site automatically</div>
+      <div class="compare-item">All signals spatially attached to the source line</div>
+      <div class="compare-item">Signature help appears when parenthesis is typed</div>
+    </div>
+    <div class="compare-col agent">
+      <div class="col-label">Agent with this layer</div>
+      <div class="compare-item">Diagnostics pre-computed by daemon, available instantly on query</div>
+      <div class="compare-item">get_type_at() for targeted hover-equivalent queries</div>
+      <div class="compare-item">get_definition() resolves through Volar's full type graph</div>
+      <div class="compare-item">get_code_actions() returns compiler-known repairs as structured options</div>
+      <div class="compare-item">get_enriched_file() returns source with diagnostics woven inline</div>
+      <div class="compare-item">get_signature() before writing a call site to verify parameters</div>
+    </div>
+  </div>
+</div>
+
+<hr>
+
+<div class="section">
+  <div class="section-label">07 — prior art</div>
+  <h2>Landscape</h2>
+
+  <div class="prior-art">
+    <div class="prior-row header">
+      <div>project</div>
+      <div>what it does</div>
+      <div>gap</div>
+    </div>
+    <div class="prior-row">
+      <div class="prior-name">tsc --incremental</div>
+      <div class="prior-does">Fast type checking via .tsbuildinfo cache. Works well in turbo pipelines with --filter scoping.</div>
+      <div class="prior-gap">Polling model. No type queries. No code actions. No baseline diffing.</div>
+    </div>
+    <div class="prior-row">
+      <div class="prior-name">ts-diagnostics-mcp</div>
+      <div class="prior-does">MCP server wrapping ts.createWatchProgram. Daemon architecture with LRU cache. Monorepo aware.</div>
+      <div class="prior-gap">Diagnostics only. No hover, signature, references, or code actions. Vanilla TS only, no Volar.</div>
+    </div>
+    <div class="prior-row">
+      <div class="prior-name">cx</div>
+      <div class="prior-does">Tree-sitter AST index. Symbol search, overview, definition, references at very low token cost. 58% fewer file reads.</div>
+      <div class="prior-gap">Syntactic only — no types, no inference, no generics. References are name-based not type-based. Complementary, not competing.</div>
+    </div>
+    <div class="prior-row">
+      <div class="prior-name">This project</div>
+      <div class="prior-does">Volar language server + MCP adapter. Full LSP surface including types, diagnostics, hover, code actions, references, signatures. Baseline diffing. Framework-aware via Volar plugins.</div>
+      <div class="prior-gap">Does not exist yet.</div>
+    </div>
+  </div>
+</div>
+
+<footer class="footer">
+  <div class="footer-left">agent semantic intelligence layer — project overview</div>
+  <div class="footer-right">2026</div>
+</footer>
+
+</body>
+</html>

@@ -1,15 +1,66 @@
 {
+  "comments": {
+    "blockComment": ["<!--", "-->"]
+  },
   "brackets": [
-    ["<", ">"]
+    ["<", ">"],
+    ["{", "}"],
+    ["(", ")"],
+    ["[", "]"]
   ],
   "autoClosingPairs": [
     {
       "open": "<",
-      "close": ">"
+      "close": ">",
+      "notIn": ["string", "comment"]
+    },
+    {
+      "open": "{",
+      "close": "}",
+      "notIn": ["string", "comment"]
+    },
+    {
+      "open": "(",
+      "close": ")",
+      "notIn": ["string", "comment"]
+    },
+    {
+      "open": "[",
+      "close": "]",
+      "notIn": ["string", "comment"]
+    },
+    {
+      "open": "\"",
+      "close": "\"",
+      "notIn": ["string", "comment"]
+    },
+    {
+      "open": "'",
+      "close": "'",
+      "notIn": ["string", "comment"]
+    },
+    {
+      "open": "<!--",
+      "close": "-->"
     }
   ],
   "surroundingPairs": [
-    ["<", ">"]
-  ]
+    ["<", ">"],
+    ["{", "}"],
+    ["(", ")"],
+    ["[", "]"],
+    ["\"", "\""],
+    ["'", "'"]
+  ],
+  "folding": {
+    "markers": {
+      "start": "^\\s*<([A-Za-z][A-Za-z0-9-]*)(\\s[^>]*)?>\\s*$",
+      "end": "^\\s*</([A-Za-z][A-Za-z0-9-]*)>\\s*$"
+    }
+  },
+  "indentationRules": {
+    "increaseIndentPattern": "^\\s*<(?!/)([A-Za-z][A-Za-z0-9-]*)(\\s[^>]*)?>\\s*$",
+    "decreaseIndentPattern": "^\\s*</([A-Za-z][A-Za-z0-9-]*)>\\s*$"
+  },
+  "wordPattern": "(-?-?[A-Za-z][A-Za-z0-9_-]*)|(--[A-Za-z0-9-]+)"
 }
-

@@ -7,7 +7,9 @@
     "dev": "turbo run dev",
     "test": "turbo run test",
     "check-types": "turbo run check-types",
-    "lint": "turbo run lint"
+    "lint": "turbo run lint",
+    "build:mcp": "turbo run build --filter=@featuretype/mcp",
+    "start:mcp": "node packages/mcp/dist/index.cjs"
   },
   "devDependencies": {
     "@types/react": "^19.0.10",
