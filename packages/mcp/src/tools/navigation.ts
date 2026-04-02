@@ -12,10 +12,14 @@ import type {
   CallHierarchyOutgoingCall,
   DocumentHighlight,
   Location,
-  LocationLink,
   Range,
 } from "vscode-languageserver-protocol";
 import { explainFailure } from "../failure.js";
+import {
+  dedupeSemanticLocations,
+  excludeSemanticLocations,
+  formatSemanticLocation,
+} from "./semantic-locations.js";
 
 export async function getDefinition(
   session: DiagnosticsSession,
@@ -67,18 +71,6 @@ export async function getReferences(
   return `${results.length} references:\n${results.join("\n")}`;
 }
 
-function formatLocation(
-  rootDir: string,
-  location: Location | LocationLink,
-): string {
-  const targetUri = "targetUri" in location ? location.targetUri : location.uri;
-  const targetRange = "targetRange" in location ? location.targetRange : location.range;
-  const targetPath = path.relative(rootDir, URI.parse(targetUri).fsPath);
-  const line = targetRange.start.line + 1;
-  const col = targetRange.start.character + 1;
-  return `${targetPath}:${line}:${col}`;
-}
-
 function formatCallHierarchyItem(
   rootDir: string,
   item: CallHierarchyItem,
@@ -109,7 +101,9 @@ export async function getTypeDefinition(
     });
   }
 
-  return locations.map((location) => formatLocation(session.rootDir, location)).join("\n");
+  return dedupeSemanticLocations(locations)
+    .map((location) => formatSemanticLocation(session.rootDir, location))
+    .join("\n");
 }
 
 export async function getImplementations(
@@ -119,14 +113,29 @@ export async function getImplementations(
   const absPath = path.resolve(session.rootDir, args.file);
   const position = { line: args.line - 1, character: args.col - 1 };
 
-  const locations = await session.getFileImplementations(absPath, position);
+  const [definitions, locations] = await Promise.all([
+    session.getFileDefinition(absPath, position),
+    session.getFileImplementations(absPath, position),
+  ]);
   if (!locations || locations.length === 0) {
     return explainFailure("get_implementations", args.file, session, {
       position: `${args.line}:${args.col}`,
     });
   }
 
-  const results = locations.map((location) => formatLocation(session.rootDir, location));
+  const distinctLocations = excludeSemanticLocations(locations, definitions);
+  if (distinctLocations.length === 0) {
+    return [
+      `No distinct implementations found for ${args.file}:${args.line}:${args.col}`,
+      "",
+      "The language server resolved the symbol's own definition.",
+      "Try an interface, abstract member, or provider contract.",
+    ].join("\n");
+  }
+
+  const results = distinctLocations.map((location) =>
+    formatSemanticLocation(session.rootDir, location),
+  );
   return `${results.length} implementations:\n${results.join("\n")}`;
 }
 

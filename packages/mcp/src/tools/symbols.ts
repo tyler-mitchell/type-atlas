@@ -6,13 +6,16 @@ import {
   SymbolKind,
   type Hover,
   type Location,
-  type LocationLink,
   type Range,
-  type SignatureHelp,
   type SymbolInformation,
   type WorkspaceSymbol,
 } from "vscode-languageserver-protocol";
 import { explainFailure } from "../failure.js";
+import {
+  excludeSemanticLocations,
+  formatSemanticLocation,
+} from "./semantic-locations.js";
+import { findSignatureHelp, formatSignatureHelp } from "./signature-help.js";
 
 const DEFAULT_MAX_DEPTH = 1;
 const DEFAULT_MAX_ITEMS = 25;
@@ -162,48 +165,6 @@ function formatHoverContents(hover: Hover): string {
       .join("\n\n");
   }
   return hover.contents.value;
-}
-
-function formatSignatureHelp(help: SignatureHelp): string {
-  const lines: string[] = [];
-  for (const sig of help.signatures) {
-    lines.push(sig.label);
-    if (sig.documentation) {
-      lines.push(
-        typeof sig.documentation === "string"
-          ? sig.documentation
-          : sig.documentation.value,
-      );
-    }
-    if (sig.parameters) {
-      for (const param of sig.parameters) {
-        const label =
-          typeof param.label === "string"
-            ? param.label
-            : sig.label.slice(param.label[0], param.label[1]);
-        const documentation = param.documentation
-          ? typeof param.documentation === "string"
-            ? param.documentation
-            : param.documentation.value
-          : "";
-        lines.push(`  ${label}${documentation ? ` — ${documentation}` : ""}`);
-      }
-    }
-  }
-  return lines.join("\n");
-}
-
-function formatDefinitionLocation(
-  rootDir: string,
-  location: Location | LocationLink,
-): string {
-  const targetUri = "targetUri" in location ? location.targetUri : location.uri;
-  const targetRange =
-    "targetRange" in location ? location.targetRange : location.range;
-  const targetPath = path.relative(rootDir, URI.parse(targetUri).fsPath);
-  const line = targetRange.start.line + 1;
-  const col = targetRange.start.character + 1;
-  return `${targetPath}:${line}:${col}`;
 }
 
 function formatReferenceLocation(rootDir: string, location: Location): string {
@@ -594,7 +555,7 @@ export async function inspectSymbol(
 
   const [hover, signatureHelp, definitions, typeDefinitions, implementations, references] = await Promise.all([
     session.getFileHover(absPath, resolvedPosition),
-    session.getFileSignatureHelp(absPath, resolvedPosition),
+    findSignatureHelp(session, absPath, resolvedPosition),
     session.getFileDefinition(absPath, resolvedPosition),
     session.getFileTypeDefinition(absPath, resolvedPosition),
     session.getFileImplementations(absPath, resolvedPosition),
@@ -640,24 +601,38 @@ export async function inspectSymbol(
   }
 
   const definitionLines = dedupeLines(
-    definitions.map((location) => formatDefinitionLocation(session.rootDir, location)),
+    definitions.map((location) => formatSemanticLocation(session.rootDir, location)),
   );
   if (definitionLines.length > 0) {
     sections.push(`Definition:\n${definitionLines.join("\n")}`);
   }
 
   const typeDefinitionLines = dedupeLines(
-    typeDefinitions.map((location) => formatDefinitionLocation(session.rootDir, location)),
+    typeDefinitions.map((location) => formatSemanticLocation(session.rootDir, location)),
   );
   if (typeDefinitionLines.length > 0) {
     sections.push(`Type definition:\n${typeDefinitionLines.join("\n")}`);
   }
 
+  const distinctImplementations = excludeSemanticLocations(
+    implementations,
+    definitions,
+  );
   const implementationLines = dedupeLines(
-    implementations.map((location) => formatDefinitionLocation(session.rootDir, location)),
+    distinctImplementations.map((location) =>
+      formatSemanticLocation(session.rootDir, location)
+    ),
   );
   if (implementationLines.length > 0) {
     sections.push(`Implementations (${implementationLines.length}):\n${implementationLines.join("\n")}`);
+  } else if (implementations.length > 0) {
+    sections.push(
+      [
+        "Implementations:",
+        "No distinct implementations found.",
+        "The language server resolved the symbol's own definition.",
+      ].join("\n"),
+    );
   }
 
   const referenceLines = dedupeLines(

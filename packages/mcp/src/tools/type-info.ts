@@ -6,6 +6,7 @@
 import * as path from "node:path";
 import type { DiagnosticsSession } from "@featuretype/language-server";
 import { explainFailure } from "../failure.js";
+import { findSignatureHelp, formatSignatureHelp } from "./signature-help.js";
 
 export async function getTypeAt(
   session: DiagnosticsSession,
@@ -42,7 +43,7 @@ export async function getSignature(
   const position = { line: args.line - 1, character: args.col - 1 };
 
   const absPath = path.resolve(session.rootDir, args.file);
-  const help = await session.getFileSignatureHelp(absPath, position);
+  const help = await findSignatureHelp(session, absPath, position);
   if (!help || help.signatures.length === 0) {
     return explainFailure("get_signature", args.file, session, {
       position: `${args.line}:${args.col}`,
@@ -50,30 +51,5 @@ export async function getSignature(
     });
   }
 
-  const lines: string[] = [];
-  for (const sig of help.signatures) {
-    lines.push(sig.label);
-    if (sig.documentation) {
-      const doc =
-        typeof sig.documentation === "string"
-          ? sig.documentation
-          : sig.documentation.value;
-      lines.push(doc);
-    }
-    if (sig.parameters) {
-      for (const param of sig.parameters) {
-        const paramLabel =
-          typeof param.label === "string"
-            ? param.label
-            : sig.label.slice(param.label[0], param.label[1]);
-        const paramDoc = param.documentation
-          ? typeof param.documentation === "string"
-            ? param.documentation
-            : param.documentation.value
-          : "";
-        lines.push(`  ${paramLabel}${paramDoc ? " — " + paramDoc : ""}`);
-      }
-    }
-  }
-  return lines.join("\n");
+  return formatSignatureHelp(help);
 }
