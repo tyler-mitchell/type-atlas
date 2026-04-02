@@ -80,19 +80,25 @@ importers:
       volar-service-typescript:
         specifier: 0.0.65
         version: 0.0.65(@volar/language-service@2.4.28)
+      vscode-languageserver-protocol:
+        specifier: ^3.17.5
+        version: 3.17.5
+      vscode-uri:
+        specifier: ^3.0.8
+        version: 3.1.0
     devDependencies:
       '@volar/test-utils':
         specifier: 2.4.28
         version: 2.4.28
-      vscode-uri:
-        specifier: ^3.0.8
-        version: 3.1.0
 
   packages/mcp:
     dependencies:
       '@featuretype/core':
         specifier: workspace:*
         version: link:../core
+      '@featuretype/language-server':
+        specifier: workspace:*
+        version: link:../language-server
       '@featuretype/service':
         specifier: workspace:*
         version: link:../service

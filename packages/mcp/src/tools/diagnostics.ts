@@ -3,9 +3,8 @@
  * snapshot_baseline — captures current diagnostic state for diffing.
  */
 
-import { URI } from "vscode-uri";
 import * as path from "node:path";
-import type { VolarHost } from "../volar-host.js";
+import type { DiagnosticsSession } from "@featuretype/language-server";
 import {
   formatDiagnostic,
   diagnosticsToXml,
@@ -17,17 +16,17 @@ import {
   type BaselineSnapshot,
 } from "../baseline.js";
 
-let baseline: BaselineSnapshot | null = null;
+const baselines = new Map<string, BaselineSnapshot>();
 
 async function collectFileDiagnostics(
-  host: VolarHost,
+  session: DiagnosticsSession,
   absPath: string,
 ): Promise<FormattedDiagnostic[]> {
-  const uri = URI.file(absPath);
-  const relPath = path.relative(host.rootDir, absPath);
-  const rawDiags = await host.languageService.getDiagnostics(uri);
-  return rawDiags.map((d) => {
-    const formatted = formatDiagnostic(d, relPath, "new");
+  const relPath = path.relative(session.rootDir, absPath);
+  const baseline = baselines.get(session.rootDir) ?? null;
+  const rawDiags = await session.getFileDiagnostics(absPath);
+  return rawDiags.map((diagnostic) => {
+    const formatted = formatDiagnostic(diagnostic, relPath, "new");
     formatted.scope = classifyDiagnostic(formatted, baseline);
     return formatted;
   });
@@ -40,63 +39,112 @@ export interface DiagnosticArgs {
   summary?: boolean;
 }
 
+export interface DiagnosticSnapshot {
+  text: string;
+  totalCount: number;
+  totalErrorCount: number;
+  totalWarningCount: number;
+  newCount: number;
+  baselineCount: number;
+}
+
 export async function getDiagnostics(
-  host: VolarHost,
+  session: DiagnosticsSession,
   args: DiagnosticArgs,
-): Promise<string> {
+): Promise<DiagnosticSnapshot> {
   let diagnostics: FormattedDiagnostic[];
 
   if (args.file) {
-    const absPath = path.resolve(host.rootDir, args.file);
-    diagnostics = await collectFileDiagnostics(host, absPath);
+    const absPath = path.resolve(session.rootDir, args.file);
+    diagnostics = await collectFileDiagnostics(session, absPath);
   } else {
     diagnostics = [];
-    for (const fileName of host.getProjectFileNames()) {
-      const fileDiags = await collectFileDiagnostics(host, fileName);
+    for (const fileName of await session.getProjectFileNames()) {
+      const fileDiags = await collectFileDiagnostics(session, fileName);
       diagnostics.push(...fileDiags);
     }
   }
 
-  // Filter by scope
   const scopeFilter = args.scope ?? "all";
   if (scopeFilter !== "all") {
-    diagnostics = diagnostics.filter((d) => d.scope === scopeFilter);
+    diagnostics = diagnostics.filter(
+      (diagnostic) => diagnostic.scope === scopeFilter,
+    );
   }
 
-  // Filter by severity
   const severityFilter = args.severity ?? "all";
   if (severityFilter !== "all") {
-    diagnostics = diagnostics.filter((d) => d.severity === severityFilter);
+    diagnostics = diagnostics.filter(
+      (diagnostic) => diagnostic.severity === severityFilter,
+    );
   }
 
-  // Summary mode: grouped counts instead of full XML
+  const counts = summarizeDiagnostics(diagnostics);
+
   if (args.summary) {
-    return formatSummary(diagnostics);
+    return {
+      text: formatSummary(diagnostics, counts),
+      ...counts,
+    };
   }
 
-  return diagnosticsToXml(diagnostics);
+  return {
+    text: diagnosticsToXml(diagnostics),
+    ...counts,
+  };
 }
 
-function formatSummary(diagnostics: FormattedDiagnostic[]): string {
+function summarizeDiagnostics(
+  diagnostics: FormattedDiagnostic[],
+): Omit<DiagnosticSnapshot, "text"> {
+  const totalErrorCount = diagnostics.filter(
+    (diagnostic) => diagnostic.severity === "error",
+  ).length;
+  const totalWarningCount = diagnostics.length - totalErrorCount;
+  const newCount = diagnostics.filter(
+    (diagnostic) => diagnostic.scope === "new",
+  ).length;
+  const baselineCount = diagnostics.filter(
+    (diagnostic) => diagnostic.scope === "baseline",
+  ).length;
+
+  return {
+    totalCount: diagnostics.length,
+    totalErrorCount,
+    totalWarningCount,
+    newCount,
+    baselineCount,
+  };
+}
+
+function formatSummary(
+  diagnostics: FormattedDiagnostic[],
+  counts: Omit<DiagnosticSnapshot, "text">,
+): string {
   if (diagnostics.length === 0) return "No diagnostics.";
 
-  const byFile = new Map<string, { errors: number; warnings: number; new: number; baseline: number }>();
-  for (const d of diagnostics) {
-    const entry = byFile.get(d.file) ?? { errors: 0, warnings: 0, new: 0, baseline: 0 };
-    if (d.severity === "error") entry.errors++;
+  const byFile = new Map<
+    string,
+    { errors: number; warnings: number; new: number; baseline: number }
+  >();
+  for (const diagnostic of diagnostics) {
+    const entry = byFile.get(diagnostic.file) ?? {
+      errors: 0,
+      warnings: 0,
+      new: 0,
+      baseline: 0,
+    };
+    if (diagnostic.severity === "error") entry.errors++;
     else entry.warnings++;
-    if (d.scope === "new") entry.new++;
+    if (diagnostic.scope === "new") entry.new++;
     else entry.baseline++;
-    byFile.set(d.file, entry);
+    byFile.set(diagnostic.file, entry);
   }
 
-  const totalNew = diagnostics.filter((d) => d.scope === "new").length;
-  const totalBaseline = diagnostics.filter((d) => d.scope === "baseline").length;
-  const totalErrors = diagnostics.filter((d) => d.severity === "error").length;
-  const totalWarnings = diagnostics.length - totalErrors;
-
   const lines: string[] = [];
-  lines.push(`${diagnostics.length} diagnostics (${totalErrors} errors, ${totalWarnings} warnings | ${totalNew} new, ${totalBaseline} baseline)`);
+  lines.push(
+    `${counts.totalCount} diagnostics (${counts.totalErrorCount} errors, ${counts.totalWarningCount} warnings | ${counts.newCount} new, ${counts.baselineCount} baseline)`,
+  );
   lines.push("");
 
   for (const [file, counts] of byFile) {
@@ -113,22 +161,27 @@ function formatSummary(diagnostics: FormattedDiagnostic[]): string {
 }
 
 export async function snapshotBaseline(
-  host: VolarHost,
+  session: DiagnosticsSession,
 ): Promise<string> {
   const diagnostics: FormattedDiagnostic[] = [];
-  for (const fileName of host.getProjectFileNames()) {
-    const uri = URI.file(fileName);
-    const relPath = path.relative(host.rootDir, fileName);
-    const rawDiags = await host.languageService.getDiagnostics(uri);
-    for (const d of rawDiags) {
-      diagnostics.push(formatDiagnostic(d, relPath, "baseline"));
+  for (const fileName of await session.getProjectFileNames()) {
+    const relPath = path.relative(session.rootDir, fileName);
+    const rawDiags = await session.getFileDiagnostics(fileName);
+    for (const diagnostic of rawDiags) {
+      diagnostics.push(formatDiagnostic(diagnostic, relPath, "baseline"));
     }
   }
 
-  baseline = createBaseline(diagnostics);
-  return `Baseline captured: ${baseline.fingerprints.size} diagnostics at ${new Date(baseline.createdAt).toISOString()}`;
+  const baseline = createBaseline(diagnostics);
+  baselines.set(session.rootDir, baseline);
+  return `Baseline captured: ${baseline.fingerprints.size} diagnostics at ${new Date(
+    baseline.createdAt,
+  ).toISOString()}`;
 }
 
-export function getBaseline(): BaselineSnapshot | null {
-  return baseline;
+export function getBaseline(rootDir?: string): BaselineSnapshot | null {
+  if (rootDir) {
+    return baselines.get(path.resolve(rootDir)) ?? null;
+  }
+  return baselines.values().next().value ?? null;
 }

@@ -2,45 +2,40 @@
  * get_code_actions — compiler-known quick fixes and refactors.
  */
 
-import { URI } from "vscode-uri";
+import type { DiagnosticsSession } from "@featuretype/language-server";
 import * as path from "node:path";
 import type * as vscode from "vscode-languageserver-protocol";
-import type { VolarHost } from "../volar-host.js";
+import { URI } from "vscode-uri";
 import { explainFailure } from "../failure.js";
 
 export async function getCodeActions(
-  host: VolarHost,
+  session: DiagnosticsSession,
   args: { file: string; startLine: number; startCol: number; endLine: number; endCol: number },
 ): Promise<string> {
-  const absPath = path.resolve(host.rootDir, args.file);
-  const uri = URI.file(absPath);
+  const absPath = path.resolve(session.rootDir, args.file);
   const range: vscode.Range = {
     start: { line: args.startLine - 1, character: args.startCol - 1 },
     end: { line: args.endLine - 1, character: args.endCol - 1 },
   };
 
   // Get diagnostics for the range to provide context
-  const allDiags = await host.languageService.getDiagnostics(uri);
+  const allDiags = await session.getFileDiagnostics(absPath);
   const rangeDiags = allDiags.filter((d) => rangesOverlap(d.range, range));
 
-  const context: vscode.CodeActionContext = {
-    diagnostics: rangeDiags,
-  };
-
-  const actions = await host.languageService.getCodeActions(uri, range, context);
+  const actions = await session.getFileCodeActions(absPath, range, rangeDiags);
   if (!actions || actions.length === 0) {
-    return explainFailure("get_code_actions", args.file, host, {
+    return explainFailure("get_code_actions", args.file, session, {
       position: `${args.startLine}:${args.startCol}-${args.endLine}:${args.endCol}`,
       hint: "No quick fixes or refactors available for this range. If there are diagnostics, try targeting the exact error line.",
     });
   }
 
   const results = actions.map((action) => {
-    const parts = [`[${action.kind ?? "quickfix"}] ${action.title}`];
-    if (action.edit?.changes) {
+    const parts = [`[${"kind" in action ? action.kind ?? "quickfix" : "command"}] ${action.title}`];
+    if ("edit" in action && action.edit?.changes) {
       for (const [changeUri, edits] of Object.entries(action.edit.changes)) {
         const changePath = path.relative(
-          host.rootDir,
+          session.rootDir,
           URI.parse(changeUri).fsPath,
         );
         for (const edit of edits) {

@@ -3,22 +3,20 @@
  * get_signature — signature help at a call site.
  */
 
-import { URI } from "vscode-uri";
 import * as path from "node:path";
-import type { VolarHost } from "../volar-host.js";
+import type { DiagnosticsSession } from "@featuretype/language-server";
 import { explainFailure } from "../failure.js";
 
 export async function getTypeAt(
-  host: VolarHost,
+  session: DiagnosticsSession,
   args: { file: string; line: number; col: number },
 ): Promise<string> {
-  const absPath = path.resolve(host.rootDir, args.file);
-  const uri = URI.file(absPath);
   const position = { line: args.line - 1, character: args.col - 1 };
 
-  const hover = await host.languageService.getHover(uri, position);
+  const absPath = path.resolve(session.rootDir, args.file);
+  const hover = await session.getFileHover(absPath, position);
   if (!hover) {
-    return explainFailure("get_type_at", args.file, host, {
+    return explainFailure("get_type_at", args.file, session, {
       position: `${args.line}:${args.col}`,
     });
   }
@@ -26,24 +24,27 @@ export async function getTypeAt(
   const content =
     typeof hover.contents === "string"
       ? hover.contents
-      : "kind" in hover.contents
+      : Array.isArray(hover.contents)
+        ? hover.contents.map((content) => (
+            typeof content === "string" ? content : content.value
+          )).join("\n")
+        : "kind" in hover.contents
         ? hover.contents.value
-        : hover.contents.map((c) => (typeof c === "string" ? c : c.value)).join("\n");
+        : hover.contents.value;
 
   return content;
 }
 
 export async function getSignature(
-  host: VolarHost,
+  session: DiagnosticsSession,
   args: { file: string; line: number; col: number },
 ): Promise<string> {
-  const absPath = path.resolve(host.rootDir, args.file);
-  const uri = URI.file(absPath);
   const position = { line: args.line - 1, character: args.col - 1 };
 
-  const help = await host.languageService.getSignatureHelp(uri, position);
+  const absPath = path.resolve(session.rootDir, args.file);
+  const help = await session.getFileSignatureHelp(absPath, position);
   if (!help || help.signatures.length === 0) {
-    return explainFailure("get_signature", args.file, host, {
+    return explainFailure("get_signature", args.file, session, {
       position: `${args.line}:${args.col}`,
       hint: "Signature help requires the cursor to be inside a function call's argument list.",
     });

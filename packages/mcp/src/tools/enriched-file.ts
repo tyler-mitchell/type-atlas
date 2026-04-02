@@ -2,36 +2,33 @@
  * get_enriched_file — returns source with diagnostics woven inline.
  */
 
-import * as fs from "node:fs";
+import type { DiagnosticsSession } from "@featuretype/language-server";
 import * as path from "node:path";
-import { URI } from "vscode-uri";
-import type { VolarHost } from "../volar-host.js";
 import { formatDiagnostic, type FormattedDiagnostic } from "../format.js";
 import { classifyDiagnostic } from "../baseline.js";
 import { getBaseline } from "./diagnostics.js";
 
 export async function getEnrichedFile(
-  host: VolarHost,
+  session: DiagnosticsSession,
   args: { file: string },
 ): Promise<string> {
-  const absPath = path.resolve(host.rootDir, args.file);
-  const relPath = path.relative(host.rootDir, absPath);
+  const absPath = path.resolve(session.rootDir, args.file);
+  const relPath = path.relative(session.rootDir, absPath);
 
   let content: string;
   try {
-    content = fs.readFileSync(absPath, "utf-8");
+    content = session.getFileContent(args.file);
   } catch {
     return `File not found: ${args.file}`;
   }
 
-  const uri = URI.file(absPath);
-  const rawDiags = await host.languageService.getDiagnostics(uri);
+  const rawDiags = await session.getFileDiagnostics(absPath);
 
   if (rawDiags.length === 0) {
     return `# ${relPath} (no diagnostics)\n\n${content}`;
   }
 
-  const baseline = getBaseline();
+  const baseline = getBaseline(session.rootDir);
   const diagnostics: FormattedDiagnostic[] = rawDiags.map((d) => {
     const formatted = formatDiagnostic(d, relPath, "new");
     formatted.scope = classifyDiagnostic(formatted, baseline);

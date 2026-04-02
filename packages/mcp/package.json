@@ -15,10 +15,16 @@
   "scripts": {
     "build": "tsup src/index.ts --format cjs --dts --outDir dist",
     "check-types": "tsc --noEmit -p tsconfig.json",
-    "test": "vitest run --passWithNoTests"
+    "pretest": "pnpm --filter @featuretype/language-server build",
+    "test": "vitest run --passWithNoTests",
+    "pretest:integration": "pnpm --filter @featuretype/language-server build",
+    "test:integration": "vitest run src/integration.test.ts",
+    "smoke": "node --import tsx ./src/smoke.ts",
+    "smoke:in-memory": "node --import tsx ./src/smoke.ts --transport=in-memory"
   },
   "dependencies": {
     "@featuretype/core": "workspace:*",
+    "@featuretype/language-server": "workspace:*",
     "@featuretype/service": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.12.1",
     "@volar/language-core": "2.4.28",
