@@ -26,6 +26,7 @@ import {
   ReferencesRequest,
   RenameRequest,
   SignatureHelpRequest,
+  SignatureHelpTriggerKind,
   ShutdownRequest,
   TypeDefinitionRequest,
   WillRenameFilesRequest,
@@ -55,6 +56,7 @@ import {
   loadTsdkByPath,
 } from "@volar/language-server/node.js";
 import { URI } from "vscode-uri";
+import { requestSignatureHelpWithFallback } from "./signature-help.js";
 
 export interface ResolveWorkspaceTsdkOptions {
   tsdk?: string;
@@ -256,6 +258,16 @@ const DYNAMIC_IMPORT_PATTERN = /\bimport\s*\(\s*["'](\.[^"'`\n]+)["']\s*\)/g;
 const NORMALIZABLE_LANGUAGE_IDS = new Set(["typescript", "typescriptreact", "javascript", "javascriptreact"]);
 
 function resolveLanguageServerModule(): { scriptPath: string; execArgv: string[] } {
+  const shouldPreferSourceModule =
+    (process.env.VITEST ?? "").length > 0 || process.env.NODE_ENV === "test";
+
+  if (shouldPreferSourceModule && fs.existsSync(srcServerModulePath)) {
+    return {
+      scriptPath: srcServerModulePath,
+      execArgv: ["--nolazy", "--import", "tsx"],
+    };
+  }
+
   if (fs.existsSync(distServerModulePath)) {
     return { scriptPath: distServerModulePath, execArgv: ["--nolazy"] };
   }
@@ -450,7 +462,13 @@ export async function createFeatureTypeLanguageServerClient(
     initializationOptions: {
       typescript: { tsdk },
     },
-    capabilities: {},
+    capabilities: {
+      textDocument: {
+        signatureHelp: {
+          contextSupport: true,
+        },
+      },
+    },
   });
   await connection.sendNotification(InitializedNotification.type, {});
 
@@ -575,12 +593,20 @@ export async function createFeatureTypeLanguageServerClient(
     if (!document) {
       return null;
     }
-    return (
-      (await connection.sendRequest(SignatureHelpRequest.type, {
-        textDocument: { uri: document.uri },
-        position,
-      })) ?? null
-    );
+
+    return await requestSignatureHelpWithFallback({
+      text: document.text,
+      position,
+      request: async (candidatePosition, context) =>
+        (await connection.sendRequest(SignatureHelpRequest.type, {
+          textDocument: { uri: document.uri },
+          position: candidatePosition,
+          context: {
+            triggerKind: SignatureHelpTriggerKind.Invoked,
+            isRetrigger: context.isRetrigger,
+          },
+        })) ?? null,
+    });
   };
 
   const getDocumentDefinition = async (

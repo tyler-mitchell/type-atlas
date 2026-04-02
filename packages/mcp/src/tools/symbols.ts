@@ -15,7 +15,7 @@ import {
   excludeSemanticLocations,
   formatSemanticLocation,
 } from "./semantic-locations.js";
-import { findSignatureHelp, formatSignatureHelp } from "./signature-help.js";
+import { formatSignatureHelp } from "./signature-help.js";
 
 const DEFAULT_MAX_DEPTH = 1;
 const DEFAULT_MAX_ITEMS = 25;
@@ -555,7 +555,7 @@ export async function inspectSymbol(
 
   const [hover, signatureHelp, definitions, typeDefinitions, implementations, references] = await Promise.all([
     session.getFileHover(absPath, resolvedPosition),
-    findSignatureHelp(session, absPath, resolvedPosition),
+    session.getFileSignatureHelp(absPath, resolvedPosition),
     session.getFileDefinition(absPath, resolvedPosition),
     session.getFileTypeDefinition(absPath, resolvedPosition),
     session.getFileImplementations(absPath, resolvedPosition),

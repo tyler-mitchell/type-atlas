@@ -136,4 +136,5 @@ describe("featuretype MCP local probes", () => {
     expect(Number(structured?.totalSymbols ?? 0)).toBe(2);
     expect(structured?.roots).toEqual([betaRoot, alphaRoot]);
   });
+
 });

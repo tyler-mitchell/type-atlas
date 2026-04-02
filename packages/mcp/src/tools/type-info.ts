@@ -6,7 +6,7 @@
 import * as path from "node:path";
 import type { DiagnosticsSession } from "@featuretype/language-server";
 import { explainFailure } from "../failure.js";
-import { findSignatureHelp, formatSignatureHelp } from "./signature-help.js";
+import { formatSignatureHelp } from "./signature-help.js";
 
 export async function getTypeAt(
   session: DiagnosticsSession,
@@ -43,7 +43,7 @@ export async function getSignature(
   const position = { line: args.line - 1, character: args.col - 1 };
 
   const absPath = path.resolve(session.rootDir, args.file);
-  const help = await findSignatureHelp(session, absPath, position);
+  const help = await session.getFileSignatureHelp(absPath, position);
   if (!help || help.signatures.length === 0) {
     return explainFailure("get_signature", args.file, session, {
       position: `${args.line}:${args.col}`,
