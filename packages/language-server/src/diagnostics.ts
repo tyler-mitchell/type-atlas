@@ -256,10 +256,22 @@ const requireFromLanguageServerPackage = createRequire(
 const RELATIVE_JS_MODULE_PATTERN = /\b(?:import|export)\b[^'"\n;]*["'](\.[^"'`\n;]+)["']/g;
 const DYNAMIC_IMPORT_PATTERN = /\bimport\s*\(\s*["'](\.[^"'`\n]+)["']\s*\)/g;
 const NORMALIZABLE_LANGUAGE_IDS = new Set(["typescript", "typescriptreact", "javascript", "javascriptreact"]);
+const FEATURETYPE_RUNTIME_MODE_ENV = "FEATURETYPE_RUNTIME_MODE";
+
+function getFeatureTypeRuntimeMode(): "auto" | "source" | "dist" {
+  const configuredMode = process.env[FEATURETYPE_RUNTIME_MODE_ENV]?.trim().toLowerCase();
+  if (configuredMode === "source" || configuredMode === "dist") {
+    return configuredMode;
+  }
+  return "auto";
+}
 
 function resolveLanguageServerModule(): { scriptPath: string; execArgv: string[] } {
+  const runtimeMode = getFeatureTypeRuntimeMode();
   const shouldPreferSourceModule =
-    (process.env.VITEST ?? "").length > 0 || process.env.NODE_ENV === "test";
+    runtimeMode === "source" ||
+    (runtimeMode !== "dist" &&
+      ((process.env.VITEST ?? "").length > 0 || process.env.NODE_ENV === "test"));
 
   if (shouldPreferSourceModule && fs.existsSync(srcServerModulePath)) {
     return {

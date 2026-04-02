@@ -5,13 +5,12 @@
  * for agent diagnostic and semantic intelligence.
  */
 
-import {
-  createDiagnosticsSession,
-  type DiagnosticsSession,
-} from "@featuretype/language-server";
+import type { DiagnosticsSession } from "@featuretype/language-server";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import * as fs from "node:fs";
 import * as path from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import type { Hover } from "vscode-languageserver-protocol";
 import { z } from "zod";
 import { classifyFailure } from "./failure";
@@ -45,34 +44,102 @@ type AttachedProject = {
   sessionPromise: Promise<DiagnosticsSession>;
 };
 
+type CreateDiagnosticsSession = (
+  options: { rootDir: string },
+) => Promise<DiagnosticsSession>;
+
 export type FeatureTypeMcpRuntime = {
   server: McpServer;
   dispose: () => Promise<void>;
 };
+
+const FEATURETYPE_RUNTIME_MODE_ENV = "FEATURETYPE_RUNTIME_MODE";
+const mcpModuleDir = path.dirname(
+  typeof __filename === "string"
+    ? __filename
+    : fileURLToPath(import.meta.url),
+);
+const languageServerSourceModulePath = path.resolve(
+  mcpModuleDir,
+  "../../language-server/src/index.ts",
+);
+
+function getFeatureTypeRuntimeMode(): "auto" | "source" | "dist" {
+  const configuredMode = process.env[FEATURETYPE_RUNTIME_MODE_ENV]?.trim().toLowerCase();
+  if (configuredMode === "source" || configuredMode === "dist") {
+    return configuredMode;
+  }
+  return "auto";
+}
+
+let createDiagnosticsSessionPromise: Promise<CreateDiagnosticsSession> | null = null;
+
+async function loadCreateDiagnosticsSession(): Promise<CreateDiagnosticsSession> {
+  if (!createDiagnosticsSessionPromise) {
+    createDiagnosticsSessionPromise = (async () => {
+      const runtimeMode = getFeatureTypeRuntimeMode();
+
+      if (runtimeMode === "source") {
+        if (!fs.existsSync(languageServerSourceModulePath)) {
+          throw new Error(
+            `FEATURETYPE_RUNTIME_MODE=source requires ${languageServerSourceModulePath} to exist.`,
+          );
+        }
+
+        const moduleUrl = pathToFileURL(languageServerSourceModulePath).href;
+        const languageServerModule = await import(moduleUrl) as {
+          createDiagnosticsSession: CreateDiagnosticsSession;
+        };
+        return languageServerModule.createDiagnosticsSession;
+      }
+
+      const languageServerModule = await import("@featuretype/language-server") as {
+        createDiagnosticsSession: CreateDiagnosticsSession;
+      };
+      return languageServerModule.createDiagnosticsSession;
+    })();
+  }
+
+  return await createDiagnosticsSessionPromise;
+}
 
 /**
  * Manages attached project roots and their canonical language-server sessions.
  */
 class HostManager {
   private projects = new Map<string, AttachedProject>();
-  private activeRoot: string;
+  private activeRoot: string | null;
+  private createDiagnosticsSession: CreateDiagnosticsSession;
 
-  constructor(initialRoot: string) {
-    this.activeRoot = path.resolve(initialRoot);
+  constructor(
+    initialRoot: string | null,
+    createDiagnosticsSession: CreateDiagnosticsSession,
+  ) {
+    this.activeRoot = initialRoot ? path.resolve(initialRoot) : null;
+    this.createDiagnosticsSession = createDiagnosticsSession;
   }
 
-  getActiveRoot(): string {
+  getActiveRoot(): string | null {
     return this.activeRoot;
   }
 
-  private async ensureProject(rootDir = this.activeRoot): Promise<AttachedProject> {
+  private requireActiveRoot(): string {
+    if (!this.activeRoot) {
+      throw new Error(
+        "No active project is attached. Call attach_project with a repo root first.",
+      );
+    }
+    return this.activeRoot;
+  }
+
+  private async ensureProject(rootDir: string): Promise<AttachedProject> {
     const resolvedRoot = path.resolve(rootDir);
     const existing = this.projects.get(resolvedRoot);
     if (existing) {
       return existing;
     }
 
-    const sessionPromise = createDiagnosticsSession({ rootDir: resolvedRoot });
+    const sessionPromise = this.createDiagnosticsSession({ rootDir: resolvedRoot });
     const project: AttachedProject = {
       root: resolvedRoot,
       fileCount: 0,
@@ -90,10 +157,14 @@ class HostManager {
     }
   }
 
-  resolveRootForFile(filePath: string): string {
+  resolveRootForFile(filePath: string): string | null {
+    if (!path.isAbsolute(filePath) && !this.activeRoot) {
+      return null;
+    }
+
     const absPath = path.isAbsolute(filePath)
       ? path.resolve(filePath)
-      : path.resolve(this.activeRoot, filePath);
+      : path.resolve(this.requireActiveRoot(), filePath);
     for (const root of this.projects.keys()) {
       if (absPath.startsWith(root + path.sep) || absPath === root) {
         return root;
@@ -102,15 +173,26 @@ class HostManager {
     return this.activeRoot;
   }
 
-  async getDiagnosticsSession(rootDir = this.activeRoot): Promise<DiagnosticsSession> {
-    return await (await this.ensureProject(rootDir)).sessionPromise;
+  async getDiagnosticsSession(rootDir?: string): Promise<DiagnosticsSession> {
+    const resolvedRoot = rootDir ?? this.requireActiveRoot();
+    return await (await this.ensureProject(resolvedRoot)).sessionPromise;
   }
 
   getDiagnosticsSessionForFile(filePath: string): Promise<DiagnosticsSession> {
-    return this.getDiagnosticsSession(this.resolveRootForFile(filePath));
+    const resolvedRoot = this.resolveRootForFile(filePath);
+    if (!resolvedRoot) {
+      throw new Error(
+        "No active project is attached. Call attach_project with a repo root first.",
+      );
+    }
+    return this.getDiagnosticsSession(resolvedRoot);
   }
 
   async getAttachedDiagnosticsSessions(): Promise<DiagnosticsSession[]> {
+    if (!this.activeRoot) {
+      return [];
+    }
+
     const attachedRoots = [
       this.activeRoot,
       ...[...this.projects.keys()].filter((root) => root !== this.activeRoot),
@@ -214,6 +296,7 @@ export function createMcpServer(manager: HostManager): McpServer {
     },
     async (args) => {
       const result = await manager.attach(args.projectRoot);
+      await snapshotBaseline(await manager.getDiagnosticsSession(result.root));
       const status = result.isNew
         ? "Attached new project"
         : "Switched to existing project";
@@ -244,6 +327,14 @@ export function createMcpServer(manager: HostManager): McpServer {
     },
     async () => {
       const roots = await manager.listRoots();
+      if (roots.length === 0) {
+        return {
+          content: [{ type: "text", text: "No projects attached." }],
+          structuredContent: {
+            projects: [],
+          },
+        };
+      }
       const lines = roots.map((root) =>
         `${root.active ? "→ " : "  "}${root.root} (${root.fileCount} files)`,
       );
@@ -296,6 +387,19 @@ export function createMcpServer(manager: HostManager): McpServer {
         baselineErrorCount: z.number().int().nonnegative(),
         totalErrorCount: z.number().int().nonnegative(),
         totalWarningCount: z.number().int().nonnegative(),
+        files: z
+          .array(
+            z.object({
+              file: z.string(),
+              totalCount: z.number().int().nonnegative(),
+              totalErrorCount: z.number().int().nonnegative(),
+              totalWarningCount: z.number().int().nonnegative(),
+              newCount: z.number().int().nonnegative(),
+              baselineCount: z.number().int().nonnegative(),
+              generated: z.boolean(),
+            }),
+          )
+          .optional(),
         error: z
           .object({ code: z.string(), message: z.string() })
           .nullable()
@@ -352,6 +456,7 @@ export function createMcpServer(manager: HostManager): McpServer {
           baselineErrorCount: snapshot.baselineCount,
           totalErrorCount: snapshot.totalErrorCount,
           totalWarningCount: snapshot.totalWarningCount,
+          files: snapshot.files,
           error: null,
         },
       };
@@ -882,10 +987,11 @@ export function createMcpServer(manager: HostManager): McpServer {
           .describe("Maximum number of workspace symbols to return. Defaults to 25."),
       },
       outputSchema: {
-        root: z.string(),
+        root: z.string().nullable(),
         roots: z.array(z.string()),
         query: z.string(),
         totalSymbols: z.number().int().nonnegative(),
+        omittedGeneratedCount: z.number().int().nonnegative(),
         symbols: z.array(
           z.object({
             name: z.string(),
@@ -930,6 +1036,7 @@ export function createMcpServer(manager: HostManager): McpServer {
           roots: result.roots,
           query: args.query,
           totalSymbols: result.totalSymbols,
+          omittedGeneratedCount: result.omittedGeneratedCount,
           symbols: result.symbols,
         },
       };
@@ -1087,14 +1194,14 @@ export function createMcpServer(manager: HostManager): McpServer {
 }
 
 export async function createMcpRuntime(
-  projectRoot: string,
+  projectRoot?: string,
 ): Promise<FeatureTypeMcpRuntime> {
-  const manager = new HostManager(projectRoot);
-  await manager.attach(projectRoot);
-
-  await snapshotBaseline(
-    await manager.getDiagnosticsSession(manager.getActiveRoot()),
-  );
+  const createDiagnosticsSession = await loadCreateDiagnosticsSession();
+  const manager = new HostManager(projectRoot ?? null, createDiagnosticsSession);
+  if (projectRoot) {
+    await manager.attach(projectRoot);
+    await snapshotBaseline(await manager.getDiagnosticsSession(projectRoot));
+  }
 
   const server = createMcpServer(manager);
 
@@ -1107,7 +1214,7 @@ export async function createMcpRuntime(
   };
 }
 
-export async function startServer(projectRoot: string): Promise<void> {
+export async function startServer(projectRoot?: string): Promise<void> {
   const runtime = await createMcpRuntime(projectRoot);
   const transport = new StdioServerTransport();
   await runtime.server.connect(transport);

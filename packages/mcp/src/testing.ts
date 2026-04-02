@@ -7,7 +7,6 @@ import { createMcpRuntime } from "./server.js";
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const repoRoot = path.resolve(packageRoot, "..", "..");
-const sourceServerEntryPath = path.resolve(packageRoot, "src/index.ts");
 
 export const demoWorkspaceRoot = path.resolve(
   repoRoot,
@@ -120,9 +119,8 @@ export async function createStdioTestClient(
   projectRoot: string,
 ): Promise<TestClientHandle> {
   const transport = new StdioClientTransport({
-    command: process.execPath,
-    args: ["--import", "tsx", sourceServerEntryPath, projectRoot],
-    cwd: repoRoot,
+    command: "pnpm",
+    args: ["--dir", repoRoot, "mcp:dev", projectRoot],
     stderr: "inherit",
   });
 

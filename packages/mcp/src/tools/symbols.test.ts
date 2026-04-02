@@ -9,7 +9,11 @@ import {
   SymbolKind,
   type WorkspaceSymbol,
 } from "vscode-languageserver-protocol";
-import { inspectSymbol, searchWorkspaceSymbols } from "./symbols.js";
+import {
+  inspectSymbol,
+  searchWorkspaceSymbols,
+  searchWorkspaceSymbolsAcrossSessions,
+} from "./symbols.js";
 
 function createWorkspaceSymbol(
   name: string,
@@ -133,6 +137,40 @@ describe("searchWorkspaceSymbols", () => {
     expect(result.symbols[1]?.name).toBe("analyzeGithubSearchQuery");
     expect(result.text).toContain('Workspace matches for "Github" (3 results):');
     expect(result.text).toContain("… 1 more symbols omitted");
+  });
+
+  it("omits generated workspace symbol paths from the visible result when source files exist", async () => {
+    const session = createSessionMock("/repo", {
+      workspaceSymbols: [
+        createWorkspaceSymbol(
+          "defineProgram",
+          "core/kbwl/dist/shared/kbwl.255ea827.mjs",
+          110,
+        ),
+        createWorkspaceSymbol(
+          "defineProgram",
+          "patches/vendor-kbwl/dist/index.js",
+          12,
+        ),
+        createWorkspaceSymbol(
+          "defineProgram",
+          "core/kbwl/src/utils/cli-utils.ts",
+          14,
+        ),
+      ],
+    });
+
+    const result = await searchWorkspaceSymbolsAcrossSessions([session], {
+      query: "defineProgram",
+      maxResults: 3,
+    });
+
+    expect(result.totalSymbols).toBe(3);
+    expect(result.omittedGeneratedCount).toBe(2);
+    expect(result.symbols.map((symbol) => symbol.location.uri)).toEqual([
+      "file:///repo/core/kbwl/src/utils/cli-utils.ts",
+    ]);
+    expect(result.text).toContain("generated results omitted");
   });
 
   it("suppresses self-only implementations in inspectSymbol output", async () => {

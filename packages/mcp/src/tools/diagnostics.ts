@@ -39,6 +39,16 @@ export interface DiagnosticArgs {
   summary?: boolean;
 }
 
+export interface DiagnosticFileSummary {
+  file: string;
+  totalCount: number;
+  totalErrorCount: number;
+  totalWarningCount: number;
+  newCount: number;
+  baselineCount: number;
+  generated: boolean;
+}
+
 export interface DiagnosticSnapshot {
   text: string;
   totalCount: number;
@@ -46,6 +56,7 @@ export interface DiagnosticSnapshot {
   totalWarningCount: number;
   newCount: number;
   baselineCount: number;
+  files?: DiagnosticFileSummary[];
 }
 
 export async function getDiagnostics(
@@ -80,10 +91,12 @@ export async function getDiagnostics(
   }
 
   const counts = summarizeDiagnostics(diagnostics);
+  const fileSummaries = summarizeDiagnosticsByFile(diagnostics);
 
   if (args.summary) {
     return {
-      text: formatSummary(diagnostics, counts),
+      text: formatSummary(counts, fileSummaries),
+      files: fileSummaries,
       ...counts,
     };
   }
@@ -117,29 +130,86 @@ function summarizeDiagnostics(
   };
 }
 
-function formatSummary(
-  diagnostics: FormattedDiagnostic[],
-  counts: Omit<DiagnosticSnapshot, "text">,
-): string {
-  if (diagnostics.length === 0) return "No diagnostics.";
+const GENERATED_DIAGNOSTIC_SEGMENTS = new Set([
+  "dist",
+  "build",
+  "coverage",
+  ".next",
+  ".turbo",
+  "node_modules",
+]);
 
-  const byFile = new Map<
-    string,
-    { errors: number; warnings: number; new: number; baseline: number }
-  >();
+function normalizeDiagnosticPathSegments(filePath: string): string[] {
+  return filePath
+    .split(/[\\/]+/)
+    .filter((segment) => segment.length > 0)
+    .map((segment) => segment.toLowerCase());
+}
+
+function isLikelyGeneratedDiagnosticPath(filePath: string): boolean {
+  const normalizedSegments = normalizeDiagnosticPathSegments(filePath);
+  if (normalizedSegments.some((segment) => GENERATED_DIAGNOSTIC_SEGMENTS.has(segment))) {
+    return true;
+  }
+
+  const normalizedPath = filePath.toLowerCase();
+  return /(?:^|\/)patches\/.+\/dist(?:\/|$)/.test(normalizedPath) ||
+    /\.[0-9a-f]{6,}\.(?:c|m)?js$/i.test(normalizedPath);
+}
+
+function summarizeDiagnosticsByFile(
+  diagnostics: FormattedDiagnostic[],
+): DiagnosticFileSummary[] {
+  const byFile = new Map<string, DiagnosticFileSummary>();
+
   for (const diagnostic of diagnostics) {
     const entry = byFile.get(diagnostic.file) ?? {
-      errors: 0,
-      warnings: 0,
-      new: 0,
-      baseline: 0,
+      file: diagnostic.file,
+      totalCount: 0,
+      totalErrorCount: 0,
+      totalWarningCount: 0,
+      newCount: 0,
+      baselineCount: 0,
+      generated: isLikelyGeneratedDiagnosticPath(diagnostic.file),
     };
-    if (diagnostic.severity === "error") entry.errors++;
-    else entry.warnings++;
-    if (diagnostic.scope === "new") entry.new++;
-    else entry.baseline++;
+
+    entry.totalCount += 1;
+    if (diagnostic.severity === "error") {
+      entry.totalErrorCount += 1;
+    } else {
+      entry.totalWarningCount += 1;
+    }
+    if (diagnostic.scope === "new") {
+      entry.newCount += 1;
+    } else {
+      entry.baselineCount += 1;
+    }
+
     byFile.set(diagnostic.file, entry);
   }
+
+  return [...byFile.values()].sort((left, right) => {
+    if (left.generated !== right.generated) {
+      return Number(left.generated) - Number(right.generated);
+    }
+    if (right.totalErrorCount !== left.totalErrorCount) {
+      return right.totalErrorCount - left.totalErrorCount;
+    }
+    if (right.totalWarningCount !== left.totalWarningCount) {
+      return right.totalWarningCount - left.totalWarningCount;
+    }
+    if (right.totalCount !== left.totalCount) {
+      return right.totalCount - left.totalCount;
+    }
+    return left.file.localeCompare(right.file);
+  });
+}
+
+function formatSummary(
+  counts: Omit<DiagnosticSnapshot, "text">,
+  fileSummaries: DiagnosticFileSummary[],
+): string {
+  if (fileSummaries.length === 0) return "No diagnostics.";
 
   const lines: string[] = [];
   lines.push(
@@ -147,14 +217,17 @@ function formatSummary(
   );
   lines.push("");
 
-  for (const [file, counts] of byFile) {
+  for (const summary of fileSummaries) {
     const parts: string[] = [];
-    if (counts.errors) parts.push(`${counts.errors} errors`);
-    if (counts.warnings) parts.push(`${counts.warnings} warnings`);
+    if (summary.totalErrorCount) parts.push(`${summary.totalErrorCount} errors`);
+    if (summary.totalWarningCount) parts.push(`${summary.totalWarningCount} warnings`);
     const scopeParts: string[] = [];
-    if (counts.new) scopeParts.push(`${counts.new} new`);
-    if (counts.baseline) scopeParts.push(`${counts.baseline} baseline`);
-    lines.push(`  ${file}: ${parts.join(", ")} (${scopeParts.join(", ")})`);
+    if (summary.newCount) scopeParts.push(`${summary.newCount} new`);
+    if (summary.baselineCount) scopeParts.push(`${summary.baselineCount} baseline`);
+    const generatedSuffix = summary.generated ? " [generated]" : "";
+    lines.push(
+      `  ${summary.file}${generatedSuffix}: ${parts.join(", ")} (${scopeParts.join(", ")})`,
+    );
   }
 
   return lines.join("\n");

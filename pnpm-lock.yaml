@@ -114,6 +114,9 @@ importers:
       '@volar/typescript':
         specifier: 2.4.28
         version: 2.4.28
+      citty:
+        specifier: ^0.2.2
+        version: 0.2.2
       volar-service-typescript:
         specifier: 0.0.65
         version: 0.0.65(@volar/language-service@2.4.28)
@@ -1250,6 +1253,9 @@ packages:
 
   chownr@1.1.4:
     resolution: {integrity: sha512-jJ0bqzaylmJtVnNgzTeSOs8DPavpbYgEr/b0YL8/2GO3xJEhInFmhKMUnEJQjZumK7KXGFhUy89PrsJWlakBVg==}
+
+  citty@0.2.2:
+    resolution: {integrity: sha512-+6vJA3L98yv+IdfKGZHBNiGW5KHn22e/JwID0Strsz8h4S/csAu/OuICwxrg44k5MRiZHWIo8XXuJgQTriRP4w==}
 
   cliui@8.0.1:
     resolution: {integrity: sha512-BSeNnyus75C4//NQ9gQt1/csTXyo/8Sb+afLAkzAptFuMsod9HFokGNudZpi/oQV73hnVK+sR+5PVRMd+Dr7YQ==}
@@ -3864,6 +3870,8 @@ snapshots:
 
   chownr@1.1.4:
     optional: true
+
+  citty@0.2.2: {}
 
   cliui@8.0.1:
     dependencies:

@@ -245,6 +245,7 @@ function formatWorkspaceSymbolLine(rootDir: string, symbol: WorkspaceSymbol): st
 type WorkspaceSymbolMatch = {
   rootDir: string;
   symbol: WorkspaceSymbol;
+  originalIndex: number;
 };
 
 function getWorkspaceSymbolKey(match: WorkspaceSymbolMatch): string {
@@ -283,6 +284,134 @@ function dedupeWorkspaceSymbolMatches(
   }
 
   return deduped;
+}
+
+const GENERATED_WORKSPACE_SEGMENTS = new Set([
+  "dist",
+  "build",
+  "coverage",
+  ".next",
+  ".turbo",
+  "node_modules",
+]);
+
+function getWorkspaceSymbolRelativePath(
+  rootDir: string,
+  symbol: WorkspaceSymbol,
+): string {
+  return path.relative(rootDir, URI.parse(symbol.location.uri).fsPath);
+}
+
+function normalizePathSegments(filePath: string): string[] {
+  return filePath
+    .split(/[\\/]+/)
+    .filter((segment) => segment.length > 0)
+    .map((segment) => segment.toLowerCase());
+}
+
+function isLikelyGeneratedWorkspacePath(filePath: string): boolean {
+  const normalizedSegments = normalizePathSegments(filePath);
+  if (normalizedSegments.some((segment) => GENERATED_WORKSPACE_SEGMENTS.has(segment))) {
+    return true;
+  }
+
+  const normalizedPath = filePath.toLowerCase();
+  return /(?:^|\/)patches\/.+\/dist(?:\/|$)/.test(normalizedPath) ||
+    /\.[0-9a-f]{6,}\.(?:c|m)?js$/i.test(normalizedPath);
+}
+
+function scoreWorkspaceSymbolName(symbol: WorkspaceSymbol, query: string): number {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) {
+    return 0;
+  }
+
+  const name = symbol.name.toLowerCase();
+  const container = (symbol.containerName ?? "").toLowerCase();
+
+  if (name === normalizedQuery) return 500;
+  if (name.startsWith(normalizedQuery)) return 350;
+  if (name.includes(normalizedQuery)) return 250;
+  if (container.includes(normalizedQuery)) return 100;
+  return 0;
+}
+
+function scoreWorkspaceSymbolMatch(match: WorkspaceSymbolMatch, query: string): number {
+  const relativePath = getWorkspaceSymbolRelativePath(match.rootDir, match.symbol);
+  const normalizedSegments = normalizePathSegments(relativePath);
+
+  let score = scoreWorkspaceSymbolName(match.symbol, query);
+
+  if (normalizedSegments.includes("src")) {
+    score += 150;
+  }
+
+  if (normalizedSegments.includes("test") || normalizedSegments.includes("tests")) {
+    score -= 20;
+  }
+
+  if (isLikelyGeneratedWorkspacePath(relativePath)) {
+    score -= 1000;
+  } else {
+    score += 300;
+  }
+
+  if ("range" in match.symbol.location) {
+    score -= match.symbol.location.range.start.line / 10_000;
+    score -= match.symbol.location.range.start.character / 100_000;
+  }
+
+  return score;
+}
+
+function compareWorkspaceSymbolMatches(
+  left: WorkspaceSymbolMatch,
+  right: WorkspaceSymbolMatch,
+  query: string,
+): number {
+  const scoreDifference =
+    scoreWorkspaceSymbolMatch(right, query) - scoreWorkspaceSymbolMatch(left, query);
+  if (scoreDifference !== 0) {
+    return scoreDifference;
+  }
+
+  const leftPath = getWorkspaceSymbolRelativePath(left.rootDir, left.symbol);
+  const rightPath = getWorkspaceSymbolRelativePath(right.rootDir, right.symbol);
+
+  const pathLengthDifference = leftPath.length - rightPath.length;
+  if (pathLengthDifference !== 0) {
+    return pathLengthDifference;
+  }
+
+  const nameDifference = left.symbol.name.localeCompare(right.symbol.name);
+  if (nameDifference !== 0) {
+    return nameDifference;
+  }
+
+  return left.originalIndex - right.originalIndex;
+}
+
+function splitWorkspaceSymbolMatches(
+  matches: WorkspaceSymbolMatch[],
+): {
+  preferred: WorkspaceSymbolMatch[];
+  omittedGeneratedCount: number;
+} {
+  const sourceLikeMatches = matches.filter((match) =>
+    !isLikelyGeneratedWorkspacePath(getWorkspaceSymbolRelativePath(match.rootDir, match.symbol))
+  );
+
+  if (sourceLikeMatches.length === 0) {
+    return {
+      preferred: matches,
+      omittedGeneratedCount: 0,
+    };
+  }
+
+  return {
+    preferred: sourceLikeMatches,
+    omittedGeneratedCount: matches.length - sourceLikeMatches.length,
+  };
 }
 
 export async function getDocumentSymbolsOutline(
@@ -351,6 +480,7 @@ export async function searchWorkspaceSymbols(
   text: string;
   symbols: WorkspaceSymbol[];
   totalSymbols: number;
+  omittedGeneratedCount: number;
 }> {
   const query = args.query.trim();
   if (!query) {
@@ -358,6 +488,7 @@ export async function searchWorkspaceSymbols(
       text: "search_workspace_symbols requires a non-empty query.",
       symbols: [],
       totalSymbols: 0,
+      omittedGeneratedCount: 0,
     };
   }
 
@@ -366,28 +497,48 @@ export async function searchWorkspaceSymbols(
     1,
     100,
   );
-  const symbols = await session.getWorkspaceSymbols(query);
+  const matches = (await session.getWorkspaceSymbols(query)).map((symbol, originalIndex) => ({
+    rootDir: session.rootDir,
+    symbol,
+    originalIndex,
+  }));
+  const symbols = dedupeWorkspaceSymbolMatches(matches)
+    .sort((left, right) => compareWorkspaceSymbolMatches(left, right, query))
+    .map((match) => match.symbol);
 
   if (symbols.length === 0) {
     return {
       text: `No workspace symbols matching "${query}" found.`,
       symbols: [],
       totalSymbols: 0,
+      omittedGeneratedCount: 0,
     };
   }
 
-  const visibleSymbols = symbols.slice(0, maxResults);
+  const { preferred: preferredMatches, omittedGeneratedCount } =
+    splitWorkspaceSymbolMatches(
+      symbols.map((symbol, originalIndex) => ({
+        rootDir: session.rootDir,
+        symbol,
+        originalIndex,
+      })),
+    );
+  const visibleSymbols = preferredMatches.slice(0, maxResults).map((match) => match.symbol);
   const lines = visibleSymbols.map((symbol) =>
     formatWorkspaceSymbolLine(session.rootDir, symbol),
   );
-  if (symbols.length > visibleSymbols.length) {
-    lines.push(`… ${symbols.length - visibleSymbols.length} more symbols omitted`);
+  if (preferredMatches.length > visibleSymbols.length) {
+    lines.push(`… ${preferredMatches.length - visibleSymbols.length} more symbols omitted`);
+  }
+  if (omittedGeneratedCount > 0) {
+    lines.push(`… ${omittedGeneratedCount} generated results omitted`);
   }
 
   return {
     text: `Workspace matches for "${query}" (${symbols.length} results):\n${lines.join("\n")}`,
     symbols: visibleSymbols,
     totalSymbols: symbols.length,
+    omittedGeneratedCount,
   };
 }
 
@@ -402,6 +553,7 @@ export async function searchWorkspaceSymbolsAcrossSessions(
   symbols: WorkspaceSymbol[];
   totalSymbols: number;
   roots: string[];
+  omittedGeneratedCount: number;
 }> {
   const query = args.query.trim();
   if (!query) {
@@ -410,6 +562,7 @@ export async function searchWorkspaceSymbolsAcrossSessions(
       symbols: [],
       totalSymbols: 0,
       roots: [],
+      omittedGeneratedCount: 0,
     };
   }
 
@@ -420,6 +573,7 @@ export async function searchWorkspaceSymbolsAcrossSessions(
       symbols: [],
       totalSymbols: 0,
       roots: [],
+      omittedGeneratedCount: 0,
     };
   }
 
@@ -431,15 +585,16 @@ export async function searchWorkspaceSymbolsAcrossSessions(
   const matchesBySession = await Promise.all(
     sessions.map(async (session) => ({
       rootDir: session.rootDir,
-      matches: (await session.getWorkspaceSymbols(query)).map((symbol) => ({
+      matches: (await session.getWorkspaceSymbols(query)).map((symbol, originalIndex) => ({
         rootDir: session.rootDir,
         symbol,
+        originalIndex,
       })),
     })),
   );
   const matches = dedupeWorkspaceSymbolMatches(
     matchesBySession.flatMap((sessionResult) => sessionResult.matches),
-  );
+  ).sort((left, right) => compareWorkspaceSymbolMatches(left, right, query));
 
   if (matches.length === 0) {
     return {
@@ -447,10 +602,13 @@ export async function searchWorkspaceSymbolsAcrossSessions(
       symbols: [],
       totalSymbols: 0,
       roots,
+      omittedGeneratedCount: 0,
     };
   }
 
-  const visibleMatches = matches.slice(0, maxResults);
+  const { preferred: preferredMatches, omittedGeneratedCount } =
+    splitWorkspaceSymbolMatches(matches);
+  const visibleMatches = preferredMatches.slice(0, maxResults);
   const lines: string[] = [];
 
   if (roots.length === 1) {
@@ -479,8 +637,11 @@ export async function searchWorkspaceSymbolsAcrossSessions(
     }
   }
 
-  if (matches.length > visibleMatches.length) {
-    lines.push(`… ${matches.length - visibleMatches.length} more symbols omitted`);
+  if (preferredMatches.length > visibleMatches.length) {
+    lines.push(`… ${preferredMatches.length - visibleMatches.length} more symbols omitted`);
+  }
+  if (omittedGeneratedCount > 0) {
+    lines.push(`… ${omittedGeneratedCount} generated results omitted`);
   }
 
   const scopeText = roots.length > 1
@@ -492,6 +653,7 @@ export async function searchWorkspaceSymbolsAcrossSessions(
     symbols: visibleMatches.map((match) => match.symbol),
     totalSymbols: matches.length,
     roots,
+    omittedGeneratedCount,
   };
 }
 
