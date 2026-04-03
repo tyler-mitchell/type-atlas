@@ -30,6 +30,7 @@ import {
   ShutdownRequest,
   TypeDefinitionRequest,
   WillRenameFilesRequest,
+  WorkspaceDiagnosticRequest,
   WorkspaceSymbolRequest,
   type CallHierarchyIncomingCall,
   type CallHierarchyItem,
@@ -67,6 +68,11 @@ export interface CreateFeatureTypeLanguageServerClientOptions
   rootDir: string;
 }
 
+type ProjectDiagnosticBatch = {
+  filePath: string;
+  diagnostics: Diagnostic[];
+};
+
 export interface SyncedDocument {
   uri: string;
   languageId: string;
@@ -95,6 +101,9 @@ export interface FeatureTypeLanguageServerClient {
   getVirtualFilePaths(): string[];
   /** Returns the in-memory content for a virtual file, or undefined if not virtual. */
   getVirtualFileContent(filePath: string): string | undefined;
+  getWorkspaceDiagnostics(): Promise<
+    Array<{ filePath: string; diagnostics: Diagnostic[] }> | null
+  >;
   getDocumentDiagnostics(filePath: string): Promise<Diagnostic[]>;
   getDocumentCodeActions(
     filePath: string,
@@ -165,6 +174,7 @@ export interface DiagnosticsSession {
   rootDir: string;
   tsdk: string;
   getProjectFileNames(): Promise<string[]>;
+  getWorkspaceDiagnostics(): Promise<Array<{ filePath: string; diagnostics: Diagnostic[] }> | null>;
   /**
    * Register a virtual file with the session using caller-supplied content.
    * The file does not need to exist on disk. It will appear in
@@ -392,11 +402,69 @@ function resolveBundledTsdk(): string | null {
   }
 }
 
+function findNestedRepositoryRoots(
+  rootDir: string,
+  currentDir = path.resolve(rootDir),
+): string[] {
+  const results: string[] = [];
+
+  try {
+    for (const entry of fs.readdirSync(currentDir, { withFileTypes: true })) {
+      if (entry.name === "node_modules" || entry.name === ".git") {
+        continue;
+      }
+
+      const fullPath = path.join(currentDir, entry.name);
+      if (!entry.isDirectory()) {
+        continue;
+      }
+
+      if (
+        fullPath !== path.resolve(rootDir) &&
+        fs.existsSync(path.join(fullPath, ".git"))
+      ) {
+        results.push(fullPath);
+        continue;
+      }
+
+      results.push(...findNestedRepositoryRoots(rootDir, fullPath));
+    }
+  } catch {
+    // Ignore directories that cannot be read.
+  }
+
+  return results;
+}
+
+function isWithinAnyNestedRepository(
+  filePath: string,
+  nestedRepositoryRoots: readonly string[],
+): boolean {
+  const resolvedFilePath = path.resolve(filePath);
+
+  return nestedRepositoryRoots.some(
+    (nestedRoot) =>
+      resolvedFilePath === nestedRoot ||
+      resolvedFilePath.startsWith(`${nestedRoot}${path.sep}`),
+  );
+}
+
+function filterFilesOutsideNestedRepositories(
+  filePaths: readonly string[],
+  nestedRepositoryRoots: readonly string[],
+): string[] {
+  return filePaths.filter(
+    (filePath) =>
+      !isWithinAnyNestedRepository(filePath, nestedRepositoryRoots),
+  );
+}
+
 export function enumerateProjectFiles(
   rootDir: string,
   options: ResolveWorkspaceTsdkOptions = {},
 ): string[] {
   const resolvedRoot = path.resolve(rootDir);
+  const nestedRepositoryRoots = findNestedRepositoryRoots(resolvedRoot);
   const tsdk = resolveWorkspaceTsdk(resolvedRoot, options);
   const { typescript: ts } = loadTsdkByPath(tsdk, undefined);
   const tsconfigPath = ts.findConfigFile(
@@ -413,13 +481,114 @@ export function enumerateProjectFiles(
     : ts.parseJsonConfigFileContent({}, ts.sys, resolvedRoot);
 
   const files = new Set<string>(
-    parsedCommandLine.fileNames.map((fileName) => path.resolve(fileName)),
+    filterFilesOutsideNestedRepositories(
+      parsedCommandLine.fileNames.map((fileName) => path.resolve(fileName)),
+      nestedRepositoryRoots,
+    ),
   );
-  for (const fileName of findFeatureTypeFiles(resolvedRoot)) {
+  for (const fileName of findFeatureTypeFiles(resolvedRoot, nestedRepositoryRoots)) {
     files.add(fileName);
   }
 
   return [...files].filter(isSupportedDiagnosticFile);
+}
+
+function collectTypeScriptProjectDiagnostics(
+  rootDir: string,
+  tsdk: string,
+): ProjectDiagnosticBatch[] {
+  const nestedRepositoryRoots = findNestedRepositoryRoots(rootDir);
+  const { typescript: ts } = loadTsdkByPath(tsdk, undefined);
+  const tsconfigPath = ts.findConfigFile(rootDir, ts.sys.fileExists, "tsconfig.json");
+  const parsedCommandLine = tsconfigPath
+    ? ts.parseJsonConfigFileContent(
+        ts.readConfigFile(tsconfigPath, ts.sys.readFile).config,
+        ts.sys,
+        path.dirname(tsconfigPath),
+      )
+    : ts.parseJsonConfigFileContent({}, ts.sys, rootDir);
+
+  const builder = ts.createIncrementalProgram({
+    rootNames: filterFilesOutsideNestedRepositories(
+      parsedCommandLine.fileNames,
+      nestedRepositoryRoots,
+    ),
+    options: parsedCommandLine.options,
+    projectReferences: parsedCommandLine.projectReferences,
+    configFileParsingDiagnostics: parsedCommandLine.errors,
+  });
+  const program = builder.getProgram();
+
+  const diagnosticsByFile = new Map<string, Diagnostic[]>();
+
+  const pushDiagnostic = (diagnostic: import("typescript").Diagnostic): void => {
+    const sourceFile = diagnostic.file;
+    if (!sourceFile || diagnostic.start == null) {
+      return;
+    }
+
+    const start = sourceFile.getLineAndCharacterOfPosition(diagnostic.start);
+    const end = sourceFile.getLineAndCharacterOfPosition(
+      diagnostic.start + (diagnostic.length ?? 0),
+    );
+    const filePath = path.resolve(sourceFile.fileName);
+    const existing = diagnosticsByFile.get(filePath) ?? [];
+    existing.push({
+      range: {
+        start: { line: start.line, character: start.character },
+        end: { line: end.line, character: end.character },
+      },
+      severity:
+        diagnostic.category === ts.DiagnosticCategory.Warning
+          ? 2
+          : diagnostic.category === ts.DiagnosticCategory.Suggestion ||
+              diagnostic.category === ts.DiagnosticCategory.Message
+            ? 3
+            : 1,
+      code: diagnostic.code,
+      message: ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n"),
+      source: "typescript",
+      relatedInformation: diagnostic.relatedInformation?.flatMap((related) => {
+        if (!related.file || related.start == null) {
+          return [];
+        }
+
+        const relatedStart = related.file.getLineAndCharacterOfPosition(related.start);
+        const relatedEnd = related.file.getLineAndCharacterOfPosition(
+          related.start + (related.length ?? 0),
+        );
+
+        return [
+          {
+            location: {
+              uri: URI.file(path.resolve(related.file.fileName)).toString(),
+              range: {
+                start: {
+                  line: relatedStart.line,
+                  character: relatedStart.character,
+                },
+                end: {
+                  line: relatedEnd.line,
+                  character: relatedEnd.character,
+                },
+              },
+            },
+            message: ts.flattenDiagnosticMessageText(related.messageText, "\n"),
+          },
+        ];
+      }),
+    });
+    diagnosticsByFile.set(filePath, existing);
+  };
+
+  for (const diagnostic of ts.getPreEmitDiagnostics(program)) {
+    pushDiagnostic(diagnostic);
+  }
+
+  return [...diagnosticsByFile.entries()].map(([filePath, diagnostics]) => ({
+    filePath,
+    diagnostics,
+  }));
 }
 
 export async function createFeatureTypeLanguageServerClient(
@@ -475,7 +644,15 @@ export async function createFeatureTypeLanguageServerClient(
       typescript: { tsdk },
     },
     capabilities: {
+      workspace: {
+        diagnostics: {
+          refreshSupport: true,
+        },
+      },
       textDocument: {
+        diagnostic: {
+          relatedDocumentSupport: true,
+        },
         signatureHelp: {
           contextSupport: true,
         },
@@ -548,12 +725,33 @@ export async function createFeatureTypeLanguageServerClient(
   const getDocumentDiagnostics = async (
     filePath: string,
   ): Promise<Diagnostic[]> => {
-    const document = await syncDocumentFromDisk(filePath, "refresh");
-    if (!document) {
+    const absPath = resolveFilePath(rootDir, filePath);
+
+    if (virtualFilePaths.has(absPath)) {
+      const document = await syncDocumentFromDisk(filePath, "refresh");
+      if (!document) {
+        return [];
+      }
+
+      const report = await connection.sendRequest(DocumentDiagnosticRequest.type, {
+        textDocument: { uri: document.uri },
+      });
+
+      if (report.kind === DocumentDiagnosticReportKind.Full) {
+        return report.items;
+      }
+
       return [];
     }
+
+    if (!fs.existsSync(absPath)) {
+      return [];
+    }
+
+    await ensureWorkspaceInitialized();
+
     const report = await connection.sendRequest(DocumentDiagnosticRequest.type, {
-      textDocument: { uri: document.uri },
+      textDocument: { uri: URI.file(absPath).toString() },
     });
 
     if (report.kind === DocumentDiagnosticReportKind.Full) {
@@ -737,6 +935,55 @@ export async function createFeatureTypeLanguageServerClient(
         textDocument: { uri: document.uri },
       })) ?? []
     );
+  };
+
+  const getWorkspaceDiagnostics = async (): Promise<
+    Array<{ filePath: string; diagnostics: Diagnostic[] }> | null
+  > => {
+    await ensureWorkspaceInitialized();
+
+    try {
+      const report = await connection.sendRequest(WorkspaceDiagnosticRequest.type, {
+        previousResultIds: [],
+      });
+
+      if (!report) {
+        return [];
+      }
+
+      return report.items
+        .filter((item) => item.kind === DocumentDiagnosticReportKind.Full)
+        .map((item) => ({
+          filePath: URI.parse(item.uri).fsPath,
+          diagnostics: item.items,
+        }));
+    } catch {
+      const seen = new Set<string>();
+      const projectDiagnostics = collectTypeScriptProjectDiagnostics(rootDir, tsdk).map(
+        (entry) => {
+          seen.add(path.resolve(entry.filePath));
+          return entry;
+        },
+      );
+
+      const nestedRepositoryRoots = findNestedRepositoryRoots(rootDir);
+      const extraFiles = [
+        ...findFeatureTypeFiles(rootDir, nestedRepositoryRoots),
+        ...[...virtualFilePaths].filter((filePath) => !seen.has(path.resolve(filePath))),
+      ].filter(
+        (filePath) =>
+          !isWithinAnyNestedRepository(filePath, nestedRepositoryRoots),
+      );
+
+      const extraDiagnostics = await Promise.all(
+        extraFiles.map(async (filePath) => ({
+          filePath,
+          diagnostics: await getDocumentDiagnostics(filePath),
+        })),
+      );
+
+      return [...projectDiagnostics, ...extraDiagnostics];
+    }
   };
 
   const ensureWorkspaceInitialized = async (): Promise<void> => {
@@ -963,6 +1210,7 @@ export async function createFeatureTypeLanguageServerClient(
       const uri = URI.file(absPath).toString();
       return openedDocuments.get(uri)?.text;
     },
+    getWorkspaceDiagnostics,
     getDocumentDiagnostics,
     getDocumentCodeActions,
     getDocumentHover,
@@ -1004,6 +1252,9 @@ export async function createDiagnosticsSession(
         (p) => isSupportedDiagnosticFile(p) && !diskFiles.includes(p),
       );
       return Promise.resolve([...diskFiles, ...virtualFiles]);
+    },
+    getWorkspaceDiagnostics() {
+      return client.getWorkspaceDiagnostics();
     },
     async openVirtualFile(filePath: string, content: string) {
       await client.openVirtualFile(filePath, content);
@@ -1164,7 +1415,10 @@ function getLanguageId(fileName: string): string {
   throw new Error(`Unsupported diagnostic file type: ${fileName}`);
 }
 
-function findFeatureTypeFiles(dir: string): string[] {
+function findFeatureTypeFiles(
+  dir: string,
+  nestedRepositoryRoots: readonly string[] = [],
+): string[] {
   const results: string[] = [];
 
   try {
@@ -1174,8 +1428,15 @@ function findFeatureTypeFiles(dir: string): string[] {
       }
 
       const fullPath = path.join(dir, entry.name);
+      if (
+        entry.isDirectory() &&
+        nestedRepositoryRoots.includes(fullPath)
+      ) {
+        continue;
+      }
+
       if (entry.isDirectory()) {
-        results.push(...findFeatureTypeFiles(fullPath));
+        results.push(...findFeatureTypeFiles(fullPath, nestedRepositoryRoots));
         continue;
       }
 

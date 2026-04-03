@@ -1,7 +1,4 @@
-/**
- * get_diagnostics — returns errors/warnings for a file or the whole project.
- * snapshot_baseline — captures current diagnostic state for diffing.
- */
+/** get_diagnostics — returns errors/warnings for a file or the whole project. */
 
 import * as path from "node:path";
 import type { DiagnosticsSession } from "@featuretype/language-server";
@@ -10,31 +7,48 @@ import {
   diagnosticsToXml,
   type FormattedDiagnostic,
 } from "../format.js";
-import {
-  createBaseline,
-  classifyDiagnostic,
-  type BaselineSnapshot,
-} from "../baseline.js";
 
-const baselines = new Map<string, BaselineSnapshot>();
+const PROJECT_DIAGNOSTIC_CONCURRENCY = 24;
+const MAX_PROJECT_DIAGNOSTIC_FILES = 250;
 
 async function collectFileDiagnostics(
   session: DiagnosticsSession,
   absPath: string,
 ): Promise<FormattedDiagnostic[]> {
   const relPath = path.relative(session.rootDir, absPath);
-  const baseline = baselines.get(session.rootDir) ?? null;
   const rawDiags = await session.getFileDiagnostics(absPath);
-  return rawDiags.map((diagnostic) => {
-    const formatted = formatDiagnostic(diagnostic, relPath, "new");
-    formatted.scope = classifyDiagnostic(formatted, baseline);
-    return formatted;
-  });
+  return rawDiags.map((diagnostic) => formatDiagnostic(diagnostic, relPath));
+}
+
+async function collectProjectDiagnostics(
+  session: DiagnosticsSession,
+): Promise<FormattedDiagnostic[]> {
+  const workspaceDiagnostics = await session.getWorkspaceDiagnostics();
+
+  if (workspaceDiagnostics !== null) {
+    return workspaceDiagnostics.flatMap(({ filePath, diagnostics }) =>
+      diagnostics.map((diagnostic) =>
+        formatDiagnostic(diagnostic, path.relative(session.rootDir, filePath)),
+      ),
+    );
+  }
+
+  const fileNames = await session.getProjectFileNames();
+  const diagnostics: FormattedDiagnostic[] = [];
+
+  for (let start = 0; start < fileNames.length; start += PROJECT_DIAGNOSTIC_CONCURRENCY) {
+    const batch = fileNames.slice(start, start + PROJECT_DIAGNOSTIC_CONCURRENCY);
+    const batchResults = await Promise.all(
+      batch.map((fileName) => collectFileDiagnostics(session, fileName)),
+    );
+    diagnostics.push(...batchResults.flat());
+  }
+
+  return diagnostics;
 }
 
 export interface DiagnosticArgs {
   file?: string;
-  scope?: "new" | "baseline" | "all";
   severity?: "error" | "warning" | "all";
   summary?: boolean;
 }
@@ -44,8 +58,6 @@ export interface DiagnosticFileSummary {
   totalCount: number;
   totalErrorCount: number;
   totalWarningCount: number;
-  newCount: number;
-  baselineCount: number;
   generated: boolean;
 }
 
@@ -54,33 +66,54 @@ export interface DiagnosticSnapshot {
   totalCount: number;
   totalErrorCount: number;
   totalWarningCount: number;
-  newCount: number;
-  baselineCount: number;
   files?: DiagnosticFileSummary[];
+  limited?: boolean;
+  projectFileCount?: number;
+  projectFileLimit?: number;
+  error?: { code: string; message: string } | null;
 }
 
 export async function getDiagnostics(
   session: DiagnosticsSession,
   args: DiagnosticArgs,
 ): Promise<DiagnosticSnapshot> {
+  const projectFileCount = (await session.getProjectFileNames()).length;
+  if (projectFileCount > MAX_PROJECT_DIAGNOSTIC_FILES) {
+    const message = args.file
+      ? [
+          "Diagnostics are disabled for files inside large attached workspaces.",
+          `Attached project has ${projectFileCount} files, which exceeds the fast-scan limit of ${MAX_PROJECT_DIAGNOSTIC_FILES}.`,
+          "Attach a smaller subproject root to use get_diagnostics here.",
+        ].join(" ")
+      : [
+          "Whole-project diagnostics are disabled for large workspaces.",
+          `Attached project has ${projectFileCount} files, which exceeds the fast-scan limit of ${MAX_PROJECT_DIAGNOSTIC_FILES}.`,
+          "Attach a smaller subproject root to use get_diagnostics here.",
+        ].join(" ");
+
+    return {
+      text: message,
+      totalCount: 0,
+      totalErrorCount: 0,
+      totalWarningCount: 0,
+      files: [],
+      limited: true,
+      projectFileCount,
+      projectFileLimit: MAX_PROJECT_DIAGNOSTIC_FILES,
+      error: {
+        code: "PROJECT_TOO_LARGE",
+        message,
+      },
+    };
+  }
+
   let diagnostics: FormattedDiagnostic[];
 
   if (args.file) {
     const absPath = path.resolve(session.rootDir, args.file);
     diagnostics = await collectFileDiagnostics(session, absPath);
   } else {
-    diagnostics = [];
-    for (const fileName of await session.getProjectFileNames()) {
-      const fileDiags = await collectFileDiagnostics(session, fileName);
-      diagnostics.push(...fileDiags);
-    }
-  }
-
-  const scopeFilter = args.scope ?? "all";
-  if (scopeFilter !== "all") {
-    diagnostics = diagnostics.filter(
-      (diagnostic) => diagnostic.scope === scopeFilter,
-    );
+    diagnostics = await collectProjectDiagnostics(session);
   }
 
   const severityFilter = args.severity ?? "all";
@@ -97,12 +130,16 @@ export async function getDiagnostics(
     return {
       text: formatSummary(counts, fileSummaries),
       files: fileSummaries,
+      limited: false,
+      error: null,
       ...counts,
     };
   }
 
   return {
     text: diagnosticsToXml(diagnostics),
+    limited: false,
+    error: null,
     ...counts,
   };
 }
@@ -114,19 +151,11 @@ function summarizeDiagnostics(
     (diagnostic) => diagnostic.severity === "error",
   ).length;
   const totalWarningCount = diagnostics.length - totalErrorCount;
-  const newCount = diagnostics.filter(
-    (diagnostic) => diagnostic.scope === "new",
-  ).length;
-  const baselineCount = diagnostics.filter(
-    (diagnostic) => diagnostic.scope === "baseline",
-  ).length;
 
   return {
     totalCount: diagnostics.length,
     totalErrorCount,
     totalWarningCount,
-    newCount,
-    baselineCount,
   };
 }
 
@@ -168,8 +197,6 @@ function summarizeDiagnosticsByFile(
       totalCount: 0,
       totalErrorCount: 0,
       totalWarningCount: 0,
-      newCount: 0,
-      baselineCount: 0,
       generated: isLikelyGeneratedDiagnosticPath(diagnostic.file),
     };
 
@@ -178,11 +205,6 @@ function summarizeDiagnosticsByFile(
       entry.totalErrorCount += 1;
     } else {
       entry.totalWarningCount += 1;
-    }
-    if (diagnostic.scope === "new") {
-      entry.newCount += 1;
-    } else {
-      entry.baselineCount += 1;
     }
 
     byFile.set(diagnostic.file, entry);
@@ -213,7 +235,7 @@ function formatSummary(
 
   const lines: string[] = [];
   lines.push(
-    `${counts.totalCount} diagnostics (${counts.totalErrorCount} errors, ${counts.totalWarningCount} warnings | ${counts.newCount} new, ${counts.baselineCount} baseline)`,
+    `${counts.totalCount} diagnostics (${counts.totalErrorCount} errors, ${counts.totalWarningCount} warnings)`,
   );
   lines.push("");
 
@@ -221,40 +243,11 @@ function formatSummary(
     const parts: string[] = [];
     if (summary.totalErrorCount) parts.push(`${summary.totalErrorCount} errors`);
     if (summary.totalWarningCount) parts.push(`${summary.totalWarningCount} warnings`);
-    const scopeParts: string[] = [];
-    if (summary.newCount) scopeParts.push(`${summary.newCount} new`);
-    if (summary.baselineCount) scopeParts.push(`${summary.baselineCount} baseline`);
     const generatedSuffix = summary.generated ? " [generated]" : "";
     lines.push(
-      `  ${summary.file}${generatedSuffix}: ${parts.join(", ")} (${scopeParts.join(", ")})`,
+      `  ${summary.file}${generatedSuffix}: ${parts.join(", ")}`,
     );
   }
 
   return lines.join("\n");
-}
-
-export async function snapshotBaseline(
-  session: DiagnosticsSession,
-): Promise<string> {
-  const diagnostics: FormattedDiagnostic[] = [];
-  for (const fileName of await session.getProjectFileNames()) {
-    const relPath = path.relative(session.rootDir, fileName);
-    const rawDiags = await session.getFileDiagnostics(fileName);
-    for (const diagnostic of rawDiags) {
-      diagnostics.push(formatDiagnostic(diagnostic, relPath, "baseline"));
-    }
-  }
-
-  const baseline = createBaseline(diagnostics);
-  baselines.set(session.rootDir, baseline);
-  return `Baseline captured: ${baseline.fingerprints.size} diagnostics at ${new Date(
-    baseline.createdAt,
-  ).toISOString()}`;
-}
-
-export function getBaseline(rootDir?: string): BaselineSnapshot | null {
-  if (rootDir) {
-    return baselines.get(path.resolve(rootDir)) ?? null;
-  }
-  return baselines.values().next().value ?? null;
 }

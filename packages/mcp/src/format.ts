@@ -5,7 +5,6 @@
 import type * as vscode from "vscode-languageserver-protocol";
 
 export interface FormattedDiagnostic {
-  scope: "new" | "baseline";
   file: string;
   line: number;
   col: number;
@@ -32,10 +31,8 @@ const severityMap: Record<number, FormattedDiagnostic["severity"]> = {
 export function formatDiagnostic(
   d: vscode.Diagnostic,
   filePath: string,
-  scope: "new" | "baseline",
 ): FormattedDiagnostic {
   return {
-    scope,
     file: filePath,
     line: d.range.start.line + 1,
     col: d.range.start.character + 1,
@@ -65,13 +62,9 @@ export function diagnosticsToXml(
   diagnostics: FormattedDiagnostic[],
   sessionId?: string,
 ): string {
-  const newCount = diagnostics.filter((d) => d.scope === "new").length;
-  const baselineCount = diagnostics.filter((d) => d.scope === "baseline").length;
-
   const attrs = [
     sessionId ? `session="${sessionId}"` : "",
-    `new-errors="${newCount}"`,
-    `baseline-errors="${baselineCount}"`,
+    `count="${diagnostics.length}"`,
   ]
     .filter(Boolean)
     .join(" ");
@@ -87,7 +80,7 @@ export function diagnosticsToXml(
       .join("\n");
     const chain = related ? `\n    <chain>\n${related}\n    </chain>` : "";
 
-    return `  <${tag} scope="${d.scope}" file="${d.file}" line="${d.line}" col="${d.col}" code="${d.code}"${fixable}>
+    return `  <${tag} file="${d.file}" line="${d.line}" col="${d.col}" code="${d.code}"${fixable}>
     <message>${escapeXml(d.message)}</message>${chain}
   </${tag}>`;
   });

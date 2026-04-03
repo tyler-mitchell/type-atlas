@@ -5,8 +5,6 @@
 import type { DiagnosticsSession } from "@featuretype/language-server";
 import * as path from "node:path";
 import { formatDiagnostic, type FormattedDiagnostic } from "../format.js";
-import { classifyDiagnostic } from "../baseline.js";
-import { getBaseline } from "./diagnostics.js";
 
 export async function getEnrichedFile(
   session: DiagnosticsSession,
@@ -28,14 +26,10 @@ export async function getEnrichedFile(
     return `# ${relPath} (no diagnostics)\n\n${content}`;
   }
 
-  const baseline = getBaseline(session.rootDir);
-  const diagnostics: FormattedDiagnostic[] = rawDiags.map((d) => {
-    const formatted = formatDiagnostic(d, relPath, "new");
-    formatted.scope = classifyDiagnostic(formatted, baseline);
-    return formatted;
-  });
+  const diagnostics: FormattedDiagnostic[] = rawDiags.map((d) =>
+    formatDiagnostic(d, relPath),
+  );
 
-  // Group diagnostics by line
   const diagsByLine = new Map<number, FormattedDiagnostic[]>();
   for (const d of diagnostics) {
     const existing = diagsByLine.get(d.line) ?? [];
@@ -43,13 +37,10 @@ export async function getEnrichedFile(
     diagsByLine.set(d.line, existing);
   }
 
-  // Weave diagnostics inline
   const lines = content.split("\n");
   const output: string[] = [];
-  const newCount = diagnostics.filter((d) => d.scope === "new").length;
-  const baselineCount = diagnostics.filter((d) => d.scope === "baseline").length;
 
-  output.push(`# ${relPath} — ${newCount} new, ${baselineCount} baseline diagnostics`);
+  output.push(`# ${relPath} — ${diagnostics.length} diagnostics`);
   output.push("");
 
   for (let i = 0; i < lines.length; i++) {
@@ -61,9 +52,8 @@ export async function getEnrichedFile(
     if (lineDiags) {
       for (const d of lineDiags) {
         const marker = d.severity === "error" ? "✗" : "⚠";
-        const scopeTag = d.scope === "baseline" ? " [baseline]" : "";
         output.push(
-          `     │ ${" ".repeat(Math.max(0, d.col - 1))}${marker} ${d.code}: ${d.message}${scopeTag}`,
+          `     │ ${" ".repeat(Math.max(0, d.col - 1))}${marker} ${d.code}: ${d.message}`,
         );
       }
     }

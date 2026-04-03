@@ -15,7 +15,8 @@ import type { Hover } from "vscode-languageserver-protocol";
 import { z } from "zod";
 import { classifyFailure } from "./failure";
 import { getCodeActions } from "./tools/actions";
-import { getBaseline, getDiagnostics, snapshotBaseline } from "./tools/diagnostics";
+import { getDiagnostics } from "./tools/diagnostics";
+import { getErrorsAndFixes } from "./tools/errors-and-fixes";
 import { getEnrichedFile } from "./tools/enriched-file";
 import {
   getCallHierarchy,
@@ -296,7 +297,6 @@ export function createMcpServer(manager: HostManager): McpServer {
     },
     async (args) => {
       const result = await manager.attach(args.projectRoot);
-      await snapshotBaseline(await manager.getDiagnosticsSession(result.root));
       const status = result.isNew
         ? "Attached new project"
         : "Switched to existing project";
@@ -351,19 +351,13 @@ export function createMcpServer(manager: HostManager): McpServer {
     "get_diagnostics",
     {
       description:
-        "Get TypeScript errors and warnings for a file or the whole project. Returns structured diagnostics with baseline awareness (new vs pre-existing errors). Use summary mode for project-wide scans to avoid large output.",
+        "Get TypeScript errors and warnings for a file or the whole project. Use summary mode for project-wide scans to avoid large output.",
       inputSchema: {
         file: z
           .string()
           .optional()
           .describe(
             "File path relative to project root. Omit for all project diagnostics.",
-          ),
-        scope: z
-          .enum(["new", "baseline", "all"])
-          .optional()
-          .describe(
-            "Filter: 'new' for errors you introduced, 'baseline' for pre-existing, 'all' for both (default: all)",
           ),
         severity: z
           .enum(["error", "warning", "all"])
@@ -379,12 +373,9 @@ export function createMcpServer(manager: HostManager): McpServer {
       outputSchema: {
         root: z.string(),
         file: z.string().nullable(),
-        scope: z.enum(["new", "baseline", "all"]),
         severity: z.enum(["error", "warning", "all"]),
         summary: z.boolean(),
         totalCount: z.number().int().nonnegative(),
-        newErrorCount: z.number().int().nonnegative(),
-        baselineErrorCount: z.number().int().nonnegative(),
         totalErrorCount: z.number().int().nonnegative(),
         totalWarningCount: z.number().int().nonnegative(),
         files: z
@@ -394,12 +385,13 @@ export function createMcpServer(manager: HostManager): McpServer {
               totalCount: z.number().int().nonnegative(),
               totalErrorCount: z.number().int().nonnegative(),
               totalWarningCount: z.number().int().nonnegative(),
-              newCount: z.number().int().nonnegative(),
-              baselineCount: z.number().int().nonnegative(),
               generated: z.boolean(),
             }),
           )
           .optional(),
+        limited: z.boolean().optional(),
+        projectFileCount: z.number().int().nonnegative().optional(),
+        projectFileLimit: z.number().int().nonnegative().optional(),
         error: z
           .object({ code: z.string(), message: z.string() })
           .nullable()
@@ -422,12 +414,9 @@ export function createMcpServer(manager: HostManager): McpServer {
             structuredContent: {
               root: session.rootDir,
               file: args.file,
-              scope: (args.scope ?? "all") as "new" | "baseline" | "all",
               severity: (args.severity ?? "all") as "error" | "warning" | "all",
               summary: args.summary ?? false,
               totalCount: 0,
-              newErrorCount: 0,
-              baselineErrorCount: 0,
               totalErrorCount: 0,
               totalWarningCount: 0,
               error: { code: failure.code, message: failure.message },
@@ -438,7 +427,6 @@ export function createMcpServer(manager: HostManager): McpServer {
 
       const diagnosticArgs = {
         file: args.file,
-        scope: args.scope as "new" | "baseline" | "all" | undefined,
         severity: args.severity as "error" | "warning" | "all" | undefined,
         summary: args.summary,
       };
@@ -448,48 +436,16 @@ export function createMcpServer(manager: HostManager): McpServer {
         structuredContent: {
           root: session.rootDir,
           file: args.file ?? null,
-          scope: diagnosticArgs.scope ?? "all",
           severity: diagnosticArgs.severity ?? "all",
           summary: diagnosticArgs.summary ?? false,
           totalCount: snapshot.totalCount,
-          newErrorCount: snapshot.newCount,
-          baselineErrorCount: snapshot.baselineCount,
           totalErrorCount: snapshot.totalErrorCount,
           totalWarningCount: snapshot.totalWarningCount,
           files: snapshot.files,
-          error: null,
-        },
-      };
-    },
-  );
-
-  server.registerTool(
-    "snapshot_baseline",
-    {
-      description:
-        "Capture current diagnostic state as baseline for the active project. Subsequent get_diagnostics calls will tag errors as 'new' or 'baseline'. Call this before making changes to distinguish your errors from pre-existing ones.",
-      outputSchema: {
-        root: z.string(),
-        createdAt: z.string(),
-        diagnosticCount: z.number().int().nonnegative(),
-      },
-    },
-    async () => {
-      const session = await manager.getDiagnosticsSession();
-      const text = await snapshotBaseline(session);
-      const baseline = getBaseline(session.rootDir);
-
-      return {
-        content: [
-          {
-            type: "text",
-            text,
-          },
-        ],
-        structuredContent: {
-          root: session.rootDir,
-          createdAt: new Date(baseline?.createdAt ?? Date.now()).toISOString(),
-          diagnosticCount: baseline?.fingerprints.size ?? 0,
+          limited: snapshot.limited ?? false,
+          projectFileCount: snapshot.projectFileCount,
+          projectFileLimit: snapshot.projectFileLimit,
+          error: snapshot.error ?? null,
         },
       };
     },
@@ -866,6 +822,75 @@ export function createMcpServer(manager: HostManager): McpServer {
   );
 
   server.registerTool(
+    "find_errors_and_fixes",
+    {
+      description:
+        "Get diagnostics paired with their available code actions in a single call. Prefer this over calling get_diagnostics then get_code_actions separately. Defaults to errors only — pass severity: 'all' to include warnings.",
+      inputSchema: {
+        file: z
+          .string()
+          .optional()
+          .describe(
+            "File path relative to project root. Omit to scan the whole project (blocked for large workspaces — attach a smaller root or pass a specific file).",
+          ),
+        severity: z
+          .enum(["error", "warning", "all"])
+          .optional()
+          .describe("Filter by severity. Defaults to 'error'."),
+      },
+      outputSchema: {
+        totalCount: z.number().int().nonnegative(),
+        totalErrorCount: z.number().int().nonnegative(),
+        totalWarningCount: z.number().int().nonnegative(),
+        limited: z.boolean().optional(),
+        projectFileCount: z.number().int().nonnegative().optional(),
+        projectFileLimit: z.number().int().nonnegative().optional(),
+        items: z.array(
+          z.object({
+            file: z.string(),
+            line: z.number().int().positive(),
+            col: z.number().int().positive(),
+            severity: z.enum(["error", "warning", "info", "hint"]),
+            code: z.string(),
+            message: z.string(),
+            fixes: z.array(
+              z.object({
+                title: z.string(),
+                kind: z.string(),
+                edits: z.array(
+                  z.object({
+                    file: z.string(),
+                    line: z.number().int().positive(),
+                    newText: z.string(),
+                  }),
+                ),
+              }),
+            ),
+          }),
+        ),
+      },
+    },
+    async (args) => {
+      const session = args.file
+        ? await manager.getDiagnosticsSessionForFile(args.file)
+        : await manager.getDiagnosticsSession();
+      const snapshot = await getErrorsAndFixes(session, args);
+      return {
+        content: [{ type: "text", text: snapshot.text }],
+        structuredContent: {
+          totalCount: snapshot.totalCount,
+          totalErrorCount: snapshot.totalErrorCount,
+          totalWarningCount: snapshot.totalWarningCount,
+          limited: snapshot.limited ?? false,
+          projectFileCount: snapshot.projectFileCount,
+          projectFileLimit: snapshot.projectFileLimit,
+          items: snapshot.items,
+        },
+      };
+    },
+  );
+
+  server.registerTool(
     "get_enriched_file",
     {
       description:
@@ -1200,7 +1225,6 @@ export async function createMcpRuntime(
   const manager = new HostManager(projectRoot ?? null, createDiagnosticsSession);
   if (projectRoot) {
     await manager.attach(projectRoot);
-    await snapshotBaseline(await manager.getDiagnosticsSession(projectRoot));
   }
 
   const server = createMcpServer(manager);

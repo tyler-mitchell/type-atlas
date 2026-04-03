@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DiagnosticsSession } from "@featuretype/language-server";
-import { getDiagnostics, snapshotBaseline } from "./diagnostics.js";
+import { getDiagnostics } from "./diagnostics.js";
 
 type MinimalDiagnostic = {
   range: {
@@ -21,6 +21,7 @@ function createSessionMock(
     tsdk: `${rootDir}/node_modules/typescript/lib`,
     getProjectFileNames: async () =>
       Object.keys(diagnosticsByFile).map((file) => `${rootDir}/${file}`),
+    getWorkspaceDiagnostics: async () => null,
     getFileDiagnostics: async (filePath: string) => {
       const relPath = filePath.replace(`${rootDir}/`, "");
       return (diagnosticsByFile[relPath] ?? []) as never;
@@ -46,36 +47,24 @@ function makeDiagnostic(
 }
 
 describe("getDiagnostics", () => {
-  it("returns accurate scope counts in summary mode", async () => {
-    const diagnosticsByFile = {
+  it("returns accurate aggregate counts in summary mode", async () => {
+    const session = createSessionMock("/repo", {
       "src/example.ts": [
-        makeDiagnostic(0, 1001, "baseline error"),
-        makeDiagnostic(1, 2001, "baseline warning", 2),
+        makeDiagnostic(0, 1001, "error"),
+        makeDiagnostic(1, 2001, "warning", 2),
+        makeDiagnostic(2, 3001, "another error"),
       ],
-    };
-    const session = createSessionMock("/repo", diagnosticsByFile);
-
-    await snapshotBaseline(session);
-
-    diagnosticsByFile["src/example.ts"] = [
-      ...diagnosticsByFile["src/example.ts"],
-      makeDiagnostic(2, 3001, "new error"),
-    ];
+    });
 
     const snapshot = await getDiagnostics(session, {
       summary: true,
-      scope: "all",
       severity: "all",
     });
 
-    expect(snapshot.newCount).toBe(1);
-    expect(snapshot.baselineCount).toBe(2);
     expect(snapshot.totalCount).toBe(3);
     expect(snapshot.totalErrorCount).toBe(2);
     expect(snapshot.totalWarningCount).toBe(1);
-    expect(snapshot.text).toContain(
-      "3 diagnostics (2 errors, 1 warnings | 1 new, 2 baseline)",
-    );
+    expect(snapshot.text).toContain("3 diagnostics (2 errors, 1 warnings)");
   });
 
   it("includes structured per-file summaries with source files before generated output", async () => {
@@ -89,7 +78,6 @@ describe("getDiagnostics", () => {
 
     const snapshot = await getDiagnostics(session, {
       summary: true,
-      scope: "all",
       severity: "all",
     });
 
@@ -99,8 +87,6 @@ describe("getDiagnostics", () => {
         totalCount: 2,
         totalErrorCount: 1,
         totalWarningCount: 1,
-        newCount: 2,
-        baselineCount: 0,
         generated: false,
       },
       {
@@ -108,12 +94,10 @@ describe("getDiagnostics", () => {
         totalCount: 1,
         totalErrorCount: 1,
         totalWarningCount: 0,
-        newCount: 1,
-        baselineCount: 0,
         generated: true,
       },
     ]);
-    expect(snapshot.text).toContain("src/example.ts: 1 errors, 1 warnings (2 new)");
-    expect(snapshot.text).toContain("dist/generated.js [generated]: 1 errors (1 new)");
+    expect(snapshot.text).toContain("src/example.ts: 1 errors, 1 warnings");
+    expect(snapshot.text).toContain("dist/generated.js [generated]: 1 errors");
   });
 });
