@@ -254,6 +254,7 @@ export interface DiagnosticsSession {
   getFileDocumentSymbols(
     filePath: string,
   ): Promise<Array<DocumentSymbol | SymbolInformation>>;
+  notifyFilesChanged(filePaths: string[]): Promise<void>;
   notifyFileChanged(filePath: string): Promise<void>;
   dispose(): Promise<void>;
 }
@@ -1403,6 +1404,9 @@ export async function createDiagnosticsSession(
     },
     getFileDocumentSymbols(filePath: string) {
       return client.getDocumentSymbols(filePath);
+    },
+    async notifyFilesChanged(filePaths: string[]) {
+      await client.notifyWatchedFiles(filePaths);
     },
     async notifyFileChanged(filePath: string) {
       await client.notifyWatchedFiles([filePath]);

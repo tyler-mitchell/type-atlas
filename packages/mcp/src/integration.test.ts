@@ -209,6 +209,93 @@ async function createLargeDiagnosticProject(parentDir: string): Promise<string> 
   return projectRoot;
 }
 
+async function createReferenceSummaryProject(parentDir: string): Promise<string> {
+  const projectRoot = await mkdtemp(
+    path.join(parentDir, "featuretype-mcp-reference-summary-"),
+  );
+  const srcDir = path.join(projectRoot, "src");
+
+  await mkdir(srcDir, { recursive: true });
+  await writeFile(
+    path.join(projectRoot, "tsconfig.json"),
+    JSON.stringify(
+      {
+        compilerOptions: {
+          module: "NodeNext",
+          moduleResolution: "NodeNext",
+          target: "ES2022",
+          strict: true,
+        },
+        include: ["src/**/*.ts"],
+      },
+      null,
+      2,
+    ),
+  );
+  await writeFile(
+    path.join(srcDir, "shared.ts"),
+    "export const sharedValue = 1;\n",
+  );
+  await writeFile(
+    path.join(srcDir, "a.ts"),
+    [
+      'import { sharedValue } from "./shared.js";',
+      "export const first = sharedValue;",
+      "",
+      "export function readAgain() {",
+      "  return sharedValue;",
+      "}",
+      "",
+    ].join("\n"),
+  );
+  await writeFile(
+    path.join(srcDir, "b.ts"),
+    [
+      'import { sharedValue } from "./shared.js";',
+      "",
+      "export const second = sharedValue + 1;",
+      "",
+    ].join("\n"),
+  );
+
+  return projectRoot;
+}
+
+async function createValidationProject(parentDir: string): Promise<string> {
+  const projectRoot = await mkdtemp(
+    path.join(parentDir, "featuretype-mcp-validate-files-"),
+  );
+  const srcDir = path.join(projectRoot, "src");
+
+  await mkdir(srcDir, { recursive: true });
+  await writeFile(
+    path.join(projectRoot, "tsconfig.json"),
+    JSON.stringify(
+      {
+        compilerOptions: {
+          module: "NodeNext",
+          moduleResolution: "NodeNext",
+          target: "ES2022",
+          strict: true,
+        },
+        include: ["src/**/*.ts"],
+      },
+      null,
+      2,
+    ),
+  );
+  await writeFile(
+    path.join(srcDir, "a.ts"),
+    "export const first: string = \"ok\";\n",
+  );
+  await writeFile(
+    path.join(srcDir, "b.ts"),
+    "export const second: string = \"ok\";\n",
+  );
+
+  return projectRoot;
+}
+
 describe("featuretype MCP local probes", () => {
   let handle: TestClientHandle | undefined;
   let tempDir: string | undefined;
@@ -374,6 +461,119 @@ describe("featuretype MCP local probes", () => {
     expect(
       (readStructuredContent(result)?.error as { code?: string } | undefined)?.code,
     ).toBe("NOT_FOUND");
+  });
+
+  it("summarizes references by file with structured output", async () => {
+    tempDir = await createRepoTempDir("featuretype-mcp-reference-summary-parent-");
+    const projectRoot = await createReferenceSummaryProject(tempDir);
+
+    handle = await createInMemoryTestClient(projectRoot);
+
+    const result = await handle.client.callTool({
+      name: "get_reference_summary",
+      arguments: {
+        file: "src/shared.ts",
+        line: 1,
+        col: 14,
+      },
+    });
+
+    const text = readTextContent(result);
+    const structured = readStructuredContent(result);
+
+    expect(text).toContain("references across");
+    expect(text).toContain('import { sharedValue } from "./shared.js";');
+    expect(text).toContain("src/a.ts (3)");
+    expect(Number(structured?.totalReferences ?? 0)).toBe(6);
+    expect(Number(structured?.totalFiles ?? 0)).toBe(3);
+    expect(
+      (structured?.files as Array<{ file?: string; count?: number }> | undefined)?.[0],
+    ).toMatchObject({
+      file: "src/a.ts",
+      count: 3,
+    });
+  }, 60_000);
+
+  it("validates several changed files in one tool call", async () => {
+    tempDir = await createRepoTempDir("featuretype-mcp-validate-files-parent-");
+    const projectRoot = await createValidationProject(tempDir);
+
+    handle = await createInMemoryTestClient(projectRoot);
+
+    await writeFile(
+      path.join(projectRoot, "src", "a.ts"),
+      "export const first: string = 1;\n",
+    );
+    await writeFile(
+      path.join(projectRoot, "src", "b.ts"),
+      "export const second: string = 2;\n",
+    );
+
+    const result = await handle.client.callTool({
+      name: "validate_files",
+      arguments: {
+        files: ["src/a.ts", "src/b.ts"],
+        severity: "all",
+        includeItems: true,
+      },
+    });
+
+    const text = readTextContent(result);
+    const structured = readStructuredContent(result);
+    const items =
+      (structured?.items as Array<{ file?: string; fixes?: unknown[] }> | undefined) ?? [];
+
+    expect(hasToolError(result)).toBe(false);
+    expect(text).toContain("Validated 2 files.");
+    expect(Number(structured?.fileCount ?? 0)).toBe(2);
+    expect(Number(structured?.totalErrorCount ?? 0)).toBe(2);
+    expect(items).toHaveLength(2);
+    expect(items.every((item) => item.file === "src/a.ts" || item.file === "src/b.ts")).toBe(
+      true,
+    );
+  }, 60_000);
+
+  it("rejects whitespace-only validate_files input deterministically", async () => {
+    handle = await createInMemoryTestClient(demoWorkspaceRoot);
+
+    const result = await handle.client.callTool({
+      name: "validate_files",
+      arguments: {
+        files: ["   "],
+      },
+    });
+
+    expect(hasToolError(result)).toBe(true);
+    expect(readTextContent(result)).toContain(
+      "validate_files requires at least one non-empty file path.",
+    );
+    expect(
+      (readStructuredContent(result)?.error as { code?: string } | undefined)?.code,
+    ).toBe("INVALID_INPUT");
+  });
+
+  it("rejects validate_files when absolute paths are outside the active root", async () => {
+    tempDir = await createRepoTempDir("featuretype-mcp-validate-files-outside-parent-");
+    const projectRoot = await createValidationProject(tempDir);
+    const outsideRootFile = path.join(projectRoot, "..", "outside.ts");
+
+    handle = await createInMemoryTestClient(projectRoot);
+    await writeFile(outsideRootFile, "export const outside = 1;\n");
+
+    const result = await handle.client.callTool({
+      name: "validate_files",
+      arguments: {
+        files: [outsideRootFile],
+      },
+    });
+
+    expect(hasToolError(result)).toBe(true);
+    expect(readTextContent(result)).toContain(
+      "validate_files requires all files to resolve under the same attached root.",
+    );
+    expect(
+      (readStructuredContent(result)?.error as { code?: string } | undefined)?.code,
+    ).toBe("INVALID_INPUT");
   });
 
   it("searches workspace symbols across attached roots without per-root node_modules", async () => {

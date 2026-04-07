@@ -21,6 +21,30 @@ import {
   formatSemanticLocation,
 } from "./semantic-locations.js";
 
+const DEFAULT_REFERENCE_SUMMARY_MAX_FILES = 20;
+const DEFAULT_REFERENCE_SUMMARY_MAX_REFERENCES_PER_FILE = 5;
+
+export interface ReferenceSummaryOccurrence {
+  line: number;
+  col: number;
+  text: string;
+}
+
+export interface ReferenceSummaryFile {
+  file: string;
+  count: number;
+  references: ReferenceSummaryOccurrence[];
+  omittedCount: number;
+}
+
+export interface ReferenceSummarySnapshot {
+  text: string;
+  totalReferences: number;
+  totalFiles: number;
+  files: ReferenceSummaryFile[];
+  omittedFiles: number;
+}
+
 export async function getDefinition(
   session: DiagnosticsSession,
   args: { file: string; line: number; col: number },
@@ -69,6 +93,166 @@ export async function getReferences(
   });
 
   return `${results.length} references:\n${results.join("\n")}`;
+}
+
+function clampReferenceSummaryValue(
+  value: number | undefined,
+  min: number,
+  max: number,
+): number {
+  if (typeof value !== "number" || Number.isNaN(value)) {
+    return min;
+  }
+
+  return Math.max(min, Math.min(max, Math.floor(value)));
+}
+
+function dedupeReferenceLocations(locations: Location[]): Location[] {
+  const seen = new Set<string>();
+  const deduped: Location[] = [];
+
+  for (const location of locations) {
+    const key = [
+      location.uri,
+      location.range.start.line,
+      location.range.start.character,
+      location.range.end.line,
+      location.range.end.character,
+    ].join(":");
+
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    deduped.push(location);
+  }
+
+  return deduped;
+}
+
+function formatReferenceExcerpt(sourceLine: string | undefined): string {
+  const compactLine = (sourceLine ?? "")
+    .trim()
+    .replace(/\s+/g, " ");
+
+  if (!compactLine) {
+    return "(source unavailable)";
+  }
+
+  return compactLine.length > 120
+    ? `${compactLine.slice(0, 117)}...`
+    : compactLine;
+}
+
+export async function getReferenceSummary(
+  session: DiagnosticsSession,
+  args: {
+    file: string;
+    line: number;
+    col: number;
+    maxFiles?: number;
+    maxReferencesPerFile?: number;
+  },
+): Promise<ReferenceSummarySnapshot> {
+  const absPath = path.resolve(session.rootDir, args.file);
+  const position = { line: args.line - 1, character: args.col - 1 };
+  const maxFiles = clampReferenceSummaryValue(
+    args.maxFiles ?? DEFAULT_REFERENCE_SUMMARY_MAX_FILES,
+    1,
+    100,
+  );
+  const maxReferencesPerFile = clampReferenceSummaryValue(
+    args.maxReferencesPerFile ?? DEFAULT_REFERENCE_SUMMARY_MAX_REFERENCES_PER_FILE,
+    1,
+    20,
+  );
+
+  const locations = dedupeReferenceLocations(
+    await session.getFileReferences(absPath, position),
+  );
+
+  if (locations.length === 0) {
+    return {
+      text: await explainFailure("get_reference_summary", args.file, session, {
+        position: `${args.line}:${args.col}`,
+      }),
+      totalReferences: 0,
+      totalFiles: 0,
+      files: [],
+      omittedFiles: 0,
+    };
+  }
+
+  const locationsByFile = new Map<string, Location[]>();
+  for (const location of locations) {
+    const refPath = path.relative(session.rootDir, URI.parse(location.uri).fsPath);
+    const existing = locationsByFile.get(refPath) ?? [];
+    existing.push(location);
+    locationsByFile.set(refPath, existing);
+  }
+
+  const fileSummaries = await Promise.all(
+    [...locationsByFile.entries()].map(async ([file, fileLocations]) => {
+      const sortedLocations = [...fileLocations].sort((left, right) => {
+        if (left.range.start.line !== right.range.start.line) {
+          return left.range.start.line - right.range.start.line;
+        }
+        return left.range.start.character - right.range.start.character;
+      });
+      const absFilePath = URI.parse(sortedLocations[0]?.uri ?? "").fsPath;
+      const fileContents = (await session.getFileContent(absFilePath)).split(/\r?\n/);
+      const references = sortedLocations
+        .slice(0, maxReferencesPerFile)
+        .map((location) => ({
+          line: location.range.start.line + 1,
+          col: location.range.start.character + 1,
+          text: formatReferenceExcerpt(fileContents[location.range.start.line]),
+        }));
+
+      return {
+        file,
+        count: sortedLocations.length,
+        references,
+        omittedCount: Math.max(0, sortedLocations.length - references.length),
+      } satisfies ReferenceSummaryFile;
+    }),
+  );
+
+  const sortedFiles = fileSummaries.sort((left, right) => {
+    if (right.count !== left.count) {
+      return right.count - left.count;
+    }
+    return left.file.localeCompare(right.file);
+  });
+  const visibleFiles = sortedFiles.slice(0, maxFiles);
+  const omittedFiles = Math.max(0, sortedFiles.length - visibleFiles.length);
+
+  const lines = [
+    `${locations.length} references across ${sortedFiles.length} files:`,
+  ];
+
+  for (const summary of visibleFiles) {
+    lines.push(`${summary.file} (${summary.count})`);
+    for (const reference of summary.references) {
+      lines.push(`  ${reference.line}:${reference.col}  ${reference.text}`);
+    }
+    if (summary.omittedCount > 0) {
+      lines.push(`  … ${summary.omittedCount} more references omitted`);
+    }
+  }
+
+  if (omittedFiles > 0) {
+    lines.push(`… ${omittedFiles} more files omitted`);
+  }
+
+  return {
+    text: lines.join("\n"),
+    totalReferences: locations.length,
+    totalFiles: sortedFiles.length,
+    files: visibleFiles,
+    omittedFiles,
+  };
 }
 
 function formatCallHierarchyItem(

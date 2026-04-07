@@ -6,6 +6,7 @@ import type { DiagnosticsSession } from "@featuretype/language-server";
 import type * as vscode from "vscode-languageserver-protocol";
 import { explainFailure } from "../failure.js";
 import { collectWorkspaceTextEdits } from "./workspace-edits.js";
+import * as path from "node:path";
 
 export async function getCodeActions(
   session: DiagnosticsSession,

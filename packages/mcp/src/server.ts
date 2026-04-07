@@ -25,6 +25,7 @@ import {
   getDocumentHighlights,
   getFileReferencesForDocument,
   getImplementations,
+  getReferenceSummary,
   getReferences,
   getTypeDefinition,
 } from "./tools/navigation";
@@ -39,6 +40,7 @@ import {
   searchWorkspaceSymbolsAcrossSessions,
 } from "./tools/symbols";
 import { getSignature, getTypeAt } from "./tools/type-info";
+import { validateFiles } from "./tools/validation.js";
 import {
   createSlidingWindowRateLimiter,
   parsePositiveIntEnv,
@@ -73,7 +75,10 @@ const DIAGNOSTIC_RATE_LIMIT_WINDOW_MS_ENV =
   "FEATURETYPE_DIAGNOSTIC_TOOL_WINDOW_MS";
 const DEFAULT_DIAGNOSTIC_RATE_LIMIT_MAX_CALLS = 120;
 const DEFAULT_DIAGNOSTIC_RATE_LIMIT_WINDOW_MS = 60_000;
-type DiagnosticToolName = "get_diagnostics" | "find_errors_and_fixes";
+type DiagnosticToolName =
+  | "get_diagnostics"
+  | "find_errors_and_fixes"
+  | "validate_files";
 const MAX_PERSISTED_ROOTS = 12;
 const toRetryAfterSeconds = (resetAt: number, now: number = Date.now()): number =>
   Math.max(1, Math.ceil(Math.max(0, resetAt - now) / 1000));
@@ -179,6 +184,19 @@ const getDiagnosticRateLimitWindowMs = (): number =>
     DIAGNOSTIC_RATE_LIMIT_WINDOW_MS_ENV,
     DEFAULT_DIAGNOSTIC_RATE_LIMIT_WINDOW_MS,
   );
+
+const isProjectRelativePath = (
+  rootDir: string,
+  filePath: string,
+): { path: string; isInRoot: boolean } => {
+  const relativePath = path.relative(rootDir, filePath);
+  const isInRoot =
+    relativePath !== "" &&
+    relativePath !== ".." &&
+    !relativePath.startsWith(`..${path.sep}`) &&
+    !path.isAbsolute(relativePath);
+  return { path: relativePath, isInRoot };
+};
 
 function getFeatureTypeRuntimeMode(): "auto" | "source" | "dist" {
   const configuredMode =
@@ -378,7 +396,7 @@ class HostManager {
   resolveRootForFile(filePath: string): string | null {
     if (path.isAbsolute(filePath)) {
       const absPath = path.resolve(filePath);
-      return this.findBestAttachedRoot(absPath) ?? this.activeRoot;
+      return this.findBestAttachedRoot(absPath);
     }
 
     const attachedRoots = this.getAttachedRoots();
@@ -524,6 +542,26 @@ const diagnosticWithFixesSchema = z.object({
   code: z.string(),
   message: z.string(),
   fixes: z.array(diagnosticFixSchema),
+});
+
+const referenceSummaryOccurrenceSchema = z.object({
+  line: z.number().int().positive(),
+  col: z.number().int().positive(),
+  text: z.string(),
+});
+
+const referenceSummaryFileSchema = z.object({
+  file: z.string(),
+  count: z.number().int().nonnegative(),
+  references: z.array(referenceSummaryOccurrenceSchema),
+  omittedCount: z.number().int().nonnegative(),
+});
+
+const validatedFileSummarySchema = z.object({
+  file: z.string(),
+  totalCount: z.number().int().nonnegative(),
+  totalErrorCount: z.number().int().nonnegative(),
+  totalWarningCount: z.number().int().nonnegative(),
 });
 
 function formatHoverContents(hover: Hover): string {
@@ -920,6 +958,59 @@ export function createMcpServer(manager: HostManager): McpServer {
   );
 
   server.registerTool(
+    "get_reference_summary",
+    {
+      description:
+        "Summarize references for a symbol by file, with grouped counts and representative usage lines. Prefer this over get_references when you need triage rather than a long flat location list.",
+      inputSchema: {
+        file: z.string().describe("File path relative to project root"),
+        line: z.number().describe("Line number (1-based)"),
+        col: z.number().describe("Column number (1-based)"),
+        maxFiles: z
+          .number()
+          .int()
+          .min(1)
+          .max(100)
+          .optional()
+          .describe("Maximum number of files to include. Defaults to 20."),
+        maxReferencesPerFile: z
+          .number()
+          .int()
+          .min(1)
+          .max(20)
+          .optional()
+          .describe(
+            "Maximum number of representative references to include per file. Defaults to 5.",
+          ),
+      },
+      outputSchema: {
+        totalReferences: z.number().int().nonnegative(),
+        totalFiles: z.number().int().nonnegative(),
+        omittedFiles: z.number().int().nonnegative(),
+        files: z.array(referenceSummaryFileSchema),
+      },
+    },
+    async (args) => {
+      const session = await manager.getDiagnosticsSessionForFile(args.file);
+      const summary = await getReferenceSummary(session, args);
+      return {
+        content: [
+          {
+            type: "text",
+            text: summary.text,
+          },
+        ],
+        structuredContent: {
+          totalReferences: summary.totalReferences,
+          totalFiles: summary.totalFiles,
+          omittedFiles: summary.omittedFiles,
+          files: summary.files,
+        },
+      };
+    },
+  );
+
+  server.registerTool(
     "get_document_highlights",
     {
       description:
@@ -1163,6 +1254,12 @@ export function createMcpServer(manager: HostManager): McpServer {
           .describe(
             "Include full per-diagnostic fix objects in structuredContent. Defaults to true; pass false to omit them and rely on the text summary.",
           ),
+        includeEmptyFixes: z
+          .boolean()
+          .optional()
+          .describe(
+            "Include fixes that do not include a concrete text edit (defaults to false to reduce noise).",
+          ),
       },
       outputSchema: {
         totalErrorCount: z.number().int().nonnegative(),
@@ -1221,6 +1318,161 @@ export function createMcpServer(manager: HostManager): McpServer {
           projectFileCount: snapshot.projectFileCount,
           projectFileLimit: snapshot.projectFileLimit,
           ...((args.includeItems ?? true) ? { items: snapshot.items } : {}),
+        },
+      };
+    },
+  );
+
+  server.registerTool(
+    "validate_files",
+    {
+      description:
+        "Validate several changed files in one call. Refreshes the language server for those files, then returns grouped diagnostic counts and optional fix details for the changed-file set.",
+      inputSchema: {
+        files: z
+          .array(z.string())
+          .min(1)
+          .max(50)
+          .describe(
+            "File paths relative to one attached project root. All files must resolve under the same attached root.",
+          ),
+        severity: z
+          .enum(["error", "warning", "all"])
+          .optional()
+          .describe("Filter by severity. Defaults to 'all'."),
+        includeItems: z
+          .boolean()
+          .optional()
+          .describe(
+            "Include per-diagnostic fix objects in structuredContent. Defaults to false for a more compact result.",
+          ),
+      },
+      outputSchema: {
+        fileCount: z.number().int().nonnegative(),
+        totalErrorCount: z.number().int().nonnegative(),
+        totalWarningCount: z.number().int().nonnegative(),
+        totalCount: z.number().int().nonnegative(),
+        files: z.array(validatedFileSummarySchema),
+        items: z.array(diagnosticWithFixesSchema).optional(),
+        error: z
+          .object({ code: z.string(), message: z.string() })
+          .nullable()
+          .optional(),
+      },
+    },
+    async (args) => {
+      const normalizedFiles = [...new Set(args.files.map((file) => file.trim()))]
+        .filter((file) => file.length > 0);
+      if (normalizedFiles.length === 0) {
+        const message = "validate_files requires at least one non-empty file path.";
+        return {
+          isError: true,
+          content: [{ type: "text", text: message }],
+          structuredContent: {
+            fileCount: 0,
+            totalCount: 0,
+            totalErrorCount: 0,
+            totalWarningCount: 0,
+            files: [],
+            error: {
+              code: "INVALID_INPUT",
+              message,
+            },
+          },
+        };
+      }
+      const firstFile = normalizedFiles[0] ?? "";
+      const session = await (async () => {
+        if (!path.isAbsolute(firstFile)) {
+          return manager.getDiagnosticsSessionForFile(firstFile);
+        }
+
+        try {
+          return await manager.getDiagnosticsSessionForFile(firstFile);
+        } catch (error) {
+          if (error instanceof Error && error.message.includes("No active project")) {
+            return manager.getDiagnosticsSession();
+          }
+          throw error;
+        }
+      })();
+      const rateLimit = manager.checkDiagnosticToolRateLimit(
+        "validate_files",
+        session.rootDir,
+      );
+      if (!rateLimit.success) {
+        const message = [
+          "Diagnostic request rate limit reached.",
+          `Max ${getDiagnosticRateLimitMaxCalls()} calls per`,
+          `${getDiagnosticRateLimitWindowMs()}ms for validate_files is in effect.`,
+          `Retry after ${toRetryAfterSeconds(rateLimit.reset)} seconds.`,
+        ].join(" ");
+        return {
+          isError: true,
+          content: [{ type: "text", text: message }],
+          structuredContent: {
+            fileCount: 0,
+            totalCount: 0,
+            totalErrorCount: 0,
+            totalWarningCount: 0,
+            files: [],
+            error: {
+              code: "RATE_LIMIT_EXCEEDED",
+              message,
+            },
+          },
+        };
+      }
+
+      const normalizedPaths: string[] = [];
+      for (const file of normalizedFiles) {
+        const absPath = path.isAbsolute(file)
+          ? path.resolve(file)
+          : path.resolve(session.rootDir, file);
+        const { path: relativePath, isInRoot } = isProjectRelativePath(
+          session.rootDir,
+          absPath,
+        );
+
+        if (!isInRoot) {
+          const message =
+            "validate_files requires all files to resolve under the same attached root.";
+          return {
+            isError: true,
+            content: [{ type: "text", text: message }],
+            structuredContent: {
+              fileCount: 0,
+              totalCount: 0,
+              totalErrorCount: 0,
+              totalWarningCount: 0,
+              files: [],
+              error: {
+                code: "INVALID_INPUT",
+                message,
+              },
+            },
+          };
+        }
+
+        normalizedPaths.push(relativePath);
+      }
+
+      await session.notifyFilesChanged(normalizedPaths);
+      const snapshot = await validateFiles(session, {
+        files: normalizedPaths,
+        severity: args.severity,
+        includeItems: args.includeItems,
+      });
+      return {
+        content: [{ type: "text", text: snapshot.text }],
+        structuredContent: {
+          fileCount: snapshot.fileCount,
+          totalErrorCount: snapshot.totalErrorCount,
+          totalWarningCount: snapshot.totalWarningCount,
+          totalCount: snapshot.totalCount,
+          files: snapshot.files,
+          error: null,
+          ...((args.includeItems ?? false) ? { items: snapshot.items } : {}),
         },
       };
     },

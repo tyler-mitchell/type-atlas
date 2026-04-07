@@ -47,11 +47,34 @@ export interface ErrorsAndFixesSnapshot {
 
 const MAX_PROJECT_DIAGNOSTIC_FILES = 250;
 
+export function extractCodeActionFixes(
+  rootDir: string,
+  actions: ReadonlyArray<vscode.CodeAction | vscode.Command>,
+  includeEmptyFixes: boolean,
+): DiagnosticFix[] {
+  return actions.flatMap((action): DiagnosticFix[] => {
+    const kind = "kind" in action ? (action.kind ?? "quickfix") : "command";
+    const edits =
+      "edit" in action
+        ? collectWorkspaceTextEdits(rootDir, action.edit)
+        : [];
+
+    if (edits.length > 0 || includeEmptyFixes) {
+      return [{ title: action.title, kind, edits }];
+    }
+
+    return [];
+  });
+}
+
 async function fetchActionsForDiagnostic(
   session: DiagnosticsSession,
   absPath: string,
   diagnostic: FormattedDiagnostic,
   rawDiags: vscode.Diagnostic[],
+  options: {
+    includeEmptyFixes: boolean;
+  },
 ): Promise<DiagnosticFix[]> {
   const range: vscode.Range = {
     start: {
@@ -77,21 +100,16 @@ async function fetchActionsForDiagnostic(
 
   if (!actions || actions.length === 0) return [];
 
-  return actions.map((action): DiagnosticFix => {
-    const kind = "kind" in action ? (action.kind ?? "quickfix") : "command";
-    const edits =
-      "edit" in action
-        ? collectWorkspaceTextEdits(session.rootDir, action.edit)
-        : [];
-
-    return { title: action.title, kind, edits };
-  });
+  return extractCodeActionFixes(session.rootDir, actions, options.includeEmptyFixes);
 }
 
 async function collectForFile(
   session: DiagnosticsSession,
   absPath: string,
   severityFilter: "error" | "warning" | "all",
+  options: {
+    includeEmptyFixes: boolean;
+  },
 ): Promise<DiagnosticWithFixes[]> {
   const relPath = path.relative(session.rootDir, absPath);
   const rawDiags = await session.getFileDiagnostics(absPath);
@@ -106,7 +124,13 @@ async function collectForFile(
 
   return Promise.all(
     filtered.map(async (diag): Promise<DiagnosticWithFixes> => {
-      const fixes = await fetchActionsForDiagnostic(session, absPath, diag, rawDiags);
+      const fixes = await fetchActionsForDiagnostic(
+        session,
+        absPath,
+        diag,
+        rawDiags,
+        options,
+      );
       return {
         file: diag.file,
         line: diag.line,
@@ -153,6 +177,7 @@ function formatOutput(items: DiagnosticWithFixes[]): string {
 export interface ErrorsAndFixesArgs {
   file?: string;
   severity?: "error" | "warning" | "all";
+  includeEmptyFixes?: boolean;
 }
 
 export async function getErrorsAndFixes(
@@ -160,6 +185,7 @@ export async function getErrorsAndFixes(
   args: ErrorsAndFixesArgs,
 ): Promise<ErrorsAndFixesSnapshot> {
   const severityFilter = args.severity ?? "error";
+  const includeEmptyFixes = args.includeEmptyFixes ?? false;
 
   // For single-file queries the project size is irrelevant — we only touch one file.
   if (!args.file) {
@@ -187,7 +213,12 @@ export async function getErrorsAndFixes(
 
   if (args.file) {
     const absPath = path.resolve(session.rootDir, args.file);
-    items = await collectForFile(session, absPath, severityFilter);
+    items = await collectForFile(
+      session,
+      absPath,
+      severityFilter,
+      { includeEmptyFixes },
+    );
   } else {
     // Try workspace diagnostics first (fast path when Volar supports it).
     const workspaceDiagnostics = await session.getWorkspaceDiagnostics();
@@ -220,6 +251,7 @@ export async function getErrorsAndFixes(
                 entry.absPath,
                 diag,
                 entry.rawDiags,
+                { includeEmptyFixes },
               );
               return {
                 file: diag.file,
@@ -246,7 +278,9 @@ export async function getErrorsAndFixes(
       ) {
         const batch = fileNames.slice(start, start + PROJECT_DIAGNOSTIC_CONCURRENCY);
         const batchResults = await Promise.all(
-          batch.map((fileName) => collectForFile(session, fileName, severityFilter)),
+          batch.map((fileName) =>
+            collectForFile(session, fileName, severityFilter, { includeEmptyFixes }),
+          ),
         );
         items.push(...batchResults.flat());
       }
