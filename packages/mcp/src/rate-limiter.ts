@@ -17,7 +17,7 @@ export type RateLimitResult = {
 };
 
 export type SlidingWindowRateLimiter = {
-  limit: (key: string) => RateLimitResult;
+  limit: (identifier: string) => RateLimitResult;
   reset: (key?: string) => void;
 };
 
@@ -65,13 +65,13 @@ export const createSlidingWindowRateLimiter = ({
   };
 
   return {
-    limit: (key) => {
+    limit: (identifier) => {
       const now = Date.now();
-      const windowTimestamps = cleanupBucket(key, now);
+      const windowTimestamps = cleanupBucket(identifier, now);
 
       if (windowTimestamps.length >= normalizedLimit) {
         const nextAllowedAfter = (windowTimestamps.at(0) ?? now) + normalizedWindowMs;
-        buckets.set(key, windowTimestamps);
+        buckets.set(identifier, windowTimestamps);
         return {
           success: false,
           limit: normalizedLimit,
@@ -81,7 +81,7 @@ export const createSlidingWindowRateLimiter = ({
       }
 
       const updatedBucket = [...windowTimestamps, now];
-      buckets.set(key, updatedBucket);
+      buckets.set(identifier, updatedBucket);
 
       const nextAllowedAfter = updatedBucket[0] + normalizedWindowMs;
       return {
