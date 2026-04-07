@@ -1,9 +1,9 @@
 /**
  * Shared rate limiting primitives for MCP tools.
  *
- * Modeled after practical token/window limiter APIs used by
- * popular libraries (for example `success`/`remaining`/`msBeforeNext` in
- * upstash-style responses).
+ * Upstash-style shape for the subset we use:
+ * - `limit(identifier)` entrypoint
+ * - `{ success, limit, remaining, reset }` result shape
  */
 
 const RATE_LIMIT_MIN_WINDOW_MS = 1;
@@ -13,13 +13,11 @@ export type RateLimitResult = {
   success: boolean;
   limit: number;
   remaining: number;
-  resetAt: number;
-  msBeforeNext: number;
-  retryAfterSeconds: number;
+  reset: number;
 };
 
 export type SlidingWindowRateLimiter = {
-  consume: (key: string) => RateLimitResult;
+  limit: (key: string) => RateLimitResult;
   reset: (key?: string) => void;
 };
 
@@ -66,30 +64,19 @@ export const createSlidingWindowRateLimiter = ({
     return (buckets.get(bucketKey) ?? []).filter((ts) => ts > cutoffAt);
   };
 
-  const toRetryAfter = (nextAllowedAfter: number, now: number) => {
-    const msBeforeNext = Math.max(0, nextAllowedAfter - now);
-    return {
-      msBeforeNext,
-      retryAfterSeconds: Math.max(1, Math.ceil(msBeforeNext / 1000)),
-    };
-  };
-
   return {
-    consume: (key) => {
+    limit: (key) => {
       const now = Date.now();
       const windowTimestamps = cleanupBucket(key, now);
 
       if (windowTimestamps.length >= normalizedLimit) {
         const nextAllowedAfter = (windowTimestamps.at(0) ?? now) + normalizedWindowMs;
         buckets.set(key, windowTimestamps);
-        const timeout = toRetryAfter(nextAllowedAfter, now);
         return {
           success: false,
           limit: normalizedLimit,
           remaining: 0,
-          resetAt: nextAllowedAfter,
-          msBeforeNext: timeout.msBeforeNext,
-          retryAfterSeconds: timeout.retryAfterSeconds,
+          reset: nextAllowedAfter,
         };
       }
 
@@ -101,9 +88,7 @@ export const createSlidingWindowRateLimiter = ({
         success: true,
         limit: normalizedLimit,
         remaining: Math.max(0, normalizedLimit - updatedBucket.length),
-        resetAt: nextAllowedAfter,
-        msBeforeNext: nextAllowedAfter - now,
-        retryAfterSeconds: 0,
+        reset: nextAllowedAfter,
       };
     },
     reset: (key) => {

@@ -75,6 +75,8 @@ const DEFAULT_DIAGNOSTIC_RATE_LIMIT_MAX_CALLS = 120;
 const DEFAULT_DIAGNOSTIC_RATE_LIMIT_WINDOW_MS = 60_000;
 type DiagnosticToolName = "get_diagnostics" | "find_errors_and_fixes";
 const MAX_PERSISTED_ROOTS = 12;
+const toRetryAfterSeconds = (resetAt: number, now: number = Date.now()): number =>
+  Math.max(1, Math.ceil(Math.max(0, resetAt - now) / 1000));
 const mcpModuleDir = path.dirname(
   typeof __filename === "string"
     ? __filename
@@ -341,7 +343,7 @@ class HostManager {
     tool: DiagnosticToolName,
     rootDir: string,
   ): RateLimitOutcome {
-    return this.diagnosticToolLimiter.consume(
+    return this.diagnosticToolLimiter.limit(
       this.getDiagnosticToolBucketKey(tool, rootDir),
     );
   }
@@ -716,7 +718,7 @@ export function createMcpServer(manager: HostManager): McpServer {
           "Diagnostic request rate limit reached.",
           `Max ${getDiagnosticRateLimitMaxCalls()} calls per`,
           `${getDiagnosticRateLimitWindowMs()}ms for get_diagnostics is in effect.`,
-          `Retry after ${rateLimit.retryAfterSeconds} seconds.`,
+          `Retry after ${toRetryAfterSeconds(rateLimit.reset)} seconds.`,
         ].join(" ");
         return {
           isError: true,
@@ -1189,7 +1191,7 @@ export function createMcpServer(manager: HostManager): McpServer {
           "Diagnostic request rate limit reached.",
           `Max ${getDiagnosticRateLimitMaxCalls()} calls per`,
           `${getDiagnosticRateLimitWindowMs()}ms for find_errors_and_fixes is in effect.`,
-          `Retry after ${rateLimit.retryAfterSeconds} seconds.`,
+          `Retry after ${toRetryAfterSeconds(rateLimit.reset)} seconds.`,
         ].join(" ");
         return {
           isError: true,
