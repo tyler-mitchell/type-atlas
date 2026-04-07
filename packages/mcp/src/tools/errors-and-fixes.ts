@@ -8,10 +8,9 @@
 
 import type { DiagnosticsSession } from "@featuretype/language-server";
 import * as path from "node:path";
-import { TextDocumentEdit } from "vscode-languageserver-protocol";
 import type * as vscode from "vscode-languageserver-protocol";
-import { URI } from "vscode-uri";
 import { formatDiagnostic, type FormattedDiagnostic } from "../format.js";
+import { collectWorkspaceTextEdits } from "./workspace-edits.js";
 
 const PROJECT_DIAGNOSTIC_CONCURRENCY = 24;
 
@@ -69,7 +68,7 @@ async function fetchActionsForDiagnostic(
   // internally, but we already have rawDiags so we avoid a second getFileDiagnostics call.
   const overlapping = rawDiags.filter((d) => rangesOverlap(d.range, range));
 
-  let actions: vscode.CodeAction[] | null = null;
+  let actions: Array<vscode.CodeAction | vscode.Command> | null = null;
   try {
     actions = await session.getFileCodeActions(absPath, range, overlapping);
   } catch {
@@ -80,41 +79,10 @@ async function fetchActionsForDiagnostic(
 
   return actions.map((action): DiagnosticFix => {
     const kind = "kind" in action ? (action.kind ?? "quickfix") : "command";
-    const edits: DiagnosticFix["edits"] = [];
-
-    if ("edit" in action && action.edit) {
-      const workspaceEdit = action.edit;
-
-      // Handle legacy changes map
-      if (workspaceEdit.changes) {
-        for (const [changeUri, textEdits] of Object.entries(workspaceEdit.changes)) {
-          const changePath = path.relative(session.rootDir, URI.parse(changeUri).fsPath);
-          for (const edit of textEdits) {
-            edits.push({
-              file: changePath,
-              line: edit.range.start.line + 1,
-              newText: edit.newText,
-            });
-          }
-        }
-      }
-
-      // Handle documentChanges (TextDocumentEdit + file renames) — Volar uses this
-      for (const change of workspaceEdit.documentChanges ?? []) {
-        if (TextDocumentEdit.is(change)) {
-          const changePath = path.relative(session.rootDir, URI.parse(change.textDocument.uri).fsPath);
-          for (const edit of change.edits) {
-            if ("newText" in edit) {
-              edits.push({
-                file: changePath,
-                line: edit.range.start.line + 1,
-                newText: edit.newText,
-              });
-            }
-          }
-        }
-      }
-    }
+    const edits =
+      "edit" in action
+        ? collectWorkspaceTextEdits(session.rootDir, action.edit)
+        : [];
 
     return { title: action.title, kind, edits };
   });

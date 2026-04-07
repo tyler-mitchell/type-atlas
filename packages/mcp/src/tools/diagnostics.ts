@@ -78,18 +78,12 @@ export async function getDiagnostics(
   args: DiagnosticArgs,
 ): Promise<DiagnosticSnapshot> {
   const projectFileCount = (await session.getProjectFileNames()).length;
-  if (projectFileCount > MAX_PROJECT_DIAGNOSTIC_FILES) {
-    const message = args.file
-      ? [
-          "Diagnostics are disabled for files inside large attached workspaces.",
-          `Attached project has ${projectFileCount} files, which exceeds the fast-scan limit of ${MAX_PROJECT_DIAGNOSTIC_FILES}.`,
-          "Attach a smaller subproject root to use get_diagnostics here.",
-        ].join(" ")
-      : [
-          "Whole-project diagnostics are disabled for large workspaces.",
-          `Attached project has ${projectFileCount} files, which exceeds the fast-scan limit of ${MAX_PROJECT_DIAGNOSTIC_FILES}.`,
-          "Attach a smaller subproject root to use get_diagnostics here.",
-        ].join(" ");
+  if (!args.file && projectFileCount > MAX_PROJECT_DIAGNOSTIC_FILES) {
+    const message = [
+      "Whole-project diagnostics are disabled for large workspaces.",
+      `Attached project has ${projectFileCount} files, which exceeds the fast-scan limit of ${MAX_PROJECT_DIAGNOSTIC_FILES}.`,
+      "Attach a smaller subproject root to use get_diagnostics here.",
+    ].join(" ");
 
     return {
       text: message,

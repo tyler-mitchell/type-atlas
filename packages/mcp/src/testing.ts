@@ -97,7 +97,7 @@ export function readStructuredContent(result: unknown): Record<string, unknown> 
 }
 
 export async function createInMemoryTestClient(
-  projectRoot: string,
+  projectRoot?: string,
 ): Promise<TestClientHandle> {
   const runtime = await createMcpRuntime(projectRoot);
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();

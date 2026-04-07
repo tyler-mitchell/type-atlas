@@ -3,10 +3,9 @@
  */
 
 import type { DiagnosticsSession } from "@featuretype/language-server";
-import * as path from "node:path";
 import type * as vscode from "vscode-languageserver-protocol";
-import { URI } from "vscode-uri";
 import { explainFailure } from "../failure.js";
+import { collectWorkspaceTextEdits } from "./workspace-edits.js";
 
 export async function getCodeActions(
   session: DiagnosticsSession,
@@ -32,17 +31,11 @@ export async function getCodeActions(
 
   const results = actions.map((action) => {
     const parts = [`[${"kind" in action ? action.kind ?? "quickfix" : "command"}] ${action.title}`];
-    if ("edit" in action && action.edit?.changes) {
-      for (const [changeUri, edits] of Object.entries(action.edit.changes)) {
-        const changePath = path.relative(
-          session.rootDir,
-          URI.parse(changeUri).fsPath,
+    if ("edit" in action) {
+      for (const edit of collectWorkspaceTextEdits(session.rootDir, action.edit)) {
+        parts.push(
+          `  ${edit.file}:${edit.line} → ${edit.newText.slice(0, 100)}${edit.newText.length > 100 ? "..." : ""}`,
         );
-        for (const edit of edits) {
-          parts.push(
-            `  ${changePath}:${edit.range.start.line + 1} → ${edit.newText.slice(0, 100)}${edit.newText.length > 100 ? "..." : ""}`,
-          );
-        }
       }
     }
     return parts.join("\n");

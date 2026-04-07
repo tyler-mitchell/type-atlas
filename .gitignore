@@ -7,3 +7,5 @@ coverage/
 *.tsbuildinfo
 .env
 .env.*
+.tmp-mcp-tests*/
+.agent-relay
