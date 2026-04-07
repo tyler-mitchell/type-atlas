@@ -45,9 +45,9 @@ type AttachedProject = {
   sessionPromise: Promise<DiagnosticsSession>;
 };
 
-type CreateDiagnosticsSession = (
-  options: { rootDir: string },
-) => Promise<DiagnosticsSession>;
+type CreateDiagnosticsSession = (options: {
+  rootDir: string;
+}) => Promise<DiagnosticsSession>;
 
 export type FeatureTypeMcpRuntime = {
   server: McpServer;
@@ -66,14 +66,16 @@ const languageServerSourceModulePath = path.resolve(
 );
 
 function getFeatureTypeRuntimeMode(): "auto" | "source" | "dist" {
-  const configuredMode = process.env[FEATURETYPE_RUNTIME_MODE_ENV]?.trim().toLowerCase();
+  const configuredMode =
+    process.env[FEATURETYPE_RUNTIME_MODE_ENV]?.trim().toLowerCase();
   if (configuredMode === "source" || configuredMode === "dist") {
     return configuredMode;
   }
   return "auto";
 }
 
-let createDiagnosticsSessionPromise: Promise<CreateDiagnosticsSession> | null = null;
+let createDiagnosticsSessionPromise: Promise<CreateDiagnosticsSession> | null =
+  null;
 
 async function loadCreateDiagnosticsSession(): Promise<CreateDiagnosticsSession> {
   if (!createDiagnosticsSessionPromise) {
@@ -88,15 +90,16 @@ async function loadCreateDiagnosticsSession(): Promise<CreateDiagnosticsSession>
         }
 
         const moduleUrl = pathToFileURL(languageServerSourceModulePath).href;
-        const languageServerModule = await import(moduleUrl) as {
+        const languageServerModule = (await import(moduleUrl)) as {
           createDiagnosticsSession: CreateDiagnosticsSession;
         };
         return languageServerModule.createDiagnosticsSession;
       }
 
-      const languageServerModule = await import("@featuretype/language-server") as {
-        createDiagnosticsSession: CreateDiagnosticsSession;
-      };
+      const languageServerModule =
+        (await import("@featuretype/language-server")) as {
+          createDiagnosticsSession: CreateDiagnosticsSession;
+        };
       return languageServerModule.createDiagnosticsSession;
     })();
   }
@@ -140,7 +143,15 @@ class HostManager {
       return existing;
     }
 
-    const sessionPromise = this.createDiagnosticsSession({ rootDir: resolvedRoot });
+    if (!fs.existsSync(resolvedRoot)) {
+      throw new Error(
+        `Project root does not exist: ${resolvedRoot}\n\nPass an absolute path, or ensure the MCP server's working directory is the repo root when using relative paths.`,
+      );
+    }
+
+    const sessionPromise = this.createDiagnosticsSession({
+      rootDir: resolvedRoot,
+    });
     const project: AttachedProject = {
       root: resolvedRoot,
       fileCount: 0,
@@ -158,25 +169,85 @@ class HostManager {
     }
   }
 
-  resolveRootForFile(filePath: string): string | null {
-    if (!path.isAbsolute(filePath) && !this.activeRoot) {
+  private getAttachedRoots(): string[] {
+    if (!this.activeRoot) {
+      return [...this.projects.keys()];
+    }
+
+    return [
+      this.activeRoot,
+      ...[...this.projects.keys()].filter((root) => root !== this.activeRoot),
+    ];
+  }
+
+  private resolveProjectRoot(projectRoot: string): string {
+    if (path.isAbsolute(projectRoot)) {
+      return path.resolve(projectRoot);
+    }
+
+    const activeRootCandidate = this.activeRoot
+      ? path.resolve(this.activeRoot, projectRoot)
+      : null;
+    const cwdCandidate = path.resolve(projectRoot);
+    const candidates = [activeRootCandidate, cwdCandidate].filter(
+      (candidate): candidate is string => candidate !== null,
+    );
+
+    return candidates.find((candidate) => fs.existsSync(candidate))
+      ?? candidates[0]
+      ?? cwdCandidate;
+  }
+
+  private findBestAttachedRoot(absPath: string): string | null {
+    const matches = [...this.projects.keys()].filter(
+      (root) => absPath === root || absPath.startsWith(`${root}${path.sep}`),
+    );
+    if (matches.length === 0) {
       return null;
     }
 
-    const absPath = path.isAbsolute(filePath)
-      ? path.resolve(filePath)
-      : path.resolve(this.requireActiveRoot(), filePath);
-    for (const root of this.projects.keys()) {
-      if (absPath.startsWith(root + path.sep) || absPath === root) {
-        return root;
-      }
+    return matches.sort((left, right) => right.length - left.length)[0] ?? null;
+  }
+
+  resolveRootForFile(filePath: string): string | null {
+    if (path.isAbsolute(filePath)) {
+      const absPath = path.resolve(filePath);
+      return this.findBestAttachedRoot(absPath) ?? this.activeRoot;
     }
-    return this.activeRoot;
+
+    const attachedRoots = this.getAttachedRoots();
+    if (attachedRoots.length === 0) {
+      return null;
+    }
+
+    const existingMatches = attachedRoots
+      .map((root) => ({
+        root,
+        absPath: path.resolve(root, filePath),
+      }))
+      .filter(({ absPath }) => fs.existsSync(absPath));
+
+    const activeRoot = this.requireActiveRoot();
+    const activeMatch = existingMatches.find(({ root }) => root === activeRoot);
+    if (activeMatch) {
+      return activeMatch.root;
+    }
+
+    if (existingMatches.length > 0) {
+      return existingMatches.sort((left, right) => right.root.length - left.root.length)[0]
+        ?.root
+        ?? activeRoot;
+    }
+
+    const fallbackAbsPath = path.resolve(activeRoot, filePath);
+    return this.findBestAttachedRoot(fallbackAbsPath) ?? activeRoot;
   }
 
   async getDiagnosticsSession(rootDir?: string): Promise<DiagnosticsSession> {
     const resolvedRoot = rootDir ?? this.requireActiveRoot();
-    return await (await this.ensureProject(resolvedRoot)).sessionPromise;
+    return await (
+      await this.ensureProject(resolvedRoot)
+    ).sessionPromise;
   }
 
   getDiagnosticsSessionForFile(filePath: string): Promise<DiagnosticsSession> {
@@ -194,10 +265,7 @@ class HostManager {
       return [];
     }
 
-    const attachedRoots = [
-      this.activeRoot,
-      ...[...this.projects.keys()].filter((root) => root !== this.activeRoot),
-    ];
+    const attachedRoots = this.getAttachedRoots();
     return await Promise.all(
       attachedRoots.map((root) => this.getDiagnosticsSession(root)),
     );
@@ -208,7 +276,7 @@ class HostManager {
     fileCount: number;
     isNew: boolean;
   }> {
-    const resolved = path.resolve(projectRoot);
+    const resolved = this.resolveProjectRoot(projectRoot);
     const isNew = !this.projects.has(resolved);
     const project = await this.ensureProject(resolved);
     this.activeRoot = resolved;
@@ -219,7 +287,9 @@ class HostManager {
     };
   }
 
-  async listRoots(): Promise<Array<{ root: string; active: boolean; fileCount: number }>> {
+  async listRoots(): Promise<
+    Array<{ root: string; active: boolean; fileCount: number }>
+  > {
     const projects = await Promise.all(
       [...this.projects.keys()].map((root) => this.ensureProject(root)),
     );
@@ -257,6 +327,28 @@ const projectInfoSchema = {
   active: z.boolean(),
   fileCount: z.number().int().nonnegative(),
 };
+
+const diagnosticFixSchema = z.object({
+  title: z.string(),
+  kind: z.string(),
+  edits: z.array(
+    z.object({
+      file: z.string(),
+      line: z.number().int().positive(),
+      newText: z.string(),
+    }),
+  ),
+});
+
+const diagnosticWithFixesSchema = z.object({
+  file: z.string(),
+  line: z.number().int().positive(),
+  col: z.number().int().positive(),
+  severity: z.enum(["error", "warning", "info", "hint"]),
+  code: z.string(),
+  message: z.string(),
+  fixes: z.array(diagnosticFixSchema),
+});
 
 function formatHoverContents(hover: Hover): string {
   if (typeof hover.contents === "string") {
@@ -296,7 +388,17 @@ export function createMcpServer(manager: HostManager): McpServer {
       },
     },
     async (args) => {
-      const result = await manager.attach(args.projectRoot);
+      let result: Awaited<ReturnType<typeof manager.attach>>;
+      try {
+        result = await manager.attach(args.projectRoot);
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : String(error);
+        return {
+          isError: true,
+          content: [{ type: "text", text: message }],
+        };
+      }
       const status = result.isNew
         ? "Attached new project"
         : "Switched to existing project";
@@ -320,7 +422,8 @@ export function createMcpServer(manager: HostManager): McpServer {
   server.registerTool(
     "list_projects",
     {
-      description: "List all attached project roots and which is currently active.",
+      description:
+        "List all attached project roots and which is currently active.",
       outputSchema: {
         projects: z.array(z.object(projectInfoSchema)),
       },
@@ -335,8 +438,9 @@ export function createMcpServer(manager: HostManager): McpServer {
           },
         };
       }
-      const lines = roots.map((root) =>
-        `${root.active ? "→ " : "  "}${root.root} (${root.fileCount} files)`,
+      const lines = roots.map(
+        (root) =>
+          `${root.active ? "→ " : "  "}${root.root} (${root.fileCount} files)`,
       );
       return {
         content: [{ type: "text", text: lines.join("\n") }],
@@ -407,7 +511,11 @@ export function createMcpServer(manager: HostManager): McpServer {
       // language server. Without this, missing or out-of-scope files silently
       // return empty diagnostics, which is indistinguishable from "no errors".
       if (args.file) {
-        const failure = await classifyFailure("get_diagnostics", args.file, session);
+        const failure = await classifyFailure(
+          "get_diagnostics",
+          args.file,
+          session,
+        );
         if (failure.code === "NOT_FOUND" || failure.code === "OUT_OF_SCOPE") {
           return {
             content: [{ type: "text", text: failure.message }],
@@ -764,7 +872,9 @@ export function createMcpServer(manager: HostManager): McpServer {
       description:
         "Compute workspace edits for renaming or moving a file so imports and references update consistently.",
       inputSchema: {
-        oldFile: z.string().describe("Current file path relative to project root"),
+        oldFile: z
+          .string()
+          .describe("Current file path relative to project root"),
         newFile: z.string().describe("New file path relative to project root"),
       },
       outputSchema: {
@@ -837,37 +947,21 @@ export function createMcpServer(manager: HostManager): McpServer {
           .enum(["error", "warning", "all"])
           .optional()
           .describe("Filter by severity. Defaults to 'error'."),
+        includeItems: z
+          .boolean()
+          .optional()
+          .describe(
+            "Include full per-diagnostic fix objects in structuredContent. Defaults to true; pass false to omit them and rely on the text summary.",
+          ),
       },
       outputSchema: {
-        totalCount: z.number().int().nonnegative(),
         totalErrorCount: z.number().int().nonnegative(),
         totalWarningCount: z.number().int().nonnegative(),
+        totalCount: z.number().int().nonnegative(),
+        items: z.array(diagnosticWithFixesSchema).optional(),
         limited: z.boolean().optional(),
         projectFileCount: z.number().int().nonnegative().optional(),
         projectFileLimit: z.number().int().nonnegative().optional(),
-        items: z.array(
-          z.object({
-            file: z.string(),
-            line: z.number().int().positive(),
-            col: z.number().int().positive(),
-            severity: z.enum(["error", "warning", "info", "hint"]),
-            code: z.string(),
-            message: z.string(),
-            fixes: z.array(
-              z.object({
-                title: z.string(),
-                kind: z.string(),
-                edits: z.array(
-                  z.object({
-                    file: z.string(),
-                    line: z.number().int().positive(),
-                    newText: z.string(),
-                  }),
-                ),
-              }),
-            ),
-          }),
-        ),
       },
     },
     async (args) => {
@@ -878,13 +972,13 @@ export function createMcpServer(manager: HostManager): McpServer {
       return {
         content: [{ type: "text", text: snapshot.text }],
         structuredContent: {
-          totalCount: snapshot.totalCount,
           totalErrorCount: snapshot.totalErrorCount,
           totalWarningCount: snapshot.totalWarningCount,
-          limited: snapshot.limited ?? false,
+          totalCount: snapshot.totalCount,
+          limited: snapshot.limited,
           projectFileCount: snapshot.projectFileCount,
           projectFileLimit: snapshot.projectFileLimit,
-          items: snapshot.items,
+          ...((args.includeItems ?? true) ? { items: snapshot.items } : {}),
         },
       };
     },
@@ -937,7 +1031,9 @@ export function createMcpServer(manager: HostManager): McpServer {
         });
         return {
           content: [{ type: "text" as const, text: failure.message }],
-          structuredContent: { error: { code: failure.code, message: failure.message } },
+          structuredContent: {
+            error: { code: failure.code, message: failure.message },
+          },
         };
       }
 
@@ -970,7 +1066,9 @@ export function createMcpServer(manager: HostManager): McpServer {
           .min(1)
           .max(5)
           .optional()
-          .describe("Maximum nesting depth to include. Defaults to 1 (top-level only)."),
+          .describe(
+            "Maximum nesting depth to include. Defaults to 1 (top-level only).",
+          ),
         maxItems: z
           .number()
           .int()
@@ -1009,7 +1107,9 @@ export function createMcpServer(manager: HostManager): McpServer {
           .min(1)
           .max(100)
           .optional()
-          .describe("Maximum number of workspace symbols to return. Defaults to 25."),
+          .describe(
+            "Maximum number of workspace symbols to return. Defaults to 25.",
+          ),
       },
       outputSchema: {
         root: z.string().nullable(),
@@ -1090,14 +1190,18 @@ export function createMcpServer(manager: HostManager): McpServer {
         query: z
           .string()
           .optional()
-          .describe("Symbol name/detail query. Use when you do not have an exact position."),
+          .describe(
+            "Symbol name/detail query. Use when you do not have an exact position.",
+          ),
         maxReferences: z
           .number()
           .int()
           .min(1)
           .max(20)
           .optional()
-          .describe("Maximum number of reference lines to include. Defaults to 8."),
+          .describe(
+            "Maximum number of reference lines to include. Defaults to 8.",
+          ),
       },
     },
     async (args) => {
@@ -1162,7 +1266,9 @@ export function createMcpServer(manager: HostManager): McpServer {
       const session = await manager.getDiagnosticsSession();
       const wasVirtual = session.isVirtualFile(args.file);
       await session.openVirtualFile(args.file, args.content);
-      const action = wasVirtual ? "Updated virtual file" : "Opened virtual file";
+      const action = wasVirtual
+        ? "Updated virtual file"
+        : "Opened virtual file";
       return {
         content: [
           {
@@ -1222,7 +1328,10 @@ export async function createMcpRuntime(
   projectRoot?: string,
 ): Promise<FeatureTypeMcpRuntime> {
   const createDiagnosticsSession = await loadCreateDiagnosticsSession();
-  const manager = new HostManager(projectRoot ?? null, createDiagnosticsSession);
+  const manager = new HostManager(
+    projectRoot ?? null,
+    createDiagnosticsSession,
+  );
   if (projectRoot) {
     await manager.attach(projectRoot);
   }

@@ -7,6 +7,7 @@ import {
   CallHierarchyOutgoingCallsRequest,
   CallHierarchyPrepareRequest,
   CodeActionRequest,
+  CodeActionResolveRequest,
   ConfigurationRequest,
   DefinitionRequest,
   DidChangeTextDocumentNotification,
@@ -276,6 +277,12 @@ function getFeatureTypeRuntimeMode(): "auto" | "source" | "dist" {
   return "auto";
 }
 
+function supportsCodeActionResolve(
+  action: CodeAction | Command,
+): action is CodeAction & { data: NonNullable<CodeAction["data"]> } {
+  return "data" in action && action.data !== undefined && action.data !== null;
+}
+
 function resolveLanguageServerModule(): { scriptPath: string; execArgv: string[] } {
   const runtimeMode = getFeatureTypeRuntimeMode();
   const shouldPreferSourceModule =
@@ -472,17 +479,11 @@ export function enumerateProjectFiles(
     ts.sys.fileExists,
     "tsconfig.json",
   );
-  const parsedCommandLine = tsconfigPath
-    ? ts.parseJsonConfigFileContent(
-        ts.readConfigFile(tsconfigPath, ts.sys.readFile).config,
-        ts.sys,
-        path.dirname(tsconfigPath),
-      )
-    : ts.parseJsonConfigFileContent({}, ts.sys, resolvedRoot);
-
   const files = new Set<string>(
     filterFilesOutsideNestedRepositories(
-      parsedCommandLine.fileNames.map((fileName) => path.resolve(fileName)),
+      tsconfigPath
+        ? collectReferencedProjectFiles(ts, tsconfigPath)
+        : [],
       nestedRepositoryRoots,
     ),
   );
@@ -491,6 +492,35 @@ export function enumerateProjectFiles(
   }
 
   return [...files].filter(isSupportedDiagnosticFile);
+}
+
+function collectReferencedProjectFiles(
+  ts: typeof import("typescript"),
+  tsconfigPath: string,
+  seen = new Set<string>(),
+): string[] {
+  const resolvedConfigPath = path.resolve(tsconfigPath);
+  if (seen.has(resolvedConfigPath)) {
+    return [];
+  }
+  seen.add(resolvedConfigPath);
+
+  const parsedCommandLine = ts.parseJsonConfigFileContent(
+    ts.readConfigFile(resolvedConfigPath, ts.sys.readFile).config,
+    ts.sys,
+    path.dirname(resolvedConfigPath),
+  );
+
+  return [
+    ...parsedCommandLine.fileNames.map((fileName) => path.resolve(fileName)),
+    ...(parsedCommandLine.projectReferences ?? []).flatMap((reference) =>
+      collectReferencedProjectFiles(
+        ts,
+        ts.resolveProjectReferencePath(reference),
+        seen,
+      ),
+    ),
+  ];
 }
 
 function collectTypeScriptProjectDiagnostics(
@@ -650,6 +680,30 @@ export async function createFeatureTypeLanguageServerClient(
         },
       },
       textDocument: {
+        codeAction: {
+          codeActionLiteralSupport: {
+            codeActionKind: {
+              valueSet: [
+                "",
+                "quickfix",
+                "refactor",
+                "refactor.extract",
+                "refactor.inline",
+                "refactor.move",
+                "refactor.rewrite",
+                "source",
+                "source.organizeImports",
+                "source.fixAll",
+              ],
+            },
+          },
+          dataSupport: true,
+          resolveSupport: {
+            properties: ["edit"],
+          },
+          isPreferredSupport: true,
+          disabledSupport: true,
+        },
         diagnostic: {
           relatedDocumentSupport: true,
         },
@@ -770,12 +824,28 @@ export async function createFeatureTypeLanguageServerClient(
     if (!document) {
       return [];
     }
-    return (
+    const actions =
       (await connection.sendRequest(CodeActionRequest.type, {
         textDocument: { uri: document.uri },
         range,
         context: { diagnostics },
-      })) ?? []
+      })) ?? [];
+
+    return Promise.all(
+      actions.map(async (action) => {
+        if (!supportsCodeActionResolve(action)) {
+          return action;
+        }
+
+        try {
+          return (
+            (await connection.sendRequest(CodeActionResolveRequest.type, action)) ??
+            action
+          );
+        } catch {
+          return action;
+        }
+      }),
     );
   };
 
