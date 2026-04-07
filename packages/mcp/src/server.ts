@@ -39,6 +39,11 @@ import {
   searchWorkspaceSymbolsAcrossSessions,
 } from "./tools/symbols";
 import { getSignature, getTypeAt } from "./tools/type-info";
+import {
+  createSlidingWindowRateLimiter,
+  parsePositiveIntEnv,
+  type RateLimitOutcome,
+} from "./rate-limiter.js";
 
 type AttachedProject = {
   root: string;
@@ -55,19 +60,6 @@ type PersistedRootState = {
   roots: string[];
 };
 
-type DiagnosticRateLimitOutcome =
-  | {
-      allowed: true;
-    }
-  | {
-      allowed: false;
-      retryAfterSeconds: number;
-    };
-
-type DiagnosticToolBucket = {
-  calls: number[];
-};
-
 export type FeatureTypeMcpRuntime = {
   server: McpServer;
   dispose: () => Promise<void>;
@@ -81,6 +73,7 @@ const DIAGNOSTIC_RATE_LIMIT_WINDOW_MS_ENV =
   "FEATURETYPE_DIAGNOSTIC_TOOL_WINDOW_MS";
 const DEFAULT_DIAGNOSTIC_RATE_LIMIT_MAX_CALLS = 120;
 const DEFAULT_DIAGNOSTIC_RATE_LIMIT_WINDOW_MS = 60_000;
+type DiagnosticToolName = "get_diagnostics" | "find_errors_and_fixes";
 const MAX_PERSISTED_ROOTS = 12;
 const mcpModuleDir = path.dirname(
   typeof __filename === "string"
@@ -173,23 +166,6 @@ const writePersistedRootState = (
   fs.renameSync(tempStateFile, stateFile);
 };
 
-const parsePositiveIntEnv = (
-  key: string,
-  fallback: number,
-): number => {
-  const rawValue = process.env[key]?.trim();
-  if (!rawValue) {
-    return fallback;
-  }
-
-  const parsedValue = Number.parseInt(rawValue, 10);
-  if (!Number.isFinite(parsedValue) || parsedValue < 1) {
-    return fallback;
-  }
-
-  return parsedValue;
-};
-
 const getDiagnosticRateLimitMaxCalls = (): number =>
   parsePositiveIntEnv(
     DIAGNOSTIC_RATE_LIMIT_MAX_CALLS_ENV,
@@ -253,7 +229,10 @@ class HostManager {
   private createDiagnosticsSession: CreateDiagnosticsSession;
   private knownRoots: string[];
   private stateFile: string;
-  private diagnosticToolBuckets = new Map<string, DiagnosticToolBucket>();
+  private diagnosticToolLimiter = createSlidingWindowRateLimiter({
+    limit: getDiagnosticRateLimitMaxCalls(),
+    windowMs: getDiagnosticRateLimitWindowMs(),
+  });
 
   constructor(
     initialRoot: string | null,
@@ -351,43 +330,20 @@ class HostManager {
     ]).roots;
   }
 
-  private getDiagnosticToolBucketKey(tool: string, rootDir: string): string {
+  private getDiagnosticToolBucketKey(
+    tool: DiagnosticToolName,
+    rootDir: string,
+  ): string {
     return `${tool}:${path.resolve(rootDir)}`;
   }
 
   checkDiagnosticToolRateLimit(
-    tool: "get_diagnostics" | "find_errors_and_fixes",
+    tool: DiagnosticToolName,
     rootDir: string,
-  ): DiagnosticRateLimitOutcome {
-    const bucketKey = this.getDiagnosticToolBucketKey(tool, rootDir);
-    const now = Date.now();
-    const windowMs = getDiagnosticRateLimitWindowMs();
-    const maxCalls = getDiagnosticRateLimitMaxCalls();
-    const cutoff = now - windowMs;
-    const bucket = this.diagnosticToolBuckets.get(bucketKey) ?? { calls: [] };
-
-    while (bucket.calls.length > 0 && bucket.calls[0] <= cutoff) {
-      bucket.calls.shift();
-    }
-
-    if (bucket.calls.length >= maxCalls) {
-      const nextSlotAt = bucket.calls[0] ?? now;
-      const retryAfterSeconds = Math.max(
-        1,
-        Math.ceil((nextSlotAt + windowMs - now) / 1000),
-      );
-      this.diagnosticToolBuckets.set(bucketKey, bucket);
-      return {
-        allowed: false,
-        retryAfterSeconds,
-      };
-    }
-
-    bucket.calls.push(now);
-    this.diagnosticToolBuckets.set(bucketKey, bucket);
-    return {
-      allowed: true,
-    };
+  ): RateLimitOutcome {
+    return this.diagnosticToolLimiter.consume(
+      this.getDiagnosticToolBucketKey(tool, rootDir),
+    );
   }
 
   private resolveProjectRoot(projectRoot: string): string {
@@ -755,7 +711,7 @@ export function createMcpServer(manager: HostManager): McpServer {
         "get_diagnostics",
         session.rootDir,
       );
-      if (!rateLimit.allowed) {
+      if (!rateLimit.success) {
         const message = [
           "Diagnostic request rate limit reached.",
           `Max ${getDiagnosticRateLimitMaxCalls()} calls per`,
@@ -1228,7 +1184,7 @@ export function createMcpServer(manager: HostManager): McpServer {
         "find_errors_and_fixes",
         session.rootDir,
       );
-      if (!rateLimit.allowed) {
+      if (!rateLimit.success) {
         const message = [
           "Diagnostic request rate limit reached.",
           `Max ${getDiagnosticRateLimitMaxCalls()} calls per`,
