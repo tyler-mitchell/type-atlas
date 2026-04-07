@@ -9,6 +9,7 @@ import type { DiagnosticsSession } from "@featuretype/language-server";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import * as fs from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import type { Hover } from "vscode-languageserver-protocol";
@@ -49,12 +50,38 @@ type CreateDiagnosticsSession = (options: {
   rootDir: string;
 }) => Promise<DiagnosticsSession>;
 
+type PersistedRootState = {
+  activeRoot: string | null;
+  roots: string[];
+};
+
+type DiagnosticRateLimitOutcome =
+  | {
+      allowed: true;
+    }
+  | {
+      allowed: false;
+      retryAfterSeconds: number;
+    };
+
+type DiagnosticToolBucket = {
+  calls: number[];
+};
+
 export type FeatureTypeMcpRuntime = {
   server: McpServer;
   dispose: () => Promise<void>;
 };
 
 const FEATURETYPE_RUNTIME_MODE_ENV = "FEATURETYPE_RUNTIME_MODE";
+const FEATURETYPE_STATE_FILE_ENV = "FEATURETYPE_MCP_STATE_FILE";
+const DIAGNOSTIC_RATE_LIMIT_MAX_CALLS_ENV =
+  "FEATURETYPE_DIAGNOSTIC_TOOL_MAX_CALLS_PER_MINUTE";
+const DIAGNOSTIC_RATE_LIMIT_WINDOW_MS_ENV =
+  "FEATURETYPE_DIAGNOSTIC_TOOL_WINDOW_MS";
+const DEFAULT_DIAGNOSTIC_RATE_LIMIT_MAX_CALLS = 120;
+const DEFAULT_DIAGNOSTIC_RATE_LIMIT_WINDOW_MS = 60_000;
+const MAX_PERSISTED_ROOTS = 12;
 const mcpModuleDir = path.dirname(
   typeof __filename === "string"
     ? __filename
@@ -64,6 +91,116 @@ const languageServerSourceModulePath = path.resolve(
   mcpModuleDir,
   "../../language-server/src/index.ts",
 );
+const persistedRootStateSchema = z.object({
+  activeRoot: z.string().nullable().optional(),
+  roots: z.array(z.string()).optional(),
+});
+
+const toUniqueResolvedPaths = (roots: readonly string[]): string[] =>
+  roots.reduce<string[]>((acc, root) => {
+    const trimmedRoot = root.trim();
+    if (trimmedRoot.length === 0) {
+      return acc;
+    }
+
+    const resolvedRoot = path.resolve(trimmedRoot);
+    return acc.includes(resolvedRoot) ? acc : [...acc, resolvedRoot];
+  }, []);
+
+const normalizePersistedRootState = (
+  activeRoot: string | null,
+  roots: readonly string[],
+): PersistedRootState => {
+  const normalizedRoots = toUniqueResolvedPaths([
+    ...(activeRoot ? [activeRoot] : []),
+    ...roots,
+  ])
+    .filter((root) => fs.existsSync(root))
+    .slice(0, MAX_PERSISTED_ROOTS);
+
+  const resolvedActiveRoot = activeRoot ? path.resolve(activeRoot) : null;
+
+  return {
+    activeRoot:
+      resolvedActiveRoot && normalizedRoots.includes(resolvedActiveRoot)
+        ? resolvedActiveRoot
+        : normalizedRoots[0] ?? null,
+    roots: normalizedRoots,
+  };
+};
+
+const resolvePersistedStateFile = (): string =>
+  path.resolve(
+    process.env[FEATURETYPE_STATE_FILE_ENV]?.trim()
+      || path.join(os.homedir(), ".featuretype", "mcp-state.json"),
+  );
+
+const readPersistedRootState = (stateFile: string): PersistedRootState => {
+  try {
+    const rawState = fs.readFileSync(stateFile, "utf8");
+    const parsedState = persistedRootStateSchema.safeParse(JSON.parse(rawState));
+    if (!parsedState.success) {
+      return {
+        activeRoot: null,
+        roots: [],
+      };
+    }
+
+    return normalizePersistedRootState(
+      parsedState.data.activeRoot ?? null,
+      parsedState.data.roots ?? [],
+    );
+  } catch {
+    return {
+      activeRoot: null,
+      roots: [],
+    };
+  }
+};
+
+const writePersistedRootState = (
+  stateFile: string,
+  state: PersistedRootState,
+): void => {
+  const normalizedState = normalizePersistedRootState(
+    state.activeRoot,
+    state.roots,
+  );
+  const tempStateFile = `${stateFile}.${process.pid}.tmp`;
+
+  fs.mkdirSync(path.dirname(stateFile), { recursive: true });
+  fs.writeFileSync(`${tempStateFile}`, `${JSON.stringify(normalizedState, null, 2)}\n`);
+  fs.renameSync(tempStateFile, stateFile);
+};
+
+const parsePositiveIntEnv = (
+  key: string,
+  fallback: number,
+): number => {
+  const rawValue = process.env[key]?.trim();
+  if (!rawValue) {
+    return fallback;
+  }
+
+  const parsedValue = Number.parseInt(rawValue, 10);
+  if (!Number.isFinite(parsedValue) || parsedValue < 1) {
+    return fallback;
+  }
+
+  return parsedValue;
+};
+
+const getDiagnosticRateLimitMaxCalls = (): number =>
+  parsePositiveIntEnv(
+    DIAGNOSTIC_RATE_LIMIT_MAX_CALLS_ENV,
+    DEFAULT_DIAGNOSTIC_RATE_LIMIT_MAX_CALLS,
+  );
+
+const getDiagnosticRateLimitWindowMs = (): number =>
+  parsePositiveIntEnv(
+    DIAGNOSTIC_RATE_LIMIT_WINDOW_MS_ENV,
+    DEFAULT_DIAGNOSTIC_RATE_LIMIT_WINDOW_MS,
+  );
 
 function getFeatureTypeRuntimeMode(): "auto" | "source" | "dist" {
   const configuredMode =
@@ -114,13 +251,26 @@ class HostManager {
   private projects = new Map<string, AttachedProject>();
   private activeRoot: string | null;
   private createDiagnosticsSession: CreateDiagnosticsSession;
+  private knownRoots: string[];
+  private stateFile: string;
+  private diagnosticToolBuckets = new Map<string, DiagnosticToolBucket>();
 
   constructor(
     initialRoot: string | null,
     createDiagnosticsSession: CreateDiagnosticsSession,
+    stateFile: string,
   ) {
-    this.activeRoot = initialRoot ? path.resolve(initialRoot) : null;
+    const resolvedInitialRoot = initialRoot ? path.resolve(initialRoot) : null;
+    const persistedState = readPersistedRootState(stateFile);
+    const restoredState = normalizePersistedRootState(
+      resolvedInitialRoot ?? persistedState.activeRoot,
+      resolvedInitialRoot ? [resolvedInitialRoot] : persistedState.roots,
+    );
+
+    this.activeRoot = restoredState.activeRoot;
     this.createDiagnosticsSession = createDiagnosticsSession;
+    this.knownRoots = restoredState.roots;
+    this.stateFile = stateFile;
   }
 
   getActiveRoot(): string | null {
@@ -162,6 +312,7 @@ class HostManager {
     try {
       const session = await sessionPromise;
       project.fileCount = (await session.getProjectFileNames()).length;
+      this.rememberRoots([project.root]);
       return project;
     } catch (error) {
       this.projects.delete(resolvedRoot);
@@ -169,15 +320,74 @@ class HostManager {
     }
   }
 
+  private rememberRoots(roots: readonly string[]): void {
+    const restoredState = normalizePersistedRootState(this.activeRoot, [
+      ...roots,
+      ...this.knownRoots,
+      ...this.projects.keys(),
+    ]);
+
+    this.activeRoot = restoredState.activeRoot;
+    this.knownRoots = restoredState.roots;
+  }
+
+  private persistRoots(): void {
+    this.rememberRoots([]);
+
+    try {
+      writePersistedRootState(this.stateFile, {
+        activeRoot: this.activeRoot,
+        roots: this.knownRoots,
+      });
+    } catch {
+      // Ignore persistence errors so semantic queries still work in ephemeral environments.
+    }
+  }
+
   private getAttachedRoots(): string[] {
-    if (!this.activeRoot) {
-      return [...this.projects.keys()];
+    return normalizePersistedRootState(this.activeRoot, [
+      ...this.knownRoots,
+      ...this.projects.keys(),
+    ]).roots;
+  }
+
+  private getDiagnosticToolBucketKey(tool: string, rootDir: string): string {
+    return `${tool}:${path.resolve(rootDir)}`;
+  }
+
+  checkDiagnosticToolRateLimit(
+    tool: "get_diagnostics" | "find_errors_and_fixes",
+    rootDir: string,
+  ): DiagnosticRateLimitOutcome {
+    const bucketKey = this.getDiagnosticToolBucketKey(tool, rootDir);
+    const now = Date.now();
+    const windowMs = getDiagnosticRateLimitWindowMs();
+    const maxCalls = getDiagnosticRateLimitMaxCalls();
+    const cutoff = now - windowMs;
+    const bucket = this.diagnosticToolBuckets.get(bucketKey) ?? { calls: [] };
+
+    while (bucket.calls.length > 0 && bucket.calls[0] <= cutoff) {
+      bucket.calls.shift();
     }
 
-    return [
-      this.activeRoot,
-      ...[...this.projects.keys()].filter((root) => root !== this.activeRoot),
-    ];
+    if (bucket.calls.length >= maxCalls) {
+      const nextSlotAt = bucket.calls[0] ?? now;
+      const retryAfterSeconds = Math.max(
+        1,
+        Math.ceil((nextSlotAt + windowMs - now) / 1000),
+      );
+      this.diagnosticToolBuckets.set(bucketKey, bucket);
+      return {
+        allowed: false,
+        retryAfterSeconds,
+      };
+    }
+
+    bucket.calls.push(now);
+    this.diagnosticToolBuckets.set(bucketKey, bucket);
+    return {
+      allowed: true,
+    };
   }
 
   private resolveProjectRoot(projectRoot: string): string {
@@ -185,21 +395,19 @@ class HostManager {
       return path.resolve(projectRoot);
     }
 
-    const activeRootCandidate = this.activeRoot
-      ? path.resolve(this.activeRoot, projectRoot)
-      : null;
-    const cwdCandidate = path.resolve(projectRoot);
-    const candidates = [activeRootCandidate, cwdCandidate].filter(
-      (candidate): candidate is string => candidate !== null,
-    );
+    const candidates = toUniqueResolvedPaths([
+      ...(this.activeRoot ? [path.resolve(this.activeRoot, projectRoot)] : []),
+      ...this.getAttachedRoots().map((root) => path.resolve(root, projectRoot)),
+      path.resolve(projectRoot),
+    ]);
 
     return candidates.find((candidate) => fs.existsSync(candidate))
       ?? candidates[0]
-      ?? cwdCandidate;
+      ?? path.resolve(projectRoot);
   }
 
   private findBestAttachedRoot(absPath: string): string | null {
-    const matches = [...this.projects.keys()].filter(
+    const matches = this.getAttachedRoots().filter(
       (root) => absPath === root || absPath.startsWith(`${root}${path.sep}`),
     );
     if (matches.length === 0) {
@@ -227,7 +435,10 @@ class HostManager {
       }))
       .filter(({ absPath }) => fs.existsSync(absPath));
 
-    const activeRoot = this.requireActiveRoot();
+    const activeRoot = this.activeRoot ?? attachedRoots[0] ?? null;
+    if (!activeRoot) {
+      return null;
+    }
     const activeMatch = existingMatches.find(({ root }) => root === activeRoot);
     if (activeMatch) {
       return activeMatch.root;
@@ -261,11 +472,11 @@ class HostManager {
   }
 
   async getAttachedDiagnosticsSessions(): Promise<DiagnosticsSession[]> {
-    if (!this.activeRoot) {
+    const attachedRoots = this.getAttachedRoots();
+    if (attachedRoots.length === 0) {
       return [];
     }
 
-    const attachedRoots = this.getAttachedRoots();
     return await Promise.all(
       attachedRoots.map((root) => this.getDiagnosticsSession(root)),
     );
@@ -276,10 +487,17 @@ class HostManager {
     fileCount: number;
     isNew: boolean;
   }> {
+    const hadInMemoryProjects = this.projects.size > 0;
     const resolved = this.resolveProjectRoot(projectRoot);
-    const isNew = !this.projects.has(resolved);
+    const isNew = !this.getAttachedRoots().includes(resolved);
     const project = await this.ensureProject(resolved);
     this.activeRoot = resolved;
+    if (!hadInMemoryProjects && path.isAbsolute(projectRoot)) {
+      this.knownRoots = normalizePersistedRootState(resolved, [resolved]).roots;
+    } else {
+      this.rememberRoots([resolved]);
+    }
+    this.persistRoots();
     return {
       root: resolved,
       fileCount: project.fileCount,
@@ -291,7 +509,7 @@ class HostManager {
     Array<{ root: string; active: boolean; fileCount: number }>
   > {
     const projects = await Promise.all(
-      [...this.projects.keys()].map((root) => this.ensureProject(root)),
+      this.getAttachedRoots().map((root) => this.ensureProject(root)),
     );
     return projects.map((project) => ({
       root: project.root,
@@ -501,7 +719,7 @@ export function createMcpServer(manager: HostManager): McpServer {
           .nullable()
           .optional(),
       },
-    },
+      },
     async (args) => {
       const session = args.file
         ? await manager.getDiagnosticsSessionForFile(args.file)
@@ -531,6 +749,40 @@ export function createMcpServer(manager: HostManager): McpServer {
             },
           };
         }
+      }
+
+      const rateLimit = manager.checkDiagnosticToolRateLimit(
+        "get_diagnostics",
+        session.rootDir,
+      );
+      if (!rateLimit.allowed) {
+        const message = [
+          "Diagnostic request rate limit reached.",
+          `Max ${getDiagnosticRateLimitMaxCalls()} calls per`,
+          `${getDiagnosticRateLimitWindowMs()}ms for get_diagnostics is in effect.`,
+          `Retry after ${rateLimit.retryAfterSeconds} seconds.`,
+        ].join(" ");
+        return {
+          isError: true,
+          content: [{ type: "text", text: message }],
+          structuredContent: {
+            root: session.rootDir,
+            file: args.file ?? null,
+            severity: (args.severity ?? "all") as "error" | "warning" | "all",
+            summary: args.summary ?? false,
+            totalCount: 0,
+            totalErrorCount: 0,
+            totalWarningCount: 0,
+            limited: true,
+            error: {
+              code: "RATE_LIMIT_EXCEEDED",
+              message,
+            },
+            projectFileCount: undefined,
+            projectFileLimit: undefined,
+            files: [],
+          },
+        };
       }
 
       const diagnosticArgs = {
@@ -962,12 +1214,44 @@ export function createMcpServer(manager: HostManager): McpServer {
         limited: z.boolean().optional(),
         projectFileCount: z.number().int().nonnegative().optional(),
         projectFileLimit: z.number().int().nonnegative().optional(),
+        error: z
+          .object({ code: z.string(), message: z.string() })
+          .nullable()
+          .optional(),
       },
-    },
+      },
     async (args) => {
       const session = args.file
         ? await manager.getDiagnosticsSessionForFile(args.file)
         : await manager.getDiagnosticsSession();
+      const rateLimit = manager.checkDiagnosticToolRateLimit(
+        "find_errors_and_fixes",
+        session.rootDir,
+      );
+      if (!rateLimit.allowed) {
+        const message = [
+          "Diagnostic request rate limit reached.",
+          `Max ${getDiagnosticRateLimitMaxCalls()} calls per`,
+          `${getDiagnosticRateLimitWindowMs()}ms for find_errors_and_fixes is in effect.`,
+          `Retry after ${rateLimit.retryAfterSeconds} seconds.`,
+        ].join(" ");
+        return {
+          isError: true,
+          content: [{ type: "text", text: message }],
+          structuredContent: {
+            totalCount: 0,
+            totalErrorCount: 0,
+            totalWarningCount: 0,
+            limited: true,
+            projectFileCount: undefined,
+            projectFileLimit: undefined,
+            error: {
+              code: "RATE_LIMIT_EXCEEDED",
+              message,
+            },
+          },
+        };
+      }
       const snapshot = await getErrorsAndFixes(session, args);
       return {
         content: [{ type: "text", text: snapshot.text }],
@@ -1331,6 +1615,7 @@ export async function createMcpRuntime(
   const manager = new HostManager(
     projectRoot ?? null,
     createDiagnosticsSession,
+    resolvePersistedStateFile(),
   );
   if (projectRoot) {
     await manager.attach(projectRoot);

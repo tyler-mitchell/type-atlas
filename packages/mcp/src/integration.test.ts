@@ -1,6 +1,14 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "vitest";
 import {
   createInMemoryTestClient,
   createStdioTestClient,
@@ -12,6 +20,7 @@ import {
 } from "./testing.js";
 
 const previousRuntimeMode = process.env.FEATURETYPE_RUNTIME_MODE;
+const previousStateFile = process.env.FEATURETYPE_MCP_STATE_FILE;
 
 async function expectBasicProbe(handle: TestClientHandle) {
   const probe = await runBasicProbe(handle.client);
@@ -33,6 +42,34 @@ function hasToolError(result: unknown): boolean {
     "isError" in result &&
     result.isError === true
   );
+}
+
+async function withDiagnosticRateLimitConfig<T>(
+  maxCalls: string,
+  windowMs: string,
+  work: () => Promise<T>,
+): Promise<T> {
+  const previousMaxCalls =
+    process.env.FEATURETYPE_DIAGNOSTIC_TOOL_MAX_CALLS_PER_MINUTE;
+  const previousWindowMs = process.env.FEATURETYPE_DIAGNOSTIC_TOOL_WINDOW_MS;
+  process.env.FEATURETYPE_DIAGNOSTIC_TOOL_MAX_CALLS_PER_MINUTE = maxCalls;
+  process.env.FEATURETYPE_DIAGNOSTIC_TOOL_WINDOW_MS = windowMs;
+
+  try {
+    return await work();
+  } finally {
+    if (previousMaxCalls === undefined) {
+      delete process.env.FEATURETYPE_DIAGNOSTIC_TOOL_MAX_CALLS_PER_MINUTE;
+    } else {
+      process.env.FEATURETYPE_DIAGNOSTIC_TOOL_MAX_CALLS_PER_MINUTE = previousMaxCalls;
+    }
+
+    if (previousWindowMs === undefined) {
+      delete process.env.FEATURETYPE_DIAGNOSTIC_TOOL_WINDOW_MS;
+    } else {
+      process.env.FEATURETYPE_DIAGNOSTIC_TOOL_WINDOW_MS = previousWindowMs;
+    }
+  }
 }
 
 async function createTemporaryProject(
@@ -136,12 +173,54 @@ async function createTemporaryReferencedMonorepo(parentDir: string): Promise<{
   return { root, appRoot };
 }
 
+async function createLargeDiagnosticProject(parentDir: string): Promise<string> {
+  const projectRoot = await mkdtemp(path.join(parentDir, "featuretype-mcp-large-project-"));
+  const srcDir = path.join(projectRoot, "src");
+
+  await mkdir(srcDir, { recursive: true });
+  await writeFile(
+    path.join(projectRoot, "tsconfig.json"),
+    JSON.stringify(
+      {
+        compilerOptions: {
+          module: "NodeNext",
+          moduleResolution: "NodeNext",
+          target: "ES2022",
+          strict: true,
+        },
+        include: ["src/**/*.ts"],
+      },
+      null,
+      2,
+    ),
+  );
+
+  await Promise.all(
+    Array.from({ length: 260 }, (_, index) =>
+      writeFile(
+        path.join(srcDir, `file-${index}.ts`),
+        index === 0
+          ? "const broken: string = 1;\nexport { broken };\n"
+          : `export const value${index} = ${index};\n`,
+      ),
+    ),
+  );
+
+  return projectRoot;
+}
+
 describe("featuretype MCP local probes", () => {
   let handle: TestClientHandle | undefined;
   let tempDir: string | undefined;
+  let stateDir: string | undefined;
 
   beforeAll(() => {
     process.env.FEATURETYPE_RUNTIME_MODE = "source";
+  });
+
+  beforeEach(async () => {
+    stateDir = await createRepoTempDir("featuretype-mcp-state-");
+    process.env.FEATURETYPE_MCP_STATE_FILE = path.join(stateDir, "state.json");
   });
 
   afterEach(async () => {
@@ -151,14 +230,24 @@ describe("featuretype MCP local probes", () => {
       await rm(tempDir, { recursive: true, force: true });
       tempDir = undefined;
     }
+    if (stateDir) {
+      await rm(stateDir, { recursive: true, force: true });
+      stateDir = undefined;
+    }
   });
 
   afterAll(() => {
     if (previousRuntimeMode === undefined) {
       delete process.env.FEATURETYPE_RUNTIME_MODE;
+    } else {
+      process.env.FEATURETYPE_RUNTIME_MODE = previousRuntimeMode;
+    }
+
+    if (previousStateFile === undefined) {
+      delete process.env.FEATURETYPE_MCP_STATE_FILE;
       return;
     }
-    process.env.FEATURETYPE_RUNTIME_MODE = previousRuntimeMode;
+    process.env.FEATURETYPE_MCP_STATE_FILE = previousStateFile;
   });
 
   it("supports in-memory MCP probing without Codex or stdio", async () => {
@@ -206,6 +295,66 @@ describe("featuretype MCP local probes", () => {
     });
 
     expect(readStructuredContent(result)?.items).toBeUndefined();
+  });
+
+  it("rate-limits get_diagnostics after configured max calls per window", async () => {
+    await withDiagnosticRateLimitConfig("1", "60000", async () => {
+      handle = await createInMemoryTestClient(demoWorkspaceRoot);
+
+      const first = await handle.client.callTool({
+        name: "get_diagnostics",
+        arguments: {
+          file: "broken-button.featuretype",
+          severity: "all",
+        },
+      });
+      const second = await handle.client.callTool({
+        name: "get_diagnostics",
+        arguments: {
+          file: "broken-button.featuretype",
+          severity: "all",
+        },
+      });
+
+      expect(hasToolError(first)).toBe(false);
+      expect(hasToolError(second)).toBe(true);
+      expect(
+        (readStructuredContent(second)?.error as
+          | { code?: string; message?: string }
+          | undefined)?.code,
+      ).toBe("RATE_LIMIT_EXCEEDED");
+      expect(readTextContent(second)).toContain("Retry after");
+    });
+  });
+
+  it("rate-limits find_errors_and_fixes after configured max calls per window", async () => {
+    await withDiagnosticRateLimitConfig("1", "60000", async () => {
+      handle = await createInMemoryTestClient(demoWorkspaceRoot);
+
+      const first = await handle.client.callTool({
+        name: "find_errors_and_fixes",
+        arguments: {
+          file: "broken-button.featuretype",
+          severity: "all",
+        },
+      });
+      const second = await handle.client.callTool({
+        name: "find_errors_and_fixes",
+        arguments: {
+          file: "broken-button.featuretype",
+          severity: "all",
+        },
+      });
+
+      expect(hasToolError(first)).toBe(false);
+      expect(hasToolError(second)).toBe(true);
+      expect(
+        (readStructuredContent(second)?.error as
+          | { code?: string; message?: string }
+          | undefined)?.code,
+      ).toBe("RATE_LIMIT_EXCEEDED");
+      expect(readTextContent(second)).toContain("Retry after");
+    });
   });
 
   it("returns structured NOT_FOUND failures for missing semantic files", async () => {
@@ -310,6 +459,84 @@ describe("featuretype MCP local probes", () => {
     expect(readTextContent(monorepoRelative)).toContain("TS2322");
     expect(readStructuredContent(appRelative)?.root).toBe(appRoot);
     expect(readStructuredContent(monorepoRelative)?.root).toBe(root);
+  }, 60_000);
+
+  it("restores attached roots across fresh runtimes for relative attaches and file routing", async () => {
+    tempDir = await createRepoTempDir("featuretype-mcp-monorepo-parent-");
+    const { root, appRoot } = await createTemporaryReferencedMonorepo(tempDir);
+
+    const firstHandle = await createInMemoryTestClient(root);
+    try {
+      await firstHandle.client.callTool({
+        name: "attach_project",
+        arguments: {
+          projectRoot: "apps/web",
+        },
+      });
+    } finally {
+      await firstHandle.close();
+    }
+
+    handle = await createInMemoryTestClient();
+
+    const attach = await handle.client.callTool({
+      name: "attach_project",
+      arguments: {
+        projectRoot: "apps/web",
+      },
+    });
+    const appRelative = await handle.client.callTool({
+      name: "get_diagnostics",
+      arguments: {
+        file: "src/router.ts",
+        severity: "all",
+        summary: false,
+      },
+    });
+    const monorepoRelative = await handle.client.callTool({
+      name: "get_diagnostics",
+      arguments: {
+        file: "apps/web/src/router.ts",
+        severity: "all",
+        summary: false,
+      },
+    });
+
+    expect(readStructuredContent(attach)?.root).toBe(appRoot);
+    expect(readStructuredContent(appRelative)?.root).toBe(appRoot);
+    expect(readStructuredContent(monorepoRelative)?.root).toBe(root);
+    expect(readTextContent(appRelative)).toContain("TS2322");
+    expect(readTextContent(monorepoRelative)).toContain("TS2322");
+  }, 60_000);
+
+  it("allows file-scoped diagnostics in large attached projects while keeping whole-project scans limited", async () => {
+    tempDir = await createRepoTempDir("featuretype-mcp-large-project-parent-");
+    const projectRoot = await createLargeDiagnosticProject(tempDir);
+
+    handle = await createInMemoryTestClient(projectRoot);
+
+    const fileScoped = await handle.client.callTool({
+      name: "get_diagnostics",
+      arguments: {
+        file: "src/file-0.ts",
+        severity: "all",
+        summary: false,
+      },
+    });
+    const wholeProject = await handle.client.callTool({
+      name: "get_diagnostics",
+      arguments: {
+        severity: "all",
+        summary: false,
+      },
+    });
+
+    expect(readTextContent(fileScoped)).toContain("TS2322");
+    expect(readStructuredContent(fileScoped)?.limited).toBe(false);
+    expect(readStructuredContent(wholeProject)?.limited).toBe(true);
+    expect(
+      (readStructuredContent(wholeProject)?.error as { code?: string } | undefined)?.code,
+    ).toBe("PROJECT_TOO_LARGE");
   }, 60_000);
 
 });
