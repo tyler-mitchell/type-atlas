@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { DiagnosticsSession } from "@featuretype/language-server";
 import type { Diagnostic, Range } from "vscode-languageserver-protocol";
-import { validateFiles } from "./validation.js";
+import {
+  normalizeValidateFilesInput,
+  VALIDATE_FILES_EMPTY_INPUT_MESSAGE,
+  validateFiles,
+} from "./validation.js";
 
 function createDiagnostic(
   line: number,
@@ -40,6 +44,12 @@ function createSessionMock(
 }
 
 describe("validateFiles", () => {
+  it("normalizes file input by trimming and deduping", () => {
+    expect(
+      normalizeValidateFilesInput([" src/a.ts ", "src/a.ts", "", "  ", "src/b.ts"]),
+    ).toEqual(["src/a.ts", "src/b.ts"]);
+  });
+
   it("summarizes diagnostics across multiple files", async () => {
     const session = createSessionMock("/repo", {
       "/repo/src/a.ts": [
@@ -72,5 +82,17 @@ describe("validateFiles", () => {
     expect(summary.items).toHaveLength(2);
     expect(summary.text).toContain("Validated 3 files.");
     expect(summary.text).toContain("src/c.ts: clean");
+  });
+
+  it("returns the shared empty-input message when no files are provided", async () => {
+    const session = createSessionMock("/repo", {});
+
+    const summary = await validateFiles(session, {
+      files: [],
+      includeItems: true,
+    });
+
+    expect(summary.text).toBe(VALIDATE_FILES_EMPTY_INPUT_MESSAGE);
+    expect(summary.items).toEqual([]);
   });
 });

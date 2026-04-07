@@ -40,7 +40,11 @@ import {
   searchWorkspaceSymbolsAcrossSessions,
 } from "./tools/symbols";
 import { getSignature, getTypeAt } from "./tools/type-info";
-import { validateFiles } from "./tools/validation.js";
+import {
+  normalizeValidateFilesInput,
+  validateFiles,
+  VALIDATE_FILES_EMPTY_INPUT_MESSAGE,
+} from "./tools/validation.js";
 import {
   createSlidingWindowRateLimiter,
   parsePositiveIntEnv,
@@ -197,6 +201,25 @@ const isProjectRelativePath = (
     !path.isAbsolute(relativePath);
   return { path: relativePath, isInRoot };
 };
+
+const createValidateFilesErrorResult = (
+  code: "INVALID_INPUT" | "RATE_LIMIT_EXCEEDED",
+  message: string,
+) => ({
+  isError: true as const,
+  content: [{ type: "text" as const, text: message }],
+  structuredContent: {
+    fileCount: 0,
+    totalCount: 0,
+    totalErrorCount: 0,
+    totalWarningCount: 0,
+    files: [],
+    error: {
+      code,
+      message,
+    },
+  },
+});
 
 function getFeatureTypeRuntimeMode(): "auto" | "source" | "dist" {
   const configuredMode =
@@ -1361,25 +1384,12 @@ export function createMcpServer(manager: HostManager): McpServer {
       },
     },
     async (args) => {
-      const normalizedFiles = [...new Set(args.files.map((file) => file.trim()))]
-        .filter((file) => file.length > 0);
+      const normalizedFiles = normalizeValidateFilesInput(args.files);
       if (normalizedFiles.length === 0) {
-        const message = "validate_files requires at least one non-empty file path.";
-        return {
-          isError: true,
-          content: [{ type: "text", text: message }],
-          structuredContent: {
-            fileCount: 0,
-            totalCount: 0,
-            totalErrorCount: 0,
-            totalWarningCount: 0,
-            files: [],
-            error: {
-              code: "INVALID_INPUT",
-              message,
-            },
-          },
-        };
+        return createValidateFilesErrorResult(
+          "INVALID_INPUT",
+          VALIDATE_FILES_EMPTY_INPUT_MESSAGE,
+        );
       }
       const firstFile = normalizedFiles[0] ?? "";
       const session = await (async () => {
@@ -1407,24 +1417,11 @@ export function createMcpServer(manager: HostManager): McpServer {
           `${getDiagnosticRateLimitWindowMs()}ms for validate_files is in effect.`,
           `Retry after ${toRetryAfterSeconds(rateLimit.reset)} seconds.`,
         ].join(" ");
-        return {
-          isError: true,
-          content: [{ type: "text", text: message }],
-          structuredContent: {
-            fileCount: 0,
-            totalCount: 0,
-            totalErrorCount: 0,
-            totalWarningCount: 0,
-            files: [],
-            error: {
-              code: "RATE_LIMIT_EXCEEDED",
-              message,
-            },
-          },
-        };
+        return createValidateFilesErrorResult("RATE_LIMIT_EXCEEDED", message);
       }
 
       const normalizedPaths: string[] = [];
+      const seenNormalizedPaths = new Set<string>();
       for (const file of normalizedFiles) {
         const absPath = path.isAbsolute(file)
           ? path.resolve(file)
@@ -1437,23 +1434,14 @@ export function createMcpServer(manager: HostManager): McpServer {
         if (!isInRoot) {
           const message =
             "validate_files requires all files to resolve under the same attached root.";
-          return {
-            isError: true,
-            content: [{ type: "text", text: message }],
-            structuredContent: {
-              fileCount: 0,
-              totalCount: 0,
-              totalErrorCount: 0,
-              totalWarningCount: 0,
-              files: [],
-              error: {
-                code: "INVALID_INPUT",
-                message,
-              },
-            },
-          };
+          return createValidateFilesErrorResult("INVALID_INPUT", message);
         }
 
+        if (seenNormalizedPaths.has(relativePath)) {
+          continue;
+        }
+
+        seenNormalizedPaths.add(relativePath);
         normalizedPaths.push(relativePath);
       }
 

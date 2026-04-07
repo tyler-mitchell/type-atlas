@@ -1,9 +1,11 @@
-import * as path from "node:path";
 import type { DiagnosticsSession } from "@featuretype/language-server";
 import {
   getErrorsAndFixes,
   type DiagnosticWithFixes,
 } from "./errors-and-fixes.js";
+
+export const VALIDATE_FILES_EMPTY_INPUT_MESSAGE =
+  "validate_files requires at least one non-empty file path.";
 
 export interface ValidatedFileSummary {
   file: string;
@@ -28,7 +30,7 @@ export interface ValidateFilesSnapshot {
   items?: DiagnosticWithFixes[];
 }
 
-function normalizeFiles(files: string[]): string[] {
+export function normalizeValidateFilesInput(files: readonly string[]): string[] {
   const seen = new Set<string>();
   const normalized: string[] = [];
 
@@ -43,6 +45,20 @@ function normalizeFiles(files: string[]): string[] {
   }
 
   return normalized;
+}
+
+function createEmptyValidateFilesSnapshot(
+  includeItems: boolean,
+): ValidateFilesSnapshot {
+  return {
+    text: VALIDATE_FILES_EMPTY_INPUT_MESSAGE,
+    fileCount: 0,
+    totalCount: 0,
+    totalErrorCount: 0,
+    totalWarningCount: 0,
+    files: [],
+    ...(includeItems ? { items: [] } : {}),
+  };
 }
 
 function formatValidationSummary(summary: ValidatedFileSummary): string {
@@ -69,36 +85,26 @@ export async function validateFiles(
   session: DiagnosticsSession,
   args: ValidateFilesArgs,
 ): Promise<ValidateFilesSnapshot> {
-  const files = normalizeFiles(args.files);
+  const files = args.files;
+  const includeItems = args.includeItems ?? false;
   if (files.length === 0) {
-    return {
-      text: "validate_files requires at least one file.",
-      fileCount: 0,
-      totalCount: 0,
-      totalErrorCount: 0,
-      totalWarningCount: 0,
-      files: [],
-      ...(args.includeItems ? { items: [] } : {}),
-    };
+    return createEmptyValidateFilesSnapshot(includeItems);
   }
 
   const severity = args.severity ?? "all";
-  const includeItems = args.includeItems ?? false;
 
   const snapshots = await Promise.all(
     files.map(async (file) => {
-      const normalizedFile = path.isAbsolute(file)
-        ? path.relative(session.rootDir, file)
-        : file;
-      const snapshot = await getErrorsAndFixes(session, {
-        file: normalizedFile,
-        severity,
-      });
+      const snapshot = await getErrorsAndFixes(session, { file, severity });
       return {
-        file: normalizedFile,
+        file,
         snapshot,
       };
     }),
+  );
+
+  const itemsByFile = new Map(
+    snapshots.map(({ file, snapshot }) => [file, snapshot.items ?? []] as const),
   );
 
   const fileSummaries = snapshots
@@ -120,7 +126,7 @@ export async function validateFiles(
 
   const items = includeItems
     ? fileSummaries.flatMap((summary) =>
-        snapshots.find(({ file }) => file === summary.file)?.snapshot.items ?? [],
+        itemsByFile.get(summary.file) ?? [],
       )
     : undefined;
 

@@ -576,6 +576,36 @@ describe("featuretype MCP local probes", () => {
     ).toBe("INVALID_INPUT");
   });
 
+  it("dedupes validate_files entries that resolve to the same file", async () => {
+    tempDir = await createRepoTempDir("featuretype-mcp-validate-files-dedupe-parent-");
+    const projectRoot = await createValidationProject(tempDir);
+    const sharedFile = path.join(projectRoot, "src", "a.ts");
+
+    handle = await createInMemoryTestClient(projectRoot);
+    await writeFile(sharedFile, "export const first: string = 1;\n");
+
+    const result = await handle.client.callTool({
+      name: "validate_files",
+      arguments: {
+        files: ["src/a.ts", sharedFile],
+        severity: "all",
+        includeItems: true,
+      },
+    });
+
+    const text = readTextContent(result);
+    const structured = readStructuredContent(result);
+    const items =
+      (structured?.items as Array<{ file?: string; fixes?: unknown[] }> | undefined) ?? [];
+
+    expect(hasToolError(result)).toBe(false);
+    expect(text).toContain("Validated 1 file.");
+    expect(Number(structured?.fileCount ?? 0)).toBe(1);
+    expect(Number(structured?.totalErrorCount ?? 0)).toBe(1);
+    expect(items).toHaveLength(1);
+    expect(items[0]?.file).toBe("src/a.ts");
+  }, 60_000);
+
   it("searches workspace symbols across attached roots without per-root node_modules", async () => {
     tempDir = await createRepoTempDir("featuretype-mcp-roots-");
     const alphaRoot = await createTemporaryProject(tempDir, "AlphaSearchSymbol");
