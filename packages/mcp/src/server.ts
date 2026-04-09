@@ -342,6 +342,14 @@ class HostManager {
     }
   }
 
+  private async refreshProjectFileCount(
+    project: AttachedProject,
+  ): Promise<number> {
+    const session = await project.sessionPromise;
+    project.fileCount = (await session.getProjectFileNames()).length;
+    return project.fileCount;
+  }
+
   private rememberRoots(roots: readonly string[]): void {
     const restoredState = normalizePersistedRootState(this.activeRoot, [
       ...roots,
@@ -497,9 +505,10 @@ class HostManager {
       this.rememberRoots([resolved]);
     }
     this.persistRoots();
+    const fileCount = await this.refreshProjectFileCount(project);
     return {
       root: resolved,
-      fileCount: project.fileCount,
+      fileCount,
       isNew,
     };
   }
@@ -510,6 +519,7 @@ class HostManager {
     const projects = await Promise.all(
       this.getAttachedRoots().map((root) => this.ensureProject(root)),
     );
+    await Promise.all(projects.map((project) => this.refreshProjectFileCount(project)));
     return projects.map((project) => ({
       root: project.root,
       active: project.root === this.activeRoot,
@@ -523,6 +533,8 @@ class HostManager {
       ? path.resolve(filePath)
       : path.resolve(session.rootDir, filePath);
     await session.notifyFileChanged(absPath);
+    const project = await this.ensureProject(session.rootDir);
+    await this.refreshProjectFileCount(project);
   }
 
   async disposeAll(): Promise<void> {

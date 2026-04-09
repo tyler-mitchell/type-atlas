@@ -653,6 +653,10 @@ export async function createFeatureTypeLanguageServerClient(
   const openedDocuments = new Map<string, SyncedDocument>();
   // Tracks absolute paths opened as virtual (content-only, no disk read).
   const virtualFilePaths = new Set<string>();
+  const nestedRepositoryRoots = findNestedRepositoryRoots(rootDir);
+  let knownWatchedFiles = new Set(
+    findWatchedFiles(rootDir, nestedRepositoryRoots),
+  );
   let workspaceBootstrapFile: string | undefined;
   let disposed = false;
 
@@ -777,10 +781,22 @@ export async function createFeatureTypeLanguageServerClient(
     return current;
   };
 
+  const refreshOpenedDiskDocuments = async (): Promise<void> => {
+    for (const document of [...openedDocuments.values()]) {
+      const absPath = URI.parse(document.uri).fsPath;
+      if (virtualFilePaths.has(absPath)) {
+        continue;
+      }
+      await syncDocumentFromDisk(absPath, "refresh");
+    }
+  };
+
   const getDocumentDiagnostics = async (
     filePath: string,
   ): Promise<Diagnostic[]> => {
     const absPath = resolveFilePath(rootDir, filePath);
+
+    await refreshOpenedDiskDocuments();
 
     if (virtualFilePaths.has(absPath)) {
       const document = await syncDocumentFromDisk(filePath, "refresh");
@@ -1011,6 +1027,7 @@ export async function createFeatureTypeLanguageServerClient(
   const getWorkspaceDiagnostics = async (): Promise<
     Array<{ filePath: string; diagnostics: Diagnostic[] }> | null
   > => {
+    await refreshOpenedDiskDocuments();
     await ensureWorkspaceInitialized();
 
     try {
@@ -1037,7 +1054,6 @@ export async function createFeatureTypeLanguageServerClient(
         },
       );
 
-      const nestedRepositoryRoots = findNestedRepositoryRoots(rootDir);
       const extraFiles = [
         ...findFeatureTypeFiles(rootDir, nestedRepositoryRoots),
         ...[...virtualFilePaths].filter((filePath) => !seen.has(path.resolve(filePath))),
@@ -1061,12 +1077,10 @@ export async function createFeatureTypeLanguageServerClient(
     if (openedDocuments.size > 0) {
       return;
     }
-    if (workspaceBootstrapFile === undefined) {
-      const projectFiles = enumerateProjectFiles(rootDir, { tsdk });
-      workspaceBootstrapFile =
-        projectFiles.find((filePath) => !filePath.endsWith(".featuretype")) ??
-        projectFiles[0];
-    }
+    const projectFiles = enumerateProjectFiles(rootDir, { tsdk });
+    workspaceBootstrapFile =
+      projectFiles.find((filePath) => !filePath.endsWith(".featuretype")) ??
+      projectFiles[0];
     if (workspaceBootstrapFile) {
       await syncDocumentFromDisk(workspaceBootstrapFile, "open");
     }
@@ -1167,10 +1181,29 @@ export async function createFeatureTypeLanguageServerClient(
   };
 
   const notifyWatchedFiles = async (filePaths: string[]): Promise<void> => {
+    const normalizedPaths = [...new Set(filePaths.map((filePath) =>
+      resolveFilePath(rootDir, filePath)
+    ))];
+
+    await refreshOpenedDiskDocuments();
+    const previousKnownWatchedFiles = new Set(knownWatchedFiles);
+
+    for (const filePath of normalizedPaths) {
+      if (fs.existsSync(filePath)) {
+        knownWatchedFiles.add(filePath);
+      } else {
+        knownWatchedFiles.delete(filePath);
+      }
+    }
+
     await connection.sendNotification(DidChangeWatchedFilesNotification.type, {
-      changes: filePaths.map((filePath) => ({
-        uri: URI.file(resolveFilePath(rootDir, filePath)).toString(),
-        type: FileChangeType.Changed,
+      changes: normalizedPaths.map((filePath) => ({
+        uri: URI.file(filePath).toString(),
+        type: determineWatchedFileChangeType(
+          filePath,
+          previousKnownWatchedFiles,
+          knownWatchedFiles,
+        ),
       })),
     });
   };
@@ -1447,6 +1480,27 @@ function resolveFilePath(rootDir: string, filePath: string): string {
   return path.resolve(rootDir, filePath);
 }
 
+function determineWatchedFileChangeType(
+  filePath: string,
+  previousKnownWatchedFiles: ReadonlySet<string>,
+  nextKnownWatchedFiles: ReadonlySet<string>,
+): FileChangeType {
+  const resolvedFilePath = path.resolve(filePath);
+  const existsOnDisk = fs.existsSync(resolvedFilePath);
+  const existedBefore = previousKnownWatchedFiles.has(resolvedFilePath);
+  const existsAfter = nextKnownWatchedFiles.has(resolvedFilePath) || existsOnDisk;
+
+  if (!existedBefore && existsAfter) {
+    return FileChangeType.Created;
+  }
+
+  if (existedBefore && !existsAfter) {
+    return FileChangeType.Deleted;
+  }
+
+  return existsAfter ? FileChangeType.Changed : FileChangeType.Deleted;
+}
+
 function isSupportedDiagnosticFile(fileName: string): boolean {
   return (
     [
@@ -1515,6 +1569,42 @@ function findFeatureTypeFiles(
       }
 
       if (entry.name.endsWith(".featuretype")) {
+        results.push(fullPath);
+      }
+    }
+  } catch {
+    // Ignore directories that cannot be read.
+  }
+
+  return results;
+}
+
+function findWatchedFiles(
+  dir: string,
+  nestedRepositoryRoots: readonly string[] = [],
+): string[] {
+  const results: string[] = [];
+
+  try {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name === "node_modules" || entry.name === ".git") {
+        continue;
+      }
+
+      const fullPath = path.join(dir, entry.name);
+      if (
+        entry.isDirectory() &&
+        nestedRepositoryRoots.includes(fullPath)
+      ) {
+        continue;
+      }
+
+      if (entry.isDirectory()) {
+        results.push(...findWatchedFiles(fullPath, nestedRepositoryRoots));
+        continue;
+      }
+
+      if (isSupportedDiagnosticFile(fullPath)) {
         results.push(fullPath);
       }
     }

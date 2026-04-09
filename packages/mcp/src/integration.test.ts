@@ -101,6 +101,71 @@ async function createTemporaryProject(
   return projectRoot;
 }
 
+async function createBundlerProjectWithMissingImport(
+  parentDir: string,
+): Promise<string> {
+  const projectRoot = await mkdtemp(path.join(parentDir, "featuretype-mcp-bundler-"));
+  const srcDir = path.join(projectRoot, "src");
+
+  await mkdir(srcDir, { recursive: true });
+  await writeFile(
+    path.join(projectRoot, "tsconfig.json"),
+    JSON.stringify(
+      {
+        compilerOptions: {
+          target: "ES2023",
+          module: "ESNext",
+          moduleResolution: "Bundler",
+          strict: true,
+          noEmit: true,
+          allowImportingTsExtensions: true,
+        },
+        include: ["src/**/*.ts"],
+      },
+      null,
+      2,
+    ),
+  );
+  await writeFile(
+    path.join(srcDir, "index.ts"),
+    [
+      'import { createdValue } from "./created.ts";',
+      "",
+      "export const currentValue: string = createdValue;",
+      "",
+    ].join("\n"),
+  );
+
+  return projectRoot;
+}
+
+async function createConfigRefreshProject(parentDir: string): Promise<string> {
+  const projectRoot = await mkdtemp(path.join(parentDir, "featuretype-mcp-config-refresh-"));
+  const srcDir = path.join(projectRoot, "src");
+
+  await mkdir(srcDir, { recursive: true });
+  await writeFile(
+    path.join(projectRoot, "tsconfig.json"),
+    JSON.stringify(
+      {
+        compilerOptions: {
+          module: "NodeNext",
+          moduleResolution: "NodeNext",
+          target: "ES2022",
+          strict: true,
+        },
+        files: ["src/a.ts"],
+      },
+      null,
+      2,
+    ),
+  );
+  await writeFile(path.join(srcDir, "a.ts"), "export const a = 1;\n");
+  await writeFile(path.join(srcDir, "b.ts"), "export const b: string = 1;\n");
+
+  return projectRoot;
+}
+
 async function createRepoTempDir(prefix: string): Promise<string> {
   const repoTempRoot = path.join(
     path.resolve(demoWorkspaceRoot, "..", ".."),
@@ -761,6 +826,149 @@ describe("featuretype MCP local probes", () => {
     expect(readTextContent(monorepoRelative)).toContain("TS2322");
     expect(readStructuredContent(appRelative)?.root).toBe(appRoot);
     expect(readStructuredContent(monorepoRelative)?.root).toBe(root);
+  }, 60_000);
+
+  it("refreshes attached project file counts after newly created files are added", async () => {
+    tempDir = await createRepoTempDir("featuretype-mcp-file-count-parent-");
+    const projectRoot = await createTemporaryProject(tempDir, "CountSymbol");
+
+    handle = await createInMemoryTestClient(projectRoot);
+
+    const firstAttach = await handle.client.callTool({
+      name: "attach_project",
+      arguments: {
+        projectRoot,
+      },
+    });
+
+    await writeFile(
+      path.join(projectRoot, "src", "extra.ts"),
+      "export const extraValue = 1;\n",
+    );
+    await handle.client.callTool({
+      name: "notify_file_changed",
+      arguments: {
+        file: "src/extra.ts",
+      },
+    });
+
+    const secondAttach = await handle.client.callTool({
+      name: "attach_project",
+      arguments: {
+        projectRoot,
+      },
+    });
+    const projects = await handle.client.callTool({
+      name: "list_projects",
+      arguments: {},
+    });
+
+    expect(Number(readStructuredContent(firstAttach)?.fileCount ?? 0)).toBe(1);
+    expect(Number(readStructuredContent(secondAttach)?.fileCount ?? 0)).toBe(2);
+    expect(readStructuredContent(projects)?.projects).toEqual([
+      {
+        root: projectRoot,
+        active: true,
+        fileCount: 2,
+      },
+    ]);
+  }, 60_000);
+
+  it("clears stale whole-project diagnostics after creating a missing Bundler import and refreshing", async () => {
+    tempDir = await createRepoTempDir("featuretype-mcp-bundler-parent-");
+    const projectRoot = await createBundlerProjectWithMissingImport(tempDir);
+
+    handle = await createInMemoryTestClient(projectRoot);
+
+    const beforeDiagnostics = await handle.client.callTool({
+      name: "get_diagnostics",
+      arguments: {
+        summary: true,
+      },
+    });
+    const beforeFixes = await handle.client.callTool({
+      name: "find_errors_and_fixes",
+      arguments: {},
+    });
+
+    await writeFile(
+      path.join(projectRoot, "src", "created.ts"),
+      'export const createdValue = "ready";\n',
+    );
+    await handle.client.callTool({
+      name: "notify_file_changed",
+      arguments: {
+        file: "src/created.ts",
+      },
+    });
+
+    const afterDiagnostics = await handle.client.callTool({
+      name: "get_diagnostics",
+      arguments: {
+        summary: true,
+      },
+    });
+    const afterFixes = await handle.client.callTool({
+      name: "find_errors_and_fixes",
+      arguments: {},
+    });
+
+    expect(Number(readStructuredContent(beforeDiagnostics)?.totalErrorCount ?? 0)).toBe(1);
+    expect(readTextContent(beforeDiagnostics)).toContain("src/index.ts");
+    expect(Number(readStructuredContent(beforeFixes)?.totalErrorCount ?? 0)).toBe(1);
+
+    expect(Number(readStructuredContent(afterDiagnostics)?.totalErrorCount ?? 0)).toBe(0);
+    expect(readTextContent(afterDiagnostics)).toBe("No diagnostics.");
+    expect(Number(readStructuredContent(afterFixes)?.totalErrorCount ?? 0)).toBe(0);
+    expect(readTextContent(afterFixes)).toBe("No diagnostics found.");
+  }, 60_000);
+
+  it("keeps diagnostics working after tsconfig.json changes are refreshed", async () => {
+    tempDir = await createRepoTempDir("featuretype-mcp-config-refresh-parent-");
+    const projectRoot = await createConfigRefreshProject(tempDir);
+
+    handle = await createInMemoryTestClient(projectRoot);
+
+    const before = await handle.client.callTool({
+      name: "get_diagnostics",
+      arguments: {
+        summary: true,
+      },
+    });
+
+    await writeFile(
+      path.join(projectRoot, "tsconfig.json"),
+      JSON.stringify(
+        {
+          compilerOptions: {
+            module: "NodeNext",
+            moduleResolution: "NodeNext",
+            target: "ES2022",
+            strict: true,
+          },
+          files: ["src/a.ts", "src/b.ts"],
+        },
+        null,
+        2,
+      ),
+    );
+    await handle.client.callTool({
+      name: "notify_file_changed",
+      arguments: {
+        file: "tsconfig.json",
+      },
+    });
+
+    const after = await handle.client.callTool({
+      name: "get_diagnostics",
+      arguments: {
+        summary: true,
+      },
+    });
+
+    expect(readTextContent(before)).toBe("No diagnostics.");
+    expect(Number(readStructuredContent(after)?.totalErrorCount ?? 0)).toBe(1);
+    expect(readTextContent(after)).toContain("src/b.ts");
   }, 60_000);
 
   it("restores attached roots across fresh runtimes for relative attaches and file routing", async () => {
