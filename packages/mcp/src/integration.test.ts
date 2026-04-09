@@ -347,7 +347,7 @@ describe("featuretype MCP local probes", () => {
     await expectBasicProbe(handle);
   });
 
-  it("keeps find_errors_and_fixes items in structured output by default", async () => {
+  it("keeps find_errors_and_fixes text output compact by default", async () => {
     handle = await createInMemoryTestClient(demoWorkspaceRoot);
 
     const result = await handle.client.callTool({
@@ -360,16 +360,14 @@ describe("featuretype MCP local probes", () => {
 
     const text = readTextContent(result);
     const structured = readStructuredContent(result);
-    const items =
-      (structured?.items as Array<{ fixes?: unknown[] }> | undefined) ?? [];
 
     expect(text).toContain("broken-button.featuretype");
+    expect(text).not.toContain("→");
     expect(Number(structured?.totalCount ?? 0)).toBeGreaterThan(0);
-    expect(items.length).toBeGreaterThan(0);
-    expect(items.some((item) => (item.fixes?.length ?? 0) > 0)).toBe(true);
+    expect(structured?.items).toBeUndefined();
   });
 
-  it("omits structured fix items when explicitly disabled", async () => {
+  it("includes structured fix items when explicitly enabled", async () => {
     handle = await createInMemoryTestClient(demoWorkspaceRoot);
 
     const result = await handle.client.callTool({
@@ -377,11 +375,85 @@ describe("featuretype MCP local probes", () => {
       arguments: {
         file: "broken-button.featuretype",
         severity: "all",
-        includeItems: false,
+        includeItems: true,
       },
     });
 
-    expect(readStructuredContent(result)?.items).toBeUndefined();
+    const items =
+      (readStructuredContent(result)?.items as Array<{
+        line?: number;
+        code?: string;
+        fixes?: Array<{ title?: string; kind?: string }>;
+      }> | undefined) ?? [];
+
+    expect(items).toMatchObject([
+      {
+        line: 1,
+        code: "TSmissing-required-block",
+        fixes: [
+          {
+            title: "Add <intent> block",
+            kind: "quickfix",
+          },
+        ],
+      },
+      {
+        line: 9,
+        code: "TS2322",
+        fixes: [],
+      },
+    ]);
+  });
+
+  it("only reports applicable fixes in both compact text and repeated item output", async () => {
+    handle = await createInMemoryTestClient(demoWorkspaceRoot);
+
+    const compact = await handle.client.callTool({
+      name: "find_errors_and_fixes",
+      arguments: {
+        file: "broken-button.featuretype",
+        severity: "all",
+      },
+    });
+    const detailed = await handle.client.callTool({
+      name: "find_errors_and_fixes",
+      arguments: {
+        file: "broken-button.featuretype",
+        severity: "all",
+        includeItems: true,
+      },
+    });
+
+    const compactText = readTextContent(compact);
+    const items =
+      (readStructuredContent(detailed)?.items as Array<{
+        line?: number;
+        code?: string;
+        fixes?: Array<{ title?: string }>;
+      }> | undefined) ?? [];
+
+    expect(compactText).toContain(
+      "[error] 1:1  TSmissing-required-block  FeatureType documents must declare an <intent> block.",
+    );
+    expect(compactText).toContain("    fix: Add <intent> block");
+    expect(compactText).toContain(
+      "[error] 9:14  TS2322  Type '\"destructive\"' is not assignable to type '\"primary\" | \"danger\" | undefined'.",
+    );
+    expect(compactText).not.toContain(
+      "TS2322  Type '\"destructive\"' is not assignable to type '\"primary\" | \"danger\" | undefined'.\n    fix: Add <intent> block",
+    );
+    expect(items).toMatchObject([
+      {
+        line: 1,
+        code: "TSmissing-required-block",
+        fixes: [{ title: "Add <intent> block" }],
+      },
+      {
+        line: 9,
+        code: "TS2322",
+        fixes: [],
+      },
+    ]);
   });
 
   it("rate-limits get_diagnostics after configured max calls per window", async () => {

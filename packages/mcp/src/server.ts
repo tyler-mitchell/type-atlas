@@ -1259,7 +1259,7 @@ export function createMcpServer(manager: HostManager): McpServer {
     "find_errors_and_fixes",
     {
       description:
-        "Get diagnostics paired with their available code actions in a single call. Prefer this over calling get_diagnostics then get_code_actions separately. Defaults to errors only — pass severity: 'all' to include warnings.",
+        "Get diagnostics paired with actionable fixes in a single call. Prefer this over calling get_diagnostics then get_code_actions separately. Text output is compact by default, and detailed per-diagnostic fix objects are opt-in.",
       inputSchema: {
         file: z
           .string()
@@ -1275,13 +1275,19 @@ export function createMcpServer(manager: HostManager): McpServer {
           .boolean()
           .optional()
           .describe(
-            "Include full per-diagnostic fix objects in structuredContent. Defaults to true; pass false to omit them and rely on the text summary.",
+            "Include full per-diagnostic fix objects in structuredContent. Defaults to false; pass true to opt in.",
           ),
         includeEmptyFixes: z
           .boolean()
           .optional()
           .describe(
             "Include fixes that do not include a concrete text edit (defaults to false to reduce noise).",
+          ),
+        includeRefactors: z
+          .boolean()
+          .optional()
+          .describe(
+            "Include generic refactors alongside diagnostic fixes. Defaults to false to reduce noisy output.",
           ),
       },
       outputSchema: {
@@ -1340,7 +1346,7 @@ export function createMcpServer(manager: HostManager): McpServer {
           limited: snapshot.limited,
           projectFileCount: snapshot.projectFileCount,
           projectFileLimit: snapshot.projectFileLimit,
-          ...((args.includeItems ?? true) ? { items: snapshot.items } : {}),
+          ...((args.includeItems ?? false) ? { items: snapshot.items } : {}),
         },
       };
     },
