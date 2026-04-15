@@ -34,6 +34,7 @@ import {
   getRenameEdits,
   prepareRename,
 } from "./tools/refactors";
+import { listModuleExports } from "./tools/module-exports";
 import {
   getDocumentSymbolsOutline,
   inspectSymbol,
@@ -1503,6 +1504,106 @@ export function createMcpServer(manager: HostManager): McpServer {
             text,
           },
         ],
+      };
+    },
+  );
+
+  server.registerTool(
+    "list_module_exports",
+    {
+      description:
+        "List the exports of a module using the language server's completion pipeline instead of manual export parsing. This is the preferred entry point for 'what does this package export?' exploration.",
+      inputSchema: {
+        module: z
+          .string()
+          .describe("Module specifier to inspect, for example react, zod, or ./local-module.js."),
+        fromFile: z
+          .string()
+          .optional()
+          .describe(
+            "Optional file path relative to a project root. Resolve the module as if imported from this file.",
+          ),
+        projectRoot: z
+          .string()
+          .optional()
+          .describe(
+            "Optional project root override when multiple projects are attached. Defaults to the active root.",
+          ),
+        maxResults: z
+          .number()
+          .int()
+          .min(1)
+          .max(100)
+          .optional()
+          .describe("Maximum number of exports to include per page. Defaults to 25."),
+        offset: z
+          .number()
+          .int()
+          .min(0)
+          .optional()
+          .describe(
+            "Optional zero-based offset into the matching export list for progressive paging.",
+          ),
+        query: z
+          .string()
+          .optional()
+          .describe(
+            "Optional case-insensitive export-name query. Prefix matches are preferred; substring matches are used when no prefix matches exist.",
+          ),
+        includeDocs: z
+          .boolean()
+          .optional()
+          .describe(
+            "Whether to resolve completion items for documentation/details. Defaults to true.",
+          ),
+      },
+      outputSchema: {
+        root: z.string(),
+        module: z.string(),
+        fromFile: z.string().nullable(),
+        query: z.string().nullable(),
+        probeFile: z.string(),
+        totalExports: z.number().int().nonnegative(),
+        totalMatchingExports: z.number().int().nonnegative(),
+        offset: z.number().int().nonnegative(),
+        nextOffset: z.number().int().nonnegative().nullable(),
+        isIncomplete: z.boolean(),
+        exports: z.array(
+          z.object({
+            name: z.string(),
+            detail: z.string().optional(),
+            documentation: z.string().optional(),
+            kind: z.number().int().positive().optional(),
+            deprecated: z.boolean(),
+          }),
+        ),
+      },
+    },
+    async (args) => {
+      const session = args.fromFile
+        ? await manager.getDiagnosticsSessionForFile(args.fromFile)
+        : await manager.getDiagnosticsSession(args.projectRoot);
+      const result = await listModuleExports(session, args);
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: result.text,
+          },
+        ],
+        structuredContent: {
+          root: session.rootDir,
+          module: result.module,
+          fromFile: args.fromFile ?? null,
+          query: result.query ?? null,
+          probeFile: result.probeFile,
+          totalExports: result.totalExports,
+          totalMatchingExports: result.totalMatchingExports,
+          offset: result.offset,
+          nextOffset: result.nextOffset,
+          isIncomplete: result.isIncomplete,
+          exports: result.exports,
+        },
       };
     },
   );

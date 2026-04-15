@@ -8,6 +8,8 @@ import {
   CallHierarchyPrepareRequest,
   CodeActionRequest,
   CodeActionResolveRequest,
+  CompletionRequest,
+  CompletionResolveRequest,
   ConfigurationRequest,
   DefinitionRequest,
   DidChangeTextDocumentNotification,
@@ -38,6 +40,8 @@ import {
   type CallHierarchyOutgoingCall,
   type CodeAction,
   type Command,
+  type CompletionItem,
+  type CompletionList,
   type Diagnostic,
   type DocumentHighlight,
   type DocumentSymbol,
@@ -111,6 +115,11 @@ export interface FeatureTypeLanguageServerClient {
     range: Range,
     diagnostics: Diagnostic[],
   ): Promise<Array<CodeAction | Command>>;
+  getDocumentCompletions(
+    filePath: string,
+    position: Position,
+  ): Promise<CompletionList>;
+  resolveCompletionItem(item: CompletionItem): Promise<CompletionItem>;
   getDocumentHover(
     filePath: string,
     position: Position,
@@ -198,6 +207,11 @@ export interface DiagnosticsSession {
     range: Range,
     diagnostics: Diagnostic[],
   ): Promise<Array<CodeAction | Command>>;
+  getFileCompletions(
+    filePath: string,
+    position: Position,
+  ): Promise<CompletionList>;
+  resolveCompletionItem(item: CompletionItem): Promise<CompletionItem>;
   getFileHover(
     filePath: string,
     position: Position,
@@ -282,6 +296,26 @@ function supportsCodeActionResolve(
   action: CodeAction | Command,
 ): action is CodeAction & { data: NonNullable<CodeAction["data"]> } {
   return "data" in action && action.data !== undefined && action.data !== null;
+}
+
+function normalizeCompletionResult(
+  completions: CompletionItem[] | CompletionList | null,
+): CompletionList {
+  if (!completions) {
+    return {
+      isIncomplete: false,
+      items: [],
+    };
+  }
+
+  if (Array.isArray(completions)) {
+    return {
+      isIncomplete: false,
+      items: completions,
+    };
+  }
+
+  return completions;
 }
 
 function resolveLanguageServerModule(): { scriptPath: string; execArgv: string[] } {
@@ -866,6 +900,39 @@ export async function createFeatureTypeLanguageServerClient(
     );
   };
 
+  const getDocumentCompletions = async (
+    filePath: string,
+    position: Position,
+  ): Promise<CompletionList> => {
+    const document = await syncDocumentFromDisk(filePath, "refresh");
+    if (!document) {
+      return {
+        isIncomplete: false,
+        items: [],
+      };
+    }
+
+    return normalizeCompletionResult(
+      (await connection.sendRequest(CompletionRequest.type, {
+        textDocument: { uri: document.uri },
+        position,
+      })) as CompletionItem[] | CompletionList | null,
+    );
+  };
+
+  const resolveCompletionItem = async (
+    item: CompletionItem,
+  ): Promise<CompletionItem> => {
+    try {
+      return (
+        (await connection.sendRequest(CompletionResolveRequest.type, item)) ??
+        item
+      );
+    } catch {
+      return item;
+    }
+  };
+
   const getDocumentHover = async (
     filePath: string,
     position: Position,
@@ -1317,6 +1384,8 @@ export async function createFeatureTypeLanguageServerClient(
     getWorkspaceDiagnostics,
     getDocumentDiagnostics,
     getDocumentCodeActions,
+    getDocumentCompletions,
+    resolveCompletionItem,
     getDocumentHover,
     getDocumentSignatureHelp,
     getDocumentDefinition,
@@ -1385,6 +1454,12 @@ export async function createDiagnosticsSession(
       diagnostics: Diagnostic[],
     ) {
       return client.getDocumentCodeActions(filePath, range, diagnostics);
+    },
+    getFileCompletions(filePath: string, position: Position) {
+      return client.getDocumentCompletions(filePath, position);
+    },
+    resolveCompletionItem(item: CompletionItem) {
+      return client.resolveCompletionItem(item);
     },
     getFileHover(filePath: string, position: Position) {
       return client.getDocumentHover(filePath, position);

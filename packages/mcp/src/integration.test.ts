@@ -101,6 +101,32 @@ async function createTemporaryProject(
   return projectRoot;
 }
 
+async function createPackageResolutionProject(parentDir: string): Promise<string> {
+  const projectRoot = await mkdtemp(path.join(parentDir, "featuretype-mcp-package-resolution-"));
+  await mkdir(path.join(projectRoot, "src"), { recursive: true });
+  await writeFile(
+    path.join(projectRoot, "tsconfig.json"),
+    JSON.stringify(
+      {
+        compilerOptions: {
+          module: "NodeNext",
+          moduleResolution: "NodeNext",
+          target: "ES2022",
+          strict: true,
+        },
+        include: ["src/**/*.ts"],
+      },
+      null,
+      2,
+    ),
+  );
+  await writeFile(
+    path.join(projectRoot, "src", "index.ts"),
+    "export const localValue = 1;\n",
+  );
+  return projectRoot;
+}
+
 async function createBundlerProjectWithMissingImport(
   parentDir: string,
 ): Promise<string> {
@@ -773,6 +799,156 @@ describe("featuretype MCP local probes", () => {
     expect(text).toContain(betaRoot);
     expect(Number(structured?.totalSymbols ?? 0)).toBe(2);
     expect(structured?.roots).toEqual([betaRoot, alphaRoot]);
+  }, 60_000);
+
+  it("lists module exports through completion-based language-server resolution", async () => {
+    tempDir = await createRepoTempDir("featuretype-mcp-module-exports-");
+    const projectRoot = await createPackageResolutionProject(tempDir);
+
+    handle = await createInMemoryTestClient(projectRoot);
+
+    const result = await handle.client.callTool({
+      name: "list_module_exports",
+      arguments: {
+        module: "typescript",
+      },
+    });
+
+    const text = readTextContent(result);
+    const structured = readStructuredContent(result);
+    const exports =
+      (structured?.exports as Array<{ name?: string; documentation?: string }> | undefined) ?? [];
+
+    expect(hasToolError(result)).toBe(false);
+    expect(text).toContain('Exports from "typescript"');
+    expect(Number(structured?.totalExports ?? 0)).toBeGreaterThan(20);
+    expect(exports.length).toBeLessThan(Number(structured?.totalExports ?? 0));
+    expect(Number(structured?.totalMatchingExports ?? 0)).toBe(
+      Number(structured?.totalExports ?? 0),
+    );
+    expect(Number(structured?.offset ?? -1)).toBe(0);
+    expect(Number(structured?.nextOffset ?? 0)).toBe(exports.length);
+    expect(exports.some((entry) => entry.name === "addEmitHelper")).toBe(true);
+    expect(
+      exports.some(
+        (entry) =>
+          typeof entry.documentation === "string" && entry.documentation.length > 0,
+      ),
+    ).toBe(true);
+  }, 60_000);
+
+  it("narrows and pages module exports progressively", async () => {
+    tempDir = await createRepoTempDir("featuretype-mcp-module-exports-query-");
+    const projectRoot = await createPackageResolutionProject(tempDir);
+
+    handle = await createInMemoryTestClient(projectRoot);
+
+    const result = await handle.client.callTool({
+      name: "list_module_exports",
+      arguments: {
+        module: "typescript",
+        query: "create",
+        offset: 5,
+        maxResults: 5,
+      },
+    });
+
+    const text = readTextContent(result);
+    const structured = readStructuredContent(result);
+    const exports =
+      (structured?.exports as Array<{ name?: string }> | undefined) ?? [];
+
+    expect(hasToolError(result)).toBe(false);
+    expect(text).toContain('matching "create"');
+    expect(Number(structured?.totalExports ?? 0)).toBeGreaterThan(
+      Number(structured?.totalMatchingExports ?? 0),
+    );
+    expect(Number(structured?.totalMatchingExports ?? 0)).toBeGreaterThan(exports.length);
+    expect(Number(structured?.offset ?? -1)).toBe(5);
+    expect(Number(structured?.nextOffset ?? 0)).toBe(10);
+    expect(exports).toHaveLength(5);
+    expect(
+      exports.every((entry) => entry.name?.toLowerCase().startsWith("create") ?? false),
+    ).toBe(true);
+  }, 60_000);
+
+  it("clamps oversized export offsets to the last full page", async () => {
+    tempDir = await createRepoTempDir("featuretype-mcp-module-exports-offset-");
+    const projectRoot = await createPackageResolutionProject(tempDir);
+
+    handle = await createInMemoryTestClient(projectRoot);
+
+    const result = await handle.client.callTool({
+      name: "list_module_exports",
+      arguments: {
+        module: "react",
+        query: "use",
+        maxResults: 5,
+        offset: 999,
+      },
+    });
+
+    const text = readTextContent(result);
+    const structured = readStructuredContent(result);
+    const exports =
+      (structured?.exports as Array<{ name?: string }> | undefined) ?? [];
+
+    expect(hasToolError(result)).toBe(false);
+    expect(text).toContain("showing 15-19");
+    expect(Number(structured?.offset ?? -1)).toBe(14);
+    expect(structured?.nextOffset).toBeNull();
+    expect(exports).toHaveLength(5);
+    expect(exports.at(-1)?.name).toBe("useTransition");
+  }, 60_000);
+
+  it("reports unresolved modules instead of leaking parser keyword completions", async () => {
+    tempDir = await createRepoTempDir("featuretype-mcp-module-exports-unresolved-");
+    const projectRoot = await createPackageResolutionProject(tempDir);
+
+    handle = await createInMemoryTestClient(projectRoot);
+
+    const result = await handle.client.callTool({
+      name: "list_module_exports",
+      arguments: {
+        module: "definitely-not-a-real-package-name-for-featuretype",
+      },
+    });
+
+    const text = readTextContent(result);
+    const structured = readStructuredContent(result);
+
+    expect(hasToolError(result)).toBe(false);
+    expect(text).toContain('Could not resolve module "definitely-not-a-real-package-name-for-featuretype"');
+    expect(Number(structured?.totalExports ?? -1)).toBe(0);
+    expect(Number(structured?.totalMatchingExports ?? -1)).toBe(0);
+    expect(structured?.nextOffset).toBeNull();
+    expect(structured?.exports).toEqual([]);
+  }, 60_000);
+
+  it("resolves relative modules from the provided fromFile location", async () => {
+    tempDir = await createRepoTempDir("featuretype-mcp-module-exports-relative-");
+    const projectRoot = await createPackageResolutionProject(tempDir);
+    await writeFile(path.join(projectRoot, "src", "consumer.ts"), "export {};\n");
+
+    handle = await createInMemoryTestClient(projectRoot);
+
+    const result = await handle.client.callTool({
+      name: "list_module_exports",
+      arguments: {
+        module: "./index.js",
+        fromFile: "src/consumer.ts",
+        maxResults: 10,
+      },
+    });
+
+    const text = readTextContent(result);
+    const structured = readStructuredContent(result);
+    const exports =
+      (structured?.exports as Array<{ name?: string }> | undefined) ?? [];
+
+    expect(hasToolError(result)).toBe(false);
+    expect(text).toContain('Exports from "./index.js"');
+    expect(exports.some((entry) => entry.name === "localValue")).toBe(true);
   }, 60_000);
 
   it("attaches nested roots relative to the active project and follows referenced tsconfigs", async () => {

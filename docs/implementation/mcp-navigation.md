@@ -52,6 +52,21 @@ The current navigation surface follows these rules:
   `workspace/symbol` requests can return no results before any document has been
   opened
 
+### Module Discovery
+
+`list_module_exports`
+
+- uses the language server's completion pipeline against a temporary virtual
+  import probe instead of manually walking export graphs
+- is intended for “what does this package export?” exploration
+- defaults to a small page and exposes `query` plus `offset` so agents can
+  progressively narrow large module surfaces instead of requesting every export
+  at once
+- can resolve documentation through completion-item resolve when the underlying
+  TypeScript / Volar stack provides it
+- should be preferred over `search_workspace_symbols` when the agent knows the
+  module specifier but not the export names
+
 ### Composite Inspection
 
 `inspect_symbol`
@@ -107,18 +122,20 @@ full annotated file view is the right proof lane.
 The current recommended usage pattern is:
 
 1. if the file is unknown, locate it with `search_workspace_symbols`
-2. orient with `get_document_symbols`
-3. inspect with `inspect_symbol`
-4. if value-level definition is not enough, use `get_type_definition` or
+2. if the module is known but the export surface is not, start with
+   `list_module_exports`
+3. orient with `get_document_symbols`
+4. inspect with `inspect_symbol`
+5. if value-level definition is not enough, use `get_type_definition` or
    `get_implementations`
-5. use `get_document_highlights`, `get_file_references`, or
+6. use `get_document_highlights`, `get_file_references`, or
    `get_call_hierarchy` for local read-tracing, module tracing, or call
    tracing
-6. use `prepare_rename`, `get_rename_edits`, or `get_file_rename_edits` before
+7. use `prepare_rename`, `get_rename_edits`, or `get_file_rename_edits` before
    broad semantic refactors
-7. use `get_signature`, `get_type_at`, or `get_hover` for call-site or API
+8. use `get_signature`, `get_type_at`, or `get_hover` for call-site or API
    detail
-8. use `get_enriched_file` only when line-by-line diagnostic context is worth
+9. use `get_enriched_file` only when line-by-line diagnostic context is worth
    the token cost
 
 This keeps routine navigation compact while preserving access to detailed views
@@ -154,7 +171,6 @@ The current surface still has room to improve.
 Notable open gaps:
 
 - no import-origin or export-chain tracing tool exists yet
-- no dedicated module-export exploration tool exists yet
 - references are not yet summarized or grouped by file
 - semantic tokens and inlay hints are not yet exposed even though Volar can
   provide them
