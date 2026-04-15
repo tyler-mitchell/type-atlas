@@ -7,7 +7,21 @@ Implementation Planning:
 - Prefer leveraging or composing existing Volar.js capabilities before building new custom logic from scratch.
 - If custom implementation is still needed, document the gap in existing Volar.js behavior and keep the custom layer narrowly scoped around that gap.
 
-Live MCP Usage:
-- If a user asks you to use the live Featuretype MCP, first verify that Featuretype MCP is actually attached to the current session as a first-class tool.
-- If it is attached, use the MCP tools directly.
-- If it is not attached, say that plainly before doing any indirect stdio/client probing, and do not present indirect probing as if it were direct MCP tool usage.
+Featuretype MCP Usage:
+- When a user says to use the "live", "actual", or "direct" Featuretype MCP, they mean the Featuretype MCP attached to the current Codex session as first-class MCP tools.
+- The only codified automated repo-level validation modes are the `in-memory` and `stdio` probes under `packages/mcp`.
+- Do not describe `js_repl`, shell-launched stdio clients, or ad hoc Node clients as MCP validation modes.
+- Do not claim to have used the live/direct MCP when you only used a repo probe, harness, or external client.
+- If the session-attached Featuretype MCP is not available, say that plainly before proceeding.
+- Only when you are preparing to validate or claim post-restart readiness against the session-attached live Featuretype MCP, build the runtime artifacts first. In this project, the live Codex MCP config points at built `dist` output, not source files, so do not tell the user to restart or claim readiness before those builds finish.
+- This does not apply to repo probes, harnesses, or ordinary source-level development loops; it applies specifically to post-restart live MCP readiness.
+- Safe default build sequence before claiming post-restart live MCP readiness: `pnpm --filter @featuretype/service build && pnpm --filter @featuretype/language-server build && pnpm --filter @featuretype/mcp build`.
+
+MCP Output Design:
+- For agent-facing exploratory tools, prefer text as the canonical result view and keep it actually useful for agent decision-making.
+- Do not dump JSON into text, but do format the real page of results in text when that is what the agent is meant to inspect.
+- Keep `structuredContent` metadata-first by default: counts, paging state, probe/context fields, and similar control-plane data.
+- Do not mirror large arrays, itemized page payloads, or other bulky result bodies into both text and `structuredContent`.
+- Only return large per-item structured payloads when there is a concrete machine-consumption need that justifies them.
+- For module export discovery, default the tool toward runtime/API-surface exports rather than flooding agents with type-only symbols.
+- If type-like exports matter, expose an explicit opt-in such as `surface="all"` instead of making type-heavy output the default.

@@ -21,8 +21,10 @@
     "test": "vitest run --passWithNoTests",
     "pretest:integration": "pnpm --filter @featuretype/language-server build",
     "test:integration": "vitest run src/integration.test.ts",
-    "smoke": "node --import tsx ./src/smoke.ts",
-    "smoke:in-memory": "node --import tsx ./src/smoke.ts --transport=in-memory"
+    "probe:stdio": "node --import tsx ./src/smoke.ts",
+    "probe:in-memory": "node --import tsx ./src/smoke.ts --transport=in-memory",
+    "smoke": "pnpm run probe:stdio",
+    "smoke:in-memory": "pnpm run probe:in-memory"
   },
   "dependencies": {
     "@featuretype/core": "workspace:*",

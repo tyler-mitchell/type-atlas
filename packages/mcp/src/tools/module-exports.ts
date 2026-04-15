@@ -2,33 +2,42 @@ import path from "node:path";
 import type { DiagnosticsSession } from "@featuretype/language-server";
 import type {
   CompletionItem,
-  CompletionItemKind,
   Diagnostic,
-  MarkupContent,
 } from "vscode-languageserver-protocol";
 
 const DEFAULT_MAX_RESULTS = 25;
 const MAX_RESULTS = 100;
 const PROBE_DIRECTORY = ".featuretype-mcp";
+const SURFACE_PROBE_BATCH_SIZE = 64;
+const NON_RUNTIME_VALUE_DIAGNOSTIC_CODES = new Set<number>([
+  1484,
+  1485,
+  2585,
+  2690,
+  2693,
+  2708,
+]);
+
+export type ModuleExportSurface = "runtime" | "all";
 
 export interface ListedModuleExport {
   name: string;
   detail?: string;
-  documentation?: string;
-  kind?: CompletionItemKind;
   deprecated: boolean;
 }
 
 export interface ListModuleExportsResult {
   text: string;
-  exports: ListedModuleExport[];
   module: string;
   query?: string;
+  surface: ModuleExportSurface;
   probeFile: string;
   totalExports: number;
   totalMatchingExports: number;
+  hiddenExportCount: number;
   offset: number;
   nextOffset: number | null;
+  pageItemCount: number;
   isIncomplete: boolean;
 }
 
@@ -47,6 +56,10 @@ function clampOffset(value: number | undefined): number {
   return Math.max(0, Math.floor(value));
 }
 
+function normalizeSurface(value: string | undefined): ModuleExportSurface {
+  return value === "all" ? "all" : "runtime";
+}
+
 function sanitizeModuleSpecifier(moduleName: string): string {
   const sanitized = moduleName
     .replace(/[^a-zA-Z0-9._-]+/g, "_")
@@ -59,7 +72,7 @@ function dedupeCompletionItems(items: CompletionItem[]): CompletionItem[] {
   const deduped: CompletionItem[] = [];
 
   for (const item of items) {
-    if (item.kind === 14 && item.label === "type") {
+    if (item.kind === 14) {
       continue;
     }
 
@@ -120,100 +133,192 @@ function filterCompletionItems(
     : substringMatches;
 }
 
-function formatCompletionDocumentation(
-  documentation: string | MarkupContent | undefined,
-): string | undefined {
-  if (!documentation) {
-    return undefined;
-  }
-
-  return typeof documentation === "string"
-    ? documentation
-    : documentation.value;
+function chunkItems<T>(items: readonly T[], size: number): T[][] {
+  return Array.from({ length: Math.ceil(items.length / size) }, (_, index) =>
+    items.slice(index * size, (index + 1) * size),
+  );
 }
 
-function summarizeDocumentation(documentation: string | undefined): string | undefined {
-  if (!documentation) {
-    return undefined;
+type SurfaceProbeEntry = {
+  item: CompletionItem;
+  importLine: number;
+  usageLine: number;
+};
+
+function buildSurfaceProbeSource(
+  moduleName: string,
+  items: CompletionItem[],
+): {
+  content: string;
+  entries: SurfaceProbeEntry[];
+} {
+  const entries = items.map((item, index) => ({
+    item,
+    importLine: index * 2,
+    usageLine: index * 2 + 1,
+  }));
+
+  const lines = entries.flatMap(({ item }, index) => {
+    const alias = `__featuretype_value_probe_${index}`;
+    return [
+      `import { ${item.label} as ${alias} } from ${JSON.stringify(moduleName)};`,
+      `void ${alias};`,
+    ];
+  });
+
+  return {
+    content: `${lines.join("\n")}\n`,
+    entries,
+  };
+}
+
+function isNonRuntimeValueDiagnostic(diagnostic: Diagnostic): boolean {
+  return typeof diagnostic.code === "number" &&
+    NON_RUNTIME_VALUE_DIAGNOSTIC_CODES.has(diagnostic.code);
+}
+
+function collectNonRuntimeProbeIndexes(
+  diagnostics: readonly Diagnostic[],
+  entries: readonly SurfaceProbeEntry[],
+): Set<number> {
+  const entryIndexByLine = new Map(
+    entries.flatMap((entry, index) => [
+      [entry.importLine, index] as const,
+      [entry.usageLine, index] as const,
+    ]),
+  );
+
+  return new Set(
+    diagnostics
+      .filter(isNonRuntimeValueDiagnostic)
+      .map((diagnostic) => entryIndexByLine.get(diagnostic.range.start.line))
+      .filter((index): index is number => index !== undefined),
+  );
+}
+
+async function classifyRuntimeSurfaceBatch(
+  session: DiagnosticsSession,
+  moduleName: string,
+  fromFile: string | undefined,
+  items: CompletionItem[],
+  batchIndex: number,
+): Promise<{
+  visibleItems: CompletionItem[];
+  hiddenExportCount: number;
+}> {
+  if (items.length === 0) {
+    return {
+      visibleItems: [],
+      hiddenExportCount: 0,
+    };
   }
 
-  const trimmed = documentation.trim();
+  const probeFile = buildProbeFilePath(
+    session,
+    moduleName,
+    fromFile,
+    `surface_${batchIndex}`,
+  );
+  const probe = buildSurfaceProbeSource(moduleName, items);
+
+  try {
+    await session.openVirtualFile(probeFile, probe.content);
+    const diagnostics = await session.getFileDiagnostics(probeFile);
+    const hiddenIndexes = collectNonRuntimeProbeIndexes(diagnostics, probe.entries);
+
+    return {
+      visibleItems: items.filter((_, index) => !hiddenIndexes.has(index)),
+      hiddenExportCount: hiddenIndexes.size,
+    };
+  } finally {
+    await session.closeVirtualFile(probeFile).catch(() => undefined);
+  }
+}
+
+async function filterCompletionItemsBySurface(
+  session: DiagnosticsSession,
+  moduleName: string,
+  fromFile: string | undefined,
+  items: CompletionItem[],
+  surface: ModuleExportSurface,
+): Promise<{
+  visibleItems: CompletionItem[];
+  hiddenExportCount: number;
+}> {
+  if (surface === "all" || items.length === 0) {
+    return {
+      visibleItems: items,
+      hiddenExportCount: 0,
+    };
+  }
+
+  const batches = chunkItems(items, SURFACE_PROBE_BATCH_SIZE);
+  return await batches.reduce(
+    async (resultPromise, batch, batchIndex) => {
+      const result = await resultPromise;
+      const classifiedBatch = await classifyRuntimeSurfaceBatch(
+        session,
+        moduleName,
+        fromFile,
+        batch,
+        batchIndex,
+      );
+
+      return {
+        visibleItems: [...result.visibleItems, ...classifiedBatch.visibleItems],
+        hiddenExportCount: result.hiddenExportCount + classifiedBatch.hiddenExportCount,
+      };
+    },
+    Promise.resolve({
+      visibleItems: [] as CompletionItem[],
+      hiddenExportCount: 0,
+    }),
+  );
+}
+
+function toListedExport(item: CompletionItem): ListedModuleExport {
+  return {
+    name: item.label,
+    detail: item.detail,
+    deprecated: item.tags?.includes(1) ?? false,
+  };
+}
+
+function normalizeDetail(
+  detail: string | undefined,
+  exportName: string,
+): string | undefined {
+  const trimmed = detail?.trim();
   if (!trimmed) {
     return undefined;
   }
 
   const normalized = trimmed.replace(/\s+/g, " ");
-  return normalized.length <= 120
-    ? normalized
-    : `${normalized.slice(0, 117)}...`;
-}
-
-function formatCompletionKind(kind: CompletionItemKind | undefined): string | undefined {
-  switch (kind) {
-    case 3:
-      return "function";
-    case 4:
-      return "constructor";
-    case 5:
-      return "field";
-    case 6:
-      return "variable";
-    case 7:
-      return "class";
-    case 8:
-      return "interface";
-    case 9:
-      return "module";
-    case 10:
-      return "property";
-    case 13:
-      return "enum";
-    case 14:
-      return "keyword";
-    case 17:
-      return "file";
-    case 22:
-      return "struct";
-    case 25:
-      return "type-parameter";
-    default:
-      return undefined;
-  }
-}
-
-function toListedExport(item: CompletionItem): ListedModuleExport {
-  const documentation = formatCompletionDocumentation(item.documentation);
-  return {
-    name: item.label,
-    detail: item.detail,
-    documentation,
-    kind: item.kind,
-    deprecated: item.tags?.includes(1) ?? false,
-  };
+  const trailingExportLabel = new RegExp(`\\s+export\\s+${exportName}$`);
+  return normalized.replace(trailingExportLabel, "");
 }
 
 function formatExportLine(item: ListedModuleExport): string {
-  const kind = formatCompletionKind(item.kind);
-  const kindPrefix = kind ? `${kind} ` : "";
-  const detail = item.detail ? ` — ${item.detail}` : "";
+  const normalizedDetail = normalizeDetail(item.detail, item.name);
+  const detail = normalizedDetail ? ` — ${normalizedDetail}` : "";
   const deprecated = item.deprecated ? " [deprecated]" : "";
-  const summary = summarizeDocumentation(item.documentation);
-  const docsLine = summary ? `\n  ${summary}` : "";
-  return `- ${kindPrefix}${item.name}${deprecated}${detail}${docsLine}`;
+  return `- ${item.name}${deprecated}${detail}`;
 }
 
 function buildProbeFilePath(
   session: DiagnosticsSession,
   moduleName: string,
   fromFile?: string,
+  purpose?: string,
 ): string {
   const probeParent = fromFile
     ? path.dirname(path.resolve(session.rootDir, fromFile))
     : path.join(session.rootDir, PROBE_DIRECTORY);
   const safeModule = sanitizeModuleSpecifier(moduleName).slice(0, 80);
+  const safePurpose = purpose ? `_${sanitizeModuleSpecifier(purpose)}` : "";
   return path.join(
     probeParent,
-    `__list_module_exports__${safeModule}_${process.pid}.ts`,
+    `__list_module_exports${safePurpose}__${safeModule}_${process.pid}.ts`,
   );
 }
 
@@ -250,13 +355,36 @@ function findUnresolvedModuleDiagnostic(
 function buildNoMatchingExportsMessage(
   moduleName: string,
   query: string,
+  surface: ModuleExportSurface,
   totalExports: number,
+  hiddenExportCount: number,
 ): string {
   if (totalExports === 0) {
     return `No exports found for "${moduleName}".`;
   }
 
+  if (surface === "runtime" && hiddenExportCount > 0) {
+    return `No runtime exports found for "${moduleName}" matching "${query}". ${hiddenExportCount} type-like exports match; retry with surface "all" to include them.`;
+  }
+
   return `No exports found for "${moduleName}" matching "${query}".`;
+}
+
+function buildNoVisibleExportsMessage(
+  moduleName: string,
+  surface: ModuleExportSurface,
+  totalExports: number,
+  hiddenExportCount: number,
+): string {
+  if (totalExports === 0) {
+    return `No exports found for "${moduleName}".`;
+  }
+
+  if (surface === "runtime" && hiddenExportCount > 0) {
+    return `No runtime exports found for "${moduleName}". ${hiddenExportCount} type-like exports are available; retry with surface "all" to include them.`;
+  }
+
+  return `No exports found for "${moduleName}".`;
 }
 
 function formatWindowLabel(
@@ -307,6 +435,7 @@ export async function listModuleExports(
     offset?: number;
     query?: string;
     includeDocs?: boolean;
+    surface?: ModuleExportSurface;
   },
 ): Promise<ListModuleExportsResult> {
   const moduleName = args.module.trim();
@@ -314,18 +443,21 @@ export async function listModuleExports(
   const offset = clampOffset(args.offset);
   const query = args.query?.trim() || undefined;
   const includeDocs = args.includeDocs ?? true;
+  const surface = normalizeSurface(args.surface);
 
   if (!moduleName) {
     return {
       text: "list_module_exports requires a non-empty module specifier.",
-      exports: [],
       module: moduleName,
       query,
+      surface,
       probeFile: "",
       totalExports: 0,
       totalMatchingExports: 0,
+      hiddenExportCount: 0,
       offset,
       nextOffset: null,
+      pageItemCount: 0,
       isIncomplete: false,
     };
   }
@@ -342,59 +474,93 @@ export async function listModuleExports(
     if (unresolvedModule) {
       return {
         text: buildNoExportsMessage(moduleName, diagnostics),
-        exports: [],
         module: moduleName,
         query,
+        surface,
         probeFile: path.relative(session.rootDir, probeFile),
         totalExports: 0,
         totalMatchingExports: 0,
+        hiddenExportCount: 0,
         offset: 0,
         nextOffset: null,
+        pageItemCount: 0,
         isIncomplete: completions.isIncomplete,
       };
     }
 
     const dedupedItems = dedupeCompletionItems(completions.items);
-    const matchingItems = filterCompletionItems(dedupedItems, query);
+    const queriedItems = filterCompletionItems(dedupedItems, query);
+    const surfacePreparedItems =
+      includeDocs && surface === "runtime"
+        ? await Promise.all(queriedItems.map((item) => session.resolveCompletionItem(item)))
+        : queriedItems;
+    const {
+      visibleItems: matchingItems,
+      hiddenExportCount,
+    } = await filterCompletionItemsBySurface(
+      session,
+      moduleName,
+      args.fromFile,
+      surfacePreparedItems,
+      surface,
+    );
 
     if (dedupedItems.length === 0) {
       return {
         text: buildNoExportsMessage(moduleName, diagnostics),
-        exports: [],
         module: moduleName,
         query,
+        surface,
         probeFile: path.relative(session.rootDir, probeFile),
         totalExports: 0,
         totalMatchingExports: 0,
+        hiddenExportCount: 0,
         offset,
         nextOffset: null,
+        pageItemCount: 0,
         isIncomplete: completions.isIncomplete,
       };
     }
 
     if (matchingItems.length === 0) {
       return {
-        text: buildNoMatchingExportsMessage(moduleName, query ?? "", dedupedItems.length),
-        exports: [],
+        text: query
+          ? buildNoMatchingExportsMessage(
+            moduleName,
+            query,
+            surface,
+            queriedItems.length,
+            hiddenExportCount,
+          )
+          : buildNoVisibleExportsMessage(
+            moduleName,
+            surface,
+            dedupedItems.length,
+            hiddenExportCount,
+          ),
         module: moduleName,
         query,
+        surface,
         probeFile: path.relative(session.rootDir, probeFile),
         totalExports: dedupedItems.length,
         totalMatchingExports: 0,
+        hiddenExportCount,
         offset,
         nextOffset: null,
+        pageItemCount: 0,
         isIncomplete: completions.isIncomplete,
       };
     }
 
-    const maxPageOffset = Math.max(matchingItems.length - maxResults, 0);
+    const maxPageOffset =
+      Math.floor(Math.max(matchingItems.length - 1, 0) / maxResults) * maxResults;
     const pageOffset = Math.min(offset, maxPageOffset);
     const visibleItems = matchingItems.slice(pageOffset, pageOffset + maxResults);
     const nextOffset =
       pageOffset + visibleItems.length < matchingItems.length
         ? pageOffset + visibleItems.length
         : null;
-    const resolvedItems = includeDocs
+    const resolvedItems = includeDocs && surface === "all"
       ? await Promise.all(
         visibleItems.map((item) => session.resolveCompletionItem(item)),
       )
@@ -421,26 +587,32 @@ export async function listModuleExports(
     const summaryBits = query
       ? [
         `"${moduleName}" matching "${query}"`,
-        `(${matchingItems.length} of ${dedupedItems.length} total`,
+        surface === "runtime" && hiddenExportCount > 0
+          ? `(${matchingItems.length} runtime matches, ${hiddenExportCount} type-like hidden`
+          : `(${matchingItems.length} of ${queriedItems.length} matching`,
         formatWindowLabel(matchingItems.length, pageOffset, visibleItems.length),
       ]
       : [
         `"${moduleName}"`,
-        `(${dedupedItems.length} total`,
+        surface === "runtime" && hiddenExportCount > 0
+          ? `(${matchingItems.length} runtime exports, ${hiddenExportCount} type-like hidden`
+          : `(${dedupedItems.length} total`,
         formatWindowLabel(matchingItems.length, pageOffset, visibleItems.length),
       ];
     const summary = `${summaryBits[0]} ${summaryBits[1]}, ${summaryBits[2]}):`;
 
     return {
       text: `Exports from ${summary}\n${lines.join("\n")}`,
-      exports,
       module: moduleName,
       query,
+      surface,
       probeFile: path.relative(session.rootDir, probeFile),
       totalExports: dedupedItems.length,
       totalMatchingExports: matchingItems.length,
+      hiddenExportCount,
       offset: pageOffset,
       nextOffset,
+      pageItemCount: exports.length,
       isIncomplete: completions.isIncomplete,
     };
   } finally {

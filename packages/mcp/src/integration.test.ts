@@ -127,6 +127,270 @@ async function createPackageResolutionProject(parentDir: string): Promise<string
   return projectRoot;
 }
 
+async function createMixedExportsProject(parentDir: string): Promise<string> {
+  const projectRoot = await mkdtemp(path.join(parentDir, "featuretype-mcp-mixed-exports-"));
+  await mkdir(path.join(projectRoot, "src"), { recursive: true });
+  await writeFile(
+    path.join(projectRoot, "tsconfig.json"),
+    JSON.stringify(
+      {
+        compilerOptions: {
+          module: "NodeNext",
+          moduleResolution: "NodeNext",
+          target: "ES2022",
+          strict: true,
+          verbatimModuleSyntax: true,
+        },
+        include: ["src/**/*.ts"],
+      },
+      null,
+      2,
+    ),
+  );
+  await writeFile(path.join(projectRoot, "src", "consumer.ts"), "export {};\n");
+  await writeFile(
+    path.join(projectRoot, "src", "mixed.ts"),
+    [
+      "export const runtimeValue = 1;",
+      "export function runtimeFunction(input: string): string {",
+      "  return input.toUpperCase();",
+      "}",
+      "export class RuntimeClass {",
+      "  readonly kind = \"runtime\";",
+      "}",
+      "export enum RuntimeEnum {",
+      "  Primary = \"primary\",",
+      "}",
+      "export interface TypeShape {",
+      "  label: string;",
+      "}",
+      "export type TypeAlias = string;",
+      "",
+    ].join("\n"),
+  );
+  return projectRoot;
+}
+
+async function createCollapsedFileProject(parentDir: string): Promise<string> {
+  const projectRoot = await mkdtemp(path.join(parentDir, "featuretype-mcp-collapsed-file-"));
+  await mkdir(path.join(projectRoot, "src"), { recursive: true });
+  await writeFile(
+    path.join(projectRoot, "tsconfig.json"),
+    JSON.stringify(
+      {
+        compilerOptions: {
+          module: "NodeNext",
+          moduleResolution: "NodeNext",
+          target: "ES2022",
+          strict: true,
+          jsx: "react-jsx",
+        },
+        include: ["src/**/*.tsx", "src/**/*.ts"],
+      },
+      null,
+      2,
+    ),
+  );
+  await writeFile(
+    path.join(projectRoot, "src", "view.tsx"),
+    [
+      "import {",
+      "  Suspense,",
+      "  useMemo,",
+      '} from "react";',
+      "",
+      "/**",
+      " * Build a noisy panel so collapsed-file output can trim implementation detail.",
+      " */",
+      "export function DashboardPanel(props: { title: string; values: number[] }) {",
+      "  const stats = useMemo(",
+      "    () =>",
+      "      props.values.map((value) => ({",
+      "        value,",
+      "        doubled: value * 2,",
+      "      })),",
+      "    [props.values],",
+      "  );",
+      "",
+      "  return (",
+      "    <section>",
+      "      <header>",
+      "        <h2>{props.title}</h2>",
+      "      </header>",
+      "      <Suspense fallback={<span>Loading</span>}>",
+      "        <pre>{JSON.stringify(stats, null, 2)}</pre>",
+      "      </Suspense>",
+      "    </section>",
+      "  );",
+      "}",
+      "",
+    ].join("\n"),
+  );
+  await writeFile(
+    path.join(projectRoot, "src", "imports.ts"),
+    [
+      "import {",
+      "  Suspense,",
+      "  useMemo,",
+      '} from "react";',
+      'import type { Token } from "./tokens.js";',
+      "import {",
+      "  readToken,",
+      "  writeToken,",
+      '} from "./tokens.js";',
+      "",
+      "export const runtimeValue = readToken(writeToken as Token);",
+      "",
+    ].join("\n"),
+  );
+  await writeFile(
+    path.join(projectRoot, "src", "tokens.ts"),
+    [
+      "export type Token = string;",
+      "export const readToken = (token: Token): Token => token;",
+      "export const writeToken = (token: Token): Token => token;",
+      "",
+    ].join("\n"),
+  );
+  await writeFile(
+    path.join(projectRoot, "src", "auth-session.ts"),
+    [
+      "export type AuthSession = {",
+      "  userId: string;",
+      "  token: string;",
+      "};",
+      "",
+      "export function isAuthenticated(session: AuthSession | null): boolean {",
+      "  return Boolean(session?.token);",
+      "}",
+      "",
+    ].join("\n"),
+  );
+  await writeFile(
+    path.join(projectRoot, "src", "use-auth.ts"),
+    [
+      'import { useRouter } from "@tanstack/react-router";',
+      'import { useCurrentUser } from "./current-user.js";',
+      "",
+      "export function useAuth() {",
+      "  const router = useRouter();",
+      "  const currentUser = useCurrentUser();",
+      "  const isAuthenticated = currentUser !== null;",
+      "  const displayName = currentUser?.displayName ?? null;",
+      "  const hasLogin = (currentUser?.login ?? \"\").length > 0;",
+      "",
+      "  return {",
+      "    currentUser,",
+      "    displayName,",
+      "    hasLogin,",
+      "    isAuthenticated,",
+      "    navigateToSignIn: () => {",
+      "      void router.navigate({ to: \"/signin\" });",
+      "    },",
+      "    navigateToSettings: () => {",
+      "      void router.navigate({ to: \"/settings\" });",
+      "    },",
+      "  };",
+      "}",
+      "",
+      "export const authLabel = \"auth\";",
+      "export const authEnabled = true;",
+      "export const authStatus = authEnabled ? authLabel : \"disabled\";",
+      "",
+    ].join("\n"),
+  );
+  await writeFile(
+    path.join(projectRoot, "src", "current-user.ts"),
+    [
+      "export type CurrentUser = {",
+      "  displayName: string | null;",
+      "  login: string | null;",
+      "};",
+      "",
+      "export function useCurrentUser(): CurrentUser | null {",
+      "  return null;",
+      "}",
+      "",
+    ].join("\n"),
+  );
+  await writeFile(
+    path.join(projectRoot, "src", "shapes.ts"),
+    [
+      "export interface DashboardSummary {",
+      "  id: string;",
+      "  title: string;",
+      "  description: string;",
+      "  tags: string[];",
+      "  createdAt: string;",
+      "  updatedAt: string;",
+      "  owner: {",
+      "    id: string;",
+      "    name: string;",
+      "  };",
+      "}",
+      "",
+      "export type DashboardLoadState =",
+      "  | { status: \"idle\" }",
+      "  | { status: \"loading\" }",
+      "  | { status: \"ready\"; summary: DashboardSummary }",
+      "  | { status: \"error\"; message: string };",
+      "",
+      "export const READY_STATUS = \"ready\";",
+      "export const EMPTY_SUMMARY_ID = \"root\";",
+      "export const EMPTY_TITLE = \"All dashboards\";",
+      "export const EMPTY_DESCRIPTION = \"\";",
+      "",
+    ].join("\n"),
+  );
+  await writeFile(
+    path.join(projectRoot, "src", "dashboard-page.tsx"),
+    [
+      'import { useCallback, useEffect, useMemo, useState } from "react";',
+      "",
+      "export function DashboardPage() {",
+      "  const [search, setSearch] = useState(\"\");",
+      "  const [topic, setTopic] = useState<string | null>(null);",
+      "",
+      "  useEffect(() => {",
+      "    const controller = new AbortController();",
+      "    const requestId = search.length + (topic?.length ?? 0);",
+      "    const shouldTrack = requestId > 0;",
+      "    if (shouldTrack) {",
+      "      void controller.signal;",
+      "    }",
+      "    return () => controller.abort();",
+      "  }, [search, topic]);",
+      "",
+      "  const onSelectTopic = useCallback((nextTopic: string | null) => {",
+      "    setTopic(nextTopic);",
+      "    setSearch(nextTopic ?? \"\");",
+      "    const nextValue = nextTopic ?? \"all\";",
+      "    const isReset = nextTopic === null;",
+      "    return isReset ? nextValue : `${nextValue}!`;",
+      "  }, []);",
+      "",
+      "  const summary = useMemo(() => {",
+      "    const topicLabel = topic ?? \"all\";",
+      "    const searchLabel = search || \"empty\";",
+      "    const uppercaseLabel = searchLabel.toUpperCase();",
+      "    const summaryValue = `${uppercaseLabel}:${topicLabel}`;",
+      "    return summaryValue;",
+      "  }, [search, topic]);",
+      "",
+      "  return (",
+      "    <section>",
+      "      <div>{summary}</div>",
+      "      <button onClick={() => onSelectTopic(null)}>Reset</button>",
+      "      <span>{search}</span>",
+      "    </section>",
+      "  );",
+      "}",
+      "",
+    ].join("\n"),
+  );
+  return projectRoot;
+}
+
 async function createBundlerProjectWithMissingImport(
   parentDir: string,
 ): Promise<string> {
@@ -436,6 +700,29 @@ describe("featuretype MCP local probes", () => {
   it("supports stdio MCP probing without rebinding Codex", async () => {
     handle = await createStdioTestClient(demoWorkspaceRoot);
     await expectBasicProbe(handle);
+  });
+
+  it("surfaces conventional MCP tool metadata for agent discovery", async () => {
+    handle = await createInMemoryTestClient(demoWorkspaceRoot);
+
+    const { tools } = await handle.client.listTools();
+    const diagnosticsTool = tools.find((tool) => tool.name === "get_diagnostics");
+    const openVirtualFileTool = tools.find((tool) => tool.name === "open_virtual_file");
+    const closeVirtualFileTool = tools.find((tool) => tool.name === "close_virtual_file");
+
+    expect(diagnosticsTool?.title).toBe("Get Diagnostics");
+    expect(diagnosticsTool?.annotations?.readOnlyHint).toBe(true);
+    expect(diagnosticsTool?.annotations?.openWorldHint).toBe(false);
+
+    expect(openVirtualFileTool?.title).toBe("Open Virtual File");
+    expect(openVirtualFileTool?.annotations?.destructiveHint).toBe(false);
+    expect(openVirtualFileTool?.annotations?.idempotentHint).toBe(true);
+    expect(openVirtualFileTool?.annotations?.openWorldHint).toBe(false);
+
+    expect(closeVirtualFileTool?.title).toBe("Close Virtual File");
+    expect(closeVirtualFileTool?.annotations?.destructiveHint).toBe(true);
+    expect(closeVirtualFileTool?.annotations?.idempotentHint).toBe(true);
+    expect(closeVirtualFileTool?.annotations?.openWorldHint).toBe(false);
   });
 
   it("keeps find_errors_and_fixes text output compact by default", async () => {
@@ -811,30 +1098,26 @@ describe("featuretype MCP local probes", () => {
       name: "list_module_exports",
       arguments: {
         module: "typescript",
+        surface: "all",
       },
     });
 
     const text = readTextContent(result);
     const structured = readStructuredContent(result);
-    const exports =
-      (structured?.exports as Array<{ name?: string; documentation?: string }> | undefined) ?? [];
 
     expect(hasToolError(result)).toBe(false);
     expect(text).toContain('Exports from "typescript"');
+    expect(text).toContain("- addEmitHelper — function ts.addEmitHelper");
+    expect(structured?.surface).toBe("all");
     expect(Number(structured?.totalExports ?? 0)).toBeGreaterThan(20);
-    expect(exports.length).toBeLessThan(Number(structured?.totalExports ?? 0));
     expect(Number(structured?.totalMatchingExports ?? 0)).toBe(
       Number(structured?.totalExports ?? 0),
     );
+    expect(Number(structured?.hiddenExportCount ?? -1)).toBe(0);
     expect(Number(structured?.offset ?? -1)).toBe(0);
-    expect(Number(structured?.nextOffset ?? 0)).toBe(exports.length);
-    expect(exports.some((entry) => entry.name === "addEmitHelper")).toBe(true);
-    expect(
-      exports.some(
-        (entry) =>
-          typeof entry.documentation === "string" && entry.documentation.length > 0,
-      ),
-    ).toBe(true);
+    expect(Number(structured?.pageItemCount ?? 0)).toBeGreaterThan(0);
+    expect(Number(structured?.nextOffset ?? 0)).toBe(Number(structured?.pageItemCount ?? 0));
+    expect(structured?.exports).toBeUndefined();
   }, 60_000);
 
   it("narrows and pages module exports progressively", async () => {
@@ -850,29 +1133,120 @@ describe("featuretype MCP local probes", () => {
         query: "create",
         offset: 5,
         maxResults: 5,
+        surface: "all",
       },
     });
 
     const text = readTextContent(result);
     const structured = readStructuredContent(result);
-    const exports =
-      (structured?.exports as Array<{ name?: string }> | undefined) ?? [];
 
     expect(hasToolError(result)).toBe(false);
     expect(text).toContain('matching "create"');
+    expect(text).toContain("\n- ");
+    expect(text).toContain("Hint: request offset 10 to continue this query.");
+    expect(structured?.surface).toBe("all");
     expect(Number(structured?.totalExports ?? 0)).toBeGreaterThan(
       Number(structured?.totalMatchingExports ?? 0),
     );
-    expect(Number(structured?.totalMatchingExports ?? 0)).toBeGreaterThan(exports.length);
+    expect(Number(structured?.totalMatchingExports ?? 0)).toBeGreaterThan(
+      Number(structured?.pageItemCount ?? 0),
+    );
+    expect(Number(structured?.hiddenExportCount ?? -1)).toBe(0);
     expect(Number(structured?.offset ?? -1)).toBe(5);
     expect(Number(structured?.nextOffset ?? 0)).toBe(10);
-    expect(exports).toHaveLength(5);
-    expect(
-      exports.every((entry) => entry.name?.toLowerCase().startsWith("create") ?? false),
-    ).toBe(true);
+    expect(Number(structured?.pageItemCount ?? -1)).toBe(5);
   }, 60_000);
 
-  it("clamps oversized export offsets to the last full page", async () => {
+  it("defaults to runtime-oriented exports and hides type-like symbols", async () => {
+    tempDir = await createRepoTempDir("featuretype-mcp-module-exports-runtime-");
+    const projectRoot = await createMixedExportsProject(tempDir);
+
+    handle = await createInMemoryTestClient(projectRoot);
+
+    const result = await handle.client.callTool({
+      name: "list_module_exports",
+      arguments: {
+        fromFile: "src/consumer.ts",
+        module: "./mixed.js",
+      },
+    });
+
+    const text = readTextContent(result);
+    const structured = readStructuredContent(result);
+
+    expect(hasToolError(result)).toBe(false);
+    expect(text).toContain("4 runtime exports, 2 type-like hidden");
+    expect(text).toContain("- runtimeValue — const runtimeValue: 1");
+    expect(text).toContain("- runtimeFunction — function runtimeFunction");
+    expect(text).toContain("- RuntimeClass — class RuntimeClass");
+    expect(text).toContain("- RuntimeEnum — enum RuntimeEnum");
+    expect(text).not.toContain("TypeShape");
+    expect(text).not.toContain("TypeAlias");
+    expect(structured?.surface).toBe("runtime");
+    expect(Number(structured?.totalExports ?? -1)).toBe(6);
+    expect(Number(structured?.totalMatchingExports ?? -1)).toBe(4);
+    expect(Number(structured?.hiddenExportCount ?? -1)).toBe(2);
+    expect(Number(structured?.pageItemCount ?? -1)).toBe(4);
+  }, 60_000);
+
+  it("can include type-like exports when surface is all", async () => {
+    tempDir = await createRepoTempDir("featuretype-mcp-module-exports-all-");
+    const projectRoot = await createMixedExportsProject(tempDir);
+
+    handle = await createInMemoryTestClient(projectRoot);
+
+    const result = await handle.client.callTool({
+      name: "list_module_exports",
+      arguments: {
+        fromFile: "src/consumer.ts",
+        module: "./mixed.js",
+        surface: "all",
+      },
+    });
+
+    const text = readTextContent(result);
+    const structured = readStructuredContent(result);
+
+    expect(hasToolError(result)).toBe(false);
+    expect(text).toContain('Exports from "./mixed.js" (6 total, showing 1-6):');
+    expect(text).toContain("TypeShape");
+    expect(text).toContain("TypeAlias");
+    expect(structured?.surface).toBe("all");
+    expect(Number(structured?.totalExports ?? -1)).toBe(6);
+    expect(Number(structured?.totalMatchingExports ?? -1)).toBe(6);
+    expect(Number(structured?.hiddenExportCount ?? -1)).toBe(0);
+    expect(Number(structured?.pageItemCount ?? -1)).toBe(6);
+  }, 60_000);
+
+  it("explains when only type-like exports match and suggests surface all", async () => {
+    tempDir = await createRepoTempDir("featuretype-mcp-module-exports-type-query-");
+    const projectRoot = await createMixedExportsProject(tempDir);
+
+    handle = await createInMemoryTestClient(projectRoot);
+
+    const result = await handle.client.callTool({
+      name: "list_module_exports",
+      arguments: {
+        fromFile: "src/consumer.ts",
+        module: "./mixed.js",
+        query: "Type",
+      },
+    });
+
+    const text = readTextContent(result);
+    const structured = readStructuredContent(result);
+
+    expect(hasToolError(result)).toBe(false);
+    expect(text).toContain('No runtime exports found for "./mixed.js" matching "Type".');
+    expect(text).toContain('retry with surface "all" to include them');
+    expect(structured?.surface).toBe("runtime");
+    expect(Number(structured?.totalExports ?? -1)).toBe(6);
+    expect(Number(structured?.totalMatchingExports ?? -1)).toBe(0);
+    expect(Number(structured?.hiddenExportCount ?? -1)).toBe(2);
+    expect(Number(structured?.pageItemCount ?? -1)).toBe(0);
+  }, 60_000);
+
+  it("clamps oversized export offsets to the last available page boundary", async () => {
     tempDir = await createRepoTempDir("featuretype-mcp-module-exports-offset-");
     const projectRoot = await createPackageResolutionProject(tempDir);
 
@@ -890,15 +1264,42 @@ describe("featuretype MCP local probes", () => {
 
     const text = readTextContent(result);
     const structured = readStructuredContent(result);
-    const exports =
-      (structured?.exports as Array<{ name?: string }> | undefined) ?? [];
 
     expect(hasToolError(result)).toBe(false);
-    expect(text).toContain("showing 15-19");
-    expect(Number(structured?.offset ?? -1)).toBe(14);
+    expect(text).toContain("showing 16-19");
+    expect(text).toContain("- useRef — function React.useRef");
+    expect(text).toContain("- useTransition — function React.useTransition");
+    expect(Number(structured?.offset ?? -1)).toBe(15);
     expect(structured?.nextOffset).toBeNull();
-    expect(exports).toHaveLength(5);
-    expect(exports.at(-1)?.name).toBe("useTransition");
+    expect(Number(structured?.pageItemCount ?? -1)).toBe(4);
+  }, 60_000);
+
+  it("uses nextOffset without overlapping the last page", async () => {
+    tempDir = await createRepoTempDir("featuretype-mcp-module-exports-next-offset-");
+    const projectRoot = await createPackageResolutionProject(tempDir);
+
+    handle = await createInMemoryTestClient(projectRoot);
+
+    const result = await handle.client.callTool({
+      name: "list_module_exports",
+      arguments: {
+        module: "react",
+        query: "use",
+        maxResults: 10,
+        offset: 10,
+      },
+    });
+
+    const text = readTextContent(result);
+    const structured = readStructuredContent(result);
+
+    expect(hasToolError(result)).toBe(false);
+    expect(text).toContain("showing 11-19");
+    expect(text).toContain("- useInsertionEffect — function React.useInsertionEffect");
+    expect(text).toContain("- useTransition — function React.useTransition");
+    expect(Number(structured?.offset ?? -1)).toBe(10);
+    expect(structured?.nextOffset).toBeNull();
+    expect(Number(structured?.pageItemCount ?? -1)).toBe(9);
   }, 60_000);
 
   it("reports unresolved modules instead of leaking parser keyword completions", async () => {
@@ -921,8 +1322,9 @@ describe("featuretype MCP local probes", () => {
     expect(text).toContain('Could not resolve module "definitely-not-a-real-package-name-for-featuretype"');
     expect(Number(structured?.totalExports ?? -1)).toBe(0);
     expect(Number(structured?.totalMatchingExports ?? -1)).toBe(0);
+    expect(Number(structured?.pageItemCount ?? -1)).toBe(0);
     expect(structured?.nextOffset).toBeNull();
-    expect(structured?.exports).toEqual([]);
+    expect(structured?.exports).toBeUndefined();
   }, 60_000);
 
   it("resolves relative modules from the provided fromFile location", async () => {
@@ -943,13 +1345,203 @@ describe("featuretype MCP local probes", () => {
 
     const text = readTextContent(result);
     const structured = readStructuredContent(result);
-    const exports =
-      (structured?.exports as Array<{ name?: string }> | undefined) ?? [];
 
     expect(hasToolError(result)).toBe(false);
     expect(text).toContain('Exports from "./index.js"');
-    expect(exports.some((entry) => entry.name === "type")).toBe(false);
-    expect(exports.some((entry) => entry.name === "localValue")).toBe(true);
+    expect(text).not.toContain("\n- keyword type");
+    expect(text).toContain("- localValue — const localValue: 1");
+    expect(Number(structured?.pageItemCount ?? -1)).toBeGreaterThan(0);
+  }, 60_000);
+
+  it("reads TSX files with default code collapsing for practical implementation scans", async () => {
+    tempDir = await createRepoTempDir("featuretype-mcp-collapsed-file-parent-");
+    const projectRoot = await createCollapsedFileProject(tempDir);
+
+    handle = await createInMemoryTestClient(projectRoot);
+
+    const result = await handle.client.callTool({
+      name: "read_file",
+      arguments: {
+        file: "src/view.tsx",
+      },
+    });
+
+    const text = readTextContent(result);
+    expect(hasToolError(result)).toBe(false);
+    expect(text).toContain('} from "react";');
+    expect(text).toContain(
+      "export function DashboardPanel(props: { title: string; values: number[] }) {\n  const stats = useMemo(\n    ... // collapsed stats memo (6 lines)\n  );",
+    );
+    expect(text).toContain(
+      "  return (\n    ... // collapsed return block (7 lines)\n    </section>\n  );\n}",
+    );
+    expect(text).not.toContain("JSON.stringify(stats, null, 2)");
+    expect(readStructuredContent(result)).toBeUndefined();
+  }, 60_000);
+
+  it("supports broader practical collapsing passes with imports, comments, and line numbers", async () => {
+    tempDir = await createRepoTempDir("featuretype-mcp-collapsed-file-parent-");
+    const projectRoot = await createCollapsedFileProject(tempDir);
+
+    handle = await createInMemoryTestClient(projectRoot);
+
+    const result = await handle.client.callTool({
+      name: "read_file",
+      arguments: {
+        file: "src/view.tsx",
+        kinds: ["code", "imports", "comment"],
+        lineNumbers: true,
+      },
+    });
+
+    const text = readTextContent(result);
+    expect(hasToolError(result)).toBe(false);
+    expect(text).toContain(" 1 │ import {");
+    expect(text).toContain(" 2 │   Suspense,");
+    expect(text).toContain(' 4 │ } from "react";');
+    expect(text).toContain(" 6 │ /**");
+    expect(text).toContain(
+      " 7 │  * Build a noisy panel so collapsed-file output can trim implementation detail.",
+    );
+    expect(text).toContain(" 8 │  */");
+    expect(text).toContain(
+      " 9 │ export function DashboardPanel(props: { title: string; values: number[] }) {",
+    );
+    expect(text).toContain("10 │   const stats = useMemo(");
+    expect(text).toContain("11 │     ... // collapsed stats memo (6 lines)");
+    expect(text).toContain("19 │   return (");
+    expect(text).toContain("20 │     ... // collapsed return block (7 lines)");
+    expect(text).toContain("27 │     </section>");
+    expect(readStructuredContent(result)).toBeUndefined();
+  }, 60_000);
+
+  it("keeps grouped imports fully visible even when imports are requested", async () => {
+    tempDir = await createRepoTempDir("featuretype-mcp-collapsed-file-parent-");
+    const projectRoot = await createCollapsedFileProject(tempDir);
+
+    handle = await createInMemoryTestClient(projectRoot);
+
+    const result = await handle.client.callTool({
+      name: "read_file",
+      arguments: {
+        file: "src/imports.ts",
+        kinds: ["imports"],
+        lineNumbers: true,
+      },
+    });
+
+    const text = readTextContent(result);
+    expect(hasToolError(result)).toBe(false);
+    expect(text).toContain(" 1 │ import {");
+    expect(text).toContain(" 2 │   Suspense,");
+    expect(text).toContain(' 4 │ } from "react";');
+    expect(text).toContain(' 5 │ import type { Token } from "./tokens.js";');
+    expect(text).toContain(" 6 │ import {");
+    expect(text).toContain(" 7 │   readToken,");
+    expect(text).toContain(' 9 │ } from "./tokens.js";');
+    expect(readStructuredContent(result)).toBeUndefined();
+  }, 60_000);
+
+  it("keeps small definitions readable in the default compact read lane", async () => {
+    tempDir = await createRepoTempDir("featuretype-mcp-collapsed-file-parent-");
+    const projectRoot = await createCollapsedFileProject(tempDir);
+
+    handle = await createInMemoryTestClient(projectRoot);
+
+    const result = await handle.client.callTool({
+      name: "read_file",
+      arguments: {
+        file: "src/auth-session.ts",
+        lineNumbers: true,
+      },
+    });
+
+    const text = readTextContent(result);
+    expect(hasToolError(result)).toBe(false);
+    expect(text).toContain("1 │ export type AuthSession = {");
+    expect(text).toContain("2 │   userId: string;");
+    expect(text).toContain("3 │   token: string;");
+    expect(text).toContain("6 │ export function isAuthenticated(session: AuthSession | null): boolean {");
+    expect(text).toContain("7 │   return Boolean(session?.token);");
+    expect(text).not.toContain("...");
+    expect(readStructuredContent(result)).toBeUndefined();
+  }, 60_000);
+
+  it("keeps medium single-body modules raw when collapsing would only produce one blob", async () => {
+    tempDir = await createRepoTempDir("featuretype-mcp-collapsed-file-parent-");
+    const projectRoot = await createCollapsedFileProject(tempDir);
+
+    handle = await createInMemoryTestClient(projectRoot);
+
+    const result = await handle.client.callTool({
+      name: "read_file",
+      arguments: {
+        file: "src/use-auth.ts",
+        lineNumbers: true,
+      },
+    });
+
+    const text = readTextContent(result);
+    expect(hasToolError(result)).toBe(false);
+    expect(text).toContain("4 │ export function useAuth() {");
+    expect(text).toContain("11 │   return {");
+    expect(text).toContain("17 │       void router.navigate({ to: \"/signin\" });");
+    expect(text).not.toContain("collapsed useAuth body");
+    expect(readStructuredContent(result)).toBeUndefined();
+  }, 60_000);
+
+  it("keeps larger exported type definitions visible in the default compact read lane", async () => {
+    tempDir = await createRepoTempDir("featuretype-mcp-collapsed-file-parent-");
+    const projectRoot = await createCollapsedFileProject(tempDir);
+
+    handle = await createInMemoryTestClient(projectRoot);
+
+    const result = await handle.client.callTool({
+      name: "read_file",
+      arguments: {
+        file: "src/shapes.ts",
+        lineNumbers: true,
+      },
+    });
+
+    const text = readTextContent(result);
+    expect(hasToolError(result)).toBe(false);
+    expect(text).toContain("1 │ export interface DashboardSummary {");
+    expect(text).toContain("8 │   owner: {");
+    expect(text).toContain("14 │ export type DashboardLoadState =");
+    expect(text).toContain("17 │   | { status: \"ready\"; summary: DashboardSummary }");
+    expect(text).not.toContain("collapsed DashboardSummary definition");
+    expect(text).not.toContain("collapsed DashboardLoadState definition");
+    expect(readStructuredContent(result)).toBeUndefined();
+  }, 60_000);
+
+  it("keeps monolithic page components readable instead of collapsing the whole body", async () => {
+    tempDir = await createRepoTempDir("featuretype-mcp-collapsed-file-parent-");
+    const projectRoot = await createCollapsedFileProject(tempDir);
+
+    handle = await createInMemoryTestClient(projectRoot);
+
+    const result = await handle.client.callTool({
+      name: "read_file",
+      arguments: {
+        file: "src/dashboard-page.tsx",
+        lineNumbers: true,
+      },
+    });
+
+    const text = readTextContent(result);
+    expect(hasToolError(result)).toBe(false);
+    expect(text).toContain(" 3 │ export function DashboardPage() {");
+    expect(text).toContain(" 7 │   useEffect(() => {");
+    expect(text).toContain(" 8 │     ... // collapsed useEffect callback (7 lines)");
+    expect(text).toContain("17 │   const onSelectTopic = useCallback((nextTopic: string | null) => {");
+    expect(text).toContain("18 │     setTopic(nextTopic);");
+    expect(text).toContain("25 │   const summary = useMemo(() => {");
+    expect(text).toContain("26 │     const topicLabel = topic ?? \"all\";");
+    expect(text).toContain("33 │   return (");
+    expect(text).toContain("34 │     <section>");
+    expect(text).not.toContain("... // collapsed DashboardPage body");
+    expect(readStructuredContent(result)).toBeUndefined();
   }, 60_000);
 
   it("attaches nested roots relative to the active project and follows referenced tsconfigs", async () => {

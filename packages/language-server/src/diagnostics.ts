@@ -21,6 +21,7 @@ import {
   DocumentDiagnosticRequest,
   DocumentSymbolRequest,
   FileChangeType,
+  FoldingRangeRequest,
   HoverRequest,
   ImplementationRequest,
   InitializeRequest,
@@ -45,6 +46,7 @@ import {
   type Diagnostic,
   type DocumentHighlight,
   type DocumentSymbol,
+  type FoldingRange,
   type Hover,
   type Location,
   type LocationLink,
@@ -176,6 +178,7 @@ export interface FeatureTypeLanguageServerClient {
   getDocumentSymbols(
     filePath: string,
   ): Promise<Array<DocumentSymbol | SymbolInformation>>;
+  getDocumentFoldingRanges(filePath: string): Promise<FoldingRange[]>;
   notifyWatchedFiles(filePaths: string[]): Promise<void>;
   dispose(): Promise<void>;
 }
@@ -268,6 +271,7 @@ export interface DiagnosticsSession {
   getFileDocumentSymbols(
     filePath: string,
   ): Promise<Array<DocumentSymbol | SymbolInformation>>;
+  getFileFoldingRanges(filePath: string): Promise<FoldingRange[]>;
   notifyFilesChanged(filePaths: string[]): Promise<void>;
   notifyFileChanged(filePath: string): Promise<void>;
   dispose(): Promise<void>;
@@ -748,6 +752,15 @@ export async function createFeatureTypeLanguageServerClient(
         },
         signatureHelp: {
           contextSupport: true,
+        },
+        foldingRange: {
+          lineFoldingOnly: false,
+          foldingRangeKind: {
+            valueSet: ["comment", "imports", "region"],
+          },
+          foldingRange: {
+            collapsedText: true,
+          },
         },
       },
     },
@@ -1247,6 +1260,20 @@ export async function createFeatureTypeLanguageServerClient(
     );
   };
 
+  const getDocumentFoldingRanges = async (
+    filePath: string,
+  ): Promise<FoldingRange[]> => {
+    const document = await syncDocumentFromDisk(filePath, "refresh");
+    if (!document) {
+      return [];
+    }
+    return (
+      (await connection.sendRequest(FoldingRangeRequest.type, {
+        textDocument: { uri: document.uri },
+      })) ?? []
+    );
+  };
+
   const notifyWatchedFiles = async (filePaths: string[]): Promise<void> => {
     const normalizedPaths = [...new Set(filePaths.map((filePath) =>
       resolveFilePath(rootDir, filePath)
@@ -1402,6 +1429,7 @@ export async function createFeatureTypeLanguageServerClient(
     getCallHierarchyIncomingCalls,
     getCallHierarchyOutgoingCalls,
     getDocumentSymbols,
+    getDocumentFoldingRanges,
     notifyWatchedFiles,
     dispose,
   };
@@ -1512,6 +1540,9 @@ export async function createDiagnosticsSession(
     },
     getFileDocumentSymbols(filePath: string) {
       return client.getDocumentSymbols(filePath);
+    },
+    getFileFoldingRanges(filePath: string) {
+      return client.getDocumentFoldingRanges(filePath);
     },
     async notifyFilesChanged(filePaths: string[]) {
       await client.notifyWatchedFiles(filePaths);

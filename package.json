@@ -9,9 +9,11 @@
     "check-types": "turbo run check-types",
     "lint": "turbo run lint",
     "build:mcp": "turbo run build --filter=@featuretype/mcp",
-    "mcp:dev": "pnpm exec tsx packages/mcp/src/dev.ts",
-    "start:mcp": "node packages/mcp/dist/index.cjs",
-    "start:mcp:dev": "pnpm exec tsx packages/mcp/src/dev.ts"
+    "mcp:stdio:source": "pnpm exec tsx packages/mcp/src/dev.ts",
+    "mcp:stdio:dist": "node packages/mcp/dist/index.cjs",
+    "mcp:dev": "pnpm run mcp:stdio:source",
+    "start:mcp": "pnpm run mcp:stdio:dist",
+    "start:mcp:dev": "pnpm run mcp:stdio:source"
   },
   "devDependencies": {
     "@types/react": "^19.0.10",

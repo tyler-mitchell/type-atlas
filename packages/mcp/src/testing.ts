@@ -120,7 +120,7 @@ export async function createStdioTestClient(
 ): Promise<TestClientHandle> {
   const transport = new StdioClientTransport({
     command: "pnpm",
-    args: ["--dir", repoRoot, "mcp:dev", projectRoot],
+    args: ["--dir", repoRoot, "mcp:stdio:source", projectRoot],
     stderr: "inherit",
   });
 

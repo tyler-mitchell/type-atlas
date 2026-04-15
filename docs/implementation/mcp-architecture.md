@@ -12,6 +12,8 @@ Companion docs:
 
 - `docs/implementation/mcp-navigation.md` covers the agent-facing navigation
   surface and usage patterns.
+- `docs/implementation/mcp-validation-modes.md` defines the current validation
+  modes and naming.
 - `docs/implementation/featuretype-precedent-grounding.md` captures the
   architectural rationale for the Volar-based foundation.
 

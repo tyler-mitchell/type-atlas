@@ -1,4 +1,0 @@
- [mcp_servers.featuretype]
- command = "pnpm"
- args = ["--dir", "/Users/tylermitchell/Projects/featuretype", "mcp:dev"]
- startup_timeout_sec = 20

@@ -16,6 +16,10 @@ import type { Hover } from "vscode-languageserver-protocol";
 import { z } from "zod";
 import { classifyFailure } from "./failure";
 import { getCodeActions } from "./tools/actions";
+import {
+  COLLAPSED_FILE_KINDS,
+  getCollapsedFile,
+} from "./tools/collapsed-file";
 import { getDiagnostics } from "./tools/diagnostics";
 import { getErrorsAndFixes } from "./tools/errors-and-fixes";
 import { getEnrichedFile } from "./tools/enriched-file";
@@ -621,6 +625,12 @@ export function createMcpServer(manager: HostManager): McpServer {
   server.registerTool(
     "attach_project",
     {
+      title: "Attach Project",
+      annotations: {
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
       description:
         "Attach a new TypeScript project root for semantic analysis. The attached project becomes the active root. Use this when working across multiple repos or when semantic queries fail because a file is outside the current project graph.",
       inputSchema: {
@@ -672,6 +682,11 @@ export function createMcpServer(manager: HostManager): McpServer {
   server.registerTool(
     "list_projects",
     {
+      title: "List Projects",
+      annotations: {
+        readOnlyHint: true,
+        openWorldHint: false,
+      },
       description:
         "List all attached project roots and which is currently active.",
       outputSchema: {
@@ -704,6 +719,11 @@ export function createMcpServer(manager: HostManager): McpServer {
   server.registerTool(
     "get_diagnostics",
     {
+      title: "Get Diagnostics",
+      annotations: {
+        readOnlyHint: true,
+        openWorldHint: false,
+      },
       description:
         "Get TypeScript errors and warnings for a file or the whole project. Use summary mode for project-wide scans to avoid large output.",
       inputSchema: {
@@ -751,7 +771,7 @@ export function createMcpServer(manager: HostManager): McpServer {
           .nullable()
           .optional(),
       },
-      },
+    },
     async (args) => {
       const session = args.file
         ? await manager.getDiagnosticsSessionForFile(args.file)
@@ -846,6 +866,11 @@ export function createMcpServer(manager: HostManager): McpServer {
   server.registerTool(
     "get_type_at",
     {
+      title: "Get Type At",
+      annotations: {
+        readOnlyHint: true,
+        openWorldHint: false,
+      },
       description:
         "Get the inferred type and documentation at a position (hover equivalent). Use to understand what the compiler thinks a value is.",
       inputSchema: {
@@ -871,6 +896,11 @@ export function createMcpServer(manager: HostManager): McpServer {
   server.registerTool(
     "get_signature",
     {
+      title: "Get Signature",
+      annotations: {
+        readOnlyHint: true,
+        openWorldHint: false,
+      },
       description:
         "Get function signature help at a call site. Returns parameter names, types, overloads, and documentation.",
       inputSchema: {
@@ -896,6 +926,11 @@ export function createMcpServer(manager: HostManager): McpServer {
   server.registerTool(
     "get_definition",
     {
+      title: "Get Definition",
+      annotations: {
+        readOnlyHint: true,
+        openWorldHint: false,
+      },
       description:
         "Go to definition. Returns the declaration site, resolved through re-exports, aliases, and generated types.",
       inputSchema: {
@@ -921,6 +956,11 @@ export function createMcpServer(manager: HostManager): McpServer {
   server.registerTool(
     "get_type_definition",
     {
+      title: "Get Type Definition",
+      annotations: {
+        readOnlyHint: true,
+        openWorldHint: false,
+      },
       description:
         "Go to type definition. Useful when value-level definition lands on a constructor or alias but you want the underlying type declaration.",
       inputSchema: {
@@ -946,6 +986,11 @@ export function createMcpServer(manager: HostManager): McpServer {
   server.registerTool(
     "get_implementations",
     {
+      title: "Get Implementations",
+      annotations: {
+        readOnlyHint: true,
+        openWorldHint: false,
+      },
       description:
         "Find concrete implementations of the symbol at a position. Especially useful for interfaces, abstract contracts, and provider-style indirection.",
       inputSchema: {
@@ -971,6 +1016,11 @@ export function createMcpServer(manager: HostManager): McpServer {
   server.registerTool(
     "get_references",
     {
+      title: "Get References",
+      annotations: {
+        readOnlyHint: true,
+        openWorldHint: false,
+      },
       description:
         "Find all references to a symbol (type-aware, not regex). Returns all usage sites across the project.",
       inputSchema: {
@@ -996,6 +1046,11 @@ export function createMcpServer(manager: HostManager): McpServer {
   server.registerTool(
     "get_reference_summary",
     {
+      title: "Get Reference Summary",
+      annotations: {
+        readOnlyHint: true,
+        openWorldHint: false,
+      },
       description:
         "Summarize references for a symbol by file, with grouped counts and representative usage lines. Prefer this over get_references when you need triage rather than a long flat location list.",
       inputSchema: {
@@ -1049,6 +1104,11 @@ export function createMcpServer(manager: HostManager): McpServer {
   server.registerTool(
     "get_document_highlights",
     {
+      title: "Get Document Highlights",
+      annotations: {
+        readOnlyHint: true,
+        openWorldHint: false,
+      },
       description:
         "Find same-file semantic highlights for the symbol at a position. Useful for quick local read-tracing without a full reference search.",
       inputSchema: {
@@ -1074,6 +1134,11 @@ export function createMcpServer(manager: HostManager): McpServer {
   server.registerTool(
     "get_file_references",
     {
+      title: "Get File References",
+      annotations: {
+        readOnlyHint: true,
+        openWorldHint: false,
+      },
       description:
         "Find import or module references to a file across the project graph using Volar's built-in file reference request.",
       inputSchema: {
@@ -1104,6 +1169,11 @@ export function createMcpServer(manager: HostManager): McpServer {
   server.registerTool(
     "get_call_hierarchy",
     {
+      title: "Get Call Hierarchy",
+      annotations: {
+        readOnlyHint: true,
+        openWorldHint: false,
+      },
       description:
         "Return incoming and outgoing semantic call relationships for the symbol at a position.",
       inputSchema: {
@@ -1143,6 +1213,11 @@ export function createMcpServer(manager: HostManager): McpServer {
   server.registerTool(
     "prepare_rename",
     {
+      title: "Prepare Rename",
+      annotations: {
+        readOnlyHint: true,
+        openWorldHint: false,
+      },
       description:
         "Check whether a symbol can be renamed at the given position and return the exact rename span when it can.",
       inputSchema: {
@@ -1168,6 +1243,11 @@ export function createMcpServer(manager: HostManager): McpServer {
   server.registerTool(
     "get_rename_edits",
     {
+      title: "Get Rename Edits",
+      annotations: {
+        readOnlyHint: true,
+        openWorldHint: false,
+      },
       description:
         "Compute workspace edits for renaming the symbol at a position to a new name.",
       inputSchema: {
@@ -1206,6 +1286,11 @@ export function createMcpServer(manager: HostManager): McpServer {
   server.registerTool(
     "get_file_rename_edits",
     {
+      title: "Get File Rename Edits",
+      annotations: {
+        readOnlyHint: true,
+        openWorldHint: false,
+      },
       description:
         "Compute workspace edits for renaming or moving a file so imports and references update consistently.",
       inputSchema: {
@@ -1244,6 +1329,11 @@ export function createMcpServer(manager: HostManager): McpServer {
   server.registerTool(
     "get_code_actions",
     {
+      title: "Get Code Actions",
+      annotations: {
+        readOnlyHint: true,
+        openWorldHint: false,
+      },
       description:
         "Get compiler-known quick fixes and refactors for a range. Returns available fixes like add import, narrow type, implement interface.",
       inputSchema: {
@@ -1271,6 +1361,11 @@ export function createMcpServer(manager: HostManager): McpServer {
   server.registerTool(
     "find_errors_and_fixes",
     {
+      title: "Find Errors And Fixes",
+      annotations: {
+        readOnlyHint: true,
+        openWorldHint: false,
+      },
       description:
         "Get diagnostics paired with actionable fixes in a single call. Prefer this over calling get_diagnostics then get_code_actions separately. Text output is compact by default, and detailed per-diagnostic fix objects are opt-in.",
       inputSchema: {
@@ -1316,7 +1411,7 @@ export function createMcpServer(manager: HostManager): McpServer {
           .nullable()
           .optional(),
       },
-      },
+    },
     async (args) => {
       const session = args.file
         ? await manager.getDiagnosticsSessionForFile(args.file)
@@ -1368,6 +1463,11 @@ export function createMcpServer(manager: HostManager): McpServer {
   server.registerTool(
     "validate_files",
     {
+      title: "Validate Files",
+      annotations: {
+        readOnlyHint: true,
+        openWorldHint: false,
+      },
       description:
         "Validate several changed files in one call. Refreshes the language server for those files, then returns grouped diagnostic counts and optional fix details for the changed-file set.",
       inputSchema: {
@@ -1488,6 +1588,11 @@ export function createMcpServer(manager: HostManager): McpServer {
   server.registerTool(
     "get_enriched_file",
     {
+      title: "Get Enriched File",
+      annotations: {
+        readOnlyHint: true,
+        openWorldHint: false,
+      },
       description:
         "Get file source with diagnostics and type information woven inline as annotations. Expensive but gives a complete picture. Use sparingly.",
       inputSchema: {
@@ -1509,8 +1614,59 @@ export function createMcpServer(manager: HostManager): McpServer {
   );
 
   server.registerTool(
+    "read_file",
+    {
+      title: "Read File",
+      annotations: {
+        readOnlyHint: true,
+        openWorldHint: false,
+      },
+      description:
+        "Read a file in near-original form while compacting foldable implementation regions such as functions, JSX trees, and larger comment or region blocks. This is a compact implementation-reading lane built on the language server's folding ranges instead of manual symbol rewriting.",
+      inputSchema: {
+        file: z.string().describe("File path relative to project root"),
+        kinds: z
+          .array(z.enum(COLLAPSED_FILE_KINDS))
+          .optional()
+          .describe(
+            "Optional fold kinds to compact. Defaults to ['code']. Available values: code, imports, comment, region. Imports are kept verbatim to preserve context.",
+          ),
+        preserveClosingLine: z
+          .boolean()
+          .optional()
+          .describe(
+            "Whether to keep the last line of each folded region visible. When omitted, comments keep their closing line while other fold kinds use the default compact rendering.",
+          ),
+        lineNumbers: z
+          .boolean()
+          .optional()
+          .describe(
+            "Whether to prefix the rendered output with original source line numbers. Defaults to false.",
+          ),
+      },
+    },
+    async (args) => {
+      const session = await manager.getDiagnosticsSessionForFile(args.file);
+      const snapshot = await getCollapsedFile(session, args);
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: snapshot.text,
+          },
+        ],
+      };
+    },
+  );
+
+  server.registerTool(
     "list_module_exports",
     {
+      title: "List Module Exports",
+      annotations: {
+        readOnlyHint: true,
+        openWorldHint: false,
+      },
       description:
         "List the exports of a module using the language server's completion pipeline instead of manual export parsing. This is the preferred entry point for 'what does this package export?' exploration.",
       inputSchema: {
@@ -1550,6 +1706,12 @@ export function createMcpServer(manager: HostManager): McpServer {
           .describe(
             "Optional case-insensitive export-name query. Prefix matches are preferred; substring matches are used when no prefix matches exist.",
           ),
+        surface: z
+          .enum(["runtime", "all"])
+          .optional()
+          .describe(
+            "Which export surface to show. Defaults to runtime-only API exports; use all to include type-like exports too.",
+          ),
         includeDocs: z
           .boolean()
           .optional()
@@ -1562,21 +1724,15 @@ export function createMcpServer(manager: HostManager): McpServer {
         module: z.string(),
         fromFile: z.string().nullable(),
         query: z.string().nullable(),
+        surface: z.enum(["runtime", "all"]),
         probeFile: z.string(),
         totalExports: z.number().int().nonnegative(),
         totalMatchingExports: z.number().int().nonnegative(),
+        hiddenExportCount: z.number().int().nonnegative(),
         offset: z.number().int().nonnegative(),
         nextOffset: z.number().int().nonnegative().nullable(),
+        pageItemCount: z.number().int().nonnegative(),
         isIncomplete: z.boolean(),
-        exports: z.array(
-          z.object({
-            name: z.string(),
-            detail: z.string().optional(),
-            documentation: z.string().optional(),
-            kind: z.number().int().positive().optional(),
-            deprecated: z.boolean(),
-          }),
-        ),
       },
     },
     async (args) => {
@@ -1596,13 +1752,15 @@ export function createMcpServer(manager: HostManager): McpServer {
           module: result.module,
           fromFile: args.fromFile ?? null,
           query: result.query ?? null,
+          surface: result.surface,
           probeFile: result.probeFile,
           totalExports: result.totalExports,
           totalMatchingExports: result.totalMatchingExports,
+          hiddenExportCount: result.hiddenExportCount,
           offset: result.offset,
           nextOffset: result.nextOffset,
+          pageItemCount: result.pageItemCount,
           isIncomplete: result.isIncomplete,
-          exports: result.exports,
         },
       };
     },
@@ -1611,6 +1769,11 @@ export function createMcpServer(manager: HostManager): McpServer {
   server.registerTool(
     "get_hover",
     {
+      title: "Get Hover",
+      annotations: {
+        readOnlyHint: true,
+        openWorldHint: false,
+      },
       description:
         "Get hover information at a position. For .featuretype files, returns schema descriptions for block tags. For TS/TSX, returns inferred types and JSDoc. Similar to get_type_at but includes all hover content.",
       inputSchema: {
@@ -1653,6 +1816,11 @@ export function createMcpServer(manager: HostManager): McpServer {
   server.registerTool(
     "get_document_symbols",
     {
+      title: "Get Document Symbols",
+      annotations: {
+        readOnlyHint: true,
+        openWorldHint: false,
+      },
       description:
         "Get a compact symbol outline for a file. Defaults to top-level, jump-worthy symbols instead of a full recursive dump. Use query/maxDepth when you want something more targeted.",
       inputSchema: {
@@ -1696,6 +1864,11 @@ export function createMcpServer(manager: HostManager): McpServer {
   server.registerTool(
     "search_workspace_symbols",
     {
+      title: "Search Workspace Symbols",
+      annotations: {
+        readOnlyHint: true,
+        openWorldHint: false,
+      },
       description:
         "Search symbols across the attached project graph using Volar's built-in workspace/symbol support when you know a name but not the file. Especially useful in monorepos when import-site definition lands on a local alias or barrel instead of the owning implementation.",
       inputSchema: {
@@ -1772,6 +1945,11 @@ export function createMcpServer(manager: HostManager): McpServer {
   server.registerTool(
     "inspect_symbol",
     {
+      title: "Inspect Symbol",
+      annotations: {
+        readOnlyHint: true,
+        openWorldHint: false,
+      },
       description:
         "Inspect a symbol by position or by query. This is a practical implementation tool that combines hover/type info, definition, type definition, implementations, and references into one targeted response.",
       inputSchema: {
@@ -1822,6 +2000,12 @@ export function createMcpServer(manager: HostManager): McpServer {
   server.registerTool(
     "notify_file_changed",
     {
+      title: "Notify File Changed",
+      annotations: {
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
       description:
         "Notify the server that a file has changed on disk. Call this after writing or modifying files so diagnostics stay current.",
       inputSchema: {
@@ -1847,6 +2031,12 @@ export function createMcpServer(manager: HostManager): McpServer {
   server.registerTool(
     "open_virtual_file",
     {
+      title: "Open Virtual File",
+      annotations: {
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
       description:
         "Register an in-memory file with the language server using caller-supplied content. The file does not need to exist on disk. Relative imports in virtual TypeScript/JavaScript files are normalized to include .js extensions for NodeNext compatibility. All semantic tools (get_diagnostics, get_type_at, get_definition, etc.) work against virtual files exactly as they do against disk files. Calling again with the same path updates the content. Use this to analyze code that is being generated, proposed, or not yet written to disk.",
       inputSchema: {
@@ -1889,6 +2079,12 @@ export function createMcpServer(manager: HostManager): McpServer {
   server.registerTool(
     "close_virtual_file",
     {
+      title: "Close Virtual File",
+      annotations: {
+        destructiveHint: true,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
       description:
         "Remove a previously registered virtual file from the language server. After closing, the file will no longer appear in the project graph. No-ops if the path was never opened as virtual.",
       inputSchema: {
