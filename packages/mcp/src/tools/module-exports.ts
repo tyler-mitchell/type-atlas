@@ -59,6 +59,10 @@ function dedupeCompletionItems(items: CompletionItem[]): CompletionItem[] {
   const deduped: CompletionItem[] = [];
 
   for (const item of items) {
+    if (item.kind === 14 && item.label === "type") {
+      continue;
+    }
+
     const key = [
       item.label,
       item.kind ?? "",

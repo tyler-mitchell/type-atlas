@@ -948,6 +948,7 @@ describe("featuretype MCP local probes", () => {
 
     expect(hasToolError(result)).toBe(false);
     expect(text).toContain('Exports from "./index.js"');
+    expect(exports.some((entry) => entry.name === "type")).toBe(false);
     expect(exports.some((entry) => entry.name === "localValue")).toBe(true);
   }, 60_000);
 
