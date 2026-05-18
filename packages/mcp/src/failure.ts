@@ -17,7 +17,7 @@ import type { DiagnosticsSession } from "@featuretype/language-server";
  * - OUT_OF_SCOPE: file is outside every attached project root
  * - NOT_IN_GRAPH: file is in the project root but excluded from tsconfig
  * - NO_SYMBOL: file is valid but the position has no resolvable symbol
- * - FEATURETYPE_BLOCK: position is in a non-code block of a .featuretype file
+ * - FEATURETYPE_BLOCK: position is outside a TypeScript fence in a .featuretype file
  */
 export type FailureCode =
   | "NOT_FOUND"
@@ -38,6 +38,16 @@ interface FailureContext {
 
 function buildFailure(code: FailureCode, lines: string[]): SemanticFailure {
   return { code, message: lines.join("\n") };
+}
+
+function projectRoutingHint(rootDir: string): string[] {
+  return [
+    "",
+    "Project routing:",
+    `  Interpreted against: ${rootDir}`,
+    "  If this is not the repo or worktree you are editing, this is not a blocker.",
+    "  Call list_projects, then attach_project with the repo/worktree root you are editing and retry.",
+  ];
 }
 
 export async function classifyFailure(
@@ -65,6 +75,7 @@ export async function classifyFailure(
       "",
       `Reason: file does not exist at ${absPath} and is not registered as a virtual file.`,
       "Use open_virtual_file to register in-memory content, or write the file to disk first.",
+      ...projectRoutingHint(session.rootDir),
     ]);
   }
 
@@ -78,6 +89,7 @@ export async function classifyFailure(
       "",
       "Semantic queries require the file to be part of the TypeScript project graph.",
       "Use attach_project to add the correct project root.",
+      ...projectRoutingHint(session.rootDir),
     ]);
   }
 
@@ -90,11 +102,12 @@ export async function classifyFailure(
     ];
     if (isFeatureType) {
       lines.push(
-        "  .featuretype files participate via Volar virtual code — embedded code blocks should produce diagnostics but semantic navigation into them is limited.",
+        "  .featuretype files participate via Volar virtual code. TypeScript fences should produce diagnostics and semantic navigation when the file is included.",
       );
     } else {
       lines.push("  Check tsconfig.json include/exclude patterns, or use open_virtual_file to register the file explicitly.");
     }
+    lines.push(...projectRoutingHint(session.rootDir));
     return buildFailure("NOT_IN_GRAPH", lines);
   }
 
@@ -102,9 +115,9 @@ export async function classifyFailure(
     return buildFailure("FEATURETYPE_BLOCK", [
       header,
       "",
-      "Reason: position may not be inside an embedded code block.",
-      "  Semantic queries work inside <recipe>, <showcase>, and <example> code blocks.",
-      "  Structural text blocks (intent, anatomy, etc.) do not have TypeScript semantics.",
+      "Reason: position may not be inside a ts or tsx code fence.",
+      "  Semantic queries work inside Markdown fences with first-line module comments such as // module.ts.",
+      "  Prose, headings, fence metadata, and non-TypeScript fences do not have TypeScript semantics.",
     ]);
   }
 

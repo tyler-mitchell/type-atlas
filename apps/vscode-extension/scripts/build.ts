@@ -10,7 +10,7 @@ async function main() {
   const buildContext = await context({
     entryPoints: {
       extension: "./src/extension.ts",
-      server: "../../packages/language-server/src/index.ts",
+      server: "../../packages/language-server/src/server.ts",
     },
     bundle: true,
     define: {

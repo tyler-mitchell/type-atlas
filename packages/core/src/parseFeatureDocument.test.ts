@@ -1,157 +1,213 @@
+import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { extendFeatureDocumentSchema } from "./schema";
 import { parseFeatureDocument } from "./parseFeatureDocument";
 
 describe("parseFeatureDocument", () => {
-  it("extracts legacy nested examples as embedded code blocks", () => {
+  it("extracts TypeScript fences with authored offsets and file metadata", () => {
+    const source = [
+      "# Usage Notes",
+      "",
+      "Prose before the code fence.",
+      "",
+      "```ts",
+      "// root.ts",
+      "import { helper } from \"./helper\"",
+      "",
+      "export const root = helper(\"ok\")",
+      "```",
+      "",
+      "```tsx",
+      "// ./view.tsx",
+      "export const View = () => <div />",
+      "```",
+      "",
+    ].join("\n");
+
     const document = parseFeatureDocument({
-      filePath: "/tmp/button.featuretype",
-      source: `
-<title>Button</title>
-
-<intent>
-  Trigger a primary or secondary action.
-</intent>
-
-<setup lang="ts">
-import { Button } from "./components"
-</setup>
-
-<examples>
-  <example id="default" title="Primary action">
-    <Button tone="primary">Save</Button>
-  </example>
-</examples>
-`,
+      filePath: "/repo/docs/example.featuretype",
+      source,
+      fileExists: () => false,
     });
 
-    expect(document.displayName).toBe("Button");
-    expect(document.intent?.content).toContain("Trigger a primary");
-    expect(document.setup?.attributes.lang).toBe("ts");
-    expect(document.blocks.map((block) => block.name)).toEqual([
-      "title",
-      "intent",
-      "setup",
-      "examples",
-    ]);
-    expect(document.examples).toHaveLength(1);
+    expect(document.displayName).toBe("Usage Notes");
+    expect(document.codeBlocks).toHaveLength(2);
+    expect(document.errors).toEqual([]);
+
+    expect(document.codeBlocks[0]).toMatchObject({
+      language: "ts",
+      file: "./root.ts",
+      fileName: path.resolve("/repo/docs/root.ts"),
+      importable: true,
+    });
+    expect(document.codeBlocks[0]?.code).toBe(
+      "// root.ts\nimport { helper } from \"./helper\"\n\nexport const root = helper(\"ok\")\n",
+    );
+    expect(document.codeBlocks[0]?.range.contentStart).toBe(
+      source.indexOf("// root.ts"),
+    );
+    expect(document.codeBlocks[0]?.range.contentEnd).toBe(
+      source.indexOf("```", source.indexOf("export const root")),
+    );
+
+    expect(document.codeBlocks[1]).toMatchObject({
+      language: "tsx",
+      file: "./view.tsx",
+      fileName: path.resolve("/repo/docs/view.tsx"),
+      importable: true,
+    });
+  });
+
+  it("ignores prose and non-TypeScript fences", () => {
+    const document = parseFeatureDocument({
+      filePath: "/repo/docs/example.featuretype",
+      source: [
+        "# Example",
+        "",
+        "```json",
+        "{\"ok\": true}",
+        "```",
+        "",
+        "```ts",
+        "export const anonymous = true",
+        "```",
+      ].join("\n"),
+      fileExists: () => false,
+    });
+
     expect(document.codeBlocks).toHaveLength(1);
-    expect(document.codeBlocks[0]?.id).toBe("default");
-    expect(document.codeBlocks[0]?.codeShape).toBe("fragment");
-    expect(document.codeBlocks[0]?.code).toContain("<Button tone=");
+    expect(document.codeBlocks[0]).toMatchObject({
+      language: "ts",
+      file: undefined,
+      fileName: undefined,
+      importable: false,
+    });
     expect(document.errors).toEqual([]);
   });
 
-  it("extracts top-level recipes and showcases for agent-expandable authored features", () => {
+  it("ignores ordinary first-line comments that do not contain a TypeScript path", () => {
     const document = parseFeatureDocument({
-      filePath: "/tmp/single-select-combobox.featuretype",
-      source: `
-<intent>
-  Single-select combobox for toolbar filter controls.
-</intent>
+      filePath: "/repo/docs/example.featuretype",
+      source: [
+        "# Research Notes",
+        "",
+        "```ts",
+        "// Source: https://github.com/vuejs/language-tools",
+        "export const source = true",
+        "```",
+      ].join("\n"),
+      fileExists: () => false,
+    });
 
-<recipe id="minimal-controlled" intent="controlled single-select with local state">
-  function MinimalControlledCombobox() {
-    return <SingleSelectCombobox />
-  }
-</recipe>
+    expect(document.codeBlocks).toHaveLength(1);
+    expect(document.codeBlocks[0]).toMatchObject({
+      file: undefined,
+      fileName: undefined,
+      importable: false,
+    });
+    expect(document.errors).toEqual([]);
+  });
 
-<showcase id="toolbar-composition" title="In-App Filter Toolbars" controls>
-  function ToolbarShowcase({ size, variant }) {
-    return <div>{size}{variant}</div>
-  }
-</showcase>
+  it("reports invalid importable fence file paths", () => {
+    const document = parseFeatureDocument({
+      filePath: "/repo/docs/example.featuretype",
+      source: [
+        "```ts",
+        "// ../outside.ts",
+        "export const outside = true",
+        "```",
+        "",
+        "```tsx",
+        "// ./view.ts",
+        "export const View = () => <div />",
+        "```",
+        "",
+        "```ts",
+        "// ./missing-extension",
+        "export const missing = true",
+        "```",
+      ].join("\n"),
+      fileExists: () => false,
+    });
 
-<status phase="active" reviewed="2026-03-28">
-  open: should ComboboxInput be a separate export or built-in?
-</status>
-`,
+    expect(document.codeBlocks).toHaveLength(3);
+    expect(document.codeBlocks.every((block) => !block.importable)).toBe(true);
+    expect(document.errors.map((error) => error.code)).toEqual([
+      "invalid-fence-file",
+      "fence-extension-mismatch",
+    ]);
+  });
+
+  it("reports duplicate virtual module names on every colliding fence", () => {
+    const document = parseFeatureDocument({
+      filePath: "/repo/docs/example.featuretype",
+      source: [
+        "```ts",
+        "// ./dup.ts",
+        "export const first = true",
+        "```",
+        "",
+        "```ts",
+        "// ./dup.ts",
+        "export const second = true",
+        "```",
+      ].join("\n"),
+      fileExists: () => false,
+    });
+
+    expect(document.codeBlocks.map((block) => block.importable)).toEqual([
+      false,
+      false,
+    ]);
+    expect(document.errors.map((error) => error.code)).toEqual([
+      "duplicate-fence-file",
+      "duplicate-fence-file",
+    ]);
+  });
+
+  it("reports real-file shadowing", () => {
+    const shadowedPath = path.resolve("/repo/docs/helper.ts");
+    const document = parseFeatureDocument({
+      filePath: "/repo/docs/example.featuretype",
+      source: [
+        "```ts",
+        "// ./helper.ts",
+        "export const helper = true",
+        "```",
+      ].join("\n"),
+      fileExists: (filePath) => filePath === shadowedPath,
+    });
+
+    expect(document.codeBlocks[0]?.importable).toBe(false);
+    expect(document.errors.map((error) => error.code)).toEqual([
+      "fence-file-shadows-real-file",
+    ]);
+  });
+
+  it("preserves offsets across multibyte text, CRLF, empty fences, and unclosed fences", () => {
+    const source = [
+      "# Café",
+      "",
+      "```ts",
+      "// ./empty.ts",
+      "```",
+      "",
+      "```ts",
+      "// ./open.ts",
+      "export const open = \"é\"",
+    ].join("\r\n");
+
+    const document = parseFeatureDocument({
+      filePath: "/repo/docs/example.featuretype",
+      source,
+      fileExists: () => false,
     });
 
     expect(document.codeBlocks).toHaveLength(2);
-    expect(document.codeBlocks.map((block) => block.name)).toEqual([
-      "recipe",
-      "showcase",
-    ]);
-    expect(document.codeBlocks[0]?.codeShape).toBe("module");
-    expect(document.codeBlocks[1]?.attributes.controls).toBe(true);
-    expect(document.blocksByName.status?.[0]?.attributes.reviewed).toBe("2026-03-28");
-    expect(document.errors).toEqual([]);
-  });
-
-  it("supports schema extensions with nested agent-expandable blocks", () => {
-    const schema = extendFeatureDocumentSchema({
-      blocks: {
-        capabilities: {
-          name: "capabilities",
-          description: "Agent capability declarations for this feature.",
-          kind: "container",
-          cardinality: "single",
-          insertTemplate:
-            "<capabilities>\n  <agent-capability id=\"new-capability\" name=\"describe capability\">\n    export const capability = true\n  </agent-capability>\n</capabilities>",
-          children: {
-            "agent-capability": {
-              name: "agent-capability",
-              description: "Executable or declarative agent capability block.",
-              kind: "code",
-              cardinality: "multiple",
-              requiredAttributes: ["id", "name"],
-              embeddedLanguage: "ts",
-              codeShape: "module",
-              emitServiceScript: true,
-              insertTemplate:
-                "<agent-capability id=\"new-capability\" name=\"describe capability\">\n  export const capability = true\n</agent-capability>",
-            },
-          },
-        },
-      },
-    });
-
-    const document = parseFeatureDocument({
-      filePath: "/tmp/capabilities.featuretype",
-      schema,
-      source: `
-<intent>
-  A feature with agent-specific authoring hooks.
-</intent>
-
-<capabilities>
-  <agent-capability id="hover" name="hover summary">
-    export const hover = "Summarize the feature on hover"
-  </agent-capability>
-</capabilities>
-`,
-    });
-
-    expect(document.blocksByName.capabilities?.[0]?.children.map((block) => block.name)).toEqual([
-      "agent-capability",
-    ]);
-    expect(document.allBlocks.map((block) => block.name)).toEqual([
-      "intent",
-      "capabilities",
-      "agent-capability",
-    ]);
-    expect(document.codeBlocks[0]?.parentBlockName).toBe("capabilities");
-    expect(document.codeBlocks[0]?.language).toBe("ts");
-    expect(document.errors).toEqual([]);
-  });
-
-  it("reports structural problems for required blocks and required attributes", () => {
-    const document = parseFeatureDocument({
-      filePath: "/tmp/broken.featuretype",
-      source: `
-<recipe>
-  function BrokenRecipe() {
-    return <Button />
-  }
-</recipe>
-`,
-    });
-
-    expect(document.errors.map((error) => error.code)).toEqual([
-      "missing-required-block",
-      "missing-required-attribute",
-      "missing-required-attribute",
-    ]);
+    expect(document.codeBlocks[0]?.code).toBe("// ./empty.ts\r\n");
+    expect(document.codeBlocks[0]?.range.contentEnd).toBe(
+      source.indexOf("```", source.indexOf("// ./empty.ts")),
+    );
+    expect(document.codeBlocks[1]?.code).toBe("// ./open.ts\r\nexport const open = \"é\"");
+    expect(document.codeBlocks[1]?.range.closingFenceStart).toBeUndefined();
   });
 });

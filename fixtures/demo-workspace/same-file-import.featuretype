@@ -1,0 +1,15 @@
+# Same File Import
+
+```ts
+// ./root.ts
+import { helper } from "./helper"
+
+export const root = helper("ok")
+```
+
+```ts
+// ./helper.ts
+export function helper(value: string) {
+  return value.toUpperCase()
+}
+```

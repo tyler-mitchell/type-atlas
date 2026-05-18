@@ -89,6 +89,14 @@ type DiagnosticToolName =
   | "find_errors_and_fixes"
   | "validate_files";
 const MAX_PERSISTED_ROOTS = 12;
+const PROJECT_ATTACHMENT_RECOVERY_HINT =
+  "If FeatureType is attached to a different repo or worktree, that is not a blocker: call list_projects, then attach_project with the repo/worktree root you are editing and retry.";
+const PROJECT_ROOT_INPUT_DESCRIPTION =
+  "Absolute or relative path to the TypeScript project root or worktree root you are editing. This switches the active FeatureType project.";
+const PROJECT_FILE_INPUT_DESCRIPTION =
+  `File path relative to an attached project root, or an absolute path inside an attached root. ${PROJECT_ATTACHMENT_RECOVERY_HINT}`;
+const OPTIONAL_PROJECT_FILE_INPUT_DESCRIPTION =
+  `Optional file path relative to an attached project root, or an absolute path inside an attached root. Omit to use the active project. ${PROJECT_ATTACHMENT_RECOVERY_HINT}`;
 const toRetryAfterSeconds = (resetAt: number, now: number = Date.now()): number =>
   Math.max(1, Math.ceil(Math.max(0, resetAt - now) / 1000));
 const mcpModuleDir = path.dirname(
@@ -307,7 +315,11 @@ class HostManager {
   private requireActiveRoot(): string {
     if (!this.activeRoot) {
       throw new Error(
-        "No active project is attached. Call attach_project with a repo root first.",
+        [
+          "No FeatureType project is attached.",
+          "",
+          PROJECT_ATTACHMENT_RECOVERY_HINT,
+        ].join("\n"),
       );
     }
     return this.activeRoot;
@@ -429,6 +441,42 @@ class HostManager {
     return matches.sort((left, right) => right.length - left.length)[0] ?? null;
   }
 
+  private formatAttachedRootContext(): string {
+    const attachedRoots = this.getAttachedRoots();
+    const activeRoot = this.activeRoot ?? null;
+
+    if (attachedRoots.length === 0) {
+      return "Attached projects: none";
+    }
+
+    return [
+      "Attached projects:",
+      ...attachedRoots.map((root) =>
+        `  ${root === activeRoot ? "* " : "  "}${root}`,
+      ),
+    ].join("\n");
+  }
+
+  private formatProjectResolutionFailure(filePath: string): string {
+    const requestedPath = path.isAbsolute(filePath)
+      ? path.resolve(filePath)
+      : filePath;
+    const reason = path.isAbsolute(filePath)
+      ? "Reason: no attached FeatureType project contains this absolute file path."
+      : "Reason: no FeatureType project is attached, so this relative file path has no project root.";
+
+    return [
+      "FeatureType could not choose a project for this file.",
+      "",
+      `Requested file: ${requestedPath}`,
+      reason,
+      "",
+      this.formatAttachedRootContext(),
+      "",
+      PROJECT_ATTACHMENT_RECOVERY_HINT,
+    ].join("\n");
+  }
+
   resolveRootForFile(filePath: string): string | null {
     if (path.isAbsolute(filePath)) {
       const absPath = path.resolve(filePath);
@@ -476,9 +524,7 @@ class HostManager {
   getDiagnosticsSessionForFile(filePath: string): Promise<DiagnosticsSession> {
     const resolvedRoot = this.resolveRootForFile(filePath);
     if (!resolvedRoot) {
-      throw new Error(
-        "No active project is attached. Call attach_project with a repo root first.",
-      );
+      throw new Error(this.formatProjectResolutionFailure(filePath));
     }
     return this.getDiagnosticsSession(resolvedRoot);
   }
@@ -632,13 +678,11 @@ export function createMcpServer(manager: HostManager): McpServer {
         openWorldHint: false,
       },
       description:
-        "Attach a new TypeScript project root for semantic analysis. The attached project becomes the active root. Use this when working across multiple repos or when semantic queries fail because a file is outside the current project graph.",
+        "Attach the TypeScript repo or worktree you are editing for semantic analysis. The attached project becomes the active root. Use this whenever list_projects shows a different active root or a semantic query says the file is outside the current project graph.",
       inputSchema: {
         projectRoot: z
           .string()
-          .describe(
-            "Absolute or relative path to the project root (directory containing tsconfig.json)",
-          ),
+          .describe(PROJECT_ROOT_INPUT_DESCRIPTION),
       },
       outputSchema: {
         root: z.string(),
@@ -666,7 +710,7 @@ export function createMcpServer(manager: HostManager): McpServer {
         content: [
           {
             type: "text",
-            text: `${status}: ${result.root}\n  ${result.fileCount} files in project graph\n  This is now the active project root.`,
+            text: `${status}: ${result.root}\n  ${result.fileCount} files in project graph\n  This is now the active project root.\n\n${PROJECT_ATTACHMENT_RECOVERY_HINT}`,
           },
         ],
         structuredContent: {
@@ -688,7 +732,7 @@ export function createMcpServer(manager: HostManager): McpServer {
         openWorldHint: false,
       },
       description:
-        "List all attached project roots and which is currently active.",
+        "List attached project roots and the active root. Use this first when FeatureType seems pointed at a different repo or worktree than the one you are editing.",
       outputSchema: {
         projects: z.array(z.object(projectInfoSchema)),
       },
@@ -697,18 +741,36 @@ export function createMcpServer(manager: HostManager): McpServer {
       const roots = await manager.listRoots();
       if (roots.length === 0) {
         return {
-          content: [{ type: "text", text: "No projects attached." }],
+          content: [
+            {
+              type: "text",
+              text: `No projects attached.\n\n${PROJECT_ATTACHMENT_RECOVERY_HINT}`,
+            },
+          ],
           structuredContent: {
             projects: [],
           },
         };
       }
+      const activeRoot = roots.find((root) => root.active)?.root ?? "(none)";
       const lines = roots.map(
         (root) =>
-          `${root.active ? "→ " : "  "}${root.root} (${root.fileCount} files)`,
+          `${root.active ? "* " : "  "}${root.root} (${root.fileCount} files)`,
       );
       return {
-        content: [{ type: "text", text: lines.join("\n") }],
+        content: [
+          {
+            type: "text",
+            text: [
+              `Active project root: ${activeRoot}`,
+              "",
+              "Attached projects:",
+              ...lines,
+              "",
+              PROJECT_ATTACHMENT_RECOVERY_HINT,
+            ].join("\n"),
+          },
+        ],
         structuredContent: {
           projects: roots,
         },
@@ -730,9 +792,7 @@ export function createMcpServer(manager: HostManager): McpServer {
         file: z
           .string()
           .optional()
-          .describe(
-            "File path relative to project root. Omit for all project diagnostics.",
-          ),
+          .describe(OPTIONAL_PROJECT_FILE_INPUT_DESCRIPTION),
         severity: z
           .enum(["error", "warning", "all"])
           .optional()
@@ -864,6 +924,56 @@ export function createMcpServer(manager: HostManager): McpServer {
   );
 
   server.registerTool(
+    "typecheck_file",
+    {
+      title: "Typecheck File",
+      annotations: {
+        readOnlyHint: true,
+        openWorldHint: false,
+      },
+      description:
+        "Typecheck one project file and return a simple pass/fail result with diagnostics.",
+      inputSchema: {
+        file: z.string().describe(PROJECT_FILE_INPUT_DESCRIPTION),
+      },
+    },
+    async (args) => {
+      const session = await manager.getDiagnosticsSessionForFile(args.file);
+      const failure = await classifyFailure(
+        "typecheck_file",
+        args.file,
+        session,
+      );
+      if (failure.code === "NOT_FOUND" || failure.code === "OUT_OF_SCOPE") {
+        return {
+          isError: true,
+          content: [{ type: "text", text: failure.message }],
+        };
+      }
+
+      const snapshot = await getDiagnostics(session, {
+        file: args.file,
+        severity: "all",
+      });
+      const passed = snapshot.totalErrorCount === 0;
+      const header = passed
+        ? `Typecheck passed: ${args.file}`
+        : `Typecheck failed: ${args.file}`;
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: snapshot.totalCount === 0
+              ? header
+              : `${header}\n\n${snapshot.text}`,
+          },
+        ],
+      };
+    },
+  );
+
+  server.registerTool(
     "get_type_at",
     {
       title: "Get Type At",
@@ -874,7 +984,7 @@ export function createMcpServer(manager: HostManager): McpServer {
       description:
         "Get the inferred type and documentation at a position (hover equivalent). Use to understand what the compiler thinks a value is.",
       inputSchema: {
-        file: z.string().describe("File path relative to project root"),
+        file: z.string().describe(PROJECT_FILE_INPUT_DESCRIPTION),
         line: z.number().describe("Line number (1-based)"),
         col: z.number().describe("Column number (1-based)"),
       },
@@ -904,7 +1014,7 @@ export function createMcpServer(manager: HostManager): McpServer {
       description:
         "Get function signature help at a call site. Returns parameter names, types, overloads, and documentation.",
       inputSchema: {
-        file: z.string().describe("File path relative to project root"),
+        file: z.string().describe(PROJECT_FILE_INPUT_DESCRIPTION),
         line: z.number().describe("Line number (1-based)"),
         col: z.number().describe("Column number (1-based)"),
       },
@@ -934,7 +1044,7 @@ export function createMcpServer(manager: HostManager): McpServer {
       description:
         "Go to definition. Returns the declaration site, resolved through re-exports, aliases, and generated types.",
       inputSchema: {
-        file: z.string().describe("File path relative to project root"),
+        file: z.string().describe(PROJECT_FILE_INPUT_DESCRIPTION),
         line: z.number().describe("Line number (1-based)"),
         col: z.number().describe("Column number (1-based)"),
       },
@@ -964,7 +1074,7 @@ export function createMcpServer(manager: HostManager): McpServer {
       description:
         "Go to type definition. Useful when value-level definition lands on a constructor or alias but you want the underlying type declaration.",
       inputSchema: {
-        file: z.string().describe("File path relative to project root"),
+        file: z.string().describe(PROJECT_FILE_INPUT_DESCRIPTION),
         line: z.number().describe("Line number (1-based)"),
         col: z.number().describe("Column number (1-based)"),
       },
@@ -994,7 +1104,7 @@ export function createMcpServer(manager: HostManager): McpServer {
       description:
         "Find concrete implementations of the symbol at a position. Especially useful for interfaces, abstract contracts, and provider-style indirection.",
       inputSchema: {
-        file: z.string().describe("File path relative to project root"),
+        file: z.string().describe(PROJECT_FILE_INPUT_DESCRIPTION),
         line: z.number().describe("Line number (1-based)"),
         col: z.number().describe("Column number (1-based)"),
       },
@@ -1024,7 +1134,7 @@ export function createMcpServer(manager: HostManager): McpServer {
       description:
         "Find all references to a symbol (type-aware, not regex). Returns all usage sites across the project.",
       inputSchema: {
-        file: z.string().describe("File path relative to project root"),
+        file: z.string().describe(PROJECT_FILE_INPUT_DESCRIPTION),
         line: z.number().describe("Line number (1-based)"),
         col: z.number().describe("Column number (1-based)"),
       },
@@ -1054,7 +1164,7 @@ export function createMcpServer(manager: HostManager): McpServer {
       description:
         "Summarize references for a symbol by file, with grouped counts and representative usage lines. Prefer this over get_references when you need triage rather than a long flat location list.",
       inputSchema: {
-        file: z.string().describe("File path relative to project root"),
+        file: z.string().describe(PROJECT_FILE_INPUT_DESCRIPTION),
         line: z.number().describe("Line number (1-based)"),
         col: z.number().describe("Column number (1-based)"),
         maxFiles: z
@@ -1112,7 +1222,7 @@ export function createMcpServer(manager: HostManager): McpServer {
       description:
         "Find same-file semantic highlights for the symbol at a position. Useful for quick local read-tracing without a full reference search.",
       inputSchema: {
-        file: z.string().describe("File path relative to project root"),
+        file: z.string().describe(PROJECT_FILE_INPUT_DESCRIPTION),
         line: z.number().describe("Line number (1-based)"),
         col: z.number().describe("Column number (1-based)"),
       },
@@ -1142,7 +1252,7 @@ export function createMcpServer(manager: HostManager): McpServer {
       description:
         "Find import or module references to a file across the project graph using Volar's built-in file reference request.",
       inputSchema: {
-        file: z.string().describe("File path relative to project root"),
+        file: z.string().describe(PROJECT_FILE_INPUT_DESCRIPTION),
         maxResults: z
           .number()
           .int()
@@ -1177,7 +1287,7 @@ export function createMcpServer(manager: HostManager): McpServer {
       description:
         "Return incoming and outgoing semantic call relationships for the symbol at a position.",
       inputSchema: {
-        file: z.string().describe("File path relative to project root"),
+        file: z.string().describe(PROJECT_FILE_INPUT_DESCRIPTION),
         line: z.number().describe("Line number (1-based)"),
         col: z.number().describe("Column number (1-based)"),
         maxIncoming: z
@@ -1221,7 +1331,7 @@ export function createMcpServer(manager: HostManager): McpServer {
       description:
         "Check whether a symbol can be renamed at the given position and return the exact rename span when it can.",
       inputSchema: {
-        file: z.string().describe("File path relative to project root"),
+        file: z.string().describe(PROJECT_FILE_INPUT_DESCRIPTION),
         line: z.number().describe("Line number (1-based)"),
         col: z.number().describe("Column number (1-based)"),
       },
@@ -1251,7 +1361,7 @@ export function createMcpServer(manager: HostManager): McpServer {
       description:
         "Compute workspace edits for renaming the symbol at a position to a new name.",
       inputSchema: {
-        file: z.string().describe("File path relative to project root"),
+        file: z.string().describe(PROJECT_FILE_INPUT_DESCRIPTION),
         line: z.number().describe("Line number (1-based)"),
         col: z.number().describe("Column number (1-based)"),
         newName: z.string().describe("The replacement symbol name."),
@@ -1296,8 +1406,10 @@ export function createMcpServer(manager: HostManager): McpServer {
       inputSchema: {
         oldFile: z
           .string()
-          .describe("Current file path relative to project root"),
-        newFile: z.string().describe("New file path relative to project root"),
+          .describe(`Current file path. ${PROJECT_FILE_INPUT_DESCRIPTION}`),
+        newFile: z
+          .string()
+          .describe(`New file path. ${PROJECT_FILE_INPUT_DESCRIPTION}`),
       },
       outputSchema: {
         fileCount: z.number().int().nonnegative(),
@@ -1337,7 +1449,7 @@ export function createMcpServer(manager: HostManager): McpServer {
       description:
         "Get compiler-known quick fixes and refactors for a range. Returns available fixes like add import, narrow type, implement interface.",
       inputSchema: {
-        file: z.string().describe("File path relative to project root"),
+        file: z.string().describe(PROJECT_FILE_INPUT_DESCRIPTION),
         startLine: z.number().describe("Start line (1-based)"),
         startCol: z.number().describe("Start column (1-based)"),
         endLine: z.number().describe("End line (1-based)"),
@@ -1373,7 +1485,7 @@ export function createMcpServer(manager: HostManager): McpServer {
           .string()
           .optional()
           .describe(
-            "File path relative to project root. Omit to scan the whole project (blocked for large workspaces — attach a smaller root or pass a specific file).",
+            `Optional file path. ${PROJECT_FILE_INPUT_DESCRIPTION} Omit to scan the whole active project (blocked for large workspaces).`,
           ),
         severity: z
           .enum(["error", "warning", "all"])
@@ -1476,7 +1588,7 @@ export function createMcpServer(manager: HostManager): McpServer {
           .min(1)
           .max(50)
           .describe(
-            "File paths relative to one attached project root. All files must resolve under the same attached root.",
+            `File paths relative to one attached project root, or absolute paths inside one attached root. All files must resolve under the same attached root. ${PROJECT_ATTACHMENT_RECOVERY_HINT}`,
           ),
         severity: z
           .enum(["error", "warning", "all"])
@@ -1511,20 +1623,27 @@ export function createMcpServer(manager: HostManager): McpServer {
         );
       }
       const firstFile = normalizedFiles[0] ?? "";
-      const session = await (async () => {
-        if (!path.isAbsolute(firstFile)) {
-          return manager.getDiagnosticsSessionForFile(firstFile);
-        }
-
+      const sessionResult = await (async (): Promise<
+        | { ok: true; session: DiagnosticsSession }
+        | { ok: false; message: string }
+      > => {
         try {
-          return await manager.getDiagnosticsSessionForFile(firstFile);
+          return {
+            ok: true,
+            session: await manager.getDiagnosticsSessionForFile(firstFile),
+          };
         } catch (error) {
-          if (error instanceof Error && error.message.includes("No active project")) {
-            return manager.getDiagnosticsSession();
-          }
-          throw error;
+          const message = error instanceof Error ? error.message : String(error);
+          return { ok: false, message };
         }
       })();
+      if (!sessionResult.ok) {
+        return createValidateFilesErrorResult(
+          "INVALID_INPUT",
+          sessionResult.message,
+        );
+      }
+      const { session } = sessionResult;
       const rateLimit = manager.checkDiagnosticToolRateLimit(
         "validate_files",
         session.rootDir,
@@ -1596,7 +1715,7 @@ export function createMcpServer(manager: HostManager): McpServer {
       description:
         "Get file source with diagnostics and type information woven inline as annotations. Expensive but gives a complete picture. Use sparingly.",
       inputSchema: {
-        file: z.string().describe("File path relative to project root"),
+        file: z.string().describe(PROJECT_FILE_INPUT_DESCRIPTION),
       },
     },
     async (args) => {
@@ -1624,7 +1743,7 @@ export function createMcpServer(manager: HostManager): McpServer {
       description:
         "Read a file in near-original form while compacting foldable implementation regions such as functions, JSX trees, and larger comment or region blocks. This is a compact implementation-reading lane built on the language server's folding ranges instead of manual symbol rewriting.",
       inputSchema: {
-        file: z.string().describe("File path relative to project root"),
+        file: z.string().describe(PROJECT_FILE_INPUT_DESCRIPTION),
         kinds: z
           .array(z.enum(COLLAPSED_FILE_KINDS))
           .optional()
@@ -1677,7 +1796,7 @@ export function createMcpServer(manager: HostManager): McpServer {
           .string()
           .optional()
           .describe(
-            "Optional file path relative to a project root. Resolve the module as if imported from this file.",
+            `Optional file path. ${PROJECT_FILE_INPUT_DESCRIPTION} Resolve the module as if imported from this file.`,
           ),
         projectRoot: z
           .string()
@@ -1775,9 +1894,9 @@ export function createMcpServer(manager: HostManager): McpServer {
         openWorldHint: false,
       },
       description:
-        "Get hover information at a position. For .featuretype files, returns schema descriptions for block tags. For TS/TSX, returns inferred types and JSDoc. Similar to get_type_at but includes all hover content.",
+        "Get hover information at a position. For .featuretype files, positions inside ts/tsx fences route through Volar embedded TypeScript. For TS/TSX, returns inferred types and JSDoc. Similar to get_type_at but includes all hover content.",
       inputSchema: {
-        file: z.string().describe("File path relative to project root"),
+        file: z.string().describe(PROJECT_FILE_INPUT_DESCRIPTION),
         line: z.number().describe("Line number (1-based)"),
         col: z.number().describe("Column number (1-based)"),
       },
@@ -1824,7 +1943,7 @@ export function createMcpServer(manager: HostManager): McpServer {
       description:
         "Get a compact symbol outline for a file. Defaults to top-level, jump-worthy symbols instead of a full recursive dump. Use query/maxDepth when you want something more targeted.",
       inputSchema: {
-        file: z.string().describe("File path relative to project root"),
+        file: z.string().describe(PROJECT_FILE_INPUT_DESCRIPTION),
         query: z
           .string()
           .optional()
@@ -1953,7 +2072,7 @@ export function createMcpServer(manager: HostManager): McpServer {
       description:
         "Inspect a symbol by position or by query. This is a practical implementation tool that combines hover/type info, definition, type definition, implementations, and references into one targeted response.",
       inputSchema: {
-        file: z.string().describe("File path relative to project root"),
+        file: z.string().describe(PROJECT_FILE_INPUT_DESCRIPTION),
         line: z
           .number()
           .int()
@@ -2009,7 +2128,7 @@ export function createMcpServer(manager: HostManager): McpServer {
       description:
         "Notify the server that a file has changed on disk. Call this after writing or modifying files so diagnostics stay current.",
       inputSchema: {
-        file: z.string().describe("File path relative to project root"),
+        file: z.string().describe(PROJECT_FILE_INPUT_DESCRIPTION),
       },
       outputSchema: {
         file: z.string(),
@@ -2043,7 +2162,7 @@ export function createMcpServer(manager: HostManager): McpServer {
         file: z
           .string()
           .describe(
-            "File path relative to the active project root. Must use a supported extension (.ts, .tsx, .js, etc.).",
+            `File path relative to the active project root. Must use a supported extension (.ts, .tsx, .js, etc.). ${PROJECT_ATTACHMENT_RECOVERY_HINT}`,
           ),
         content: z.string().describe("Full text content of the file."),
       },
@@ -2090,7 +2209,7 @@ export function createMcpServer(manager: HostManager): McpServer {
       inputSchema: {
         file: z
           .string()
-          .describe("File path relative to the active project root."),
+          .describe(`File path relative to the active project root. ${PROJECT_ATTACHMENT_RECOVERY_HINT}`),
       },
       outputSchema: {
         file: z.string(),

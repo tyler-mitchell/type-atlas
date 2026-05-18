@@ -154,8 +154,8 @@ export async function runBasicProbe(client: Client): Promise<BasicProbeSummary> 
     name: "get_hover",
     arguments: {
       file: "button.featuretype",
-      line: 1,
-      col: 3,
+      line: 8,
+      col: 26,
     },
   });
 

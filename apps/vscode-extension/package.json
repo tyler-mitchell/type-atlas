@@ -5,7 +5,9 @@
   "displayName": "FeatureType Language Features",
   "description": "First-class .featuretype authoring with embedded TSX diagnostics powered by Volar.js.",
   "publisher": "featuretype-local",
-  "categories": ["Programming Languages"],
+  "categories": [
+    "Programming Languages"
+  ],
   "main": "./dist/extension.js",
   "engines": {
     "vscode": "^1.82.0"
@@ -17,8 +19,13 @@
     "languages": [
       {
         "id": "featuretype",
-        "aliases": ["FeatureType", ".featuretype"],
-        "extensions": [".featuretype"],
+        "aliases": [
+          "FeatureType",
+          ".featuretype"
+        ],
+        "extensions": [
+          ".featuretype"
+        ],
         "configuration": "./language-configuration.json"
       }
     ],
@@ -29,17 +36,8 @@
         "path": "./syntaxes/featuretype.tmLanguage.json",
         "embeddedLanguages": {
           "source.ts": "typescript",
-          "source.tsx": "typescriptreact",
-          "meta.tag.tsx": "jsx-tags",
-          "meta.tag.without-attributes.tsx": "jsx-tags",
-          "meta.tag.attributes.tsx": "typescriptreact",
-          "meta.embedded.expression.tsx": "typescriptreact"
-        },
-        "unbalancedBracketScopes": [
-          "meta.tag.featuretype",
-          "punctuation.definition.tag.begin.featuretype",
-          "punctuation.definition.tag.end.featuretype"
-        ]
+          "source.tsx": "typescriptreact"
+        }
       }
     ],
     "snippets": [
@@ -50,12 +48,15 @@
     ]
   },
   "scripts": {
-    "build": "tsx scripts/build.ts --minify",
+    "build": "pnpm run bundle && pnpm run pack:vsix",
+    "bundle": "tsx scripts/build.ts --minify",
     "watch": "tsx scripts/build.ts --watch",
     "check-types": "tsc --noEmit -p tsconfig.json",
     "lint": "tsc --noEmit -p tsconfig.json",
-    "pack": "rm -f dist/featuretype-language-features.vsix && pnpm run build && vsce package --no-dependencies --out dist/featuretype-language-features.vsix",
-    "test": "pnpm run build"
+    "pack": "pnpm run build",
+    "pack:vsix": "rm -f dist/featuretype-language-features.vsix && vsce package --no-dependencies --out dist/featuretype-language-features.vsix",
+    "test": "pnpm run build",
+    "test:vscode": "pnpm run build && tsx scripts/runVscodeTests.ts"
   },
   "dependencies": {
     "@volar/language-server": "2.4.28",
@@ -66,6 +67,7 @@
   "devDependencies": {
     "@types/node": "^22.13.10",
     "@types/vscode": "^1.82.0",
+    "@vscode/test-electron": "2.5.2",
     "@vscode/vsce": "^3.2.2",
     "esbuild": "^0.25.2",
     "vscode": "^1.1.37"

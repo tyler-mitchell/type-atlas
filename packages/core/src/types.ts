@@ -2,24 +2,23 @@ export type FeatureAttributeValue = string | true;
 
 export type FeatureEmbeddedLanguage = "ts" | "tsx";
 
-export type FeatureCodeShape = "fragment" | "module";
-
-export type FeatureBlockKind = "text" | "code" | "container";
-
-export type FeatureBlockCardinality = "single" | "multiple";
-
 export interface FeatureRange {
   start: number;
   end: number;
 }
 
-export interface FeatureBlockRange {
-  openTagStart: number;
-  openTagEnd: number;
+export interface FeatureFenceRange {
+  fenceStart: number;
+  openingFenceEnd: number;
+  infoStart: number;
+  infoEnd: number;
+  metaStart: number;
+  metaEnd: number;
   contentStart: number;
   contentEnd: number;
-  closeTagStart: number;
-  closeTagEnd: number;
+  closingFenceStart?: number;
+  closingFenceEnd?: number;
+  fenceEnd: number;
 }
 
 export interface FeatureParseError {
@@ -29,45 +28,26 @@ export interface FeatureParseError {
   range?: FeatureRange;
 }
 
-export interface FeatureBlockDefinition {
+export interface FeatureFenceAttribute {
   name: string;
-  description: string;
-  kind: FeatureBlockKind;
-  cardinality: FeatureBlockCardinality;
-  required?: boolean;
-  requiredAttributes?: string[];
-  embeddedLanguage?: FeatureEmbeddedLanguage;
-  codeShape?: FeatureCodeShape;
-  emitServiceScript?: boolean;
-  insertTemplate?: string;
-  children?: Record<string, FeatureBlockDefinition>;
-}
-
-export interface FeatureDocumentSchema {
-  blocks: Record<string, FeatureBlockDefinition>;
-}
-
-export interface FeatureBlock {
-  name: string;
-  content: string;
-  attributes: Record<string, FeatureAttributeValue>;
-  range: FeatureBlockRange;
-  definition?: FeatureBlockDefinition;
-  children: FeatureBlock[];
-  parentBlockName?: string;
+  value: FeatureAttributeValue;
+  range: FeatureRange;
+  valueRange?: FeatureRange;
 }
 
 export interface FeatureCodeBlock {
   id: string;
-  name: string;
-  title?: string;
   language: FeatureEmbeddedLanguage;
-  codeShape: FeatureCodeShape;
   code: string;
+  file?: string;
+  fileName?: string;
+  fileRange?: FeatureRange;
+  importable: boolean;
   attributes: Record<string, FeatureAttributeValue>;
-  range: FeatureBlockRange;
-  definition: FeatureBlockDefinition;
-  parentBlockName?: string;
+  attributeRanges: Record<string, FeatureFenceAttribute>;
+  info: string;
+  meta: string;
+  range: FeatureFenceRange;
 }
 
 export interface FeatureDocument {
@@ -75,16 +55,6 @@ export interface FeatureDocument {
   source: string;
   slug: string;
   displayName: string;
-  schema: FeatureDocumentSchema;
-  blocks: FeatureBlock[];
-  blocksByName: Record<string, FeatureBlock[]>;
-  allBlocks: FeatureBlock[];
   codeBlocks: FeatureCodeBlock[];
-  title?: FeatureBlock;
-  intent?: FeatureBlock;
-  setup?: FeatureBlock;
-  related?: FeatureBlock;
-  examplesSection?: FeatureBlock;
-  examples: FeatureCodeBlock[];
   errors: FeatureParseError[];
 }

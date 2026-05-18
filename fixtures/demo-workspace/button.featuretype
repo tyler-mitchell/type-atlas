@@ -1,28 +1,11 @@
-<title>Button</title>
+# Button
 
-<intent>
-  Trigger a primary or secondary action from the current screen.
-</intent>
+Trigger a primary or danger action from the current screen.
 
-<guidance>
-  Keep the example surface small and direct. Use the setup block for imports and helpers.
-</guidance>
-
-<setup lang="ts">
+```tsx
+// ./button.examples.tsx
 import { Button } from "./components"
-</setup>
 
-<examples>
-  <example id="primary" title="Primary action">
-    <Button tone="primary">Save</Button>
-  </example>
-
-  <example id="danger" title="Danger action">
-    <Button tone="danger">Delete</Button>
-  </example>
-</examples>
-
-<anti-patterns>
-  Do not use this as the final confirmation step for destructive flows.
-</anti-patterns>
-
+export const primary = <Button tone="primary">Save</Button>
+export const danger = <Button tone="danger">Delete</Button>
+```

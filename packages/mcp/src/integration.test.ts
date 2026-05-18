@@ -127,6 +127,74 @@ async function createPackageResolutionProject(parentDir: string): Promise<string
   return projectRoot;
 }
 
+async function createInvalidFenceProject(parentDir: string): Promise<string> {
+  const projectRoot = await mkdtemp(path.join(parentDir, "featuretype-mcp-invalid-fences-"));
+  await writeFile(
+    path.join(projectRoot, "tsconfig.json"),
+    JSON.stringify(
+      {
+        compilerOptions: {
+          module: "NodeNext",
+          moduleResolution: "NodeNext",
+          target: "ES2022",
+          strict: true,
+        },
+        include: ["**/*"],
+      },
+      null,
+      2,
+    ),
+  );
+  await writeFile(path.join(projectRoot, "shadow.ts"), "export const real = true;\n");
+  await writeFile(
+    path.join(projectRoot, "invalid.featuretype"),
+    [
+      "# Invalid",
+      "",
+      "```ts",
+      "// ../outside.ts",
+      "export const outside = true",
+      "```",
+      "",
+      "```ts",
+      "// /absolute.ts",
+      "export const absolute = true",
+      "```",
+      "",
+      "```ts",
+      "// https://example.com/module.ts",
+      "export const url = true",
+      "```",
+      "",
+      "```ts",
+      "// ./missing-extension",
+      "export const missing = true",
+      "```",
+      "",
+      "```tsx",
+      "// ./view.ts",
+      "export const view = true",
+      "```",
+      "",
+      "```ts",
+      "// ./dup.ts",
+      "export const first = true",
+      "```",
+      "",
+      "```ts",
+      "// ./dup.ts",
+      "export const second = true",
+      "```",
+      "",
+      "```ts",
+      "// ./shadow.ts",
+      "export const shadow = true",
+      "```",
+    ].join("\n"),
+  );
+  return projectRoot;
+}
+
 async function createMixedExportsProject(parentDir: string): Promise<string> {
   const projectRoot = await mkdtemp(path.join(parentDir, "featuretype-mcp-mixed-exports-"));
   await mkdir(path.join(projectRoot, "src"), { recursive: true });
@@ -713,6 +781,13 @@ describe("featuretype MCP local probes", () => {
     expect(diagnosticsTool?.title).toBe("Get Diagnostics");
     expect(diagnosticsTool?.annotations?.readOnlyHint).toBe(true);
     expect(diagnosticsTool?.annotations?.openWorldHint).toBe(false);
+    expect(diagnosticsTool?.description).toContain("summary mode");
+    expect(JSON.stringify(diagnosticsTool?.inputSchema ?? {})).toContain(
+      "list_projects",
+    );
+    expect(JSON.stringify(diagnosticsTool?.inputSchema ?? {})).toContain(
+      "attach_project",
+    );
 
     expect(openVirtualFileTool?.title).toBe("Open Virtual File");
     expect(openVirtualFileTool?.annotations?.destructiveHint).toBe(false);
@@ -724,6 +799,58 @@ describe("featuretype MCP local probes", () => {
     expect(closeVirtualFileTool?.annotations?.idempotentHint).toBe(true);
     expect(closeVirtualFileTool?.annotations?.openWorldHint).toBe(false);
   });
+
+  it("makes attached project state actionable for wrong-root recovery", async () => {
+    tempDir = await createRepoTempDir("featuretype-mcp-project-guidance-");
+    const alphaRoot = await createTemporaryProject(tempDir, "AlphaGuidanceSymbol");
+    const betaRoot = await createTemporaryProject(tempDir, "BetaGuidanceSymbol");
+
+    handle = await createInMemoryTestClient(alphaRoot);
+    await handle.client.callTool({
+      name: "attach_project",
+      arguments: {
+        projectRoot: betaRoot,
+      },
+    });
+
+    const result = await handle.client.callTool({
+      name: "list_projects",
+      arguments: {},
+    });
+    const text = readTextContent(result);
+
+    expect(text).toContain(`Active project root: ${betaRoot}`);
+    expect(text).toContain("* ");
+    expect(text).toContain("different repo or worktree");
+    expect(text).toContain("not a blocker");
+    expect(text).toContain("attach_project");
+  }, 60_000);
+
+  it("explains project routing when a file misses the active project", async () => {
+    tempDir = await createRepoTempDir("featuretype-mcp-project-miss-");
+    const projectRoot = await createTemporaryProject(tempDir, "MissingGuidanceSymbol");
+
+    handle = await createInMemoryTestClient(projectRoot);
+
+    const result = await handle.client.callTool({
+      name: "get_diagnostics",
+      arguments: {
+        file: "src/not-here.ts",
+        summary: true,
+      },
+    });
+    const text = readTextContent(result);
+
+    expect(hasToolError(result)).toBe(false);
+    expect(text).toContain("Project routing:");
+    expect(text).toContain(`Interpreted against: ${projectRoot}`);
+    expect(text).toContain("not a blocker");
+    expect(text).toContain("list_projects");
+    expect(text).toContain("attach_project");
+    expect(
+      (readStructuredContent(result)?.error as { code?: string } | undefined)?.code,
+    ).toBe("NOT_FOUND");
+  }, 60_000);
 
   it("keeps find_errors_and_fixes text output compact by default", async () => {
     handle = await createInMemoryTestClient(demoWorkspaceRoot);
@@ -743,6 +870,33 @@ describe("featuretype MCP local probes", () => {
     expect(text).not.toContain("→");
     expect(Number(structured?.totalCount ?? 0)).toBeGreaterThan(0);
     expect(structured?.items).toBeUndefined();
+  });
+
+  it("typechecks one project file with a simple text result", async () => {
+    handle = await createInMemoryTestClient(demoWorkspaceRoot);
+
+    const passed = await handle.client.callTool({
+      name: "typecheck_file",
+      arguments: {
+        file: "clean.ts",
+      },
+    });
+    const failed = await handle.client.callTool({
+      name: "typecheck_file",
+      arguments: {
+        file: "broken-button.featuretype",
+      },
+    });
+
+    expect(readTextContent(passed)).toBe(
+      "Typecheck passed: clean.ts",
+    );
+    expect(readStructuredContent(passed)).toBeUndefined();
+    expect(readTextContent(failed)).toContain(
+      "Typecheck failed: broken-button.featuretype",
+    );
+    expect(readTextContent(failed)).toContain("TS2322");
+    expect(readStructuredContent(failed)).toBeUndefined();
   });
 
   it("includes structured fix items when explicitly enabled", async () => {
@@ -766,17 +920,7 @@ describe("featuretype MCP local probes", () => {
 
     expect(items).toMatchObject([
       {
-        line: 1,
-        code: "TSmissing-required-block",
-        fixes: [
-          {
-            title: "Add <intent> block",
-            kind: "quickfix",
-          },
-        ],
-      },
-      {
-        line: 9,
+        line: 7,
         code: "TS2322",
         fixes: [],
       },
@@ -811,28 +955,120 @@ describe("featuretype MCP local probes", () => {
       }> | undefined) ?? [];
 
     expect(compactText).toContain(
-      "[error] 1:1  TSmissing-required-block  FeatureType documents must declare an <intent> block.",
+      "TS2322  Type '\"destructive\"' is not assignable to type '\"primary\" | \"danger\" | undefined'.",
     );
-    expect(compactText).toContain("    fix: Add <intent> block");
-    expect(compactText).toContain(
-      "[error] 9:14  TS2322  Type '\"destructive\"' is not assignable to type '\"primary\" | \"danger\" | undefined'.",
-    );
-    expect(compactText).not.toContain(
-      "TS2322  Type '\"destructive\"' is not assignable to type '\"primary\" | \"danger\" | undefined'.\n    fix: Add <intent> block",
-    );
+    expect(compactText).not.toContain("fix:");
     expect(items).toMatchObject([
       {
-        line: 1,
-        code: "TSmissing-required-block",
-        fixes: [{ title: "Add <intent> block" }],
-      },
-      {
-        line: 9,
+        line: 7,
         code: "TS2322",
         fixes: [],
       },
     ]);
   });
+
+  it("inspects symbols inside .featuretype TypeScript fences through same-file imports", async () => {
+    handle = await createInMemoryTestClient(demoWorkspaceRoot);
+
+    const result = await handle.client.callTool({
+      name: "inspect_symbol",
+      arguments: {
+        file: "same-file-import.featuretype",
+        line: 7,
+        col: 22,
+        maxReferences: 5,
+      },
+    });
+    const text = readTextContent(result);
+
+    expect(text).toContain("Definition:");
+    expect(text).toContain("References");
+    expect(text).toContain("same-file-import.featuretype");
+    expect(text).toContain("helper(value: string)");
+    expect(text).not.toContain("helper.ts:");
+    expect(text).not.toContain("volar-embedded-content:");
+  });
+
+  it("inspects fenced TypeScript symbols by query through document symbols", async () => {
+    handle = await createInMemoryTestClient(demoWorkspaceRoot);
+
+    const result = await handle.client.callTool({
+      name: "inspect_symbol",
+      arguments: {
+        file: "same-file-import.featuretype",
+        query: "helper",
+        maxReferences: 5,
+      },
+    });
+    const text = readTextContent(result);
+
+    expect(text).toContain("Matched \"helper\"");
+    expect(text).toContain("Definition:");
+    expect(text).toContain("same-file-import.featuretype");
+    expect(text).toContain("helper(value: string)");
+    expect(text).not.toContain("helper.ts:");
+    expect(text).not.toContain("volar-embedded-content:");
+  });
+
+  it("shows fenced modules and TypeScript child symbols in the document outline", async () => {
+    handle = await createInMemoryTestClient(demoWorkspaceRoot);
+
+    const result = await handle.client.callTool({
+      name: "get_document_symbols",
+      arguments: {
+        file: "same-file-import.featuretype",
+        maxDepth: 2,
+      },
+    });
+    const text = readTextContent(result);
+
+    expect(text).toContain("module ./root.ts");
+    expect(text).toContain("variable root");
+    expect(text).toContain("module ./helper.ts");
+    expect(text).toContain("function helper");
+  });
+
+  it("explains .featuretype positions outside TypeScript fence bodies", async () => {
+    handle = await createInMemoryTestClient(demoWorkspaceRoot);
+
+    const result = await handle.client.callTool({
+      name: "inspect_symbol",
+      arguments: {
+        file: "same-file-import.featuretype",
+        line: 1,
+        col: 3,
+      },
+    });
+    const text = readTextContent(result);
+
+    expect(text).toContain("Reason: position may not be inside a ts or tsx code fence.");
+    expect(text).toContain("Semantic queries work inside Markdown fences");
+    expect(text).toContain("Prose, headings, fence metadata, and non-TypeScript fences");
+  });
+
+  it("surfaces all structural fence diagnostics through MCP diagnostics", async () => {
+    tempDir = await createRepoTempDir("featuretype-mcp-invalid-fences-parent-");
+    const projectRoot = await createInvalidFenceProject(tempDir);
+    handle = await createInMemoryTestClient(projectRoot);
+
+    const result = await handle.client.callTool({
+      name: "get_diagnostics",
+      arguments: {
+        file: "invalid.featuretype",
+        severity: "all",
+        summary: false,
+      },
+    });
+    const text = readTextContent(result);
+    const structured = readStructuredContent(result);
+
+    expect(structured?.totalCount).toBe(7);
+    expect(text).toContain('code="invalid-fence-file"');
+    expect(text).toContain('code="fence-extension-mismatch"');
+    expect(text).toContain('code="duplicate-fence-file"');
+    expect(text).toContain('code="fence-file-shadows-real-file"');
+    expect(text).toContain("Fence file paths cannot shadow a real file");
+  }, 60_000);
 
   it("rate-limits get_diagnostics after configured max calls per window", async () => {
     await withDiagnosticRateLimitConfig("1", "60000", async () => {
@@ -1019,8 +1255,10 @@ describe("featuretype MCP local probes", () => {
 
     expect(hasToolError(result)).toBe(true);
     expect(readTextContent(result)).toContain(
-      "validate_files requires all files to resolve under the same attached root.",
+      "FeatureType could not choose a project for this file.",
     );
+    expect(readTextContent(result)).toContain("not a blocker");
+    expect(readTextContent(result)).toContain("attach_project");
     expect(
       (readStructuredContent(result)?.error as { code?: string } | undefined)?.code,
     ).toBe("INVALID_INPUT");

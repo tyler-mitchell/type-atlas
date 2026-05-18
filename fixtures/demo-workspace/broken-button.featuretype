@@ -1,12 +1,8 @@
-<title>Broken Button</title>
+# Broken Button
 
-<setup lang="ts">
+```tsx
+// ./broken-button.example.tsx
 import { Button } from "./components"
-</setup>
 
-<examples>
-  <example id="broken-tone" title="Broken tone">
-    <Button tone="destructive">Delete</Button>
-  </example>
-</examples>
-
+export const brokenButton = <Button tone="destructive">Delete</Button>
+```

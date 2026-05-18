@@ -2,67 +2,44 @@
   "FeatureType Document": {
     "prefix": "featuretype",
     "body": [
-      "<intent>",
-      "  ${1:Describe what this feature is for.}",
-      "  Owns: ${2:state and responsibilities}",
-      "  Caller provides: ${3:inputs and contracts}",
-      "</intent>",
+      "# ${1:Feature Name}",
       "",
-      "<anatomy>",
-      "  ${4:FeatureRoot}",
-      "    > ${5:ChildPart}",
-      "</anatomy>",
+      "${2:Describe the authored usage surface.}",
       "",
-      "<setup lang=\"ts\">",
-      "import { ${6:ExampleComponent} } from \"./components\"",
-      "</setup>",
+      "```ts",
+      "// ./${3:root}.ts",
+      "import { ${4:helper} } from \"./${5:helper}\"",
       "",
-      "<recipe id=\"${7:minimal-controlled}\" intent=\"${8:describe the scenario}\">",
-      "  function ${9:ExampleRecipe}() {",
-      "    return <${6:ExampleComponent} />",
-      "  }",
-      "</recipe>",
+      "export const ${3:root} = ${4:helper}(\"${6:ok}\")",
+      "```",
       "",
-      "<constraints>",
-      "  - ${10:Do NOT ...}",
-      "</constraints>",
-      "",
-      "<status phase=\"${11:draft}\" reviewed=\"${CURRENT_YEAR}-${CURRENT_MONTH}-${CURRENT_DATE}\">",
-      "  open: ${12:current open question}",
-      "</status>"
+      "```ts",
+      "// ./${5:helper}.ts",
+      "export function ${4:helper}(value: string) {",
+      "  return value.toUpperCase()",
+      "}",
+      "```"
     ],
-    "description": "Create a full FeatureType document scaffold."
+    "description": "Create a Markdown-style FeatureType document with two importable TypeScript fences."
   },
-  "FeatureType Recipe": {
-    "prefix": "recipe",
+  "FeatureType TypeScript Fence": {
+    "prefix": "ts-fence",
     "body": [
-      "<recipe id=\"${1:new-recipe}\" intent=\"${2:describe the scenario}\">",
-      "  function ${3:NewRecipe}() {",
-      "    return <${4:ExampleComponent} />",
-      "  }",
-      "</recipe>"
+      "```ts",
+      "// ./${1:module}.ts",
+      "${2:export const value = true}",
+      "```"
     ],
-    "description": "Insert a typed recipe block."
+    "description": "Insert an importable TypeScript fence."
   },
-  "FeatureType Showcase": {
-    "prefix": "showcase",
+  "FeatureType TSX Fence": {
+    "prefix": "tsx-fence",
     "body": [
-      "<showcase id=\"${1:new-showcase}\" title=\"${2:Visual scenario}\" ${3:controls}>",
-      "  function ${4:NewShowcase}(${5:props}) {",
-      "    return <${6:ExampleComponent} />",
-      "  }",
-      "</showcase>"
+      "```tsx",
+      "// ./${1:view}.tsx",
+      "${2:export const View = () => <div />}",
+      "```"
     ],
-    "description": "Insert a typed showcase block."
-  },
-  "FeatureType Setup": {
-    "prefix": "setup",
-    "body": [
-      "<setup lang=\"${1|ts,tsx|}\">",
-      "import { ${2:ExampleComponent} } from \"./components\"",
-      "${3}",
-      "</setup>"
-    ],
-    "description": "Insert a shared setup block for embedded code."
+    "description": "Insert an importable TSX fence."
   }
 }

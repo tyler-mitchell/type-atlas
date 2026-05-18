@@ -54,7 +54,8 @@ function formatCode(
   code: vscode.Diagnostic["code"],
 ): string {
   if (code == null) return "unknown";
-  if (typeof code === "number" || typeof code === "string") return `TS${code}`;
+  if (typeof code === "number") return `TS${code}`;
+  if (typeof code === "string") return code;
   return String(code);
 }
 
