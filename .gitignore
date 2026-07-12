@@ -9,3 +9,7 @@ coverage/
 .env.*
 .tmp-mcp-tests*/
 .agent-relay
+.featuretype-browser/
+.featuretype-diagnostics/
+*.scip
+index.db

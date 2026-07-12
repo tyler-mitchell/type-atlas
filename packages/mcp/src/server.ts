@@ -55,6 +55,8 @@ import {
   parsePositiveIntEnv,
   type RateLimitOutcome,
 } from "./rate-limiter.js";
+import { consoleMirror } from "./browser/console-mirror.js";
+import { tsErrorMirror } from "./diagnostics/error-mirror.js";
 
 type AttachedProject = {
   root: string;
@@ -2236,6 +2238,63 @@ export function createMcpServer(manager: HostManager): McpServer {
       };
     },
   );
+
+  server.registerTool(
+    "browser_console_mirror",
+    {
+      title: "Browser console mirror",
+      description:
+        "Toggle an ambient mirror of the live browser console (agent-browser CDP stream — console calls, uncaught exceptions, and Log entries) into a file. Off by default. Agents read the mirrored file; no console-read tool is exposed. action: start | stop | status.",
+      inputSchema: {
+        action: z.enum(["start", "stop", "status"]),
+        out: z
+          .string()
+          .optional()
+          .describe("Output file path (default: .featuretype-browser/console.log)"),
+        session: z.string().optional().describe("agent-browser session name"),
+      },
+    },
+    ({ action, out, session }) => {
+      const result = consoleMirror(action, { out, session });
+      return { content: [{ type: "text" as const, text: result.message }] };
+    },
+  );
+
+  server.registerTool(
+    "ts_error_mirror",
+    {
+      title: "TypeScript error mirror",
+      description:
+        "Toggle an ambient mirror of project diagnostics into a file, kept live by the language server's diagnostic-refresh push (no polling). Off by default. action: start | stop | status.",
+      inputSchema: {
+        action: z.enum(["start", "stop", "status"]),
+        out: z
+          .string()
+          .optional()
+          .describe("Output file path (default: .featuretype-diagnostics/errors.txt)"),
+        errorsOnly: z.boolean().optional().describe("Mirror errors only (drop warnings)"),
+      },
+    },
+    ({ action, out, errorsOnly }) => {
+      const result = tsErrorMirror(action, () => manager.getDiagnosticsSession(), { out, errorsOnly });
+      return { content: [{ type: "text" as const, text: result.message }] };
+    },
+  );
+
+  // --- Temporarily disabled tools (revert: empty this set) ---
+  // Kept registered but hidden from tools/list and non-callable.
+  const temporarilyDisabledTools = new Set<string>([
+    "get_diagnostics",
+    "validate_files",
+  ]);
+  const registeredToolsByName = (
+    server as unknown as {
+      _registeredTools?: Record<string, { disable?: () => void } | undefined>;
+    }
+  )._registeredTools;
+  for (const toolName of temporarilyDisabledTools) {
+    registeredToolsByName?.[toolName]?.disable?.();
+  }
 
   return server;
 }

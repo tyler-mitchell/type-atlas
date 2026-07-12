@@ -12,6 +12,7 @@ import {
   CompletionResolveRequest,
   ConfigurationRequest,
   DefinitionRequest,
+  DiagnosticRefreshRequest,
   DidChangeTextDocumentNotification,
   DidChangeWatchedFilesNotification,
   DidCloseTextDocumentNotification,
@@ -180,6 +181,7 @@ export interface FeatureTypeLanguageServerClient {
   ): Promise<Array<DocumentSymbol | SymbolInformation>>;
   getDocumentFoldingRanges(filePath: string): Promise<FoldingRange[]>;
   notifyWatchedFiles(filePaths: string[]): Promise<void>;
+  onDiagnosticsRefresh(listener: () => void): () => void;
   dispose(): Promise<void>;
 }
 
@@ -188,6 +190,10 @@ export interface DiagnosticsSession {
   tsdk: string;
   getProjectFileNames(): Promise<string[]>;
   getWorkspaceDiagnostics(): Promise<Array<{ filePath: string; diagnostics: Diagnostic[] }> | null>;
+  /** Subscribe to LSP diagnostic-refresh pushes (workspace/diagnostic/refresh). Returns an unsubscribe fn. */
+  onDiagnosticsRefresh(listener: () => void): () => void;
+  /** Open/refresh a file from disk so the next pull reflects its current content. */
+  refreshFileFromDisk(filePath: string): Promise<void>;
   /**
    * Register a virtual file with the session using caller-supplied content.
    * The file does not need to exist on disk. It will appear in
@@ -702,6 +708,10 @@ export async function createFeatureTypeLanguageServerClient(
   connection.onRequest(ConfigurationRequest.type, (params: { items: unknown[] }) =>
     params.items.map(() => undefined),
   );
+  const diagnosticsRefreshListeners = new Set<() => void>();
+  connection.onRequest(DiagnosticRefreshRequest.type, () => {
+    for (const listener of diagnosticsRefreshListeners) listener();
+  });
   connection.onDispose(() => {
     connection.end();
   });
@@ -1431,6 +1441,10 @@ export async function createFeatureTypeLanguageServerClient(
     getDocumentSymbols,
     getDocumentFoldingRanges,
     notifyWatchedFiles,
+    onDiagnosticsRefresh(listener: () => void): () => void {
+      diagnosticsRefreshListeners.add(listener);
+      return () => diagnosticsRefreshListeners.delete(listener);
+    },
     dispose,
   };
 }
@@ -1456,6 +1470,12 @@ export async function createDiagnosticsSession(
     },
     getWorkspaceDiagnostics() {
       return client.getWorkspaceDiagnostics();
+    },
+    onDiagnosticsRefresh(listener: () => void): () => void {
+      return client.onDiagnosticsRefresh(listener);
+    },
+    async refreshFileFromDisk(filePath: string) {
+      await client.refreshFileFromDisk(filePath);
     },
     async openVirtualFile(filePath: string, content: string) {
       await client.openVirtualFile(filePath, content);

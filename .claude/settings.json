@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "featuretype": {
+      "command": "/opt/homebrew/bin/node",
+      "args": ["--import", "tsx", "packages/mcp/src/dev.ts"],
+      "cwd": "/Users/tylermitchell/Projects/featuretype",
+      "env": { "FEATURETYPE_RUNTIME_MODE": "source" }
+    }
+  }
+}
