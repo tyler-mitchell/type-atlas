@@ -1,0 +1,55 @@
+{
+  "name": "@featuretype/code-intelligence-mcp",
+  "version": "0.0.0",
+  "type": "module",
+  "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tyler-mitchell/featuretype.git",
+    "directory": "packages/code-intelligence-mcp"
+  },
+  "bugs": {
+    "url": "https://github.com/tyler-mitchell/featuretype/issues"
+  },
+  "homepage": "https://github.com/tyler-mitchell/featuretype#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "bin": {
+    "code-intelligence-mcp": "./bin/code-intelligence-mcp.cjs"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "bin",
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.20"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts src/cli.ts --format esm --dts --clean --outDir dist",
+    "check-types": "tsc --noEmit -p tsconfig.json",
+    "dev": "node --conditions=development src/cli.ts",
+    "lint": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@featuretype/code-intelligence-language-server": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.28.0",
+    "@volar/language-server": "2.4.28",
+    "arktype": "^2.2.3",
+    "citty": "^0.2.2",
+    "vscode-jsonrpc": "^8.2.0",
+    "vscode-languageserver-protocol": "^3.17.5",
+    "vscode-uri": "^3.0.8",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "typescript": "5.9.3"
+  }
+}
