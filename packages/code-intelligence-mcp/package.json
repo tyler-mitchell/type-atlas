@@ -43,7 +43,6 @@
     "@volar/language-server": "2.4.28",
     "arktype": "^2.2.3",
     "citty": "^0.2.2",
-    "vscode-jsonrpc": "^8.2.0",
     "vscode-languageserver-protocol": "^3.17.5",
     "vscode-uri": "^3.0.8",
     "zod": "^4.4.3"

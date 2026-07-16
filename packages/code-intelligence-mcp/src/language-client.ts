@@ -1,9 +1,15 @@
-import type {
-  ClientCapabilities,
-  MarkupKind,
+import {
+  type ClientCapabilities,
+  CompletionItemKind,
+  type MarkupKind,
+  SymbolKind,
+  SymbolTag,
 } from "vscode-languageserver-protocol";
 
 const markdown: MarkupKind[] = ["markdown", "plaintext"];
+const completionItemKinds = Object.values(CompletionItemKind);
+const symbolKinds = Object.values(SymbolKind);
+const symbolTags = Object.values(SymbolTag);
 
 type ConfigurationValue =
   | boolean
@@ -56,10 +62,13 @@ export const getClientConfiguration = (
 export const clientCapabilities = {
   workspace: {
     configuration: true,
-    symbol: {},
-    semanticTokens: { refreshSupport: true },
+    didChangeWatchedFiles: { dynamicRegistration: true },
     inlayHint: { refreshSupport: true },
-    diagnostics: { refreshSupport: true },
+    semanticTokens: { refreshSupport: true },
+    symbol: {
+      symbolKind: { valueSet: symbolKinds },
+      tagSupport: { valueSet: symbolTags },
+    },
   },
   textDocument: {
     callHierarchy: {},
@@ -70,6 +79,7 @@ export const clientCapabilities = {
       resolveSupport: { properties: ["edit", "command"] },
     },
     completion: {
+      completionItemKind: { valueSet: completionItemKinds },
       completionItem: {
         snippetSupport: true,
         commitCharactersSupport: true,
@@ -90,19 +100,17 @@ export const clientCapabilities = {
         labelDetailsSupport: true,
       },
       completionList: {
-        itemDefaults: [
-          "commitCharacters",
-          "editRange",
-          "insertTextFormat",
-          "insertTextMode",
-          "data",
-        ],
+        itemDefaults: ["editRange"],
       },
     },
     definition: { linkSupport: true },
     diagnostic: { relatedDocumentSupport: true },
     documentHighlight: {},
-    documentSymbol: { hierarchicalDocumentSymbolSupport: true },
+    documentSymbol: {
+      hierarchicalDocumentSymbolSupport: true,
+      symbolKind: { valueSet: symbolKinds },
+      tagSupport: { valueSet: symbolTags },
+    },
     foldingRange: {
       foldingRangeKind: {
         valueSet: ["comment", "imports", "region"],
@@ -111,17 +119,7 @@ export const clientCapabilities = {
     },
     hover: { contentFormat: markdown },
     implementation: { linkSupport: true },
-    inlayHint: {
-      resolveSupport: {
-        properties: [
-          "tooltip",
-          "textEdits",
-          "label.tooltip",
-          "label.location",
-          "label.command",
-        ],
-      },
-    },
+    inlayHint: {},
     publishDiagnostics: {
       relatedInformation: true,
       tagSupport: { valueSet: [1, 2] },
@@ -186,5 +184,8 @@ export const clientCapabilities = {
       contextSupport: true,
     },
     typeDefinition: { linkSupport: true },
+  },
+  general: {
+    positionEncodings: ["utf-16"],
   },
 } satisfies ClientCapabilities;

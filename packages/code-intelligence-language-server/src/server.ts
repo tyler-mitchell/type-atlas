@@ -11,6 +11,7 @@ export const registerLanguageServer = (
   connection: Connection,
 ): void => {
   const server = createServer(connection);
+  let watchedFiles: { dispose(): void } | undefined;
 
   connection.onInitialize((params) =>
     server.initialize(
@@ -21,6 +22,12 @@ export const registerLanguageServer = (
       createTypeScriptServices(ts),
     )
   );
-  connection.onInitialized(server.initialized);
-  connection.onShutdown(server.shutdown);
+  connection.onInitialized(async () => {
+    server.initialized();
+    watchedFiles = await server.fileWatcher.watchFiles(["**/*"]);
+  });
+  connection.onShutdown(() => {
+    watchedFiles?.dispose();
+    server.shutdown();
+  });
 };

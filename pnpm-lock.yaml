@@ -112,9 +112,6 @@ importers:
       citty:
         specifier: ^0.2.2
         version: 0.2.2
-      vscode-jsonrpc:
-        specifier: ^8.2.0
-        version: 8.2.0
       vscode-languageserver-protocol:
         specifier: ^3.17.5
         version: 3.17.5
