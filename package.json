@@ -29,5 +29,23 @@
     "turbo": "^2.4.0",
     "typescript": "^5.7.0",
     "vitest": "^2.1.8"
-  }
+  },
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tyler-mitchell/featuretype.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/tyler-mitchell/featuretype/issues"
+  },
+  "homepage": "https://github.com/tyler-mitchell/featuretype#readme"
 }
