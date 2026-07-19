@@ -2,10 +2,13 @@ import * as path from "node:path";
 import type { DiagnosticsSession } from "@featuretype/language-server";
 import { URI } from "vscode-uri";
 import {
+  type CallHierarchyItem,
   DocumentSymbol,
   SymbolKind,
   type Hover,
   type Location,
+  type LocationLink,
+  type Position,
   type Range,
   type SymbolInformation,
   type WorkspaceSymbol,
@@ -19,7 +22,7 @@ import { formatSignatureHelp } from "./signature-help.js";
 
 const DEFAULT_MAX_DEPTH = 1;
 const DEFAULT_MAX_ITEMS = 25;
-const DEFAULT_MAX_REFERENCES = 8;
+const DEFAULT_MAX_REFERENCES = 3;
 const DEFAULT_WORKSPACE_MAX_RESULTS = 25;
 
 const DEFAULT_OUTLINE_KINDS = new Set<number>([
@@ -215,7 +218,8 @@ function scoreSymbolMatch(symbol: FlattenedSymbol, query: string): number {
     return -1;
   }
 
-  const name = symbol.name.toLowerCase();
+  const displayName = normalizeSyntheticSymbolName(symbol).name;
+  const name = displayName.toLowerCase();
   const detail = (symbol.detail ?? "").toLowerCase();
 
   if (name === normalizedQuery) return 400;
@@ -223,6 +227,159 @@ function scoreSymbolMatch(symbol: FlattenedSymbol, query: string): number {
   if (name.includes(normalizedQuery)) return 200;
   if (detail.includes(normalizedQuery)) return 100;
   return -1;
+}
+
+function getSemanticTarget(
+  location: Location | LocationLink,
+): { uri: string; range: Range } {
+  return "targetUri" in location
+    ? {
+        uri: location.targetUri,
+        range: location.targetSelectionRange ?? location.targetRange,
+      }
+    : { uri: location.uri, range: location.range };
+}
+
+function referenceIsCoveredBySemanticLocation(
+  reference: Location,
+  location: Location | LocationLink,
+): boolean {
+  const target = "targetUri" in location
+    ? { uri: location.targetUri, range: location.targetRange }
+    : location;
+  return target.uri === reference.uri
+    && rangeContainsRange(target.range, reference.range);
+}
+
+function isTypeScriptStandardLibraryLocation(
+  location: Location | LocationLink,
+): boolean {
+  const filePath = URI.parse(getSemanticTarget(location).uri).fsPath;
+  return path.basename(path.dirname(filePath)) === "lib"
+    && path.basename(path.dirname(path.dirname(filePath))) === "typescript"
+    && /^lib\..+\.d\.ts$/.test(path.basename(filePath));
+}
+
+function getWorkspaceSymbolTarget(
+  symbol: WorkspaceSymbol,
+  sourceLines: readonly string[],
+): FlattenedSymbol | null {
+  if (!("range" in symbol.location)) return null;
+  const name = symbol.name.replace(/\(\)$/, "");
+  const range = symbol.location.range;
+  const selectionRange = Array.from(
+    { length: range.end.line - range.start.line + 1 },
+    (_, index) => range.start.line + index,
+  )
+    .map((line) => {
+      const sourceLine = sourceLines[line] ?? "";
+      const from = line === range.start.line ? range.start.character : 0;
+      const character = sourceLine.indexOf(name, from);
+      return character < 0
+        ? null
+        : {
+            start: { line, character },
+            end: { line, character: character + name.length },
+          };
+    })
+    .find((candidate) => candidate !== null);
+  if (!selectionRange) return null;
+  return {
+    name,
+    kind: symbol.kind,
+    detail: symbol.containerName,
+    depth: 0,
+    range,
+    selectionRange,
+  };
+}
+
+function rangeContainsRange(outer: Range, inner: Range): boolean {
+  const startsWithin = inner.start.line > outer.start.line
+    || (inner.start.line === outer.start.line
+      && inner.start.character >= outer.start.character);
+  const endsWithin = inner.end.line < outer.end.line
+    || (inner.end.line === outer.end.line
+      && inner.end.character <= outer.end.character);
+  return startsWithin && endsWithin;
+}
+
+function formatSourceRange(
+  session: DiagnosticsSession,
+  lines: readonly string[],
+  filePath: string,
+  item: Pick<CallHierarchyItem, "name" | "range" | "selectionRange">,
+): string {
+  const relativePath = path.relative(session.rootDir, filePath);
+  const startLine = item.range.start.line + 1;
+  const lastSourceLine = item.range.end.character === 0
+    && item.range.end.line > item.range.start.line
+    ? item.range.end.line - 1
+    : item.range.end.line;
+  const endLine = lastSourceLine + 1;
+  const endColumn = (lines[lastSourceLine]?.replace(/\r$/, "").length ?? 0) + 1;
+  const symbolStart = item.selectionRange.start;
+  const symbolEnd = item.selectionRange.end;
+  const source = lines.slice(item.range.start.line, lastSourceLine + 1).join("\n");
+  return [
+    `${item.name} — ${relativePath}:${startLine}:1-${endLine}:${endColumn}`,
+    `  symbol ${symbolStart.line + 1}:${symbolStart.character + 1}-${symbolEnd.line + 1}:${symbolEnd.character + 1}; ranges are end-exclusive`,
+    "```typescript",
+    source,
+    "```",
+  ].join("\n");
+}
+
+async function getSourceSections(
+  session: DiagnosticsSession,
+  filePath: string,
+  symbol: Pick<CallHierarchyItem, "name" | "range" | "selectionRange">,
+): Promise<string[]> {
+  const lines = session.getFileContent(filePath).split("\n");
+  const sections = [
+    `Source:\n${formatSourceRange(
+      session,
+      lines,
+      filePath,
+      symbol,
+    )}`,
+  ];
+
+  try {
+    const hierarchyItems = await session.getFileCallHierarchyItems(
+      filePath,
+      symbol.selectionRange.start,
+    );
+    const outgoingCalls = (
+      await Promise.all(
+        hierarchyItems.map((item) => session.getCallHierarchyOutgoingCalls(item)),
+      )
+    ).flat();
+    const seen = new Set<string>();
+    const callees = outgoingCalls
+      .map((call) => call.to)
+      .filter((item) => path.resolve(URI.parse(item.uri).fsPath) === path.resolve(filePath))
+      .filter((item) => !rangeContainsRange(symbol.range, item.range))
+      .filter((item) => {
+        const key = `${item.range.start.line}:${item.range.start.character}:${item.range.end.line}:${item.range.end.character}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .sort((left, right) => left.range.start.line - right.range.start.line);
+    sections.push(
+      callees.length === 0
+        ? "Direct local callees: none"
+        : `Direct local callees (${callees.length}):\n\n${callees
+          .map((callee) => formatSourceRange(session, lines, filePath, callee))
+          .join("\n\n")}`,
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    sections.push(`Direct local callees unavailable: ${message}`);
+  }
+
+  return sections;
 }
 
 function dedupeLines(lines: string[]): string[] {
@@ -665,6 +822,7 @@ export async function inspectSymbol(
     col?: number;
     query?: string;
     maxReferences?: number;
+    includeSource?: boolean;
   },
 ): Promise<string> {
   const hasLine = typeof args.line === "number";
@@ -679,7 +837,23 @@ export async function inspectSymbol(
     return "inspect_symbol requires either line/col or query.";
   }
 
+  if (query && hasLine && hasCol) {
+    return "inspect_symbol accepts query or line/col, not both.";
+  }
+
+  if (args.includeSource && !query) {
+    return "inspect_symbol includeSource requires query.";
+  }
+
   const absPath = path.resolve(session.rootDir, args.file);
+  let flattenedSymbols: FlattenedSymbol[] | null = null;
+  const getFlattenedSymbols = async (): Promise<FlattenedSymbol[]> => {
+    if (flattenedSymbols) return flattenedSymbols;
+    flattenedSymbols = flattenSymbols(
+      await session.getFileDocumentSymbols(absPath),
+    );
+    return flattenedSymbols;
+  };
   let position =
     hasLine && hasCol
       ? { line: (args.line ?? 1) - 1, character: (args.col ?? 1) - 1 }
@@ -687,9 +861,15 @@ export async function inspectSymbol(
   let matchedSymbol: FlattenedSymbol | null = null;
 
   if (!position && query) {
-    const symbols = await session.getFileDocumentSymbols(absPath);
-    matchedSymbol =
-      flattenSymbols(symbols)
+    const sourceLines = session.getFileContent(absPath).split("\n");
+    const workspaceMatches = (await session.getWorkspaceSymbols(query))
+      .filter((symbol) =>
+        path.resolve(URI.parse(symbol.location.uri).fsPath) === absPath
+      )
+      .map((symbol) => getWorkspaceSymbolTarget(symbol, sourceLines))
+      .filter((symbol): symbol is FlattenedSymbol => symbol !== null);
+    const fallbackMatches = workspaceMatches.length === 0
+      ? (await getFlattenedSymbols())
         .map((symbol) => ({ symbol, score: scoreSymbolMatch(symbol, query) }))
         .filter((entry) => entry.score >= 0)
         .sort((a, b) => {
@@ -699,7 +879,43 @@ export async function inspectSymbol(
             return a.symbol.selectionRange.start.line - b.symbol.selectionRange.start.line;
           }
           return a.symbol.selectionRange.start.character - b.symbol.selectionRange.start.character;
-        })[0]?.symbol ?? null;
+        })
+      : [];
+    const bestScore = fallbackMatches[0]?.score;
+    const bestMatches = workspaceMatches.length > 0
+      ? workspaceMatches
+      : fallbackMatches
+        .filter((entry) => entry.score === bestScore)
+        .map((entry) => entry.symbol);
+    const distinctBestMatches = [
+      ...new Map(
+        bestMatches.map((symbol) => [
+          [
+            symbol.name,
+            symbol.range.start.line,
+            symbol.range.start.character,
+            symbol.range.end.line,
+            symbol.range.end.character,
+          ].join(":"),
+          symbol,
+        ]),
+      ).values(),
+    ];
+
+    if (distinctBestMatches.length > 1) {
+      const visibleMatches = distinctBestMatches.slice(0, 8);
+      const omitted = distinctBestMatches.length - visibleMatches.length;
+      return [
+        `Ambiguous symbol query "${query}" in ${args.file}.`,
+        "Use line/col:",
+        ...visibleMatches.map(
+          (symbol) => `  ${formatSymbolLine(symbol).trim()}`,
+        ),
+        ...(omitted > 0 ? [`  … ${omitted} more matches omitted`] : []),
+      ].join("\n");
+    }
+
+    matchedSymbol = distinctBestMatches[0] ?? null;
 
     if (!matchedSymbol) {
       return `No symbol matching "${query}" found in ${args.file}`;
@@ -711,13 +927,15 @@ export async function inspectSymbol(
   const resolvedPosition = position ?? { line: 0, character: 0 };
   const maxReferences = clamp(
     args.maxReferences ?? DEFAULT_MAX_REFERENCES,
-    1,
+    0,
     20,
   );
 
   const [hover, signatureHelp, definitions, typeDefinitions, implementations, references] = await Promise.all([
     session.getFileHover(absPath, resolvedPosition),
-    session.getFileSignatureHelp(absPath, resolvedPosition),
+    hasLine && hasCol
+      ? session.getFileSignatureHelp(absPath, resolvedPosition)
+      : Promise.resolve(null),
     session.getFileDefinition(absPath, resolvedPosition),
     session.getFileTypeDefinition(absPath, resolvedPosition),
     session.getFileImplementations(absPath, resolvedPosition),
@@ -729,7 +947,8 @@ export async function inspectSymbol(
     definitions.length === 0 &&
     typeDefinitions.length === 0 &&
     implementations.length === 0 &&
-    references.length === 0
+    references.length === 0 &&
+    !matchedSymbol
   ) {
     return explainFailure("inspect_symbol", args.file, session, {
       position: `${resolvedPosition.line + 1}:${resolvedPosition.character + 1}`,
@@ -740,18 +959,6 @@ export async function inspectSymbol(
   const sections: string[] = [];
   if (matchedSymbol && query) {
     sections.push(`Matched "${query}" -> ${formatSymbolLine(matchedSymbol).trim()}`);
-    const memberLines = (matchedSymbol.children ?? [])
-      .map((child) =>
-        flattenSymbols([child], matchedSymbol.depth + 1).find((entry) => entry.depth === matchedSymbol.depth + 1),
-      )
-      .filter((symbol): symbol is FlattenedSymbol => Boolean(symbol))
-      .filter(isDefaultOutlineSymbol)
-      .slice(0, 8)
-      .map((symbol) => `  ${formatSymbolLine(symbol).trim()}`);
-
-    if (memberLines.length > 0) {
-      sections.push(`Members:\n${memberLines.join("\n")}`);
-    }
   }
 
   if (hover) {
@@ -769,8 +976,14 @@ export async function inspectSymbol(
     sections.push(`Definition:\n${definitionLines.join("\n")}`);
   }
 
+  const distinctTypeDefinitions = excludeSemanticLocations(
+    typeDefinitions,
+    definitions,
+  ).filter((location) => !isTypeScriptStandardLibraryLocation(location));
   const typeDefinitionLines = dedupeLines(
-    typeDefinitions.map((location) => formatSemanticLocation(session.rootDir, location)),
+    distinctTypeDefinitions.map((location) =>
+      formatSemanticLocation(session.rootDir, location)
+    ),
   );
   if (typeDefinitionLines.length > 0) {
     sections.push(`Type definition:\n${typeDefinitionLines.join("\n")}`);
@@ -787,28 +1000,43 @@ export async function inspectSymbol(
   );
   if (implementationLines.length > 0) {
     sections.push(`Implementations (${implementationLines.length}):\n${implementationLines.join("\n")}`);
-  } else if (implementations.length > 0) {
-    sections.push(
-      [
-        "Implementations:",
-        "No distinct implementations found.",
-        "The language server resolved the symbol's own definition.",
-      ].join("\n"),
-    );
   }
 
   const referenceLines = dedupeLines(
-    references.map((location) => formatReferenceLocation(session.rootDir, location)),
+    references
+      .filter((reference) =>
+        ![...definitions, ...implementations].some((location) =>
+          referenceIsCoveredBySemanticLocation(reference, location)
+        )
+      )
+      .map((location) => formatReferenceLocation(session.rootDir, location)),
   );
   if (referenceLines.length > 0) {
     const visibleReferences = referenceLines.slice(0, maxReferences);
-    const suffix =
-      referenceLines.length > visibleReferences.length
-        ? `\n… ${referenceLines.length - visibleReferences.length} more references omitted`
-        : "";
-    sections.push(
-      `References (${referenceLines.length}):\n${visibleReferences.join("\n")}${suffix}`,
-    );
+    if (visibleReferences.length === 0) {
+      sections.push(`References: ${referenceLines.length} (details omitted)`);
+    } else {
+      const suffix =
+        referenceLines.length > visibleReferences.length
+          ? `\n… ${referenceLines.length - visibleReferences.length} more references omitted`
+          : "";
+      sections.push(
+        `References (${referenceLines.length}):\n${visibleReferences.join("\n")}${suffix}`,
+      );
+    }
+  }
+
+  if (args.includeSource) {
+    try {
+      if (matchedSymbol) {
+        sections.push(...await getSourceSections(session, absPath, matchedSymbol));
+      } else {
+        sections.push("Source unavailable: no declaration symbol resolved.");
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      sections.push(`Source unavailable: ${message}`);
+    }
   }
 
   return sections.join("\n\n");

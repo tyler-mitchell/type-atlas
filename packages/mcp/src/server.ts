@@ -6,16 +6,30 @@
  */
 
 import type { DiagnosticsSession } from "@featuretype/language-server";
+import { getSupportedElicitationModes } from "@modelcontextprotocol/sdk/client/index.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js";
+import {
+  RootsListChangedNotificationSchema,
+  type ServerNotification,
+  type ServerRequest,
+} from "@modelcontextprotocol/sdk/types.js";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import type { Hover } from "vscode-languageserver-protocol";
+import type {
+  ApplyWorkspaceEditResult,
+  CodeAction,
+  Command,
+  Hover,
+  WorkspaceEdit,
+} from "vscode-languageserver-protocol";
 import { z } from "zod";
 import { classifyFailure } from "./failure";
 import { getCodeActions } from "./tools/actions";
+import { getFormattingEdit } from "./tools/formatting.js";
 import {
   COLLAPSED_FILE_KINDS,
   getCollapsedFile,
@@ -57,6 +71,17 @@ import {
 } from "./rate-limiter.js";
 import { consoleMirror } from "./browser/console-mirror.js";
 import { tsErrorMirror } from "./diagnostics/error-mirror.js";
+import {
+  compileWorkspaceOperations,
+  executeWorkspaceEdit,
+  getWorkspaceEditAnnotations,
+  readWorkspaceFile,
+  withWorkspaceEditTransaction,
+  type LockedWorkspaceEditApplier,
+  type WorkspaceEditExecutionOptions,
+  type WorkspaceEditResult,
+  type WorkspaceEditOperation,
+} from "./editing/workspace-edit.js";
 
 type AttachedProject = {
   root: string;
@@ -91,6 +116,7 @@ type DiagnosticToolName =
   | "find_errors_and_fixes"
   | "validate_files";
 const MAX_PERSISTED_ROOTS = 12;
+const CODEX_SANDBOX_STATE_CAPABILITY = "codex/sandbox-state-meta";
 const PROJECT_ATTACHMENT_RECOVERY_HINT =
   "If FeatureType is attached to a different repo or worktree, that is not a blocker: call list_projects, then attach_project with the repo/worktree root you are editing and retry.";
 const PROJECT_ROOT_INPUT_DESCRIPTION =
@@ -287,6 +313,8 @@ class HostManager {
   private createDiagnosticsSession: CreateDiagnosticsSession;
   private knownRoots: string[];
   private stateFile: string;
+  private clientRootLoader: (() => Promise<void>) | null = null;
+  private clientRootsReady: Promise<void> | null = null;
   private diagnosticToolLimiter = createSlidingWindowRateLimiter({
     limit: getDiagnosticRateLimitMaxCalls(),
     windowMs: getDiagnosticRateLimitWindowMs(),
@@ -312,6 +340,20 @@ class HostManager {
 
   getActiveRoot(): string | null {
     return this.activeRoot;
+  }
+
+  setClientRootLoader(loader: () => Promise<void>): void {
+    this.clientRootLoader = loader;
+  }
+
+  refreshClientRoots(): Promise<void> {
+    const ready = this.clientRootLoader?.() ?? Promise.resolve();
+    this.clientRootsReady = ready.catch(() => undefined);
+    return this.clientRootsReady;
+  }
+
+  private ensureClientRoots(): Promise<void> {
+    return this.clientRootsReady ?? this.refreshClientRoots();
   }
 
   private requireActiveRoot(): string {
@@ -517,21 +559,29 @@ class HostManager {
   }
 
   async getDiagnosticsSession(rootDir?: string): Promise<DiagnosticsSession> {
+    await this.ensureClientRoots();
     const resolvedRoot = rootDir ?? this.requireActiveRoot();
     return await (
       await this.ensureProject(resolvedRoot)
     ).sessionPromise;
   }
 
-  getDiagnosticsSessionForFile(filePath: string): Promise<DiagnosticsSession> {
+  async getDiagnosticsSessionForProject(projectRoot: string): Promise<DiagnosticsSession> {
+    await this.ensureClientRoots();
+    return await this.getDiagnosticsSession(this.resolveProjectRoot(projectRoot));
+  }
+
+  async getDiagnosticsSessionForFile(filePath: string): Promise<DiagnosticsSession> {
+    await this.ensureClientRoots();
     const resolvedRoot = this.resolveRootForFile(filePath);
     if (!resolvedRoot) {
       throw new Error(this.formatProjectResolutionFailure(filePath));
     }
-    return this.getDiagnosticsSession(resolvedRoot);
+    return await this.getDiagnosticsSession(resolvedRoot);
   }
 
   async getAttachedDiagnosticsSessions(): Promise<DiagnosticsSession[]> {
+    await this.ensureClientRoots();
     const attachedRoots = this.getAttachedRoots();
     if (attachedRoots.length === 0) {
       return [];
@@ -547,6 +597,7 @@ class HostManager {
     fileCount: number;
     isNew: boolean;
   }> {
+    await this.ensureClientRoots();
     const hadInMemoryProjects = this.projects.size > 0;
     const resolved = this.resolveProjectRoot(projectRoot);
     const isNew = !this.getAttachedRoots().includes(resolved);
@@ -566,9 +617,21 @@ class HostManager {
     };
   }
 
+  adoptClientRoots(roots: readonly string[]): void {
+    const clientRoots = toUniqueResolvedPaths(roots).filter((root) => fs.existsSync(root));
+    if (clientRoots.length === 0) return;
+    const activeIsInClientRoot = this.activeRoot !== null && clientRoots.some((root) =>
+      this.activeRoot === root || this.activeRoot?.startsWith(`${root}${path.sep}`)
+    );
+    if (!activeIsInClientRoot) this.activeRoot = clientRoots[0] ?? this.activeRoot;
+    this.rememberRoots(clientRoots);
+    this.persistRoots();
+  }
+
   async listRoots(): Promise<
     Array<{ root: string; active: boolean; fileCount: number }>
   > {
+    await this.ensureClientRoots();
     const projects = await Promise.all(
       this.getAttachedRoots().map((root) => this.ensureProject(root)),
     );
@@ -580,14 +643,29 @@ class HostManager {
     }));
   }
 
-  async notifyFileChanged(filePath: string): Promise<void> {
-    const session = await this.getDiagnosticsSessionForFile(filePath);
-    const absPath = path.isAbsolute(filePath)
-      ? path.resolve(filePath)
-      : path.resolve(session.rootDir, filePath);
-    await session.notifyFileChanged(absPath);
-    const project = await this.ensureProject(session.rootDir);
+  async notifyFilesChanged(
+    rootDir: string,
+    filePaths: readonly string[],
+  ): Promise<void> {
+    const session = await this.getDiagnosticsSession(rootDir);
+    await session.notifyFilesChanged(
+      filePaths.map((filePath) => path.resolve(rootDir, filePath)),
+    );
+    const project = await this.ensureProject(rootDir);
     await this.refreshProjectFileCount(project);
+  }
+
+  async executeCommand(
+    rootDir: string,
+    command: Command,
+    applyEdit: (edit: WorkspaceEdit, label?: string) => Promise<ApplyWorkspaceEditResult>,
+    signal?: AbortSignal,
+  ): Promise<unknown> {
+    const session = await this.getDiagnosticsSession(rootDir);
+    if (!session.canExecuteCommand(command.command)) {
+      throw new Error(`The language server did not advertise command ${command.command}.`);
+    }
+    return await session.executeCommand(command, applyEdit, signal);
   }
 
   async disposeAll(): Promise<void> {
@@ -664,12 +742,272 @@ function formatHoverContents(hover: Hover): string {
   return hover.contents.value;
 }
 
+const workspaceEditOperationSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("replace"),
+    file: z.string().describe(PROJECT_FILE_INPUT_DESCRIPTION),
+    oldText: z.string().min(1).describe("Exact existing text to replace."),
+    newText: z.string().describe("Replacement text."),
+    expectedOccurrences: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe("Required occurrence count. Defaults to 1."),
+  }),
+  z.object({
+    kind: z.literal("write"),
+    file: z.string().describe(PROJECT_FILE_INPUT_DESCRIPTION),
+    content: z.string().describe("Complete desired UTF-8 file content."),
+    ifMatch: z
+      .string()
+      .describe("Revision returned by read_file mode='exact'."),
+  }),
+  z.object({
+    kind: z.literal("create"),
+    file: z.string().describe(PROJECT_FILE_INPUT_DESCRIPTION),
+    content: z.string().describe("Complete UTF-8 content for the new file."),
+  }),
+  z.object({
+    kind: z.literal("move"),
+    oldFile: z.string().describe(PROJECT_FILE_INPUT_DESCRIPTION),
+    newFile: z.string().describe(PROJECT_FILE_INPUT_DESCRIPTION),
+    ifMatch: z
+      .string()
+      .describe("Source revision returned by read_file mode='exact'."),
+    overwrite: z
+      .boolean()
+      .optional()
+      .describe("Whether to replace an existing destination. Defaults to false."),
+  }),
+  z.object({
+    kind: z.literal("delete"),
+    file: z.string().describe(PROJECT_FILE_INPUT_DESCRIPTION),
+    ifMatch: z
+      .string()
+      .describe("Revision returned by read_file mode='exact'."),
+  }),
+]);
+
+const formatWorkspaceEditResult = (result: WorkspaceEditResult): string => {
+  const heading = `${result.status === "applied" ? "Applied" : "Previewed"} workspace edit across ${result.files.length} file(s).`;
+  const annotationLines = result.annotations.length === 0
+    ? []
+    : [
+        "Annotations:",
+        ...result.annotations.map((annotation) =>
+          `- ${annotation.label}${annotation.description ? ` — ${annotation.description}` : ""}`
+        ),
+      ];
+  const previewLines = result.preview.split("\n");
+  const visiblePreview = previewLines.slice(0, 200).join("\n");
+  const continuation = previewLines.length > 200
+    ? `\n\nPreview truncated after 200 of ${previewLines.length} lines; read the changed files for exact results.`
+    : "";
+  return [
+    heading,
+    ...result.files.map((file) => `- ${file}`),
+    ...annotationLines,
+    ...result.warnings.map((warning) => `Warning: ${warning}`),
+    visiblePreview,
+  ].filter(Boolean).join("\n") + continuation;
+};
+
+const combineWorkspaceEditResults = (
+  results: readonly WorkspaceEditResult[],
+): WorkspaceEditResult => ({
+  status: results.some((result) => result.status === "applied") ? "applied" : "preview",
+  files: [...new Set(results.flatMap((result) => result.files))].sort(),
+  preview: results.map((result) => result.preview).filter(Boolean).join("\n\n"),
+  annotations: results.flatMap((result) => result.annotations),
+  warnings: results.flatMap((result) => result.warnings),
+});
+
+const EDITOR_COMMANDS = new Set([
+  "editor.action.rename",
+  "editor.action.showReferences",
+  "setSelection",
+]);
+
+const reportToolProgress = async (
+  extra: RequestHandlerExtra<ServerRequest, ServerNotification>,
+  progress: number,
+  total: number,
+  message: string,
+): Promise<void> => {
+  const progressToken = extra._meta?.progressToken;
+  if (progressToken === undefined) return;
+  await extra.sendNotification({
+    method: "notifications/progress",
+    params: { progressToken, progress, total, message },
+  });
+};
+
+const reportWorkspaceEditPhase = (
+  progress: ((value: number, message: string) => Promise<void>) | undefined,
+  phase: Parameters<NonNullable<WorkspaceEditExecutionOptions["onProgress"]>>[0],
+): Promise<void> => progress?.(
+  phase === "preparing" ? 3 : phase === "committing" ? 4 : 5,
+  phase === "preparing"
+    ? "Preparing workspace edit"
+    : phase === "committing"
+    ? "Committing workspace edit"
+    : "Refreshing language server",
+) ?? Promise.resolve();
+
 export function createMcpServer(manager: HostManager): McpServer {
   const server = new McpServer({
     name: "featuretype",
     version: "0.0.0",
+  }, {
+    capabilities: {
+      experimental: {
+        [CODEX_SANDBOX_STATE_CAPABILITY]: {},
+      },
+    },
   });
-
+  const syncClientRoots = async (): Promise<void> => {
+    if (!server.server.getClientCapabilities()?.roots) return;
+    const result = await server.server.listRoots();
+    manager.adoptClientRoots(result.roots.flatMap((root) => {
+      try {
+        return root.uri.startsWith("file:") ? [fileURLToPath(root.uri)] : [];
+      } catch {
+        return [];
+      }
+    }));
+  };
+  manager.setClientRootLoader(syncClientRoots);
+  server.server.setNotificationHandler(
+    RootsListChangedNotificationSchema,
+    () => manager.refreshClientRoots(),
+  );
+  const confirmWorkspaceEdit = async (
+    edit: WorkspaceEdit,
+    explicitConfirmation?: boolean,
+  ): Promise<boolean | undefined> => {
+    const confirmations = getWorkspaceEditAnnotations(edit)
+      .filter((annotation) => annotation.needsConfirmation);
+    if (confirmations.length === 0 || explicitConfirmation === true) {
+      return explicitConfirmation;
+    }
+    if (explicitConfirmation === false) {
+      throw new Error("Workspace edit confirmation was declined.");
+    }
+    if (!getSupportedElicitationModes(
+      server.server.getClientCapabilities()?.elicitation,
+    ).supportsFormMode) {
+      return explicitConfirmation;
+    }
+    const result = await server.server.elicitInput({
+      mode: "form",
+      message: [
+        "The language server marked these changes as requiring confirmation:",
+        ...confirmations.map((annotation) =>
+          `- ${annotation.label}${annotation.description ? ` — ${annotation.description}` : ""}`
+        ),
+      ].join("\n"),
+      requestedSchema: {
+        type: "object",
+        properties: {
+          confirm: {
+            type: "boolean",
+            title: "Apply these changes",
+            description: "Confirm the annotated workspace edit.",
+          },
+        },
+        required: ["confirm"],
+      },
+    });
+    if (result.action !== "accept" || result.content?.confirm !== true) {
+      throw new Error("Workspace edit confirmation was declined.");
+    }
+    return true;
+  };
+  const workspaceEditExecutionHooks = (
+    session: DiagnosticsSession,
+    requestMeta: unknown,
+    signal: AbortSignal | undefined,
+    progress?: (value: number, message: string) => Promise<void>,
+  ): Pick<
+    WorkspaceEditExecutionOptions,
+    "requestMeta" | "signal" | "getDocumentVersion" | "onFilesChanged" | "onProgress"
+  > => ({
+    requestMeta,
+    signal,
+    getDocumentVersion: (file) => session.getFileVersion(file),
+    onFilesChanged: (root, files) => manager.notifyFilesChanged(root, files),
+    onProgress: progress ? (phase) => reportWorkspaceEditPhase(progress, phase) : undefined,
+  });
+  const runWorkspaceEdit = (
+    session: DiagnosticsSession,
+    edit: WorkspaceEdit,
+    options: {
+      mode?: "preview" | "apply";
+      confirm?: boolean;
+      requestMeta?: unknown;
+      signal?: AbortSignal;
+      expectedRevisions?: ReadonlyMap<string, string>;
+      progress?: (progress: number, message: string) => Promise<void>;
+    },
+  ): Promise<WorkspaceEditResult> => {
+    const { progress, ...executionOptions } = options;
+    return executeWorkspaceEdit(session.rootDir, edit, {
+      ...executionOptions,
+      ...workspaceEditExecutionHooks(
+        session,
+        options.requestMeta,
+        options.signal,
+        progress,
+      ),
+    });
+  };
+  const runGeneratedWorkspaceEdit = async (
+    session: DiagnosticsSession,
+    options: {
+      mode?: "preview" | "apply";
+      confirm?: boolean;
+      requestMeta?: unknown;
+      signal?: AbortSignal;
+      expectedRevisions?: ReadonlyMap<string, string>;
+      progress?: (progress: number, message: string) => Promise<void>;
+    },
+    generate: () => Promise<{
+      edit: WorkspaceEdit;
+      expectedRevisions?: ReadonlyMap<string, string>;
+    }>,
+  ): Promise<WorkspaceEditResult> => {
+    if ((options.mode ?? "apply") === "preview") {
+      await options.progress?.(0, "Generating workspace edit");
+      const generated = await generate();
+      await options.progress?.(1, "Preparing preview");
+      const result = await runWorkspaceEdit(session, generated.edit, {
+        ...options,
+        expectedRevisions: generated.expectedRevisions ?? options.expectedRevisions,
+      });
+      await options.progress?.(6, "Preview ready");
+      return result;
+    }
+    await options.progress?.(0, "Waiting for workspace mutation lock");
+    return withWorkspaceEditTransaction(session.rootDir, options.signal, async (apply) => {
+      await options.progress?.(1, "Generating workspace edit");
+      const generated = await generate();
+      await options.progress?.(2, "Checking workspace edit confirmation");
+      const confirm = await confirmWorkspaceEdit(generated.edit, options.confirm);
+      const result = await apply(generated.edit, {
+        confirm,
+        expectedRevisions: generated.expectedRevisions ?? options.expectedRevisions,
+        ...workspaceEditExecutionHooks(
+          session,
+          options.requestMeta,
+          options.signal,
+          options.progress,
+        ),
+      });
+      await options.progress?.(6, "Workspace edit complete");
+      return result;
+    });
+  };
   server.registerTool(
     "attach_project",
     {
@@ -775,6 +1113,82 @@ export function createMcpServer(manager: HostManager): McpServer {
         ],
         structuredContent: {
           projects: roots,
+        },
+      };
+    },
+  );
+
+  server.registerTool(
+    "edit_workspace",
+    {
+      title: "Edit Workspace",
+      annotations: {
+        destructiveHint: true,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
+      description:
+        "Apply an ordered multi-file source change without authoring a diff, URI, or LSP range. Exact replacements validate their own context. Whole-file writes, moves, and deletes require revisions from read_file mode='exact'. Preview is stateless; apply is the default.",
+      inputSchema: {
+        operations: z
+          .array(workspaceEditOperationSchema)
+          .min(1)
+          .describe("Ordered create, replace, write, move, and delete operations."),
+        mode: z
+          .enum(["apply", "preview"])
+          .optional()
+          .describe("Apply now (default) or preview without writing."),
+        confirm: z
+          .boolean()
+          .optional()
+          .describe("Confirm any LSP change annotations that require confirmation."),
+        projectRoot: z
+          .string()
+          .optional()
+          .describe("Optional attached project root. Usually inferred from the first operation."),
+      },
+      outputSchema: {
+        status: z.enum(["preview", "applied"]),
+        files: z.array(z.string()),
+        fileCount: z.number().int().nonnegative(),
+        totalPreviewLines: z.number().int().nonnegative(),
+        annotationCount: z.number().int().nonnegative(),
+        warnings: z.array(z.string()),
+      },
+    },
+    async (args, extra) => {
+      const operations = args.operations as WorkspaceEditOperation[];
+      const first = operations[0];
+      if (!first) {
+        throw new Error("edit_workspace requires at least one operation.");
+      }
+      const anchor = first.kind === "move" ? first.oldFile : first.file;
+      const session = args.projectRoot
+        ? await manager.getDiagnosticsSessionForProject(args.projectRoot)
+        : await manager.getDiagnosticsSessionForFile(anchor);
+      const result = await runGeneratedWorkspaceEdit(session, {
+        mode: args.mode,
+        confirm: args.confirm,
+        requestMeta: extra._meta,
+        signal: extra.signal,
+        progress: (progress, message) => reportToolProgress(extra, progress, 6, message),
+      }, async () => {
+        const compiled = await compileWorkspaceOperations(
+          session.rootDir,
+          operations,
+          extra.signal,
+        );
+        return compiled;
+      });
+      return {
+        content: [{ type: "text", text: formatWorkspaceEditResult(result) }],
+        structuredContent: {
+          status: result.status,
+          files: [...result.files],
+          fileCount: result.files.length,
+          totalPreviewLines: result.preview.split("\n").length,
+          annotationCount: result.annotations.length,
+          warnings: [...result.warnings],
         },
       };
     },
@@ -1379,17 +1793,65 @@ export function createMcpServer(manager: HostManager): McpServer {
       const session = await manager.getDiagnosticsSessionForFile(args.file);
       const summary = await getRenameEdits(session, args);
       return {
-        content: [
-          {
-            type: "text",
-            text: summary.text,
-          },
-        ],
+        content: [{ type: "text", text: summary.text }],
         structuredContent: {
           fileCount: summary.fileCount,
           textEditCount: summary.textEditCount,
           renameCount: summary.renameCount,
           files: summary.files,
+        },
+      };
+    },
+  );
+
+  server.registerTool(
+    "rename_symbol",
+    {
+      title: "Rename Symbol",
+      annotations: {
+        destructiveHint: true,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
+      description:
+        "Rename a symbol across the workspace in one call using Volar's linked, embedded-aware rename edits. Applies by default; use preview to inspect without writing.",
+      inputSchema: {
+        file: z.string().describe(PROJECT_FILE_INPUT_DESCRIPTION),
+        line: z.number().describe("Line number (1-based)"),
+        col: z.number().describe("Column number (1-based)"),
+        newName: z.string().describe("The replacement symbol name."),
+        mode: z.enum(["apply", "preview"]).optional(),
+        confirm: z.boolean().optional(),
+      },
+      outputSchema: {
+        status: z.enum(["preview", "applied"]),
+        files: z.array(z.string()),
+        fileCount: z.number().int().nonnegative(),
+        annotationCount: z.number().int().nonnegative(),
+        warnings: z.array(z.string()),
+      },
+    },
+    async (args, extra) => {
+      const session = await manager.getDiagnosticsSessionForFile(args.file);
+      const result = await runGeneratedWorkspaceEdit(session, {
+        mode: args.mode,
+        confirm: args.confirm,
+        requestMeta: extra._meta,
+        signal: extra.signal,
+        progress: (progress, message) => reportToolProgress(extra, progress, 6, message),
+      }, async () => {
+        const summary = await getRenameEdits(session, args, extra.signal);
+        if (!summary.edit) throw new Error(summary.text);
+        return { edit: summary.edit };
+      });
+      return {
+        content: [{ type: "text", text: formatWorkspaceEditResult(result) }],
+        structuredContent: {
+          status: result.status,
+          files: [...result.files],
+          fileCount: result.files.length,
+          annotationCount: result.annotations.length,
+          warnings: [...result.warnings],
         },
       };
     },
@@ -1424,17 +1886,64 @@ export function createMcpServer(manager: HostManager): McpServer {
       const session = await manager.getDiagnosticsSessionForFile(args.oldFile);
       const summary = await getFileRenameEdits(session, args);
       return {
-        content: [
-          {
-            type: "text",
-            text: summary.text,
-          },
-        ],
+        content: [{ type: "text", text: summary.text }],
         structuredContent: {
           fileCount: summary.fileCount,
           textEditCount: summary.textEditCount,
           renameCount: summary.renameCount,
           files: summary.files,
+        },
+      };
+    },
+  );
+
+  server.registerTool(
+    "move_file",
+    {
+      title: "Move File",
+      annotations: {
+        destructiveHint: true,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
+      description:
+        "Move or rename a file and update TypeScript imports/references in one call. Volar produces the reference edits; the headless client composes the physical move.",
+      inputSchema: {
+        oldFile: z.string().describe(`Current file path. ${PROJECT_FILE_INPUT_DESCRIPTION}`),
+        newFile: z.string().describe(`New file path. ${PROJECT_FILE_INPUT_DESCRIPTION}`),
+        overwrite: z.boolean().optional(),
+        mode: z.enum(["apply", "preview"]).optional(),
+        confirm: z.boolean().optional(),
+      },
+      outputSchema: {
+        status: z.enum(["preview", "applied"]),
+        files: z.array(z.string()),
+        fileCount: z.number().int().nonnegative(),
+        annotationCount: z.number().int().nonnegative(),
+        warnings: z.array(z.string()),
+      },
+    },
+    async (args, extra) => {
+      const session = await manager.getDiagnosticsSessionForFile(args.oldFile);
+      const result = await runGeneratedWorkspaceEdit(session, {
+        mode: args.mode,
+        confirm: args.confirm,
+        requestMeta: extra._meta,
+        signal: extra.signal,
+        progress: (progress, message) => reportToolProgress(extra, progress, 6, message),
+      }, async () => {
+        const summary = await getFileRenameEdits(session, args, extra.signal);
+        if (!summary.edit) throw new Error(summary.text);
+        return { edit: summary.edit };
+      });
+      return {
+        content: [{ type: "text", text: formatWorkspaceEditResult(result) }],
+        structuredContent: {
+          status: result.status,
+          files: [...result.files],
+          fileCount: result.files.length,
+          annotationCount: result.annotations.length,
+          warnings: [...result.warnings],
         },
       };
     },
@@ -1457,17 +1966,294 @@ export function createMcpServer(manager: HostManager): McpServer {
         endLine: z.number().describe("End line (1-based)"),
         endCol: z.number().describe("End column (1-based)"),
       },
+      outputSchema: {
+        actions: z.array(
+          z.object({
+            index: z.number().int().nonnegative(),
+            title: z.string(),
+            kind: z.string(),
+            disabledReason: z.string().nullable(),
+            hasEdit: z.boolean(),
+            hasCommand: z.boolean(),
+            isPreferred: z.boolean(),
+            isResolvable: z.boolean(),
+          }),
+        ),
+      },
     },
-    async (args) => {
+    async (args, extra) => {
       const session = await manager.getDiagnosticsSessionForFile(args.file);
-      const text = await getCodeActions(session, args);
+      const result = await getCodeActions(session, args, extra.signal);
+      const actions = result.actions.map((action, index) => {
+        const isCommand = typeof action.command === "string";
+        const codeAction = isCommand ? null : action as CodeAction;
+        return {
+          index,
+          title: action.title,
+          kind: codeAction?.kind ?? (isCommand ? "command" : "quickfix"),
+          disabledReason: codeAction?.disabled?.reason ?? null,
+          hasEdit: codeAction?.edit !== undefined,
+          hasCommand: isCommand || codeAction?.command !== undefined,
+          isPreferred: codeAction?.isPreferred === true,
+          isResolvable: codeAction?.data != null,
+        };
+      });
       return {
-        content: [
-          {
-            type: "text",
-            text,
+        content: [{ type: "text", text: result.text }],
+        structuredContent: { actions },
+      };
+    },
+  );
+
+  server.registerTool(
+    "apply_code_action",
+    {
+      title: "Apply Code Action",
+      annotations: {
+        destructiveHint: true,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
+      description:
+        "Resolve and apply one Volar code action selected by title and optional kind. The edit is applied before an advertised server command; editor commands are returned as explicit follow-up metadata.",
+      inputSchema: {
+        file: z.string().describe(PROJECT_FILE_INPUT_DESCRIPTION),
+        startLine: z.number().describe("Start line (1-based)"),
+        startCol: z.number().describe("Start column (1-based)"),
+        endLine: z.number().describe("End line (1-based)"),
+        endCol: z.number().describe("End column (1-based)"),
+        index: z
+          .number()
+          .int()
+          .nonnegative()
+          .optional()
+          .describe("Action index returned by get_code_actions. Preferred when titles repeat."),
+        title: z
+          .string()
+          .optional()
+          .describe("Exact action title returned by get_code_actions."),
+        kind: z.string().optional().describe("Optional exact action kind to disambiguate titles."),
+        mode: z.enum(["apply", "preview"]).optional(),
+        confirm: z.boolean().optional(),
+      },
+      outputSchema: {
+        status: z.enum(["preview", "applied", "executed", "follow_up"]),
+        files: z.array(z.string()),
+        fileCount: z.number().int().nonnegative(),
+        annotationCount: z.number().int().nonnegative(),
+        warnings: z.array(z.string()),
+        followUp: z.object({
+          command: z.string(),
+          arguments: z.array(z.unknown()),
+        }).nullable(),
+      },
+    },
+    async (args, extra) => {
+      const session = await manager.getDiagnosticsSessionForFile(args.file);
+      const progress = (value: number, message: string): Promise<void> =>
+        reportToolProgress(extra, value, 6, message);
+      await progress(0, (args.mode ?? "apply") === "apply"
+        ? "Waiting for workspace mutation lock"
+        : "Inspecting code actions");
+      const run = async (apply: LockedWorkspaceEditApplier | null) => {
+        await progress(1, "Fetching code actions");
+        const actions = await getCodeActions(session, args, extra.signal);
+        if (args.index === undefined && args.title === undefined) {
+          throw new Error("apply_code_action requires an action index or exact title.");
+        }
+        const matches = actions.actions.filter((candidate, index) => {
+          const isCommand = typeof candidate.command === "string";
+          const codeAction = isCommand ? null : candidate as CodeAction;
+          return (args.index === undefined || index === args.index)
+            && (args.title === undefined || candidate.title === args.title)
+            && (args.kind === undefined
+              || (codeAction?.kind ?? (isCommand ? "command" : "quickfix")) === args.kind);
+        });
+        if (matches.length !== 1) {
+          throw new Error(
+            matches.length === 0
+              ? "No code action matched the requested selector."
+              : "The code action selector is ambiguous; pass its returned index.",
+          );
+        }
+        const selected = matches[0]!;
+        const isCommand = typeof selected.command === "string";
+        await progress(2, "Resolving selected code action");
+        const codeAction = isCommand
+          ? null
+          : await session.resolveFileCodeAction(selected as CodeAction, extra.signal);
+        if (codeAction?.disabled) throw new Error(codeAction.disabled.reason);
+        const command = isCommand ? selected as Command : codeAction?.command;
+        const editorCommand = command && EDITOR_COMMANDS.has(command.command);
+        if (command && !editorCommand && !session.canExecuteCommand(command.command)) {
+          throw new Error(
+            `Code action requires client command ${command.command}, which the language server did not advertise.`,
+          );
+        }
+        const results: WorkspaceEditResult[] = [];
+        const applyEdit = async (edit: WorkspaceEdit): Promise<WorkspaceEditResult> => apply
+          ? apply(edit, {
+              confirm: await confirmWorkspaceEdit(edit, args.confirm),
+              ...workspaceEditExecutionHooks(
+                session,
+                extra._meta,
+                extra.signal,
+                progress,
+              ),
+            })
+          : runWorkspaceEdit(session, edit, {
+              mode: "preview",
+              confirm: args.confirm,
+              requestMeta: extra._meta,
+              signal: extra.signal,
+            });
+        if (codeAction?.edit) results.push(await applyEdit(codeAction.edit));
+        if (!apply) {
+          if (results.length === 0) {
+            throw new Error("Command-only code actions cannot be previewed without executing them.");
+          }
+        } else if (command && !editorCommand) {
+          let commandFailure: string | null = null;
+          await manager.executeCommand(
+            session.rootDir,
+            command,
+            async (edit) => {
+              try {
+                results.push(await applyEdit(edit));
+                return { applied: true };
+              } catch (error) {
+                commandFailure = error instanceof Error ? error.message : String(error);
+                return { applied: false, failureReason: commandFailure };
+              }
+            },
+            extra.signal,
+          );
+          if (commandFailure) throw new Error(commandFailure);
+        }
+        const followUp = editorCommand && command
+          ? { command: command.command, arguments: command.arguments ?? [] }
+          : null;
+        const combined = results.length > 0 ? combineWorkspaceEditResults(results) : null;
+        const status = combined?.status ?? (followUp ? "follow_up" : "executed");
+        const text = [
+          combined ? formatWorkspaceEditResult(combined) : `Executed code action ${selected.title}.`,
+          followUp
+            ? `Follow-up editor command required: ${followUp.command} ${JSON.stringify(followUp.arguments)}`
+            : "",
+        ].filter(Boolean).join("\n\n");
+        return {
+          content: [{ type: "text" as const, text }],
+          structuredContent: {
+            status,
+            files: combined ? [...combined.files] : [],
+            fileCount: combined?.files.length ?? 0,
+            annotationCount: combined?.annotations.length ?? 0,
+            warnings: combined ? [...combined.warnings] : [],
+            followUp,
           },
-        ],
+        };
+      };
+      const result = (args.mode ?? "apply") === "preview"
+        ? run(null)
+        : withWorkspaceEditTransaction(session.rootDir, extra.signal, run);
+      const completed = await result;
+      await progress(6, "Code action complete");
+      return completed;
+    },
+  );
+
+  server.registerTool(
+    "format_file",
+    {
+      title: "Format File",
+      annotations: {
+        destructiveHint: true,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+      description:
+        "Format one file with Volar's document-formatting pipeline and apply the returned edits. Applies by default; use preview to inspect without writing.",
+      inputSchema: {
+        file: z.string().describe(PROJECT_FILE_INPUT_DESCRIPTION),
+        tabSize: z.number().int().positive().optional(),
+        insertSpaces: z.boolean().optional(),
+        mode: z.enum(["apply", "preview"]).optional(),
+        confirm: z.boolean().optional(),
+      },
+      outputSchema: {
+        status: z.enum(["preview", "applied", "unchanged"]),
+        files: z.array(z.string()),
+        fileCount: z.number().int().nonnegative(),
+        warnings: z.array(z.string()),
+      },
+    },
+    async (args, extra) => {
+      const session = await manager.getDiagnosticsSessionForFile(args.file);
+      const progress = (value: number, message: string): Promise<void> =>
+        reportToolProgress(extra, value, 6, message);
+      const generate = async () => {
+        const edit = await getFormattingEdit(
+          session,
+          args.file,
+          {
+            tabSize: args.tabSize ?? 2,
+            insertSpaces: args.insertSpaces ?? true,
+          },
+          extra.signal,
+        );
+        return edit;
+      };
+      await progress(0, (args.mode ?? "apply") === "apply"
+        ? "Waiting for workspace mutation lock"
+        : "Generating formatting preview");
+      const result = (args.mode ?? "apply") === "preview"
+        ? await (async () => {
+            await progress(1, "Generating formatting edits");
+            const edit = await generate();
+            return edit
+              ? runWorkspaceEdit(session, edit, {
+                  mode: "preview",
+                  confirm: args.confirm,
+                  requestMeta: extra._meta,
+                  signal: extra.signal,
+                })
+              : null;
+          })()
+        : await withWorkspaceEditTransaction(session.rootDir, extra.signal, async (apply) => {
+            await progress(1, "Generating formatting edits");
+            const edit = await generate();
+            if (!edit) return null;
+            await progress(2, "Checking workspace edit confirmation");
+            return apply(edit, {
+              confirm: await confirmWorkspaceEdit(edit, args.confirm),
+              ...workspaceEditExecutionHooks(
+                session,
+                extra._meta,
+                extra.signal,
+                progress,
+              ),
+            });
+          });
+      await progress(6, result ? "Formatting complete" : "File already formatted");
+      if (!result) {
+        return {
+          content: [{ type: "text", text: `${args.file} is already formatted.` }],
+          structuredContent: {
+            status: "unchanged" as const,
+            files: [],
+            fileCount: 0,
+            warnings: [],
+          },
+        };
+      }
+      return {
+        content: [{ type: "text", text: formatWorkspaceEditResult(result) }],
+        structuredContent: {
+          status: result.status,
+          files: [...result.files],
+          fileCount: result.files.length,
+          warnings: [...result.warnings],
+        },
       };
     },
   );
@@ -1743,9 +2529,25 @@ export function createMcpServer(manager: HostManager): McpServer {
         openWorldHint: false,
       },
       description:
-        "Read a file in near-original form while compacting foldable implementation regions such as functions, JSX trees, and larger comment or region blocks. This is a compact implementation-reading lane built on the language server's folding ranges instead of manual symbol rewriting.",
+        "Read a file through either the default compact implementation lane or an exact, revision-bearing source lane. Use mode='exact' before whole-file write, move, or delete operations and for implementation bodies that must not be folded. Exact reads support bounded line ranges.",
       inputSchema: {
         file: z.string().describe(PROJECT_FILE_INPUT_DESCRIPTION),
+        mode: z
+          .enum(["compact", "exact"])
+          .optional()
+          .describe("Compact folding-aware source (default) or exact source with a revision."),
+        startLine: z
+          .number()
+          .int()
+          .positive()
+          .optional()
+          .describe("First 1-based source line for an exact ranged read."),
+        endLine: z
+          .number()
+          .int()
+          .positive()
+          .optional()
+          .describe("Last inclusive 1-based source line for an exact ranged read."),
         kinds: z
           .array(z.enum(COLLAPSED_FILE_KINDS))
           .optional()
@@ -1768,6 +2570,51 @@ export function createMcpServer(manager: HostManager): McpServer {
     },
     async (args) => {
       const session = await manager.getDiagnosticsSessionForFile(args.file);
+      if ((args.mode ?? "compact") === "exact") {
+        const exact = await readWorkspaceFile(session.rootDir, args.file);
+        const content = exact.snapshot.content ?? "";
+        const lines = content.split("\n");
+        const totalLines = content.length === 0
+          ? 0
+          : lines.length - (content.endsWith("\n") ? 1 : 0);
+        const startLine = args.startLine ?? (totalLines === 0 ? 0 : 1);
+        const endLine = args.endLine ?? totalLines;
+        if (startLine > endLine && totalLines > 0) {
+          throw new Error("read_file startLine must be less than or equal to endLine.");
+        }
+        if (endLine > totalLines) {
+          throw new Error(
+            `read_file endLine ${endLine} exceeds ${exact.file}'s ${totalLines} source lines.`,
+          );
+        }
+        const selected = totalLines === 0
+          ? ""
+          : lines.slice(startLine - 1, endLine).join("\n")
+            + (endLine === totalLines && content.endsWith("\n") ? "\n" : "");
+        const text = args.lineNumbers && selected.length > 0
+          ? selected
+            .split("\n")
+            .map((line, index) => {
+              if (index === selected.split("\n").length - 1 && line === "") {
+                return "";
+              }
+              return `${String(startLine + index).padStart(String(endLine).length, " ")} │ ${line}`;
+            })
+            .join("\n")
+          : selected;
+        return {
+          content: [{ type: "text" as const, text }],
+          structuredContent: {
+            file: exact.file,
+            mode: "exact",
+            revision: exact.snapshot.revision,
+            byteCount: Buffer.byteLength(content, "utf8"),
+            totalLines,
+            startLine,
+            endLine,
+          },
+        };
+      }
       const snapshot = await getCollapsedFile(session, args);
       return {
         content: [
@@ -2072,7 +2919,7 @@ export function createMcpServer(manager: HostManager): McpServer {
         openWorldHint: false,
       },
       description:
-        "Inspect a symbol by position or by query. This is a practical implementation tool that combines hover/type info, definition, type definition, implementations, and references into one targeted response.",
+        "Inspect a symbol by position or by query. Combines hover/type info, definition, type definition, implementations, and references. On request, it can also include complete source lines for the symbol and direct same-file callees selected by Volar's semantic ranges.",
       inputSchema: {
         file: z.string().describe(PROJECT_FILE_INPUT_DESCRIPTION),
         line: z
@@ -2091,16 +2938,22 @@ export function createMcpServer(manager: HostManager): McpServer {
           .string()
           .optional()
           .describe(
-            "Symbol name/detail query. Use when you do not have an exact position.",
+            "Volar workspace-symbol query, narrowed to this file. Use when you do not have an exact position.",
           ),
         maxReferences: z
           .number()
           .int()
-          .min(1)
+          .min(0)
           .max(20)
           .optional()
           .describe(
-            "Maximum number of reference lines to include. Defaults to 8.",
+            "Maximum number of non-declaration reference lines to include. Pass 0 for the count only. Defaults to 3.",
+          ),
+        includeSource: z
+          .boolean()
+          .default(false)
+          .describe(
+            "With query, include complete source lines for the selected symbol and direct same-file callees, with 1-based end-exclusive source and symbol ranges for follow-up edits. Nested callees already inside the symbol are not repeated. Defaults to false.",
           ),
       },
     },
@@ -2114,37 +2967,6 @@ export function createMcpServer(manager: HostManager): McpServer {
             text,
           },
         ],
-      };
-    },
-  );
-
-  server.registerTool(
-    "notify_file_changed",
-    {
-      title: "Notify File Changed",
-      annotations: {
-        destructiveHint: false,
-        idempotentHint: true,
-        openWorldHint: false,
-      },
-      description:
-        "Notify the server that a file has changed on disk. Call this after writing or modifying files so diagnostics stay current.",
-      inputSchema: {
-        file: z.string().describe(PROJECT_FILE_INPUT_DESCRIPTION),
-      },
-      outputSchema: {
-        file: z.string(),
-        acknowledged: z.boolean(),
-      },
-    },
-    async (args) => {
-      await manager.notifyFileChanged(args.file);
-      return {
-        content: [{ type: "text", text: `Acknowledged: ${args.file} updated` }],
-        structuredContent: {
-          file: args.file,
-          acknowledged: true,
-        },
       };
     },
   );

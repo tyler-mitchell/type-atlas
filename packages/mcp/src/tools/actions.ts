@@ -8,10 +8,16 @@ import { explainFailure } from "../failure.js";
 import { collectWorkspaceTextEdits } from "./workspace-edits.js";
 import * as path from "node:path";
 
+export interface CodeActionResult {
+  text: string;
+  actions: Array<vscode.CodeAction | vscode.Command>;
+}
+
 export async function getCodeActions(
   session: DiagnosticsSession,
   args: { file: string; startLine: number; startCol: number; endLine: number; endCol: number },
-): Promise<string> {
+  signal?: AbortSignal,
+): Promise<CodeActionResult> {
   const absPath = path.resolve(session.rootDir, args.file);
   const range: vscode.Range = {
     start: { line: args.startLine - 1, character: args.startCol - 1 },
@@ -22,16 +28,20 @@ export async function getCodeActions(
   const allDiags = await session.getFileDiagnostics(absPath);
   const rangeDiags = allDiags.filter((d) => rangesOverlap(d.range, range));
 
-  const actions = await session.getFileCodeActions(absPath, range, rangeDiags);
+  const actions = await session.getFileCodeActions(absPath, range, rangeDiags, signal);
   if (!actions || actions.length === 0) {
-    return explainFailure("get_code_actions", args.file, session, {
-      position: `${args.startLine}:${args.startCol}-${args.endLine}:${args.endCol}`,
-      hint: "No quick fixes or refactors available for this range. If there are diagnostics, try targeting the exact error line.",
-    });
+    return {
+      text: await explainFailure("get_code_actions", args.file, session, {
+        position: `${args.startLine}:${args.startCol}-${args.endLine}:${args.endCol}`,
+        hint: "No quick fixes or refactors available for this range. If there are diagnostics, try targeting the exact error line.",
+      }),
+      actions: [],
+    };
   }
 
   const results = actions.map((action) => {
     const parts = [`[${"kind" in action ? action.kind ?? "quickfix" : "command"}] ${action.title}`];
+    if ("data" in action && action.data != null) parts.push("  (resolve on selection)");
     if ("edit" in action) {
       for (const edit of collectWorkspaceTextEdits(session.rootDir, action.edit)) {
         parts.push(
@@ -42,7 +52,10 @@ export async function getCodeActions(
     return parts.join("\n");
   });
 
-  return results.join("\n\n");
+  return {
+    text: results.join("\n\n"),
+    actions,
+  };
 }
 
 function rangesOverlap(a: vscode.Range, b: vscode.Range): boolean {

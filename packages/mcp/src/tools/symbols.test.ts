@@ -19,9 +19,11 @@ function createWorkspaceSymbol(
   name: string,
   file: string,
   line: number,
-  kind = SymbolKind.Function,
+  kind: SymbolKind = SymbolKind.Function,
   containerName?: string,
+  character = 0,
 ): WorkspaceSymbol {
+  const symbolName = name.replace(/\(\)$/, "");
   return {
     name,
     kind,
@@ -29,8 +31,8 @@ function createWorkspaceSymbol(
     location: {
       uri: `file:///repo/${file}`,
       range: {
-        start: { line, character: 0 },
-        end: { line, character: 10 },
+        start: { line, character },
+        end: { line, character: character + symbolName.length },
       },
     },
   };
@@ -40,7 +42,7 @@ function createDocumentSymbol(
   name: string,
   fileLine: number,
   fileCol: number,
-  kind = SymbolKind.Function,
+  kind: SymbolKind = SymbolKind.Function,
 ): DocumentSymbol {
   return {
     name,
@@ -98,6 +100,8 @@ function createSessionMock(
     getFileTypeDefinition: async () => options.typeDefinitions ?? [],
     getFileImplementations: async () => options.implementations ?? [],
     getFileReferences: async () => options.references ?? [],
+    getFileCallHierarchyItems: async () => [],
+    getCallHierarchyOutgoingCalls: async () => [],
   } as unknown as DiagnosticsSession;
 }
 
@@ -173,7 +177,7 @@ describe("searchWorkspaceSymbols", () => {
     expect(result.text).toContain("generated results omitted");
   });
 
-  it("suppresses self-only implementations in inspectSymbol output", async () => {
+  it("omits redundant self-only implementation and reference sections", async () => {
     const definition = createLocation("src/client.ts", 0, 16);
     const session = createSessionMock("/repo", {
       fileContent: "export function createClient() {}\n",
@@ -192,7 +196,76 @@ describe("searchWorkspaceSymbols", () => {
     });
 
     expect(text).toContain("Definition:");
-    expect(text).toContain("No distinct implementations found.");
-    expect(text).not.toContain("Implementations (1):");
+    expect(text).not.toContain("Implementations:");
+    expect(text).not.toContain("References:");
+  });
+
+  it("rejects conflicting selectors instead of silently ignoring query", async () => {
+    const text = await inspectSymbol(createSessionMock("/repo"), {
+      file: "src/client.ts",
+      query: "createClient",
+      line: 1,
+      col: 1,
+    });
+
+    expect(text).toBe("inspect_symbol accepts query or line/col, not both.");
+  });
+
+  it("reports ambiguous Volar workspace-symbol matches with positions", async () => {
+    const session = createSessionMock("/repo", {
+      fileContent: [
+        "interface First { execute(): void }",
+        "interface Second { execute(): number }",
+      ].join("\n"),
+      workspaceSymbols: [
+        createWorkspaceSymbol("execute()", "src/client.ts", 0, SymbolKind.Method, undefined, 18),
+        createWorkspaceSymbol("execute()", "src/client.ts", 1, SymbolKind.Method, undefined, 19),
+      ],
+    });
+
+    const ambiguous = await inspectSymbol(session, {
+      file: "src/client.ts",
+      query: "execute",
+    });
+    expect(ambiguous).toContain('Ambiguous symbol query "execute"');
+    expect(ambiguous).toContain("method execute (line 1:19)");
+    expect(ambiguous).toContain("method execute (line 2:20)");
+    expect(ambiguous).toContain("Use line/col:");
+  });
+
+  it("uses the Volar workspace-symbol implementation range for overload source", async () => {
+    const implementation: WorkspaceSymbol = {
+      name: "calculate",
+      kind: SymbolKind.Function,
+      location: {
+        uri: "file:///repo/src/client.ts",
+        range: {
+          start: { line: 2, character: 0 },
+          end: { line: 4, character: 1 },
+        },
+      },
+    };
+    const implementationReference = createLocation("src/client.ts", 2, 16);
+    const session = createSessionMock("/repo", {
+      fileContent: [
+        "export function calculate(value: string): number;",
+        "export function calculate(value: number): number;",
+        "export function calculate(value: string | number): number {",
+        "  return typeof value === \"string\" ? value.length : value;",
+        "}",
+      ].join("\n"),
+      workspaceSymbols: [implementation],
+      definitions: [createLocation("src/client.ts", 2, 0)],
+      references: [implementationReference],
+    });
+
+    const text = await inspectSymbol(session, {
+      file: "src/client.ts",
+      query: "calculate",
+      includeSource: true,
+    });
+
+    expect(text).toContain("export function calculate(value: string | number): number {");
+    expect(text).not.toContain("Source:\ncalculate — src/client.ts:1:1-1:");
   });
 });

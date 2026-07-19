@@ -73,10 +73,9 @@ describe("refactor tools", () => {
       newName: "next",
     });
 
-    expect(summary.fileCount).toBe(1);
-    expect(summary.textEditCount).toBe(1);
+    expect(summary.fileCount).toBe(0);
+    expect(summary.textEditCount).toBe(0);
     expect(summary.renameCount).toBe(1);
-    expect(summary.text).toContain("src/client.ts (1 edits)");
     expect(summary.text).toContain("src/client.ts -> src/client-core.ts");
   });
 
@@ -110,7 +109,8 @@ describe("refactor tools", () => {
 
     expect(summary.fileCount).toBe(1);
     expect(summary.textEditCount).toBe(1);
-    expect(summary.renameCount).toBe(0);
+    expect(summary.renameCount).toBe(1);
     expect(summary.text).toContain("src/index.ts (1 edits)");
+    expect(summary.text).toContain("src/client.ts -> src/client-core.ts");
   });
 });

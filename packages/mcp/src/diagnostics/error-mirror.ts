@@ -4,8 +4,7 @@
  * Built entirely from what already exists:
  *   - the MCP server's warm HostManager session (no second language server),
  *   - the canonical getDiagnostics() aggregator + formatter (no hand-rolled pull),
- *   - the language server's onDiagnosticsRefresh push, which the existing
- *     notify_file_changed flow already triggers (no file watcher).
+ *   - Volar's diagnostic-refresh push after watched workspace changes.
  *
  * `start` returns instantly and wires up in the background; the snapshot is
  * (re)written whenever the language server pushes a diagnostic refresh.

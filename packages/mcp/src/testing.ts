@@ -1,28 +1,38 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { ListRootsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import { createRequire } from "node:module";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { createMcpRuntime } from "./server.js";
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const repoRoot = path.resolve(packageRoot, "..", "..");
+const sourceEntrypoint = path.resolve(packageRoot, "src", "dev.ts");
+const tsxImport = createRequire(import.meta.url).resolve("tsx");
 
 export const demoWorkspaceRoot = path.resolve(
   repoRoot,
   "fixtures/demo-workspace",
 );
 
-function createClient() {
-  return new Client(
+function createClient(roots: readonly string[] = []) {
+  const client = new Client(
     {
       name: "featuretype-local-test-client",
       version: "0.0.0",
     },
     {
-      capabilities: {},
+      capabilities: roots.length > 0 ? { roots: { listChanged: true } } : {},
     },
   );
+  if (roots.length > 0) {
+    client.setRequestHandler(ListRootsRequestSchema, async () => ({
+      roots: roots.map((root) => ({ uri: pathToFileURL(path.resolve(root)).toString() })),
+    }));
+  }
+  return client;
 }
 
 export type TestClientHandle = {
@@ -34,8 +44,6 @@ export type BasicProbeSummary = {
   toolCount: number;
   toolNames: string[];
   projectRoots: string[];
-  diagnosticsText: string;
-  diagnosticsStructured: Record<string, unknown> | undefined;
   hoverText: string;
 };
 
@@ -98,12 +106,13 @@ export function readStructuredContent(result: unknown): Record<string, unknown> 
 
 export async function createInMemoryTestClient(
   projectRoot?: string,
+  options: { clientRoots?: readonly string[] } = {},
 ): Promise<TestClientHandle> {
   const runtime = await createMcpRuntime(projectRoot);
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   await runtime.server.connect(serverTransport);
 
-  const client = createClient();
+  const client = createClient(options.clientRoots);
   await client.connect(clientTransport);
 
   return {
@@ -119,8 +128,8 @@ export async function createStdioTestClient(
   projectRoot: string,
 ): Promise<TestClientHandle> {
   const transport = new StdioClientTransport({
-    command: "pnpm",
-    args: ["--dir", repoRoot, "mcp:stdio:source", projectRoot],
+    command: process.execPath,
+    args: ["--import", tsxImport, sourceEntrypoint, projectRoot],
     stderr: "inherit",
   });
 
@@ -141,21 +150,12 @@ export async function runBasicProbe(client: Client): Promise<BasicProbeSummary> 
     name: "list_projects",
     arguments: {},
   });
-  const diagnostics = await client.callTool({
-    name: "get_diagnostics",
-    arguments: {
-      file: "broken-button.featuretype",
-      summary: true,
-      scope: "all",
-      severity: "all",
-    },
-  });
   const hover = await client.callTool({
     name: "get_hover",
     arguments: {
-      file: "button.featuretype",
-      line: 8,
-      col: 26,
+      file: "clean.ts",
+      line: 1,
+      col: 14,
     },
   });
 
@@ -168,8 +168,6 @@ export async function runBasicProbe(client: Client): Promise<BasicProbeSummary> 
     toolCount: toolList.tools.length,
     toolNames: toolList.tools.map((tool) => tool.name),
     projectRoots,
-    diagnosticsText: readTextContent(diagnostics),
-    diagnosticsStructured: readStructuredContent(diagnostics),
     hoverText: readTextContent(hover),
   };
 }

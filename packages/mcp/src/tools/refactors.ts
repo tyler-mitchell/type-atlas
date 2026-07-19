@@ -5,6 +5,7 @@ import {
   Range,
   RenameFile,
   TextDocumentEdit,
+  WorkspaceChange,
   type PrepareRenameResult,
   type WorkspaceEdit,
 } from "vscode-languageserver-protocol";
@@ -16,6 +17,7 @@ export interface WorkspaceEditSummary {
   textEditCount: number;
   renameCount: number;
   files: string[];
+  edit: WorkspaceEdit | null;
 }
 
 function formatRange(range: Range): string {
@@ -29,8 +31,6 @@ function isPrepareRenamePlaceholder(
 ): value is Extract<PrepareRenameResult, { placeholder: string }> {
   return !Range.is(value) && "placeholder" in value;
 }
-
-type WorkspaceDocumentChange = NonNullable<WorkspaceEdit["documentChanges"]>[number];
 
 export async function prepareRename(
   session: DiagnosticsSession,
@@ -74,13 +74,14 @@ function summarizeWorkspaceEdit(
       textEditCount: 0,
       renameCount: 0,
       files: [],
+      edit: null,
     };
   }
 
   const fileEditCounts = new Map<string, number>();
   const renameLines: string[] = [];
 
-  if (edit.changes) {
+  if (edit.documentChanges === undefined && edit.changes) {
     for (const [uri, edits] of Object.entries(edit.changes)) {
       const relPath = path.relative(rootDir, URI.parse(uri).fsPath);
       fileEditCounts.set(relPath, (fileEditCounts.get(relPath) ?? 0) + edits.length);
@@ -118,16 +119,18 @@ function summarizeWorkspaceEdit(
     textEditCount,
     renameCount,
     files,
+    edit,
   };
 }
 
 export async function getRenameEdits(
   session: DiagnosticsSession,
   args: { file: string; line: number; col: number; newName: string },
+  signal?: AbortSignal,
 ): Promise<WorkspaceEditSummary> {
   const absPath = path.resolve(session.rootDir, args.file);
   const position = { line: args.line - 1, character: args.col - 1 };
-  const edit = await session.getFileRenameEdits(absPath, position, args.newName);
+  const edit = await session.getFileRenameEdits(absPath, position, args.newName, signal);
   return summarizeWorkspaceEdit(
     session.rootDir,
     edit,
@@ -137,9 +140,33 @@ export async function getRenameEdits(
 
 export async function getFileRenameEdits(
   session: DiagnosticsSession,
-  args: { oldFile: string; newFile: string },
+  args: { oldFile: string; newFile: string; overwrite?: boolean },
+  signal?: AbortSignal,
 ): Promise<WorkspaceEditSummary> {
-  const edit = await session.getWorkspaceFileRenameEdits(args.oldFile, args.newFile);
+  const volarEdit = await session.getWorkspaceFileRenameEdits(
+    args.oldFile,
+    args.newFile,
+    signal,
+  );
+  const sourceEdit = volarEdit?.documentChanges
+    ? volarEdit
+    : {
+        changeAnnotations: volarEdit?.changeAnnotations,
+        documentChanges: [],
+      };
+  const change = new WorkspaceChange(sourceEdit);
+  if (!volarEdit?.documentChanges) {
+    for (const [uri, edits] of Object.entries(volarEdit?.changes ?? {})) {
+      const document = change.getTextEditChange({ uri, version: null });
+      for (const edit of edits) document.add(edit);
+    }
+  }
+  change.renameFile(
+    URI.file(path.resolve(session.rootDir, args.oldFile)).toString(),
+    URI.file(path.resolve(session.rootDir, args.newFile)).toString(),
+    { overwrite: args.overwrite },
+  );
+  const edit = change.edit;
   return summarizeWorkspaceEdit(
     session.rootDir,
     edit,

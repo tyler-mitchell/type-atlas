@@ -12,6 +12,8 @@ It is intentionally narrower than the architecture document:
   ownership, and system boundaries
 - `docs/implementation/mcp-monorepo-navigation-methodology.md` captures the
   practical large-monorepo workflow validated against gitdrops
+- `docs/implementation/mcp-ergonomics.md` tracks verified agent ergonomics,
+  the editing contract, and prioritized remaining improvements
 
 ## Navigation Design Rules
 
@@ -104,7 +106,11 @@ These tools are thin wrappers over built-in rename and file-rename support:
 - `get_rename_edits`
 - `get_file_rename_edits`
 
-They are intended for proving refactor blast radius before edits are made.
+They retain the native Volar `WorkspaceEdit` for proving refactor blast radius
+without allocating server state. `rename_symbol` and `move_file` are the
+stateless mutating counterparts; each applies by default or returns a bounded
+preview. `move_file` composes the physical move that an editor normally
+performs outside `willRenameFiles`.
 
 ### Diagnostic Context
 
@@ -171,11 +177,14 @@ The current surface still has room to improve.
 Notable open gaps:
 
 - no import-origin or export-chain tracing tool exists yet
-- references are not yet summarized or grouped by file
 - semantic tokens and inlay hints are not yet exposed even though Volar can
   provide them
 - unsaved buffer state is not modeled
 - `get_enriched_file` can still be expensive on large files
+
+The broader opportunity ranking, including semantic slices, batching,
+freshness, project routing, and conflict recovery, lives in
+`docs/implementation/mcp-ergonomics.md`.
 
 ## Completion Standard For Navigation Changes
 

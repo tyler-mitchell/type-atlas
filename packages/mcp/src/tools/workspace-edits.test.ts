@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { collectWorkspaceTextEdits } from "./workspace-edits.js";
 
 describe("collectWorkspaceTextEdits", () => {
-  it("collects legacy changes and document changes", () => {
+  it("prefers documentChanges over legacy changes", () => {
     const edits = collectWorkspaceTextEdits("/repo", {
       changes: {
         "file:///repo/src/a.ts": [
@@ -35,11 +35,6 @@ describe("collectWorkspaceTextEdits", () => {
     });
 
     expect(edits).toEqual([
-      {
-        file: "src/a.ts",
-        line: 1,
-        newText: "alpha",
-      },
       {
         file: "src/b.ts",
         line: 3,

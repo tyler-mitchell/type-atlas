@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
   afterAll,
@@ -24,15 +24,12 @@ const previousStateFile = process.env.FEATURETYPE_MCP_STATE_FILE;
 
 async function expectBasicProbe(handle: TestClientHandle) {
   const probe = await runBasicProbe(handle.client);
-  const totalCount = Number(probe.diagnosticsStructured?.totalCount ?? 0);
 
   expect(probe.toolCount).toBeGreaterThan(10);
-  expect(probe.toolNames).toContain("get_diagnostics");
   expect(probe.toolNames).toContain("get_hover");
+  expect(probe.toolNames).toContain("edit_workspace");
   expect(probe.projectRoots).toContain(demoWorkspaceRoot);
-  expect(probe.hoverText.length).toBeGreaterThan(0);
-  expect(probe.diagnosticsText).toContain("broken-button.featuretype");
-  expect(totalCount).toBeGreaterThan(0);
+  expect(probe.hoverText).toContain("cleanValue");
 }
 
 function hasToolError(result: unknown): boolean {
@@ -1326,6 +1323,24 @@ describe("featuretype MCP local probes", () => {
     expect(structured?.roots).toEqual([betaRoot, alphaRoot]);
   }, 60_000);
 
+  it("adopts MCP client roots without manual project attachment", async () => {
+    tempDir = await createRepoTempDir("featuretype-mcp-client-root-parent-");
+    const projectRoot = await createTemporaryProject(tempDir, "ClientRootSymbol");
+    handle = await createInMemoryTestClient(undefined, { clientRoots: [projectRoot] });
+
+    const projects = await handle.client.callTool({
+      name: "list_projects",
+      arguments: {},
+    });
+    const symbols = await handle.client.callTool({
+      name: "search_workspace_symbols",
+      arguments: { query: "ClientRootSymbol" },
+    });
+
+    expect(readTextContent(projects)).toContain(projectRoot);
+    expect(readTextContent(symbols)).toContain("ClientRootSymbol");
+  }, 60_000);
+
   it("lists module exports through completion-based language-server resolution", async () => {
     tempDir = await createRepoTempDir("featuretype-mcp-module-exports-");
     const projectRoot = await createPackageResolutionProject(tempDir);
@@ -1852,13 +1867,6 @@ describe("featuretype MCP local probes", () => {
       path.join(projectRoot, "src", "extra.ts"),
       "export const extraValue = 1;\n",
     );
-    await handle.client.callTool({
-      name: "notify_file_changed",
-      arguments: {
-        file: "src/extra.ts",
-      },
-    });
-
     const secondAttach = await handle.client.callTool({
       name: "attach_project",
       arguments: {
@@ -1881,7 +1889,7 @@ describe("featuretype MCP local probes", () => {
     ]);
   }, 60_000);
 
-  it("clears stale whole-project diagnostics after creating a missing Bundler import and refreshing", async () => {
+  it("clears stale whole-project diagnostics after creating a missing Bundler import", async () => {
     tempDir = await createRepoTempDir("featuretype-mcp-bundler-parent-");
     const projectRoot = await createBundlerProjectWithMissingImport(tempDir);
 
@@ -1902,13 +1910,6 @@ describe("featuretype MCP local probes", () => {
       path.join(projectRoot, "src", "created.ts"),
       'export const createdValue = "ready";\n',
     );
-    await handle.client.callTool({
-      name: "notify_file_changed",
-      arguments: {
-        file: "src/created.ts",
-      },
-    });
-
     const afterDiagnostics = await handle.client.callTool({
       name: "get_diagnostics",
       arguments: {
@@ -1930,7 +1931,7 @@ describe("featuretype MCP local probes", () => {
     expect(readTextContent(afterFixes)).toBe("No diagnostics found.");
   }, 60_000);
 
-  it("keeps diagnostics working after tsconfig.json changes are refreshed", async () => {
+  it("keeps diagnostics working after tsconfig.json changes", async () => {
     tempDir = await createRepoTempDir("featuretype-mcp-config-refresh-parent-");
     const projectRoot = await createConfigRefreshProject(tempDir);
 
@@ -1959,13 +1960,6 @@ describe("featuretype MCP local probes", () => {
         2,
       ),
     );
-    await handle.client.callTool({
-      name: "notify_file_changed",
-      arguments: {
-        file: "tsconfig.json",
-      },
-    });
-
     const after = await handle.client.callTool({
       name: "get_diagnostics",
       arguments: {
@@ -1976,6 +1970,42 @@ describe("featuretype MCP local probes", () => {
     expect(readTextContent(before)).toBe("No diagnostics.");
     expect(Number(readStructuredContent(after)?.totalErrorCount ?? 0)).toBe(1);
     expect(readTextContent(after)).toContain("src/b.ts");
+  }, 60_000);
+
+  it("reloads Volar project ownership after a tsconfig edit", async () => {
+    tempDir = await createRepoTempDir("featuretype-mcp-project-reload-parent-");
+    const projectRoot = await createConfigRefreshProject(tempDir);
+    await writeFile(
+      path.join(projectRoot, "src", "b.ts"),
+      "export const ProjectReloadSymbol = true;\n",
+    );
+    handle = await createInMemoryTestClient(projectRoot);
+
+    const before = await handle.client.callTool({
+      name: "search_workspace_symbols",
+      arguments: { query: "ProjectReloadSymbol" },
+    });
+    expect(readStructuredContent(before)?.totalSymbols).toBe(0);
+
+    const edited = await handle.client.callTool({
+      name: "edit_workspace",
+      arguments: {
+        operations: [{
+          kind: "replace",
+          file: "tsconfig.json",
+          oldText: '"files": [\n    "src/a.ts"\n  ]',
+          newText: '"files": [\n    "src/a.ts",\n    "src/b.ts"\n  ]',
+        }],
+      },
+    });
+    expect(readStructuredContent(edited)?.status).toBe("applied");
+
+    const after = await handle.client.callTool({
+      name: "search_workspace_symbols",
+      arguments: { query: "ProjectReloadSymbol" },
+    });
+    expect(Number(readStructuredContent(after)?.totalSymbols ?? 0)).toBeGreaterThan(0);
+    expect(readTextContent(after)).toContain("ProjectReloadSymbol");
   }, 60_000);
 
   it("restores attached roots across fresh runtimes for relative attaches and file routing", async () => {
@@ -2054,6 +2084,362 @@ describe("featuretype MCP local probes", () => {
     expect(
       (readStructuredContent(wholeProject)?.error as { code?: string } | undefined)?.code,
     ).toBe("PROJECT_TOO_LARGE");
+  }, 60_000);
+
+  it("reads complete symbol source lines with direct same-file callees through inspect_symbol", async () => {
+    tempDir = await createRepoTempDir("featuretype-mcp-symbol-source-parent-");
+    const projectRoot = await createTemporaryProject(tempDir, "PlanStorage");
+    const sourceFile = "src/planstorage.ts";
+    await writeFile(
+      path.join(projectRoot, sourceFile),
+      [
+        "const helper = () => 1;",
+        "",
+        "/** Plan storage. */",
+        "export const PlanStorage = () => {",
+        "  const nested = () => 2;",
+        "  return helper() + nested();",
+        "};",
+        "",
+      ].join("\n"),
+    );
+    handle = await createInMemoryTestClient(projectRoot);
+
+    const compactResult = await handle.client.callTool({
+      name: "inspect_symbol",
+      arguments: {
+        file: sourceFile,
+        query: "PlanStorage",
+      },
+    });
+    const expandedResult = await handle.client.callTool({
+      name: "inspect_symbol",
+      arguments: {
+        file: sourceFile,
+        query: "PlanStorage",
+        includeSource: true,
+      },
+    });
+    const compactText = readTextContent(compactResult);
+    const expandedText = readTextContent(expandedResult);
+
+    expect(compactText).not.toContain("Source:");
+    expect(compactText).not.toContain("Direct local callees");
+    expect(expandedText).toContain("Source:");
+    expect(expandedText).toContain("export const PlanStorage = () => {");
+    expect(expandedText).toContain("Direct local callees (1):");
+    expect(expandedText).toMatch(/PlanStorage — src\/planstorage\.ts:4:1-7:\d+/);
+    expect(expandedText).toMatch(/symbol 4:\d+-4:\d+; ranges are end-exclusive/);
+    expect(expandedText).toMatch(/helper — src\/planstorage\.ts:1:1-1:\d+/);
+    expect(expandedText).toContain("const helper = () => 1;");
+    expect(expandedText).not.toContain("nested — src/planstorage.ts");
+  }, 60_000);
+
+  it("uses Volar workspace-symbol ranges for overloaded implementation source", async () => {
+    tempDir = await createRepoTempDir("featuretype-mcp-overload-source-parent-");
+    const projectRoot = await createTemporaryProject(tempDir, "Calculate");
+    const sourceFile = "src/calculate.ts";
+    await writeFile(
+      path.join(projectRoot, sourceFile),
+      [
+        "export function calculate(value: string): number;",
+        "export function calculate(value: number): number;",
+        "export function calculate(value: string | number): number {",
+        "  return typeof value === \"string\" ? value.length : value;",
+        "}",
+        "",
+      ].join("\n"),
+    );
+    handle = await createInMemoryTestClient(projectRoot);
+
+    const result = await handle.client.callTool({
+      name: "inspect_symbol",
+      arguments: {
+        file: sourceFile,
+        query: "calculate",
+        includeSource: true,
+      },
+    });
+    const text = readTextContent(result);
+
+    expect(text).toContain("calculate — src/calculate.ts:3:1-5:2");
+    expect(text).toContain(
+      "export function calculate(value: string | number): number {",
+    );
+    expect(text).not.toContain(
+      "```typescript\nexport function calculate(value: string): number;",
+    );
+  }, 60_000);
+
+  it("reads exact revisions and applies multi-file workspace edits", async () => {
+    tempDir = await createRepoTempDir("featuretype-mcp-edit-workspace-parent-");
+    const projectRoot = await createTemporaryProject(tempDir, "EditableSymbol");
+    const sourceFile = "src/editablesymbol.ts";
+    handle = await createInMemoryTestClient(projectRoot);
+
+    const exact = await handle.client.callTool({
+      name: "read_file",
+      arguments: {
+        file: sourceFile,
+        mode: "exact",
+      },
+    });
+    const revision = String(readStructuredContent(exact)?.revision ?? "");
+    expect(readTextContent(exact)).toContain("EditableSymbol");
+    expect(revision).toMatch(/^sha256:/);
+
+    const edited = await handle.client.callTool({
+      name: "edit_workspace",
+      arguments: {
+        operations: [
+          {
+            kind: "replace",
+            file: sourceFile,
+            oldText: '"EditableSymbol"',
+            newText: '"edited"',
+          },
+          {
+            kind: "create",
+            file: "src/created.ts",
+            content: "export const CreatedAfterWorkspaceEdit = true;\n",
+          },
+        ],
+      },
+    });
+    const changed = readStructuredContent(edited);
+    expect(changed?.status).toBe("applied");
+    expect(changed?.fileCount).toBe(2);
+    expect(readTextContent(edited)).toContain("Applied workspace edit");
+    expect(await readFile(path.join(projectRoot, sourceFile), "utf8")).toContain('"edited"');
+    expect(await readFile(path.join(projectRoot, "src/created.ts"), "utf8"))
+      .toBe("export const CreatedAfterWorkspaceEdit = true;\n");
+
+    const symbols = await handle.client.callTool({
+      name: "search_workspace_symbols",
+      arguments: { query: "CreatedAfterWorkspaceEdit" },
+    });
+    expect(readTextContent(symbols)).toContain("src/created.ts");
+  }, 60_000);
+
+  it("rejects stale whole-file writes without changing the file", async () => {
+    tempDir = await createRepoTempDir("featuretype-mcp-stale-write-parent-");
+    const projectRoot = await createTemporaryProject(tempDir, "StaleSymbol");
+    const sourceFile = "src/stalesymbol.ts";
+    handle = await createInMemoryTestClient(projectRoot);
+
+    const exact = await handle.client.callTool({
+      name: "read_file",
+      arguments: { file: sourceFile, mode: "exact" },
+    });
+    const revision = String(readStructuredContent(exact)?.revision ?? "");
+    await writeFile(path.join(projectRoot, sourceFile), "export const external = true;\n");
+
+    const result = await handle.client.callTool({
+      name: "edit_workspace",
+      arguments: {
+        operations: [
+          {
+            kind: "write",
+            file: sourceFile,
+            ifMatch: revision,
+            content: "export const overwritten = true;\n",
+          },
+        ],
+      },
+    });
+
+    expect(hasToolError(result)).toBe(true);
+    expect(readTextContent(result)).toContain("Revision conflict");
+    expect(await readFile(path.join(projectRoot, sourceFile), "utf8"))
+      .toBe("export const external = true;\n");
+  }, 60_000);
+
+  it("reports bounded progress for workspace edit previews", async () => {
+    tempDir = await createRepoTempDir("featuretype-mcp-edit-progress-parent-");
+    const projectRoot = await createTemporaryProject(tempDir, "ProgressSymbol");
+    handle = await createInMemoryTestClient(projectRoot);
+    const notifications: Array<{ progress?: number; total?: number; message?: string }> = [];
+
+    const result = await handle.client.callTool({
+      name: "edit_workspace",
+      arguments: {
+        mode: "preview",
+        operations: [{
+          kind: "replace",
+          file: "src/progresssymbol.ts",
+          oldText: '"ProgressSymbol"',
+          newText: '"previewed"',
+        }],
+      },
+    }, undefined, {
+      onprogress: (notification) => notifications.push(notification),
+    });
+
+    expect(readStructuredContent(result)?.status).toBe("preview");
+    expect(notifications.at(-1)).toMatchObject({
+      progress: 6,
+      total: 6,
+      message: "Preview ready",
+    });
+  }, 60_000);
+
+  it("directly applies Volar symbol and file rename edits", async () => {
+    tempDir = await createRepoTempDir("featuretype-mcp-volar-edit-parent-");
+    const projectRoot = await createTemporaryProject(tempDir, "RenameSymbol");
+    await writeFile(
+      path.join(projectRoot, "src", "consumer.ts"),
+      [
+        'import { RenameSymbol } from "./renamesymbol.js";',
+        "export const consumed = RenameSymbol;",
+        "",
+      ].join("\n"),
+    );
+    handle = await createInMemoryTestClient(projectRoot);
+
+    const rename = await handle.client.callTool({
+      name: "rename_symbol",
+      arguments: {
+        file: "src/renamesymbol.ts",
+        line: 1,
+        col: 14,
+        newName: "RenamedSymbol",
+      },
+    });
+    expect(readStructuredContent(rename)?.status).toBe("applied");
+    expect(await readFile(path.join(projectRoot, "src", "renamesymbol.ts"), "utf8"))
+      .toContain("RenamedSymbol");
+    expect(await readFile(path.join(projectRoot, "src", "consumer.ts"), "utf8"))
+      .toContain("RenamedSymbol");
+
+    const fileRename = await handle.client.callTool({
+      name: "move_file",
+      arguments: {
+        oldFile: "src/renamesymbol.ts",
+        newFile: "src/renamed-symbol.ts",
+      },
+    });
+    expect(readStructuredContent(fileRename)?.status).toBe("applied");
+    await expect(readFile(path.join(projectRoot, "src", "renamesymbol.ts"), "utf8"))
+      .rejects.toThrow();
+    expect(await readFile(path.join(projectRoot, "src", "renamed-symbol.ts"), "utf8"))
+      .toContain("RenamedSymbol");
+    expect(await readFile(path.join(projectRoot, "src", "consumer.ts"), "utf8"))
+      .toContain('./renamed-symbol.js');
+  }, 60_000);
+
+  it("selects and applies resolved Volar code actions", async () => {
+    tempDir = await createRepoTempDir("featuretype-mcp-code-action-parent-");
+    const projectRoot = await createTemporaryProject(tempDir, "ActionSymbol");
+    await writeFile(
+      path.join(projectRoot, "src", "actionsymbol.ts"),
+      "export const value = helper();\n",
+    );
+    await writeFile(
+      path.join(projectRoot, "src", "helper.ts"),
+      "export const helper = (): string => \"ready\";\n",
+    );
+    handle = await createInMemoryTestClient(projectRoot);
+
+    const result = await handle.client.callTool({
+      name: "get_code_actions",
+      arguments: {
+        file: "src/actionsymbol.ts",
+        startLine: 1,
+        startCol: 22,
+        endLine: 1,
+        endCol: 28,
+      },
+    });
+    const actions = readStructuredContent(result)?.actions as
+      | Array<{ title?: string; kind?: string; hasEdit?: boolean }>
+      | undefined;
+    const importAction = actions?.find((action) =>
+      action.title?.toLowerCase().includes("import") && action.hasEdit
+    );
+    expect(importAction?.title).toBeTruthy();
+
+    const applied = await handle.client.callTool({
+      name: "apply_code_action",
+      arguments: {
+        file: "src/actionsymbol.ts",
+        startLine: 1,
+        startCol: 22,
+        endLine: 1,
+        endCol: 28,
+        title: importAction?.title,
+        kind: importAction?.kind,
+      },
+    });
+    expect(readStructuredContent(applied)?.status).toBe("applied");
+    expect(await readFile(path.join(projectRoot, "src", "actionsymbol.ts"), "utf8"))
+      .toContain('from "./helper"');
+  }, 60_000);
+
+  it("applies Volar document formatting directly", async () => {
+    tempDir = await createRepoTempDir("featuretype-mcp-format-parent-");
+    const projectRoot = await createTemporaryProject(tempDir, "FormatSymbol");
+    const file = "src/formatsymbol.ts";
+    await writeFile(
+      path.join(projectRoot, file),
+      "export  const FormatSymbol={value:1};\n",
+    );
+    handle = await createInMemoryTestClient(projectRoot);
+
+    const formatted = await handle.client.callTool({
+      name: "format_file",
+      arguments: { file },
+    });
+
+    expect(readStructuredContent(formatted)?.status).toBe("applied");
+    expect(await readFile(path.join(projectRoot, file), "utf8"))
+      .toBe("export const FormatSymbol = { value: 1 };\n");
+  }, 60_000);
+
+  it("returns Volar editor commands as explicit code-action follow-up", async () => {
+    tempDir = await createRepoTempDir("featuretype-mcp-refactor-command-parent-");
+    const projectRoot = await createTemporaryProject(tempDir, "RefactorSymbol");
+    const file = "src/refactorsymbol.ts";
+    await writeFile(
+      path.join(projectRoot, file),
+      "export const RefactorSymbol = 1 + 2;\n",
+    );
+    handle = await createInMemoryTestClient(projectRoot);
+    const range = {
+      file,
+      startLine: 1,
+      startCol: 31,
+      endLine: 1,
+      endCol: 36,
+    };
+
+    const listed = await handle.client.callTool({
+      name: "get_code_actions",
+      arguments: range,
+    });
+    const actions = readStructuredContent(listed)?.actions as
+      | Array<{
+          index?: number;
+          title?: string;
+          kind?: string;
+          isResolvable?: boolean;
+        }>
+      | undefined;
+    const refactor = actions?.find((action) =>
+      action.isResolvable && action.kind?.startsWith("refactor.extract")
+    );
+    expect(refactor?.title).toBeTruthy();
+
+    const applied = await handle.client.callTool({
+      name: "apply_code_action",
+      arguments: {
+        ...range,
+        index: refactor?.index,
+      },
+    });
+    const result = readStructuredContent(applied);
+    expect(result?.status).toBe("applied");
+    expect((result?.followUp as { command?: string } | undefined)?.command)
+      .toBe("editor.action.rename");
   }, 60_000);
 
 });
