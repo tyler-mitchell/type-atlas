@@ -13,7 +13,9 @@ export const rangeInput = type({
 }).onUndeclaredKey("reject");
 
 export const fileInput = {
-  workspace: type("string >= 1").describe("Absolute workspace root."),
+  workspace: type("string >= 1").describe(
+    "Workspace root. Relative paths resolve from the MCP process working directory.",
+  ),
   file: type("string >= 1").describe(
     "Workspace-relative or absolute file path.",
   ),

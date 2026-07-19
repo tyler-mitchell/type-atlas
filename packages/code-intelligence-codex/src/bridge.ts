@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 import { randomUUID } from "node:crypto";
-import path from "node:path";
 import { createInterface } from "node:readline";
 import { pathToFileURL } from "node:url";
 import { execa } from "execa";
+import * as path from "pathe";
 import type {
   DynamicToolProvider,
   DynamicToolProviderEnvironment,
@@ -74,7 +74,7 @@ const runAppServer = async (args: readonly string[]): Promise<number> => {
     process.env.CODEX_DYNAMIC_TOOLS_ENTRY ?? path.join(packageRoot, "src/runtime.ts"),
   );
   const providerModule = providerEntry.startsWith(`${packageRoot}${path.sep}`)
-    ? `/${path.relative(packageRoot, providerEntry).split(path.sep).join("/")}`
+    ? `/${path.relative(packageRoot, providerEntry)}`
     : `/@fs/${providerEntry}`;
   const languageServerEntry = pathToFileURL(
     path.join(__dirname, "language-server.cjs"),

@@ -1,7 +1,7 @@
 {
   "name": "@featuretype/code-intelligence",
   "version": "0.0.0",
-  "description": "Headless Volar-based code intelligence for TypeScript workspaces.",
+  "description": "Headless Volar-based language intelligence for coding agents.",
   "type": "module",
   "sideEffects": false,
   "repository": {
@@ -47,6 +47,7 @@
   "dependencies": {
     "@volar/language-server": "2.4.28",
     "chokidar": "^3.6.0",
+    "pathe": "^2.0.3",
     "vscode-languageserver-protocol": "3.17.5",
     "vscode-uri": "^3.0.8"
   },

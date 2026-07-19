@@ -1,8 +1,15 @@
-import type { FoldingRange } from "@volar/language-server/protocol.js";
+import {
+  type FoldingRange,
+  FoldingRangeKind,
+} from "@volar/language-server/protocol.js";
 
 const minimumViewLines = 20;
 const minimumFoldedLines = 6;
 const typeDeclaration = /^(?:(?:export|default|declare)\s+)*(?:interface|type)\s+[$_\p{ID_Start}]/u;
+const isNonCodeRange = ({ kind }: FoldingRange) =>
+  kind === FoldingRangeKind.Comment ||
+  kind === FoldingRangeKind.Imports ||
+  kind === FoldingRangeKind.Region;
 
 type SourceView = {
   readonly startLine?: number;
@@ -28,12 +35,12 @@ export const formatFoldedSource = (
   const startIndex = startLine - 1;
   const viewLineCount = endLine - startLine + 1;
   const width = String(lines.length).length;
-  const nonCode = ranges.filter(({ kind }) => kind !== undefined);
+  const nonCode = ranges.filter(isNonCodeRange);
   const folds = viewLineCount > minimumViewLines
     ? ranges.filter((range) =>
       startIndex <= range.startLine &&
       range.endLine < endLine &&
-      range.kind === undefined &&
+      !isNonCodeRange(range) &&
       !nonCode.some(({ startLine, endLine }) =>
         startLine <= range.startLine && range.endLine <= endLine
       ) &&

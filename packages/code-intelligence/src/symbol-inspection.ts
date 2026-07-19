@@ -176,21 +176,39 @@ const symbolChoice = (
   fileUri: string,
   candidates: readonly Located[],
   root: string,
-) => [
-  `Symbol "${symbol}" is ${status} · ${workspacePath(fileUri, root)}`,
-  ...(candidates.length ? [
-    `Candidates (${candidates.length})`,
-    ...candidates.map((candidate) =>
-      `  ${candidate.name} [${symbolKind(candidate.kind!)}] ${
-        locationText(candidate)
-      }${candidate.detail ? ` — ${candidate.detail}` : ""}`
-    ),
-  ] : []),
-].join("\n");
+  limit: number,
+) => {
+  const shown = candidates.slice(0, limit);
+  return [
+    `Symbol "${symbol}" is ${status} · ${workspacePath(fileUri, root)}`,
+    ...(shown.length ? [
+      `Candidates (${shown.length === candidates.length ? shown.length : `${shown.length}/${candidates.length}`})`,
+      ...shown.map((candidate) =>
+        `  ${candidate.name} [${symbolKind(candidate.kind!)}] ${
+          locationText(candidate)
+        }${candidate.detail ? ` — ${candidate.detail}` : ""}`
+      ),
+      ...(shown.length < candidates.length ? [`${candidates.length - shown.length} more`] : []),
+    ] : []),
+  ].join("\n");
+};
 
-const excerpt = async (workspace: VolarWorkspace, target: Located) => {
-  await workspace.getTextDocument(URI.parse(target.uri).fsPath);
-  const lines = (await readFile(new URL(target.uri), "utf8")).split(/\r?\n/);
+const sourceLines = async (
+  workspace: VolarWorkspace,
+  root: string,
+  uri: string,
+) => {
+  const file = URI.parse(uri).fsPath;
+  if (isFileInDir(file, root)) await workspace.getTextDocument(file);
+  return (await readFile(new URL(uri), "utf8")).split(/\r?\n/);
+};
+
+const excerpt = async (
+  workspace: VolarWorkspace,
+  root: string,
+  target: Located,
+) => {
+  const lines = await sourceLines(workspace, root, target.uri);
   const end = target.range.end.line + (target.range.end.character > 0 ? 1 : 0);
   return lines.slice(target.range.start.line, end).map((line, index) =>
     `${target.range.start.line + index + 1}|${line}`
@@ -199,11 +217,11 @@ const excerpt = async (workspace: VolarWorkspace, target: Located) => {
 
 const withSourceLines = async (
   workspace: VolarWorkspace,
+  root: string,
   items: readonly Located[],
 ) =>
   (await Promise.all(groups(items).map(async ({ uri, items: related }) => {
-    await workspace.getTextDocument(URI.parse(uri).fsPath);
-    const lines = (await readFile(new URL(uri), "utf8")).split(/\r?\n/);
+    const lines = await sourceLines(workspace, root, uri);
     return related.map((item) => ({
       ...item,
       sourceLine: lines[item.selectionRange.start.line] ?? "",
@@ -239,12 +257,16 @@ export const inspectSymbol = async (
   signal: AbortSignal,
 ): Promise<InspectSymbolResult> => {
   const textDocument = await workspace.getTextDocument(file);
-  const documentSymbols = workspace.sendRequest(
-    DocumentSymbolRequest.type,
-    { textDocument },
-    signal,
-  );
-  const symbols = flattenSymbols(await documentSymbols, textDocument.uri);
+  const symbols = "symbol" in target
+    ? flattenSymbols(
+      await workspace.sendRequest(
+        DocumentSymbolRequest.type,
+        { textDocument },
+        signal,
+      ),
+      textDocument.uri,
+    )
+    : [];
   const matches = "symbol" in target
     ? symbols.filter(({ name }) => name === target.symbol)
     : [];
@@ -253,7 +275,7 @@ export const inspectSymbol = async (
       ? matches
       : symbols.filter(({ name }) =>
         name?.toLowerCase().includes(target.symbol.toLowerCase())
-      ).slice(0, options.limit);
+      );
     return {
       textDocument,
       text: symbolChoice(
@@ -262,18 +284,18 @@ export const inspectSymbol = async (
         textDocument.uri,
         candidates,
         root,
+        options.limit,
       ),
     };
   }
 
   const selected = "symbol" in target ? matches[0]! : undefined;
   const position = "position" in target ? target.position : selected!.selectionRange.start;
-  const [project, hover, definitionResult, typeResult, implementationResult, references, items] =
+  const [project, hover, definitionResult, implementationResult, references, items] =
     await Promise.all([
       workspace.sendRequest(GetMatchTsConfigRequest.type, textDocument, signal),
       workspace.sendRequest(HoverRequest.type, { textDocument, position }, signal),
       workspace.sendRequest(DefinitionRequest.type, { textDocument, position }, signal),
-      workspace.sendRequest(TypeDefinitionRequest.type, { textDocument, position }, signal),
       workspace.sendRequest(ImplementationRequest.type, { textDocument, position }, signal),
       workspace.sendRequest(
         ReferencesRequest.type,
@@ -284,7 +306,6 @@ export const inspectSymbol = async (
     ]);
   const definitions = unique(navigationItems(definitionResult).map(locate), key);
   const implementations = unique(navigationItems(implementationResult).map(locate), key);
-  const typeDefinitions = unique(navigationItems(typeResult).map(locate), key);
   const callable = items?.[0];
   const definedSymbol = !selected && !callable
     ? await symbolAtDefinition(workspace, root, definitions[0], signal)
@@ -319,22 +340,27 @@ export const inspectSymbol = async (
       ? { range: declaration.range, selectionRange: declaration.selectionRange }
       : {}),
   };
-  const [incoming, outgoing, source] = await Promise.all([
+  const [incoming, outgoing, source, typeResult] = await Promise.all([
     items ? Promise.all(items.map((item) =>
       workspace.sendRequest(CallHierarchyIncomingCallsRequest.type, { item }, signal)
     )) : null,
     items ? Promise.all(items.map((item) =>
       workspace.sendRequest(CallHierarchyOutgoingCallsRequest.type, { item }, signal)
     )) : null,
-    options.includeSource ? excerpt(workspace, primary) : undefined,
+    options.includeSource ? excerpt(workspace, root, primary) : undefined,
+    options.includeTypeDefinitions || !items?.length
+      ? workspace.sendRequest(TypeDefinitionRequest.type, { textDocument, position }, signal)
+      : null,
   ]);
+  const typeDefinitions = unique(navigationItems(typeResult).map(locate), key);
   const callers = unique(
     incoming?.flatMap((calls) => calls?.map((call) => ({
       item: call.from,
       siteUri: call.from.uri,
       sites: unique(call.fromRanges, rangeText),
     })) ?? []) ?? [],
-    ({ item, sites }) => `${key(item)}\0${sites.map(rangeText).join(",")}`,
+    ({ item, siteUri, sites }) =>
+      `${key(item)}\0${siteUri}\0${sites.map(rangeText).join(",")}`,
   );
   const callees = unique(
     outgoing?.flatMap((calls, index) => calls?.map((call) => ({
@@ -342,7 +368,8 @@ export const inspectSymbol = async (
       siteUri: items?.[index]?.uri ?? textDocument.uri,
       sites: unique(call.fromRanges, rangeText),
     })) ?? []) ?? [],
-    ({ item, sites }) => `${key(item)}\0${sites.map(rangeText).join(",")}`,
+    ({ item, siteUri, sites }) =>
+      `${key(item)}\0${siteUri}\0${sites.map(rangeText).join(",")}`,
   );
   const represented = new Set([
     key(primary),
@@ -361,6 +388,7 @@ export const inspectSymbol = async (
   );
   const shownReferences = await withSourceLines(
     workspace,
+    root,
     otherReferences.slice(0, options.limit),
   );
   const extras = (items: readonly Located[]) =>

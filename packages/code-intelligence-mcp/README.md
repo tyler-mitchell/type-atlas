@@ -3,14 +3,14 @@
 
   # Code Intelligence MCP
 
-  Semantic TypeScript navigation for coding agents, powered by Volar.js.
+  Editor-grade code intelligence for coding agents, powered by Volar.js.
 </div>
 
-Code Intelligence MCP exposes editor-grade TypeScript intelligence over the Model Context Protocol. It is designed for agents that need exact definitions, references, call relationships, types, diagnostics, and source ranges while working in real repositories.
+Code Intelligence MCP exposes Volar language services over the Model Context Protocol. TypeScript supplies project-wide navigation and type information; Markdown and JSON use their native language services for document structure, folding, diagnostics, and other supported operations.
 
 ## Features
 
-- Native Volar.js and TypeScript language-service results
+- Native TypeScript, Markdown, and JSON language-service results through Volar.js
 - Automatic project selection and workspace change tracking
 - Multiple isolated workspace sessions in one MCP process
 - Compact plain-text results with workspace-relative paths
@@ -42,7 +42,7 @@ The server communicates over stdio, negotiates the current MCP protocol with v2 
 | Inspect editor information | `diagnostics`, `inlay_hints` |
 | Prepare source changes | `rename_symbol`, `rename_files`, `format_document`, `code_actions` |
 
-`read_file` accepts one or more files, supports independent ranges per file, and folds large implementation regions by default. File-scoped semantic tools surface relevant diagnostics without requiring a separate diagnostics request.
+`read_file` reads UTF-8 source, Markdown, JSON, and other text files. It accepts one or more files, supports independent ranges per file, and uses native folding when available; files without folding information remain fully readable with stable line numbers. File-scoped semantic tools surface relevant diagnostics without requiring a separate diagnostics request.
 
 `inspect_symbol` accepts either an exact file-local symbol name or a source position. Its default view combines the symbol's type, documentation, declaration range, callers, direct calls, and non-call references while removing facts already represented elsewhere in the same result. Complete source and callable type-definition targets are explicit opt-ins.
 
@@ -50,7 +50,7 @@ Editing tools ask the language server to compute its native edits and return a C
 
 ## Conventions
 
-- `workspace` is an absolute workspace root.
+- `workspace` may be absolute or relative to the MCP process working directory.
 - File paths may be absolute or relative to that root.
 - Semantic positions use zero-based LSP lines and UTF-16 characters.
 - `read_file` ranges and displayed source lines are one-based.

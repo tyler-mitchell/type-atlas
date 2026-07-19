@@ -1,7 +1,7 @@
 import { fork } from "node:child_process";
 import { stat } from "node:fs/promises";
-import path from "node:path";
 import { watch } from "chokidar";
+import * as path from "pathe";
 import {
   CancellationTokenSource,
   ConfigurationRequest,
@@ -46,10 +46,7 @@ const matchesWatcher = (
   ((watcher.kind ??
     (WatchKind.Create | WatchKind.Change | WatchKind.Delete)) &
       watchKind(type)) !== 0 &&
-  path.posix.matchesGlob(
-    relativePath.split(path.sep).join(path.posix.sep),
-    watcher.globPattern,
-  );
+  path.matchesGlob(relativePath, watcher.globPattern);
 
 const startVolarWorkspace = async (
   workspaceRoot: string,
@@ -282,11 +279,6 @@ export const createVolarWorkspaces = (languageServer: URL) => {
   const entries = new Map<string, Promise<VolarWorkspace>>();
 
   const get = (root: string): Promise<VolarWorkspace> => {
-    if (!path.isAbsolute(root)) {
-      return Promise.reject(
-        new Error(`Workspace must be an absolute path: ${root}`),
-      );
-    }
     const workspaceRoot = path.resolve(root);
     const existing = entries.get(workspaceRoot);
     if (existing) return existing;

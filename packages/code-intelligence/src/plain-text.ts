@@ -1,4 +1,4 @@
-import path from "node:path";
+import * as path from "pathe";
 import {
   type CallHierarchyIncomingCall,
   type CallHierarchyItem,

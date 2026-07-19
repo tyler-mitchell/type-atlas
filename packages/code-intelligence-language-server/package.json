@@ -1,6 +1,7 @@
 {
   "name": "@featuretype/code-intelligence-language-server",
   "version": "0.0.0",
+  "description": "Volar language server for TypeScript, Markdown, and JSON code intelligence.",
   "type": "module",
   "sideEffects": false,
   "repository": {
@@ -49,7 +50,10 @@
   "dependencies": {
     "@volar/language-server": "2.4.28",
     "typescript": "5.9.3",
-    "volar-service-typescript": "0.0.71"
+    "volar-service-json": "0.0.71",
+    "volar-service-markdown": "0.0.71",
+    "volar-service-typescript": "0.0.71",
+    "vscode-markdown-languageservice": "0.5.0-alpha.6"
   },
   "devDependencies": {
     "@types/node": "^22.13.10",

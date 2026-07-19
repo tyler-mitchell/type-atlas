@@ -83,7 +83,7 @@ export const namespace = {
   type: "namespace" as const,
   name: "code_intelligence",
   description:
-    "TypeScript source intelligence bound to the current Codex task and workspace.",
+    "Code intelligence bound to the current Codex task and workspace.",
   tools: [
     tool(
       "inspect_symbol",
@@ -92,7 +92,7 @@ export const namespace = {
     ),
     tool(
       "read_file",
-      "Read one or more files from this task's workspace with line numbers and optional folding.",
+      "Read UTF-8 source, Markdown, and JSON from this task's workspace with line numbers and native folding. Pass a path or ranged view, or an array of either.",
       input.ReadFile,
     ),
     tool(

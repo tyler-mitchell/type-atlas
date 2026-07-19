@@ -1,10 +1,12 @@
 {
   "name": "@featuretype/code-intelligence-mcp",
   "version": "0.0.0",
-  "description": "Semantic TypeScript code intelligence exposed through the Model Context Protocol.",
+  "description": "Editor-grade code intelligence for coding agents, powered by Volar.js.",
   "keywords": [
     "code-intelligence",
+    "json",
     "language-server",
+    "markdown",
     "mcp",
     "typescript",
     "volar"
