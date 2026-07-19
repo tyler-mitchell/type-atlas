@@ -6,6 +6,7 @@ import {
   CallHierarchyIncomingCallsRequest,
   CallHierarchyOutgoingCallsRequest,
   CallHierarchyPrepareRequest,
+  ApplyWorkspaceEditRequest,
   CodeActionRequest,
   CodeActionResolveRequest,
   CompletionRequest,
@@ -17,10 +18,12 @@ import {
   DidChangeWatchedFilesNotification,
   DidCloseTextDocumentNotification,
   DidOpenTextDocumentNotification,
+  DocumentFormattingRequest,
   DocumentHighlightRequest,
   DocumentDiagnosticReportKind,
   DocumentDiagnosticRequest,
   DocumentSymbolRequest,
+  ExecuteCommandRequest,
   FileChangeType,
   FoldingRangeRequest,
   HoverRequest,
@@ -35,7 +38,6 @@ import {
   ShutdownRequest,
   TypeDefinitionRequest,
   WillRenameFilesRequest,
-  WorkspaceDiagnosticRequest,
   WorkspaceSymbolRequest,
   type CallHierarchyIncomingCall,
   type CallHierarchyItem,
@@ -48,6 +50,7 @@ import {
   type DocumentHighlight,
   type DocumentSymbol,
   type FoldingRange,
+  type FormattingOptions,
   type Hover,
   type Location,
   type LocationLink,
@@ -56,9 +59,12 @@ import {
   type Range,
   type SignatureHelp,
   type SymbolInformation,
+  type TextEdit,
   type WorkspaceEdit,
+  type ApplyWorkspaceEditResult,
   type WorkspaceSymbol,
 } from "vscode-languageserver-protocol";
+import { CancellationTokenSource, type CancellationToken } from "vscode-jsonrpc";
 import { FindFileReferenceRequest } from "@volar/language-server/protocol.js";
 import {
   createProtocolConnection,
@@ -66,6 +72,7 @@ import {
 } from "@volar/language-server/node.js";
 import { URI } from "vscode-uri";
 import { requestSignatureHelpWithFallback } from "./signature-help.js";
+import { createWatchedFilesClient } from "./watched-files-client.js";
 
 export interface ResolveWorkspaceTsdkOptions {
   tsdk?: string;
@@ -75,11 +82,6 @@ export interface CreateFeatureTypeLanguageServerClientOptions
   extends ResolveWorkspaceTsdkOptions {
   rootDir: string;
 }
-
-type ProjectDiagnosticBatch = {
-  filePath: string;
-  diagnostics: Diagnostic[];
-};
 
 export interface SyncedDocument {
   uri: string;
@@ -117,7 +119,24 @@ export interface FeatureTypeLanguageServerClient {
     filePath: string,
     range: Range,
     diagnostics: Diagnostic[],
+    signal?: AbortSignal,
   ): Promise<Array<CodeAction | Command>>;
+  resolveDocumentCodeAction(
+    action: CodeAction,
+    signal?: AbortSignal,
+  ): Promise<CodeAction>;
+  executeDocumentCommand(
+    command: Command,
+    applyEdit: (edit: WorkspaceEdit, label?: string) => Promise<ApplyWorkspaceEditResult>,
+    signal?: AbortSignal,
+  ): Promise<unknown>;
+  getDocumentFormattingEdits(
+    filePath: string,
+    options: FormattingOptions,
+    signal?: AbortSignal,
+  ): Promise<TextEdit[]>;
+  getDocumentVersion(filePath: string): number | null;
+  canExecuteCommand(command: string): boolean;
   getDocumentCompletions(
     filePath: string,
     position: Position,
@@ -161,10 +180,12 @@ export interface FeatureTypeLanguageServerClient {
     filePath: string,
     position: Position,
     newName: string,
+    signal?: AbortSignal,
   ): Promise<WorkspaceEdit | null>;
   getDocumentFileRenameEdits(
     oldFilePath: string,
     newFilePath: string,
+    signal?: AbortSignal,
   ): Promise<WorkspaceEdit | null>;
   getDocumentCallHierarchyItems(
     filePath: string,
@@ -215,7 +236,24 @@ export interface DiagnosticsSession {
     filePath: string,
     range: Range,
     diagnostics: Diagnostic[],
+    signal?: AbortSignal,
   ): Promise<Array<CodeAction | Command>>;
+  resolveFileCodeAction(
+    action: CodeAction,
+    signal?: AbortSignal,
+  ): Promise<CodeAction>;
+  executeCommand(
+    command: Command,
+    applyEdit: (edit: WorkspaceEdit, label?: string) => Promise<ApplyWorkspaceEditResult>,
+    signal?: AbortSignal,
+  ): Promise<unknown>;
+  getFileFormattingEdits(
+    filePath: string,
+    options: FormattingOptions,
+    signal?: AbortSignal,
+  ): Promise<TextEdit[]>;
+  getFileVersion(filePath: string): number | null;
+  canExecuteCommand(command: string): boolean;
   getFileCompletions(
     filePath: string,
     position: Position,
@@ -259,10 +297,12 @@ export interface DiagnosticsSession {
     filePath: string,
     position: Position,
     newName: string,
+    signal?: AbortSignal,
   ): Promise<WorkspaceEdit | null>;
   getWorkspaceFileRenameEdits(
     oldFilePath: string,
     newFilePath: string,
+    signal?: AbortSignal,
   ): Promise<WorkspaceEdit | null>;
   getFileCallHierarchyItems(
     filePath: string,
@@ -306,6 +346,22 @@ function supportsCodeActionResolve(
   action: CodeAction | Command,
 ): action is CodeAction & { data: NonNullable<CodeAction["data"]> } {
   return "data" in action && action.data !== undefined && action.data !== null;
+}
+
+async function withCancellation<T>(
+  signal: AbortSignal | undefined,
+  work: (token: CancellationToken) => Promise<T>,
+): Promise<T> {
+  const source = new CancellationTokenSource();
+  const cancel = (): void => source.cancel();
+  if (signal?.aborted) cancel();
+  signal?.addEventListener("abort", cancel, { once: true });
+  try {
+    return await work(source.token);
+  } finally {
+    signal?.removeEventListener("abort", cancel);
+    source.dispose();
+  }
 }
 
 function normalizeCompletionResult(
@@ -568,104 +624,6 @@ function collectReferencedProjectFiles(
   ];
 }
 
-function collectTypeScriptProjectDiagnostics(
-  rootDir: string,
-  tsdk: string,
-): ProjectDiagnosticBatch[] {
-  const nestedRepositoryRoots = findNestedRepositoryRoots(rootDir);
-  const { typescript: ts } = loadTsdkByPath(tsdk, undefined);
-  const tsconfigPath = ts.findConfigFile(rootDir, ts.sys.fileExists, "tsconfig.json");
-  const parsedCommandLine = tsconfigPath
-    ? ts.parseJsonConfigFileContent(
-        ts.readConfigFile(tsconfigPath, ts.sys.readFile).config,
-        ts.sys,
-        path.dirname(tsconfigPath),
-      )
-    : ts.parseJsonConfigFileContent({}, ts.sys, rootDir);
-
-  const builder = ts.createIncrementalProgram({
-    rootNames: filterFilesOutsideNestedRepositories(
-      parsedCommandLine.fileNames,
-      nestedRepositoryRoots,
-    ),
-    options: parsedCommandLine.options,
-    projectReferences: parsedCommandLine.projectReferences,
-    configFileParsingDiagnostics: parsedCommandLine.errors,
-  });
-  const program = builder.getProgram();
-
-  const diagnosticsByFile = new Map<string, Diagnostic[]>();
-
-  const pushDiagnostic = (diagnostic: import("typescript").Diagnostic): void => {
-    const sourceFile = diagnostic.file;
-    if (!sourceFile || diagnostic.start == null) {
-      return;
-    }
-
-    const start = sourceFile.getLineAndCharacterOfPosition(diagnostic.start);
-    const end = sourceFile.getLineAndCharacterOfPosition(
-      diagnostic.start + (diagnostic.length ?? 0),
-    );
-    const filePath = path.resolve(sourceFile.fileName);
-    const existing = diagnosticsByFile.get(filePath) ?? [];
-    existing.push({
-      range: {
-        start: { line: start.line, character: start.character },
-        end: { line: end.line, character: end.character },
-      },
-      severity:
-        diagnostic.category === ts.DiagnosticCategory.Warning
-          ? 2
-          : diagnostic.category === ts.DiagnosticCategory.Suggestion ||
-              diagnostic.category === ts.DiagnosticCategory.Message
-            ? 3
-            : 1,
-      code: diagnostic.code,
-      message: ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n"),
-      source: "typescript",
-      relatedInformation: diagnostic.relatedInformation?.flatMap((related) => {
-        if (!related.file || related.start == null) {
-          return [];
-        }
-
-        const relatedStart = related.file.getLineAndCharacterOfPosition(related.start);
-        const relatedEnd = related.file.getLineAndCharacterOfPosition(
-          related.start + (related.length ?? 0),
-        );
-
-        return [
-          {
-            location: {
-              uri: URI.file(path.resolve(related.file.fileName)).toString(),
-              range: {
-                start: {
-                  line: relatedStart.line,
-                  character: relatedStart.character,
-                },
-                end: {
-                  line: relatedEnd.line,
-                  character: relatedEnd.character,
-                },
-              },
-            },
-            message: ts.flattenDiagnosticMessageText(related.messageText, "\n"),
-          },
-        ];
-      }),
-    });
-    diagnosticsByFile.set(filePath, existing);
-  };
-
-  for (const diagnostic of ts.getPreEmitDiagnostics(program)) {
-    pushDiagnostic(diagnostic);
-  }
-
-  return [...diagnosticsByFile.entries()].map(([filePath, diagnostics]) => ({
-    filePath,
-    diagnostics,
-  }));
-}
-
 export async function createFeatureTypeLanguageServerClient(
   options: CreateFeatureTypeLanguageServerClientOptions,
 ): Promise<FeatureTypeLanguageServerClient> {
@@ -694,15 +652,16 @@ export async function createFeatureTypeLanguageServerClient(
     childProcess.stdout,
     childProcess.stdin,
   );
-  const openedDocuments = new Map<string, SyncedDocument>();
-  // Tracks absolute paths opened as virtual (content-only, no disk read).
-  const virtualFilePaths = new Set<string>();
+  const virtualDocuments = new Map<string, SyncedDocument>();
   const nestedRepositoryRoots = findNestedRepositoryRoots(rootDir);
   let knownWatchedFiles = new Set(
     findWatchedFiles(rootDir, nestedRepositoryRoots),
   );
   let workspaceBootstrapFile: string | undefined;
   let disposed = false;
+  let activeWorkspaceEditApplier:
+    | ((edit: WorkspaceEdit, label?: string) => Promise<ApplyWorkspaceEditResult>)
+    | null = null;
 
   connection.listen();
   connection.onRequest(ConfigurationRequest.type, (params: { items: unknown[] }) =>
@@ -712,6 +671,15 @@ export async function createFeatureTypeLanguageServerClient(
   connection.onRequest(DiagnosticRefreshRequest.type, () => {
     for (const listener of diagnosticsRefreshListeners) listener();
   });
+  connection.onRequest(ApplyWorkspaceEditRequest.type, async (params) => {
+    if (!activeWorkspaceEditApplier) {
+      return {
+        applied: false,
+        failureReason: "No FeatureType workspace-edit transaction is active.",
+      };
+    }
+    return await activeWorkspaceEditApplier(params.edit, params.label);
+  });
   connection.onDispose(() => {
     connection.end();
   });
@@ -719,7 +687,12 @@ export async function createFeatureTypeLanguageServerClient(
     disposed = true;
   });
 
-  await connection.sendRequest(InitializeRequest.type, {
+  const watchedFilesClient = createWatchedFilesClient({
+    connection,
+    rootDir,
+  });
+
+  const initializeResult = await connection.sendRequest(InitializeRequest.type, {
     processId: childProcess.pid ?? null,
     rootUri: URI.file(rootDir).toString(),
     workspaceFolders: null,
@@ -728,6 +701,20 @@ export async function createFeatureTypeLanguageServerClient(
     },
     capabilities: {
       workspace: {
+        applyEdit: true,
+        didChangeWatchedFiles: {
+          dynamicRegistration: true,
+        },
+        fileOperations: {
+          dynamicRegistration: false,
+          willRename: true,
+        },
+        workspaceEdit: {
+          documentChanges: true,
+          resourceOperations: ["create"],
+          failureHandling: "transactional",
+          changeAnnotationSupport: {},
+        },
         diagnostics: {
           refreshSupport: true,
         },
@@ -752,7 +739,7 @@ export async function createFeatureTypeLanguageServerClient(
           },
           dataSupport: true,
           resolveSupport: {
-            properties: ["edit"],
+            properties: ["edit", "command"],
           },
           isPreferredSupport: true,
           disabledSupport: true,
@@ -775,88 +762,41 @@ export async function createFeatureTypeLanguageServerClient(
       },
     },
   });
+  const serverCommands = new Set(
+    initializeResult.capabilities.executeCommandProvider?.commands ?? [],
+  );
   await connection.sendNotification(InitializedNotification.type, {});
 
-  const syncDocumentFromDisk = async (
+  async function getRequestDocument(
     filePath: string,
-    mode: "open" | "refresh",
-  ): Promise<SyncedDocument | null> => {
+  ): Promise<SyncedDocument | null> {
+    await watchedFilesClient.settle();
     const absPath = resolveFilePath(rootDir, filePath);
     const uri = URI.file(absPath).toString();
-    const current = openedDocuments.get(uri);
-
-    // Virtual files are already open in the LSP session with caller-supplied
-    // content. Never read from disk for them — doing so would blow up on
-    // non-existent files and would also clobber content the caller registered.
-    if (current && virtualFilePaths.has(absPath)) {
-      return current;
+    const virtualDocument = virtualDocuments.get(absPath);
+    if (virtualDocument) {
+      return virtualDocument;
     }
 
     if (!fs.existsSync(absPath)) {
-      if (current) {
-        openedDocuments.delete(uri);
-        await connection.sendNotification(DidCloseTextDocumentNotification.type, {
-          textDocument: { uri },
-        });
-      }
       return null;
     }
 
-    const languageId = getLanguageId(absPath);
-    const text = fs.readFileSync(absPath, "utf-8");
-
-    if (!current) {
-      const document = { uri, languageId, version: 1, text };
-      openedDocuments.set(uri, document);
-      await connection.sendNotification(DidOpenTextDocumentNotification.type, {
-        textDocument: document,
-      });
-      return document;
-    }
-
-    if (mode === "refresh" && current.text !== text) {
-      const document = {
-        uri,
-        languageId,
-        version: current.version + 1,
-        text,
-      };
-      openedDocuments.set(uri, document);
-      await connection.sendNotification(
-        DidChangeTextDocumentNotification.type,
-        {
-          textDocument: {
-            uri,
-            version: document.version,
-          },
-          contentChanges: [{ text }],
-        },
-      );
-      return document;
-    }
-
-    return current;
-  };
-
-  const refreshOpenedDiskDocuments = async (): Promise<void> => {
-    for (const document of [...openedDocuments.values()]) {
-      const absPath = URI.parse(document.uri).fsPath;
-      if (virtualFilePaths.has(absPath)) {
-        continue;
-      }
-      await syncDocumentFromDisk(absPath, "refresh");
-    }
-  };
+    return {
+      uri,
+      languageId: getLanguageId(absPath),
+      version: 0,
+      text: fs.readFileSync(absPath, "utf-8"),
+    };
+  }
 
   const getDocumentDiagnostics = async (
     filePath: string,
   ): Promise<Diagnostic[]> => {
     const absPath = resolveFilePath(rootDir, filePath);
 
-    await refreshOpenedDiskDocuments();
-
-    if (virtualFilePaths.has(absPath)) {
-      const document = await syncDocumentFromDisk(filePath, "refresh");
+    if (virtualDocuments.has(absPath)) {
+      const document = await getRequestDocument(filePath);
       if (!document) {
         return [];
       }
@@ -893,41 +833,77 @@ export async function createFeatureTypeLanguageServerClient(
     filePath: string,
     range: Range,
     diagnostics: Diagnostic[],
+    signal?: AbortSignal,
   ): Promise<Array<CodeAction | Command>> => {
-    const document = await syncDocumentFromDisk(filePath, "refresh");
+    const document = await getRequestDocument(filePath);
     if (!document) {
       return [];
     }
-    const actions =
+    return await withCancellation(signal, async (token) =>
       (await connection.sendRequest(CodeActionRequest.type, {
-        textDocument: { uri: document.uri },
-        range,
-        context: { diagnostics },
-      })) ?? [];
-
-    return Promise.all(
-      actions.map(async (action) => {
-        if (!supportsCodeActionResolve(action)) {
-          return action;
-        }
-
-        try {
-          return (
-            (await connection.sendRequest(CodeActionResolveRequest.type, action)) ??
-            action
-          );
-        } catch {
-          return action;
-        }
-      }),
+          textDocument: { uri: document.uri },
+          range,
+          context: { diagnostics },
+        }, token)) ?? []
     );
   };
+
+  const resolveDocumentCodeAction = async (
+    action: CodeAction,
+    signal?: AbortSignal,
+  ): Promise<CodeAction> => {
+    if (!supportsCodeActionResolve(action)) return action;
+    return await withCancellation(signal, async (token) =>
+      (await connection.sendRequest(CodeActionResolveRequest.type, action, token)) ?? action
+    );
+  };
+
+  const executeDocumentCommand = async (
+    command: Command,
+    applyEdit: (edit: WorkspaceEdit, label?: string) => Promise<ApplyWorkspaceEditResult>,
+    signal?: AbortSignal,
+  ): Promise<unknown> => {
+    if (activeWorkspaceEditApplier) {
+      throw new Error("A language-server command is already applying workspace edits.");
+    }
+    activeWorkspaceEditApplier = applyEdit;
+    try {
+      return await withCancellation(signal, (token) =>
+        connection.sendRequest(ExecuteCommandRequest.type, {
+          command: command.command,
+          arguments: command.arguments,
+        }, token)
+      );
+    } finally {
+      activeWorkspaceEditApplier = null;
+    }
+  };
+
+  const getDocumentFormattingEdits = async (
+    filePath: string,
+    options: FormattingOptions,
+    signal?: AbortSignal,
+  ): Promise<TextEdit[]> => {
+    const document = await getRequestDocument(filePath);
+    if (!document) return [];
+    return await withCancellation(signal, async (token) =>
+      (await connection.sendRequest(DocumentFormattingRequest.type, {
+        textDocument: { uri: document.uri },
+        options,
+      }, token)) ?? []
+    );
+  };
+
+  const getDocumentVersion = (filePath: string): number | null =>
+    virtualDocuments.get(resolveFilePath(rootDir, filePath))?.version ?? null;
+
+  const canExecuteCommand = (command: string): boolean => serverCommands.has(command);
 
   const getDocumentCompletions = async (
     filePath: string,
     position: Position,
   ): Promise<CompletionList> => {
-    const document = await syncDocumentFromDisk(filePath, "refresh");
+    const document = await getRequestDocument(filePath);
     if (!document) {
       return {
         isIncomplete: false,
@@ -960,7 +936,7 @@ export async function createFeatureTypeLanguageServerClient(
     filePath: string,
     position: Position,
   ): Promise<Hover | null> => {
-    const document = await syncDocumentFromDisk(filePath, "refresh");
+    const document = await getRequestDocument(filePath);
     if (!document) {
       return null;
     }
@@ -976,7 +952,7 @@ export async function createFeatureTypeLanguageServerClient(
     filePath: string,
     position: Position,
   ): Promise<SignatureHelp | null> => {
-    const document = await syncDocumentFromDisk(filePath, "refresh");
+    const document = await getRequestDocument(filePath);
     if (!document) {
       return null;
     }
@@ -1000,7 +976,7 @@ export async function createFeatureTypeLanguageServerClient(
     filePath: string,
     position: Position,
   ): Promise<Array<Location | LocationLink>> => {
-    const document = await syncDocumentFromDisk(filePath, "refresh");
+    const document = await getRequestDocument(filePath);
     if (!document) {
       return [];
     }
@@ -1031,7 +1007,7 @@ export async function createFeatureTypeLanguageServerClient(
     filePath: string,
     position: Position,
   ): Promise<Location[]> => {
-    const document = await syncDocumentFromDisk(filePath, "refresh");
+    const document = await getRequestDocument(filePath);
     if (!document) {
       return [];
     }
@@ -1048,7 +1024,7 @@ export async function createFeatureTypeLanguageServerClient(
     filePath: string,
     position: Position,
   ): Promise<Array<Location | LocationLink>> => {
-    const document = await syncDocumentFromDisk(filePath, "refresh");
+    const document = await getRequestDocument(filePath);
     if (!document) {
       return [];
     }
@@ -1068,7 +1044,7 @@ export async function createFeatureTypeLanguageServerClient(
     filePath: string,
     position: Position,
   ): Promise<Array<Location | LocationLink>> => {
-    const document = await syncDocumentFromDisk(filePath, "refresh");
+    const document = await getRequestDocument(filePath);
     if (!document) {
       return [];
     }
@@ -1088,7 +1064,7 @@ export async function createFeatureTypeLanguageServerClient(
     filePath: string,
     position: Position,
   ): Promise<DocumentHighlight[]> => {
-    const document = await syncDocumentFromDisk(filePath, "refresh");
+    const document = await getRequestDocument(filePath);
     if (!document) {
       return [];
     }
@@ -1103,7 +1079,7 @@ export async function createFeatureTypeLanguageServerClient(
   const getDocumentImportReferences = async (
     filePath: string,
   ): Promise<Location[]> => {
-    const document = await syncDocumentFromDisk(filePath, "refresh");
+    const document = await getRequestDocument(filePath);
     if (!document) {
       return [];
     }
@@ -1117,54 +1093,24 @@ export async function createFeatureTypeLanguageServerClient(
   const getWorkspaceDiagnostics = async (): Promise<
     Array<{ filePath: string; diagnostics: Diagnostic[] }> | null
   > => {
-    await refreshOpenedDiskDocuments();
-    await ensureWorkspaceInitialized();
-
-    try {
-      const report = await connection.sendRequest(WorkspaceDiagnosticRequest.type, {
-        previousResultIds: [],
-      });
-
-      if (!report) {
-        return [];
-      }
-
-      return report.items
-        .filter((item) => item.kind === DocumentDiagnosticReportKind.Full)
-        .map((item) => ({
-          filePath: URI.parse(item.uri).fsPath,
-          diagnostics: item.items,
-        }));
-    } catch {
-      const seen = new Set<string>();
-      const projectDiagnostics = collectTypeScriptProjectDiagnostics(rootDir, tsdk).map(
-        (entry) => {
-          seen.add(path.resolve(entry.filePath));
-          return entry;
-        },
-      );
-
-      const extraFiles = [
-        ...findFeatureTypeFiles(rootDir, nestedRepositoryRoots),
-        ...[...virtualFilePaths].filter((filePath) => !seen.has(path.resolve(filePath))),
-      ].filter(
-        (filePath) =>
-          !isWithinAnyNestedRepository(filePath, nestedRepositoryRoots),
-      );
-
-      const extraDiagnostics = await Promise.all(
-        extraFiles.map(async (filePath) => ({
-          filePath,
-          diagnostics: await getDocumentDiagnostics(filePath),
-        })),
-      );
-
-      return [...projectDiagnostics, ...extraDiagnostics];
-    }
+    const diskFiles = enumerateProjectFiles(rootDir, { tsdk });
+    const filePaths = [
+      ...diskFiles,
+      ...[...virtualDocuments.keys()].filter(
+        (filePath) => !diskFiles.includes(filePath),
+      ),
+    ];
+    return await Promise.all(
+      filePaths.map(async (filePath) => ({
+        filePath,
+        diagnostics: await getDocumentDiagnostics(filePath),
+      })),
+    );
   };
 
   const ensureWorkspaceInitialized = async (): Promise<void> => {
-    if (openedDocuments.size > 0) {
+    await watchedFilesClient.settle();
+    if (workspaceBootstrapFile) {
       return;
     }
     const projectFiles = enumerateProjectFiles(rootDir, { tsdk });
@@ -1172,7 +1118,9 @@ export async function createFeatureTypeLanguageServerClient(
       projectFiles.find((filePath) => !filePath.endsWith(".featuretype")) ??
       projectFiles[0];
     if (workspaceBootstrapFile) {
-      await syncDocumentFromDisk(workspaceBootstrapFile, "open");
+      await connection.sendRequest(DocumentDiagnosticRequest.type, {
+        textDocument: { uri: URI.file(workspaceBootstrapFile).toString() },
+      });
     }
   };
 
@@ -1187,7 +1135,7 @@ export async function createFeatureTypeLanguageServerClient(
     filePath: string,
     position: Position,
   ): Promise<PrepareRenameResult | null> => {
-    const document = await syncDocumentFromDisk(filePath, "refresh");
+    const document = await getRequestDocument(filePath);
     if (!document) {
       return null;
     }
@@ -1203,38 +1151,40 @@ export async function createFeatureTypeLanguageServerClient(
     filePath: string,
     position: Position,
     newName: string,
+    signal?: AbortSignal,
   ): Promise<WorkspaceEdit | null> => {
-    const document = await syncDocumentFromDisk(filePath, "refresh");
+    const document = await getRequestDocument(filePath);
     if (!document) {
       return null;
     }
-    return (
+    return await withCancellation(signal, async (token) => (
       (await connection.sendRequest(RenameRequest.type, {
         textDocument: { uri: document.uri },
         position,
         newName,
-      })) ?? null
-    );
+      }, token)) ?? null
+    ));
   };
 
   const getDocumentFileRenameEdits = async (
     oldFilePath: string,
     newFilePath: string,
+    signal?: AbortSignal,
   ): Promise<WorkspaceEdit | null> => {
     const oldUri = URI.file(resolveFilePath(rootDir, oldFilePath)).toString();
     const newUri = URI.file(resolveFilePath(rootDir, newFilePath)).toString();
-    return (
+    return await withCancellation(signal, async (token) => (
       (await connection.sendRequest(WillRenameFilesRequest.type, {
         files: [{ oldUri, newUri }],
-      })) ?? null
-    );
+      }, token)) ?? null
+    ));
   };
 
   const getDocumentCallHierarchyItems = async (
     filePath: string,
     position: Position,
   ): Promise<CallHierarchyItem[]> => {
-    const document = await syncDocumentFromDisk(filePath, "refresh");
+    const document = await getRequestDocument(filePath);
     if (!document) {
       return [];
     }
@@ -1259,7 +1209,7 @@ export async function createFeatureTypeLanguageServerClient(
   const getDocumentSymbols = async (
     filePath: string,
   ): Promise<Array<DocumentSymbol | SymbolInformation>> => {
-    const document = await syncDocumentFromDisk(filePath, "refresh");
+    const document = await getRequestDocument(filePath);
     if (!document) {
       return [];
     }
@@ -1273,7 +1223,7 @@ export async function createFeatureTypeLanguageServerClient(
   const getDocumentFoldingRanges = async (
     filePath: string,
   ): Promise<FoldingRange[]> => {
-    const document = await syncDocumentFromDisk(filePath, "refresh");
+    const document = await getRequestDocument(filePath);
     if (!document) {
       return [];
     }
@@ -1289,7 +1239,6 @@ export async function createFeatureTypeLanguageServerClient(
       resolveFilePath(rootDir, filePath)
     ))];
 
-    await refreshOpenedDiskDocuments();
     const previousKnownWatchedFiles = new Set(knownWatchedFiles);
 
     for (const filePath of normalizedPaths) {
@@ -1319,13 +1268,11 @@ export async function createFeatureTypeLanguageServerClient(
     const absPath = resolveFilePath(rootDir, filePath);
     const uri = URI.file(absPath).toString();
     const languageId = getLanguageId(absPath);
-    const current = openedDocuments.get(uri);
+    const current = virtualDocuments.get(absPath);
     const shouldNormalizeImportSpecifiers = NORMALIZABLE_LANGUAGE_IDS.has(languageId);
     const updatedContent = shouldNormalizeImportSpecifiers
       ? normalizeVirtualImportSpecifiers(content)
       : content;
-
-    virtualFilePaths.add(absPath);
 
     if (!current) {
       const document = {
@@ -1334,7 +1281,7 @@ export async function createFeatureTypeLanguageServerClient(
         version: 1,
         text: updatedContent,
       };
-      openedDocuments.set(uri, document);
+      virtualDocuments.set(absPath, document);
       await connection.sendNotification(DidOpenTextDocumentNotification.type, {
         textDocument: document,
       });
@@ -1349,7 +1296,7 @@ export async function createFeatureTypeLanguageServerClient(
         version: current.version + 1,
         text: updatedContent,
       };
-      openedDocuments.set(uri, document);
+      virtualDocuments.set(absPath, document);
       await connection.sendNotification(DidChangeTextDocumentNotification.type, {
         textDocument: { uri, version: document.version },
         contentChanges: [{ text: updatedContent }],
@@ -1363,9 +1310,7 @@ export async function createFeatureTypeLanguageServerClient(
   const closeVirtualFile = async (filePath: string): Promise<void> => {
     const absPath = resolveFilePath(rootDir, filePath);
     const uri = URI.file(absPath).toString();
-    virtualFilePaths.delete(absPath);
-    if (openedDocuments.has(uri)) {
-      openedDocuments.delete(uri);
+    if (virtualDocuments.delete(absPath)) {
       await connection.sendNotification(DidCloseTextDocumentNotification.type, {
         textDocument: { uri },
       });
@@ -1377,6 +1322,7 @@ export async function createFeatureTypeLanguageServerClient(
       return;
     }
     disposed = true;
+    watchedFilesClient.dispose();
 
     try {
       await connection.sendRequest(ShutdownRequest.type);
@@ -1394,14 +1340,14 @@ export async function createFeatureTypeLanguageServerClient(
     rootDir,
     tsdk,
     async openFileFromDisk(filePath: string) {
-      const document = await syncDocumentFromDisk(filePath, "open");
+      const document = await getRequestDocument(filePath);
       if (!document) {
         throw new Error(`File not found: ${resolveFilePath(rootDir, filePath)}`);
       }
       return document;
     },
     async refreshFileFromDisk(filePath: string) {
-      const document = await syncDocumentFromDisk(filePath, "refresh");
+      const document = await getRequestDocument(filePath);
       if (!document) {
         throw new Error(`File not found: ${resolveFilePath(rootDir, filePath)}`);
       }
@@ -1410,17 +1356,20 @@ export async function createFeatureTypeLanguageServerClient(
     openVirtualFile,
     closeVirtualFile,
     getVirtualFilePaths() {
-      return [...virtualFilePaths];
+      return [...virtualDocuments.keys()];
     },
     getVirtualFileContent(filePath: string): string | undefined {
       const absPath = resolveFilePath(rootDir, filePath);
-      if (!virtualFilePaths.has(absPath)) return undefined;
-      const uri = URI.file(absPath).toString();
-      return openedDocuments.get(uri)?.text;
+      return virtualDocuments.get(absPath)?.text;
     },
     getWorkspaceDiagnostics,
     getDocumentDiagnostics,
     getDocumentCodeActions,
+    resolveDocumentCodeAction,
+    executeDocumentCommand,
+    getDocumentFormattingEdits,
+    getDocumentVersion,
+    canExecuteCommand,
     getDocumentCompletions,
     resolveCompletionItem,
     getDocumentHover,
@@ -1500,8 +1449,24 @@ export async function createDiagnosticsSession(
       filePath: string,
       range: Range,
       diagnostics: Diagnostic[],
+      signal?: AbortSignal,
     ) {
-      return client.getDocumentCodeActions(filePath, range, diagnostics);
+      return client.getDocumentCodeActions(filePath, range, diagnostics, signal);
+    },
+    resolveFileCodeAction(action, signal) {
+      return client.resolveDocumentCodeAction(action, signal);
+    },
+    executeCommand(command, applyEdit, signal) {
+      return client.executeDocumentCommand(command, applyEdit, signal);
+    },
+    getFileFormattingEdits(filePath, options, signal) {
+      return client.getDocumentFormattingEdits(filePath, options, signal);
+    },
+    getFileVersion(filePath) {
+      return client.getDocumentVersion(filePath);
+    },
+    canExecuteCommand(command) {
+      return client.canExecuteCommand(command);
     },
     getFileCompletions(filePath: string, position: Position) {
       return client.getDocumentCompletions(filePath, position);
@@ -1543,11 +1508,16 @@ export async function createDiagnosticsSession(
       filePath: string,
       position: Position,
       newName: string,
+      signal?: AbortSignal,
     ) {
-      return client.getDocumentRenameEdits(filePath, position, newName);
+      return client.getDocumentRenameEdits(filePath, position, newName, signal);
     },
-    getWorkspaceFileRenameEdits(oldFilePath: string, newFilePath: string) {
-      return client.getDocumentFileRenameEdits(oldFilePath, newFilePath);
+    getWorkspaceFileRenameEdits(
+      oldFilePath: string,
+      newFilePath: string,
+      signal?: AbortSignal,
+    ) {
+      return client.getDocumentFileRenameEdits(oldFilePath, newFilePath, signal);
     },
     getFileCallHierarchyItems(filePath: string, position: Position) {
       return client.getDocumentCallHierarchyItems(filePath, position);

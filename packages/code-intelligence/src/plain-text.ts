@@ -1,5 +1,4 @@
 import path from "node:path";
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import {
   type CallHierarchyIncomingCall,
   type CallHierarchyItem,
@@ -35,27 +34,6 @@ export type Page<Item> = {
   readonly nextOffset?: number;
 };
 
-export const textResult = (text: string): CallToolResult => ({
-  content: [{ type: "text", text }],
-});
-
-export const appendDiagnosticContext = (
-  result: CallToolResult,
-  context: string | undefined,
-): CallToolResult =>
-  context
-    ? {
-      ...result,
-      content: [
-        ...result.content,
-        {
-          type: "text",
-          text: `\n\n${context}`,
-        },
-      ],
-    }
-    : result;
-
 const enumName = (
   values: Record<string, number | ((value: number) => boolean)>,
   value: number | undefined,
@@ -66,7 +44,7 @@ const enumName = (
     ?.replace(/([a-z])([A-Z])/g, "$1 $2")
     .toLowerCase() ?? fallback;
 
-const workspacePath = (uri: string, workspaceRoot: string) => {
+export const workspacePath = (uri: string, workspaceRoot: string) => {
   try {
     const parsed = URI.parse(uri);
     if (parsed.scheme !== "file") return uri;
@@ -81,12 +59,13 @@ const workspacePath = (uri: string, workspaceRoot: string) => {
   }
 };
 
-const positionText = ({ line, character }: Position) => `${line}:${character}`;
+export const positionText = ({ line, character }: Position) =>
+  `${line}:${character}`;
 
-const rangeText = ({ start, end }: Range) =>
+export const rangeText = ({ start, end }: Range) =>
   `${positionText(start)}-${positionText(end)}`;
 
-const workspaceRange = (
+export const workspaceRange = (
   uri: string,
   range: Range,
   workspaceRoot: string,
@@ -127,7 +106,7 @@ const diagnosticSummaryText = (diagnostic: Diagnostic) => {
 const comparePositions = (left: Position, right: Position) =>
   left.line - right.line || left.character - right.character;
 
-const diagnosticIntersects = (
+export const diagnosticIntersects = (
   diagnostic: Diagnostic,
   focus: Position | Range,
 ) =>
@@ -206,7 +185,7 @@ export const formatDiagnostics = (
   if (report.kind === "unchanged") {
     return `Diagnostics: unchanged · ${file}`;
   }
-  if (!report.items.length) return `Diagnostics (0) · ${file}`;
+  if (!report.items.length) return "";
   const items = report.items.map((diagnostic) => {
     const severity = diagnosticSeverityText(diagnostic);
     const origin = diagnosticOrigin(diagnostic);
@@ -240,7 +219,8 @@ export const formatDiagnostics = (
   ].join("\n\n");
 };
 
-const symbolKind = (kind: number) => enumName(SymbolKind, kind, "symbol");
+export const symbolKind = (kind: number) =>
+  enumName(SymbolKind, kind, "symbol");
 
 const deprecatedSymbol = (
   symbol: { readonly deprecated?: boolean; readonly tags?: readonly number[] },
@@ -306,7 +286,7 @@ export const formatWorkspaceSymbols = (
   ]
     .join("\n");
 
-const hoverContentsText = (contents: Hover["contents"]) =>
+export const hoverContentsText = (contents: Hover["contents"]) =>
   Array.isArray(contents)
     ? contents.map(markupText).filter(Boolean).join("\n\n")
     : markupText(contents);
@@ -572,20 +552,22 @@ export const formatCallHierarchy = (
   workspaceRoot: string,
 ) => {
   const items = result.prepareCallHierarchy ?? [];
-  if (!items.length) return "Call hierarchy: none";
+  const relation = direction === "incoming" ? "caller" : "callee";
+  const relations = `${relation}s`;
+  if (!items.length) return `${relations[0]?.toUpperCase()}${relations.slice(1)}: none`;
   const groups = items.flatMap((item, index) => {
     const calls = direction === "incoming"
       ? result.incomingCalls?.[index]
       : result.outgoingCalls?.[index];
-    const relations = calls?.map((call) => {
+    const relatedItems = calls?.map((call) => {
       const target = "from" in call ? call.from : call.to;
-      return `  ${direction} ${
+      return `  ${relation} ${
         callItemText(target, workspaceRoot)
       }; call sites ${call.fromRanges.map(rangeText).join(", ")}`;
     }) ?? [];
     return [
       callItemText(item, workspaceRoot),
-      ...(relations.length ? relations : [`  no ${direction} calls`]),
+      ...(relatedItems.length ? relatedItems : [`  no ${relations}`]),
     ];
   });
   return groups.join("\n");

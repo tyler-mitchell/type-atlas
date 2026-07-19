@@ -4,8 +4,8 @@ import {
   type Range,
   type TextDocumentIdentifier,
 } from "@volar/language-server/protocol.js";
-import { formatDiagnosticContext } from "./plain-text.ts";
-import type { VolarWorkspace } from "./volar-workspace.ts";
+import { formatDiagnosticContext } from "@featuretype/code-intelligence/text";
+import type { VolarWorkspace } from "@featuretype/code-intelligence";
 
 export function requestDiagnosticContext(
   workspace: VolarWorkspace,

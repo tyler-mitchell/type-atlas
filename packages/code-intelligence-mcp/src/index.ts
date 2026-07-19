@@ -1,5 +1,1 @@
-export {
-  createMcpRuntime,
-  startMcpServer,
-  type McpRuntime,
-} from "./server.ts";
+export { startMcpServer } from "./server.ts";

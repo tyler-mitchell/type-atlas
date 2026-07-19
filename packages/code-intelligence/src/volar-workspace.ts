@@ -1,6 +1,7 @@
 import { fork } from "node:child_process";
-import { stat, watch } from "node:fs/promises";
+import { stat } from "node:fs/promises";
 import path from "node:path";
+import { watch } from "chokidar";
 import {
   CancellationTokenSource,
   ConfigurationRequest,
@@ -22,16 +23,12 @@ import {
   UnregistrationRequest,
   WatchKind,
 } from "vscode-languageserver-protocol/node.js";
+import { isFileInDir } from "@volar/language-server/node.js";
 import { URI } from "vscode-uri";
 import {
   clientCapabilities,
   getClientConfiguration,
 } from "./language-client.ts";
-
-const isContainedPath = (relativePath: string) =>
-  relativePath !== ".." &&
-  !relativePath.startsWith(`..${path.sep}`) &&
-  !path.isAbsolute(relativePath);
 
 const watchKind = (type: FileChangeType): WatchKind =>
   type === FileChangeType.Created
@@ -54,16 +51,17 @@ const matchesWatcher = (
     watcher.globPattern,
   );
 
-const startVolarWorkspace = async (workspaceRoot: string) => {
+const startVolarWorkspace = async (
+  workspaceRoot: string,
+  languageServerEntry: URL,
+) => {
   const workspaceStat = await stat(workspaceRoot).catch(() => undefined);
   if (!workspaceStat?.isDirectory()) {
     throw new Error(`Workspace is not a directory: ${workspaceRoot}`);
   }
 
   const languageServer = fork(
-    new URL(
-      import.meta.resolve("@featuretype/code-intelligence-language-server/node"),
-    ),
+    languageServerEntry,
     ["--node-ipc"],
     {
       cwd: workspaceRoot,
@@ -128,10 +126,12 @@ const startVolarWorkspace = async (workspaceRoot: string) => {
     },
   );
 
-  const watcherController = new AbortController();
-  languageServer.once("close", () => watcherController.abort());
-  let watcherTask = Promise.resolve();
   let watcherError: Error | undefined;
+  const watcher = watch(workspaceRoot, {
+    ignoreInitial: true,
+    followSymlinks: false,
+  });
+  languageServer.once("close", () => void watcher.close());
   try {
     const workspaceUri = URI.file(workspaceRoot).toString();
     await connection.sendRequest(InitializeRequest.type, {
@@ -176,38 +176,26 @@ const startVolarWorkspace = async (workspaceRoot: string) => {
       }
     };
 
-    watcherTask = (async () => {
-      try {
-        for await (
-          const { eventType, filename } of watch(workspaceRoot, {
-            recursive: true,
-            signal: watcherController.signal,
-          })
-        ) {
-          if (!filename) continue;
-          const relativePath = filename.toString();
-          const filePath = path.resolve(workspaceRoot, relativePath);
-          const types: readonly FileChangeType[] = eventType === "change"
-            ? [FileChangeType.Changed]
-            : await stat(filePath).then(
-              () => [FileChangeType.Created, FileChangeType.Changed],
-              () => [FileChangeType.Deleted],
-            );
-          await sendFileChanges(relativePath, types);
-          if (path.matchesGlob(relativePath, "**/node_modules/{*,@*/*}"))
-            await sendFileChanges(path.join(relativePath, "package.json"), types);
-        }
-      } catch (error) {
-        if (!watcherController.signal.aborted) {
-          watcherError = error instanceof Error
-            ? error
-            : new Error(String(error));
-        }
-      }
-    })();
+    watcher.on("all", (event, filePath) => {
+      const relativePath = path.relative(workspaceRoot, filePath);
+      const types: readonly FileChangeType[] = event === "change"
+        ? [FileChangeType.Changed]
+        : event === "add" || event === "addDir"
+        ? [FileChangeType.Created]
+        : [FileChangeType.Deleted];
+      void sendFileChanges(relativePath, types).then(() =>
+        path.matchesGlob(relativePath, "**/node_modules/{*,@*/*}")
+          ? sendFileChanges(path.join(relativePath, "package.json"), types)
+          : undefined
+      ).catch((error) => {
+        watcherError = error instanceof Error ? error : new Error(String(error));
+      });
+    });
+    watcher.on("error", (error) => {
+      watcherError = error;
+    });
   } catch (error) {
-    watcherController.abort();
-    await watcherTask;
+    await watcher.close();
     connection.dispose();
     terminateLanguageServer();
     await languageServerExit;
@@ -215,6 +203,13 @@ const startVolarWorkspace = async (workspaceRoot: string) => {
   }
 
   let disposed = false;
+  const getWorkspaceUri = (file: string) => {
+    const filePath = path.resolve(workspaceRoot, file);
+    if (!isFileInDir(filePath, workspaceRoot)) {
+      throw new Error(`File is outside the workspace: ${file}`);
+    }
+    return URI.file(filePath).toString();
+  };
   return {
     closed: languageServerExit,
     async sendRequest<Params, Result, Error>(
@@ -230,7 +225,7 @@ const startVolarWorkspace = async (workspaceRoot: string) => {
 
       try {
         return await connection.sendRequest(
-          request,
+          request.method,
           params,
           cancellation.token,
         );
@@ -247,22 +242,19 @@ const startVolarWorkspace = async (workspaceRoot: string) => {
       }
     },
     async getTextDocument(file: string) {
-      const filePath = path.resolve(workspaceRoot, file);
-      const relativePath = path.relative(workspaceRoot, filePath);
-      if (!isContainedPath(relativePath)) {
-        throw new Error(`File is outside the workspace: ${file}`);
-      }
+      const uri = getWorkspaceUri(file);
+      const filePath = URI.parse(uri).fsPath;
       const fileStat = await stat(filePath).catch(() => undefined);
       if (!fileStat?.isFile()) {
         throw new Error(`File is not a regular file: ${file}`);
       }
-      return { uri: URI.file(filePath).toString() };
+      return { uri };
     },
+    getWorkspaceUri,
     async dispose() {
       if (disposed) return;
       disposed = true;
-      watcherController.abort();
-      await watcherTask;
+      await watcher.close();
       const shutdownTimer = setTimeout(terminateLanguageServer, 2_000);
       shutdownTimer.unref();
       try {
@@ -285,8 +277,8 @@ export type VolarWorkspace = Awaited<ReturnType<typeof startVolarWorkspace>>;
 
 export type VolarWorkspacePool = ReturnType<typeof createVolarWorkspaces>;
 
-/** Owns one long-lived Volar workspace per MCP workspace root. */
-export const createVolarWorkspaces = () => {
+/** Owns one long-lived Volar workspace per workspace root. */
+export const createVolarWorkspaces = (languageServer: URL) => {
   const entries = new Map<string, Promise<VolarWorkspace>>();
 
   const get = (root: string): Promise<VolarWorkspace> => {
@@ -299,7 +291,7 @@ export const createVolarWorkspaces = () => {
     const existing = entries.get(workspaceRoot);
     if (existing) return existing;
 
-    const workspace = startVolarWorkspace(workspaceRoot);
+    const workspace = startVolarWorkspace(workspaceRoot, languageServer);
     entries.set(workspaceRoot, workspace);
     const remove = () => {
       if (entries.get(workspaceRoot) === workspace) {

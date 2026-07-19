@@ -131,7 +131,6 @@ export const clientCapabilities = {
     rename: {
       prepareSupport: true,
       prepareSupportDefaultBehavior: 1,
-      honorsChangeAnnotations: true,
     },
     semanticTokens: {
       requests: { range: true, full: true },

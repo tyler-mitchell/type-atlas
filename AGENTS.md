@@ -6,6 +6,8 @@ Implementation Planning:
 - Before implementing a new language-server or MCP capability, first identify what existing Volar.js / LSP capabilities already provide that behavior or most of it.
 - Prefer leveraging or composing existing Volar.js capabilities before building new custom logic from scratch.
 - If custom implementation is still needed, document the gap in existing Volar.js behavior and keep the custom layer narrowly scoped around that gap.
+- After inspecting or experimentally proving a Volar.js affordance, update `docs/implementation/volar-affordance-evidence.md` in the same change. Record the installed source, observed contract, FeatureType consequence, and validation status; affordance research is incomplete until the ledger reflects it.
+- Trace each affordance through every owning layer before concluding it is absent: LSP protocol and client feature, `@volar/language-server`, `@volar/language-service`, `volar-service-typescript`, `@volar/typescript`, `@volar/kit`, and `@volar/vscode` when host behavior is relevant. A custom boundary requires both installed-source evidence that these layers do not provide it and an executable reproduction of the remaining gap.
 
 Featuretype MCP Usage:
 - When a user says to use the "live", "actual", or "direct" Featuretype MCP, they mean the Featuretype MCP attached to the current Codex session as first-class MCP tools.

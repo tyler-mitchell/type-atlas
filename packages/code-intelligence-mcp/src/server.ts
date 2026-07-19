@@ -1,49 +1,44 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { registerObservabilityTools } from "./tools.ts";
-import { createVolarWorkspaces } from "./volar-workspace.ts";
+import { McpServer } from "@modelcontextprotocol/server";
+import { serveStdio } from "@modelcontextprotocol/server/stdio";
+import { createVolarWorkspaces } from "@featuretype/code-intelligence";
+import { serverInfo } from "./metadata.ts";
+import { registerTools } from "./tools.ts";
 
-/** Owns the MCP server lifecycle. */
-export type McpRuntime = {
-  server: McpServer;
-  dispose(): Promise<void>;
-};
-
-/** Creates an MCP runtime backed by isolated Volar workspace sessions. */
-export const createMcpRuntime = (): McpRuntime => {
-  const workspaces = createVolarWorkspaces();
-  const server = new McpServer(
-    {
-      name: "Code Intelligence MCP",
-      version: "0.0.0",
+const createServer = (
+  workspaces: ReturnType<typeof createVolarWorkspaces>,
+): McpServer => {
+  const server = new McpServer(serverInfo, {
+    capabilities: { tools: { listChanged: false } },
+    cacheHints: {
+      "tools/list": { ttlMs: 60_000, cacheScope: "public" },
     },
-    {
-      instructions:
-        "Use an absolute workspace root. A file may be workspace-relative or absolute within that root. Positions and ranges are literal LSP coordinates: zero-based lines and UTF-16 characters. Results preserve the same coordinates.",
-    },
-  );
-
-  registerObservabilityTools(server, workspaces);
-
-  return {
-    server,
-    async dispose() {
-      await workspaces.dispose();
-      await server.close();
-    },
-  };
+  });
+  registerTools(server, workspaces);
+  return server;
 };
 
 /** Starts the MCP server over standard input and output. */
-export const startMcpServer = async (): Promise<void> => {
-  const runtime = createMcpRuntime();
-  await runtime.server.connect(new StdioServerTransport());
+export const startMcpServer = (): void => {
+  const workspaces = createVolarWorkspaces(new URL(
+    import.meta.resolve("@featuretype/code-intelligence-language-server/node"),
+  ));
+  const handle = serveStdio(() => createServer(workspaces), {
+    onerror: (error) => console.error(error),
+  });
 
   let shuttingDown = false;
   const shutdown = (): void => {
     if (shuttingDown) return;
     shuttingDown = true;
-    void runtime.dispose().finally(() => process.exit(0));
+    void handle.close()
+      .finally(workspaces.dispose)
+      .then(
+        () => process.exit(0),
+        (error) => {
+          console.error(error);
+          process.exit(1);
+        },
+      );
   };
   process.stdin.once("end", shutdown);
   process.once("SIGINT", shutdown);
