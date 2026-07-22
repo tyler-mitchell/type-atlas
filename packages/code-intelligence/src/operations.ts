@@ -1,4 +1,3 @@
-import { readFile } from "node:fs/promises";
 import {
   DefinitionRequest,
   DocumentDiagnosticRequest,
@@ -14,17 +13,14 @@ import type { VolarWorkspace } from "./volar-workspace.ts";
 
 export const createCodeIntelligence = (workspace: VolarWorkspace) => ({
   async readSource(file: string, fold: boolean, signal: AbortSignal) {
-    const textDocument = await workspace.getTextDocument(file);
-    const [source, foldingRanges] = await Promise.all([
-      readFile(new URL(textDocument.uri), "utf8"),
-      fold
-        ? workspace.sendRequest(
-          FoldingRangeRequest.type,
-          { textDocument },
-          signal,
-        )
-        : Promise.resolve([]),
-    ]);
+    const { textDocument, source } = await workspace.readTextDocument(file);
+    const foldingRanges = fold
+      ? await workspace.sendRequest(
+        FoldingRangeRequest.type,
+        { textDocument },
+        signal,
+      )
+      : [];
     return { textDocument, source, foldingRanges: foldingRanges ?? [] };
   },
 

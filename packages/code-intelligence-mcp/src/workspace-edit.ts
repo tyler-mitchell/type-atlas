@@ -1,4 +1,3 @@
-import { readFile } from "node:fs/promises";
 import { structuredPatch, type ParsedDiff } from "diff";
 import {
   TextDocumentEdit,
@@ -122,12 +121,10 @@ export const renderWorkspaceEdit = async (
     }
   }
   const rendered = await Promise.all([...byUri.values()].map(async ({ uri, edits }) => {
-    const parsed = URI.parse(uri);
-    if (parsed.scheme !== "file") {
+    if (URI.parse(uri).scheme !== "file") {
       throw new Error(`Workspace edit URI is not a file: ${uri}`);
     }
-    const textDocument = await workspace.getTextDocument(parsed.fsPath);
-    const source = await readFile(new URL(textDocument.uri), "utf8");
+    const { textDocument, source } = await workspace.readTextDocumentUri(uri);
     const updated = TextDocument.applyEdits(
       TextDocument.create(textDocument.uri, "typescript", 0, source),
       [...edits],

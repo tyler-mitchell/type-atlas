@@ -45,6 +45,7 @@
     "lint": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@featuretype/code-intelligence-language-server": "workspace:*",
     "@volar/language-server": "2.4.28",
     "chokidar": "^3.6.0",
     "pathe": "^2.0.3",

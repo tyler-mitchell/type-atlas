@@ -5,10 +5,11 @@ import {
   createTypeScriptProject,
 } from "@volar/language-server/node.js";
 import ts from "typescript";
-import type { URI } from "vscode-uri";
+import { URI } from "vscode-uri";
 import { create as createJsonService } from "volar-service-json";
 import { create as createMarkdownService } from "volar-service-markdown";
 import { create as createTypeScriptServices } from "volar-service-typescript";
+import { ReadFileRequest } from "./protocol.ts";
 
 const markdownFileExtensions = [
   "md",
@@ -39,6 +40,12 @@ export const registerLanguageServer = (
 ): void => {
   const server = createServer(connection);
   let watchedFiles: { dispose(): void } | undefined;
+
+  server.onInitialize(() => {
+    connection.onRequest(ReadFileRequest.type, async ({ uri }) =>
+      await server.fileSystem.readFile(URI.parse(uri)) ?? null
+    );
+  });
 
   connection.onInitialize((params) =>
     server.initialize(

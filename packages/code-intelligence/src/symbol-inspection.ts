@@ -1,4 +1,3 @@
-import { readFile } from "node:fs/promises";
 import {
   CallHierarchyIncomingCallsRequest,
   type CallHierarchyItem,
@@ -195,20 +194,14 @@ const symbolChoice = (
 
 const sourceLines = async (
   workspace: VolarWorkspace,
-  root: string,
   uri: string,
-) => {
-  const file = URI.parse(uri).fsPath;
-  if (isFileInDir(file, root)) await workspace.getTextDocument(file);
-  return (await readFile(new URL(uri), "utf8")).split(/\r?\n/);
-};
+) => (await workspace.readTextDocumentUri(uri)).source.split(/\r?\n/);
 
 const excerpt = async (
   workspace: VolarWorkspace,
-  root: string,
   target: Located,
 ) => {
-  const lines = await sourceLines(workspace, root, target.uri);
+  const lines = await sourceLines(workspace, target.uri);
   const end = target.range.end.line + (target.range.end.character > 0 ? 1 : 0);
   return lines.slice(target.range.start.line, end).map((line, index) =>
     `${target.range.start.line + index + 1}|${line}`
@@ -217,11 +210,10 @@ const excerpt = async (
 
 const withSourceLines = async (
   workspace: VolarWorkspace,
-  root: string,
   items: readonly Located[],
 ) =>
   (await Promise.all(groups(items).map(async ({ uri, items: related }) => {
-    const lines = await sourceLines(workspace, root, uri);
+    const lines = await sourceLines(workspace, uri);
     return related.map((item) => ({
       ...item,
       sourceLine: lines[item.selectionRange.start.line] ?? "",
@@ -347,7 +339,7 @@ export const inspectSymbol = async (
     items ? Promise.all(items.map((item) =>
       workspace.sendRequest(CallHierarchyOutgoingCallsRequest.type, { item }, signal)
     )) : null,
-    options.includeSource ? excerpt(workspace, root, primary) : undefined,
+    options.includeSource ? excerpt(workspace, primary) : undefined,
     options.includeTypeDefinitions || !items?.length
       ? workspace.sendRequest(TypeDefinitionRequest.type, { textDocument, position }, signal)
       : null,
@@ -388,7 +380,6 @@ export const inspectSymbol = async (
   );
   const shownReferences = await withSourceLines(
     workspace,
-    root,
     otherReferences.slice(0, options.limit),
   );
   const extras = (items: readonly Located[]) =>

@@ -24,6 +24,7 @@ import {
   WatchKind,
 } from "vscode-languageserver-protocol/node.js";
 import { isFileInDir } from "@volar/language-server/node.js";
+import { ReadFileRequest } from "@featuretype/code-intelligence-language-server/protocol";
 import { URI } from "vscode-uri";
 import {
   clientCapabilities,
@@ -207,6 +208,14 @@ const startVolarWorkspace = async (
     }
     return URI.file(filePath).toString();
   };
+  const readTextDocumentUri = async (uri: string) => {
+    if (watcherError) throw watcherError;
+    const source = await connection.sendRequest(ReadFileRequest.type, { uri });
+    if (source === null) {
+      throw new Error(`Source document is unavailable: ${uri}`);
+    }
+    return { textDocument: { uri }, source };
+  };
   return {
     closed: languageServerExit,
     async sendRequest<Params, Result, Error>(
@@ -239,14 +248,12 @@ const startVolarWorkspace = async (
       }
     },
     async getTextDocument(file: string) {
-      const uri = getWorkspaceUri(file);
-      const filePath = URI.parse(uri).fsPath;
-      const fileStat = await stat(filePath).catch(() => undefined);
-      if (!fileStat?.isFile()) {
-        throw new Error(`File is not a regular file: ${file}`);
-      }
-      return { uri };
+      return (await readTextDocumentUri(getWorkspaceUri(file))).textDocument;
     },
+    readTextDocument(file: string) {
+      return readTextDocumentUri(getWorkspaceUri(file));
+    },
+    readTextDocumentUri,
     getWorkspaceUri,
     async dispose() {
       if (disposed) return;

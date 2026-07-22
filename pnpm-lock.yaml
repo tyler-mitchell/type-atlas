@@ -72,6 +72,9 @@ importers:
 
   packages/code-intelligence:
     dependencies:
+      '@featuretype/code-intelligence-language-server':
+        specifier: workspace:*
+        version: link:../code-intelligence-language-server
       '@volar/language-server':
         specifier: 2.4.28
         version: 2.4.28

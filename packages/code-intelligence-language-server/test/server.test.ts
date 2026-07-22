@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { startLanguageServer } from "@volar/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
 import { URI } from "vscode-uri";
+import { ReadFileRequest } from "../src/protocol.ts";
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const temporaryRoots = new Set<string>();
@@ -17,7 +18,7 @@ afterEach(async () => {
 });
 
 describe("language server", () => {
-  it("serves standard TypeScript through the Volar process entrypoint", async () => {
+  it("serves TypeScript and source documents through the Volar process entrypoint", async () => {
     const root = await mkdtemp(path.join(packageRoot, ".language-server-test-"));
     temporaryRoots.add(root);
     await mkdir(path.join(root, "src"));
@@ -62,6 +63,18 @@ describe("language server", () => {
           value: expect.stringContaining("const value: 1"),
         }),
       });
+
+      const source = await handle.connection.sendRequest(
+        ReadFileRequest.type,
+        { uri: document.uri },
+      );
+      await rm(file);
+      expect(source).toBe("export const value = 1;\n");
+      expect(
+        await handle.connection.sendRequest(ReadFileRequest.type, {
+          uri: document.uri,
+        }),
+      ).toBe(source);
     } finally {
       handle.connection.dispose();
     }
