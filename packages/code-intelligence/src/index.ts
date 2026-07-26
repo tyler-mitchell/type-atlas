@@ -7,6 +7,11 @@ export {
   createCodeIntelligence,
   type CodeIntelligence,
 } from "./operations.ts";
+export {
+  listModuleExports,
+  type ModuleExportPage,
+  type ModuleExportSurface,
+} from "./module-exports.ts";
 export { page, projectDocumentSymbols } from "./projection.ts";
 export {
   inspectSymbol,

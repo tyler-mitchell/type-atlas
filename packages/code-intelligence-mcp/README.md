@@ -37,7 +37,7 @@ The server communicates over stdio, negotiates the current MCP protocol with v2 
 | Workflow | Tools |
 | --- | --- |
 | Read and orient | `read_file`, `document_symbols`, `workspace_symbols`, `project_config` |
-| Inspect types and calls | `inspect_symbol`, `hover`, `signature_help`, `completions`, `callers`, `callees` |
+| Inspect types and calls | `inspect_symbol`, `hover`, `signature_help`, `completions`, `list_module_exports`, `callers`, `callees` |
 | Navigate declarations | `definitions`, `type_definitions`, `implementations` |
 | Find usage | `references`, `file_references`, `document_highlights` |
 | Discover and investigate code | `search_code`, `search_dependency_code`, `related_code`, `explore_symbol`, `investigate_code` |
@@ -47,6 +47,8 @@ The server communicates over stdio, negotiates the current MCP protocol with v2 
 `read_file` reads UTF-8 source, Markdown, JSON, and other text files. It accepts one or more files, supports independent ranges per file, and uses native folding when available; files without folding information remain fully readable with stable line numbers. File-scoped semantic tools surface relevant diagnostics without requiring a separate diagnostics request.
 
 `inspect_symbol` accepts either an exact file-local symbol name or a source position. Its default view combines the symbol's type, documentation, declaration range, callers, direct calls, and non-call references while removing facts already represented elsewhere in the same result. Complete source and callable type-definition targets are explicit opt-ins.
+
+`list_module_exports` asks TypeScript for the API surface visible from an importing file. Runtime exports are the default; type-only exports and resolved documentation are opt-in. Module resolution, project selection, export discovery, and item resolution remain owned by the Volar language server.
 
 `search_code` retrieves code by behavior, concept, or identifier and anchors each result to its enclosing Volar document symbol. `search_dependency_code` searches only the explicitly requested installed packages; its consumer `file` selects the exact package versions visible to that project. `related_code` starts from a known source line and finds structurally similar code. `explore_symbol` combines one exact Volar inspection with related implementations. `investigate_code` preserves Semble's ranked candidate page, expands one exact identifier when present, and otherwise expands only the most specific retrieved symbol sharing the first candidate's Volar declaration ancestry. Similarity remains opt-in. In large monorepos, `scope` can search a workspace-relative subtree through Semble's native repository boundary.
 

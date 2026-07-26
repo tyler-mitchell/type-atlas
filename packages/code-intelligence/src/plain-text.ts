@@ -28,6 +28,7 @@ import {
   type WorkspaceSymbol,
 } from "@volar/language-server/protocol.js";
 import { URI } from "vscode-uri";
+import type { ModuleExportPage } from "./module-exports.ts";
 
 export type Page<Item> = {
   readonly total: number;
@@ -491,6 +492,37 @@ export const formatCompletions = (
     `${pageHeader("completions", page)}${state}`,
     ...(defaults ? [defaults] : []),
     ...page.items.map(completionText),
+  ].join("\n");
+};
+
+const moduleExportText = (item: CompletionItem) => {
+  const kind = enumName(CompletionItemKind, item.kind, "export");
+  const deprecated = (item as { readonly deprecated?: boolean }).deprecated ||
+      item.tags?.includes(1)
+    ? " [deprecated]"
+    : "";
+  const documentation = markupText(item.documentation);
+  return [
+    `${item.label} [${kind}]${deprecated}${
+      item.detail ? ` — ${item.detail}` : ""
+    }`,
+    ...(documentation ? [indent(documentation)] : []),
+  ].join("\n");
+};
+
+export const formatModuleExports = (page: ModuleExportPage) => {
+  const context = [
+    page.module,
+    page.surface,
+    ...(page.query ? [`query ${JSON.stringify(page.query)}`] : []),
+    ...(page.isIncomplete ? ["more available"] : []),
+  ].join(" · ");
+  return [
+    `${pageHeader("exports", page)} · ${context}`,
+    ...(page.resolved === false
+      ? ["Module could not be resolved from the selected project context."]
+      : []),
+    ...page.items.map(moduleExportText),
   ].join("\n");
 };
 

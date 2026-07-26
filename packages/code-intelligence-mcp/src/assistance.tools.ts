@@ -4,7 +4,10 @@ import {
   InlayHintRequest,
   SignatureHelpRequest,
 } from "@volar/language-server/protocol.js";
-import { createCodeIntelligence } from "@featuretype/code-intelligence";
+import {
+  createCodeIntelligence,
+  listModuleExports,
+} from "@featuretype/code-intelligence";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { type } from "arktype";
 import { requestDiagnosticContext } from "./ambient-diagnostics.ts";
@@ -13,6 +16,7 @@ import {
   formatCompletions,
   formatHover,
   formatInlayHints,
+  formatModuleExports,
   formatSignatureHelp,
 } from "@featuretype/code-intelligence/text";
 import { appendDiagnosticContext, textResult } from "./mcp-result.ts";
@@ -39,6 +43,38 @@ const input = type.module({
   Range: type({
     ...observedFileInput,
     range: rangeInput,
+  }).onUndeclaredKey("reject"),
+  ModuleExports: type({
+    workspace: observedFileInput.workspace,
+    module: type("string >= 1").describe(
+      "Module specifier to inspect, such as react, @scope/package, or ./local-module.js.",
+    ),
+    "fromFile?": type("string >= 1").describe(
+      "Workspace-relative or absolute importing file that determines module resolution. Recommended for monorepos and relative modules.",
+    ),
+    "surface?": type("'runtime' | 'all'").configure({
+      default: "runtime",
+      description:
+        "Runtime exports by default; use all to include type-only exports.",
+    }),
+    "query?": type("string").configure({
+      default: "",
+      description:
+        "Optional case-insensitive text filter over Volar's completion labels.",
+    }),
+    "offset?": type("number.integer >= 0").configure({
+      default: 0,
+      description: "Zero-based offset into the completion results.",
+    }),
+    "limit?": type("1 <= number.integer <= 100").configure({
+      default: 25,
+      description: "Maximum exports returned.",
+    }),
+    "includeDocs?": type("boolean").configure({
+      default: false,
+      description:
+        "Resolve the displayed completion items to include upstream types and documentation.",
+    }),
   }).onUndeclaredKey("reject"),
 });
 
@@ -222,6 +258,40 @@ export const registerAssistanceTools = (
         textResult(formatInlayHints(textDocument.uri, result, root)),
         await diagnosticContext,
       );
+    },
+  );
+
+  server.registerTool(
+    "list_module_exports",
+    {
+      title: "List module exports",
+      description:
+        "List the runtime or complete export surface visible from a TypeScript file using Volar's native completion and completion-resolution pipeline.",
+      inputSchema: input.ModuleExports,
+      annotations: readOnlyToolAnnotations,
+    },
+    async ({
+      workspace: root,
+      module,
+      fromFile,
+      surface = "runtime",
+      query = "",
+      offset = 0,
+      limit = 25,
+      includeDocs = false,
+    }, { mcpReq: { signal } }) => {
+      const workspace = await workspaces.get(root);
+      return textResult(formatModuleExports(await listModuleExports({
+        workspace,
+        module,
+        fromFile,
+        surface,
+        query,
+        offset,
+        limit,
+        includeDocs,
+        signal,
+      })));
     },
   );
 };

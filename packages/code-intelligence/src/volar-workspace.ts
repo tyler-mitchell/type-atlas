@@ -7,8 +7,11 @@ import {
   CancellationTokenSource,
   ConfigurationRequest,
   createProtocolConnection,
+  DidCloseTextDocumentNotification,
+  DidChangeTextDocumentNotification,
   type DidChangeWatchedFilesRegistrationOptions,
   DidChangeWatchedFilesNotification,
+  DidOpenTextDocumentNotification,
   ExitNotification,
   type FileSystemWatcher,
   FileChangeType,
@@ -87,6 +90,10 @@ const startVolarWorkspace = async (
     new IPCMessageWriter(languageServer),
   );
   const resolverSequences = new PQueue({ concurrency: 1 });
+  const synchronizedDocuments = new Map<string, {
+    readonly languageId: string;
+    readonly version: number;
+  }>();
   let idleTimer: ReturnType<typeof setTimeout> | undefined;
   languageServer.once("close", () => {
     clearTimeout(idleTimer);
@@ -274,6 +281,49 @@ const startVolarWorkspace = async (
     },
     readTextDocumentUri,
     getWorkspaceUri,
+    withTextDocument<T>({
+      uri,
+      languageId,
+      source,
+      signal,
+      task,
+    }: {
+      readonly uri: string;
+      readonly languageId: string;
+      readonly source: string;
+      readonly signal?: AbortSignal;
+      readonly task: (
+        textDocument: { readonly uri: string },
+      ) => Promise<T>;
+    }) {
+      return resolverSequences.add(async () => {
+        const current = synchronizedDocuments.get(uri);
+        if (current && current.languageId !== languageId) {
+          throw new Error(
+            `Synchronized document language changed from ${current.languageId} to ${languageId}: ${uri}`,
+          );
+        }
+        const version = (current?.version ?? 0) + 1;
+        if (current) {
+          await connection.sendNotification(
+            DidChangeTextDocumentNotification.type,
+            {
+              textDocument: { uri, version },
+              contentChanges: [{ text: source }],
+            },
+          );
+        } else {
+          await connection.sendNotification(
+            DidOpenTextDocumentNotification.type,
+            {
+              textDocument: { uri, languageId, version, text: source },
+            },
+          );
+        }
+        synchronizedDocuments.set(uri, { languageId, version });
+        return await task({ uri });
+      }, { signal });
+    },
     runResolverSequence<T>(task: () => Promise<T>, signal?: AbortSignal) {
       return resolverSequences.add(task, { signal });
     },
@@ -289,6 +339,14 @@ const startVolarWorkspace = async (
     shutdownTimer.unref();
     try {
       if (isLanguageServerRunning()) {
+        await resolverSequences.onIdle();
+        for (const uri of synchronizedDocuments.keys()) {
+          await connection.sendNotification(
+            DidCloseTextDocumentNotification.type,
+            { textDocument: { uri } },
+          );
+        }
+        synchronizedDocuments.clear();
         await connection.sendRequest(ShutdownRequest.type);
         await connection.sendNotification(ExitNotification.type);
         await languageServerExit;
