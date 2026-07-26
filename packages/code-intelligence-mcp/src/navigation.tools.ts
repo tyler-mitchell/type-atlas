@@ -310,20 +310,28 @@ export const registerNavigationTools = (
         signal,
         position,
       );
-      const items = await workspace.sendRequest(
-        CallHierarchyPrepareRequest.type,
-        { textDocument, position },
+      const { items, incomingCalls } = await workspace.runResolverSequence(
+        async () => {
+          const items = await workspace.sendRequest(
+            CallHierarchyPrepareRequest.type,
+            { textDocument, position },
+            signal,
+          );
+          return {
+            items,
+            incomingCalls: items === null
+              ? null
+              : await Promise.all(items.map((item) =>
+                workspace.sendRequest(
+                  CallHierarchyIncomingCallsRequest.type,
+                  { item },
+                  signal,
+                )
+              )),
+          };
+        },
         signal,
       );
-      const incomingCalls = items === null
-        ? null
-        : await Promise.all(items.map((item) =>
-          workspace.sendRequest(
-            CallHierarchyIncomingCallsRequest.type,
-            { item },
-            signal,
-          )
-        ));
       return appendDiagnosticContext(
         textResult(
           formatCallHierarchy("incoming", {
@@ -361,20 +369,28 @@ export const registerNavigationTools = (
         signal,
         position,
       );
-      const items = await workspace.sendRequest(
-        CallHierarchyPrepareRequest.type,
-        { textDocument, position },
+      const { items, outgoingCalls } = await workspace.runResolverSequence(
+        async () => {
+          const items = await workspace.sendRequest(
+            CallHierarchyPrepareRequest.type,
+            { textDocument, position },
+            signal,
+          );
+          return {
+            items,
+            outgoingCalls: items === null
+              ? null
+              : await Promise.all(items.map((item) =>
+                workspace.sendRequest(
+                  CallHierarchyOutgoingCallsRequest.type,
+                  { item },
+                  signal,
+                )
+              )),
+          };
+        },
         signal,
       );
-      const outgoingCalls = items === null
-        ? null
-        : await Promise.all(items.map((item) =>
-          workspace.sendRequest(
-            CallHierarchyOutgoingCallsRequest.type,
-            { item },
-            signal,
-          )
-        ));
       return appendDiagnosticContext(
         textResult(
           formatCallHierarchy("outgoing", {

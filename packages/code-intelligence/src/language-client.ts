@@ -14,6 +14,7 @@ const symbolTags = Object.values(SymbolTag);
 type ConfigurationValue =
   | boolean
   | string
+  | readonly ConfigurationValue[]
   | { readonly [key: string]: ConfigurationValue };
 
 const languageConfiguration = {
@@ -42,6 +43,17 @@ const languageConfiguration = {
 
 const configurations = {
   javascript: languageConfiguration,
+  markdown: {
+    validate: {
+      validateReferences: "warning",
+      validateFragmentLinks: "warning",
+      validateFileLinks: "warning",
+      validateMarkdownFileLinkFragments: "warning",
+      validateUnusedLinkDefinitions: "hint",
+      validateDuplicateLinkDefinitions: "warning",
+      ignoreLinks: [],
+    },
+  },
   typescript: languageConfiguration,
 } as const satisfies Record<string, ConfigurationValue>;
 
@@ -53,7 +65,9 @@ export const getClientConfiguration = (
   const root = configurations[language as keyof typeof configurations];
   return path.reduce<ConfigurationValue | undefined>(
     (value, key) =>
-      typeof value === "object" && key in value ? value[key] : undefined,
+      typeof value === "object" && !Array.isArray(value) && key in value
+        ? (value as { readonly [key: string]: ConfigurationValue })[key]
+        : undefined,
     root,
   ) ?? null;
 };
@@ -106,6 +120,7 @@ export const clientCapabilities = {
     definition: { linkSupport: true },
     diagnostic: { relatedDocumentSupport: true },
     documentHighlight: {},
+    documentLink: { tooltipSupport: true },
     documentSymbol: {
       hierarchicalDocumentSymbolSupport: true,
       symbolKind: { valueSet: symbolKinds },
@@ -132,6 +147,7 @@ export const clientCapabilities = {
       prepareSupport: true,
       prepareSupportDefaultBehavior: 1,
     },
+    selectionRange: {},
     semanticTokens: {
       requests: { range: true, full: true },
       tokenTypes: [

@@ -8,8 +8,14 @@ import ts from "typescript";
 import { URI } from "vscode-uri";
 import { create as createJsonService } from "volar-service-json";
 import { create as createMarkdownService } from "volar-service-markdown";
-import { create as createTypeScriptServices } from "volar-service-typescript";
-import { ReadFileRequest } from "./protocol.ts";
+import {
+  create as createTypeScriptServices,
+  type Provide as TypeScriptService,
+} from "volar-service-typescript";
+import {
+  ReadFileRequest,
+  ResolveDependencySourceRequest,
+} from "./protocol.ts";
 
 const markdownFileExtensions = [
   "md",
@@ -44,6 +50,55 @@ export const registerLanguageServer = (
   server.onInitialize(() => {
     connection.onRequest(ReadFileRequest.type, async ({ uri }) =>
       await server.fileSystem.readFile(URI.parse(uri)) ?? null
+    );
+    connection.onRequest(
+      ResolveDependencySourceRequest.type,
+      async ({ textDocument, moduleName }) => {
+        const uri = URI.parse(textDocument.uri);
+        const service = await server.project.getLanguageService(uri);
+        const languageService = service.context.inject<
+          TypeScriptService,
+          "typescript/languageService"
+        >(
+          "typescript/languageService",
+        );
+        const host = service.context.inject<
+          TypeScriptService,
+          "typescript/languageServiceHost"
+        >(
+          "typescript/languageServiceHost",
+        );
+        const fileName = service.context.inject<
+          TypeScriptService,
+          "typescript/documentFileName"
+        >(
+          "typescript/documentFileName",
+          uri,
+        );
+        if (!languageService || !host || !fileName) return null;
+
+        const options = host.getCompilationSettings();
+        const mode = languageService.getProgram()?.getSourceFile(fileName)
+          ?.impliedNodeFormat;
+        const source = ts.resolveModuleName(
+          moduleName,
+          fileName,
+          { ...options, noDtsResolution: true },
+          host,
+          undefined,
+          undefined,
+          mode,
+        ).resolvedModule;
+        return source ?? ts.resolveModuleName(
+          moduleName,
+          fileName,
+          options,
+          host,
+          host.getModuleResolutionCache?.(),
+          undefined,
+          mode,
+        ).resolvedModule ?? null;
+      },
     );
   });
 

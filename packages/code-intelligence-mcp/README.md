@@ -40,7 +40,7 @@ The server communicates over stdio, negotiates the current MCP protocol with v2 
 | Inspect types and calls | `inspect_symbol`, `hover`, `signature_help`, `completions`, `callers`, `callees` |
 | Navigate declarations | `definitions`, `type_definitions`, `implementations` |
 | Find usage | `references`, `file_references`, `document_highlights` |
-| Discover and investigate code | `search_code`, `related_code`, `explore_symbol`, `investigate_code` |
+| Discover and investigate code | `search_code`, `search_dependency_code`, `related_code`, `explore_symbol`, `investigate_code` |
 | Inspect editor information | `diagnostics`, `inlay_hints` |
 | Prepare source changes | `rename_symbol`, `rename_files`, `format_document`, `code_actions` |
 
@@ -48,7 +48,7 @@ The server communicates over stdio, negotiates the current MCP protocol with v2 
 
 `inspect_symbol` accepts either an exact file-local symbol name or a source position. Its default view combines the symbol's type, documentation, declaration range, callers, direct calls, and non-call references while removing facts already represented elsewhere in the same result. Complete source and callable type-definition targets are explicit opt-ins.
 
-`search_code` retrieves code by behavior, concept, or identifier and anchors each result to its enclosing Volar document symbol. `related_code` starts from a known source line and finds structurally similar code. `explore_symbol` combines one exact Volar inspection with related implementations, while `investigate_code` starts from an implementation question and keeps verified callers, calls, definitions, implementations, and references distinct from similarity results. In large monorepos, `scope` can search a workspace-relative subtree through Semble's native repository boundary.
+`search_code` retrieves code by behavior, concept, or identifier and anchors each result to its enclosing Volar document symbol. `search_dependency_code` searches only the explicitly requested installed packages; its consumer `file` selects the exact package versions visible to that project. `related_code` starts from a known source line and finds structurally similar code. `explore_symbol` combines one exact Volar inspection with related implementations. `investigate_code` preserves Semble's ranked candidate page, expands one exact identifier when present, and otherwise expands only the most specific retrieved symbol sharing the first candidate's Volar declaration ancestry. Similarity remains opt-in. In large monorepos, `scope` can search a workspace-relative subtree through Semble's native repository boundary.
 
 Editing tools ask the language server to compute its native edits and return a Codex patch. The MCP never writes source files; the agent applies the proposal through its normal patch mechanism, preserving its usual review, stale-content rejection, and visible diff.
 
@@ -58,7 +58,8 @@ Editing tools ask the language server to compute its native edits and return a C
 - File paths may be absolute or relative to that root.
 - Semantic positions use zero-based LSP lines and UTF-16 characters.
 - `read_file` ranges and displayed source lines are one-based.
-- Intelligence retrieval ranges and displayed source lines are zero-based so their locations can be passed directly to semantic tools.
+- Workspace intelligence retrieval ranges and displayed source lines are zero-based so their locations can be passed directly to semantic tools.
+- Dependency-search ranges and displayed source lines are one-based so they can be passed directly to `read_file`.
 - `workspace_symbols` can inspect many project files; prefer `document_symbols` when the file is already known.
 
 ## Development

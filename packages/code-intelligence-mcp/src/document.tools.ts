@@ -11,19 +11,35 @@ import { requestDiagnosticContext } from "./ambient-diagnostics.ts";
 import { readOnlyToolAnnotations } from "./metadata.ts";
 import {
   formatDiagnostics,
+  formatDocumentLinks,
   formatDocumentSymbols,
   formatProjectConfig,
+  formatSelectionRanges,
 } from "@featuretype/code-intelligence/text";
 import { appendDiagnosticContext, textResult } from "./mcp-result.ts";
-import { fileInput, observedFileInput } from "./tool-input.ts";
+import {
+  fileInput,
+  observedFileInput,
+  positionInput,
+} from "./tool-input.ts";
 import type { VolarWorkspacePool } from "@featuretype/code-intelligence";
 
 const input = type.module({
   File: type(fileInput).onUndeclaredKey("reject"),
+  DocumentLinks: type(observedFileInput).onUndeclaredKey("reject"),
   DocumentSymbols: type({
     ...observedFileInput,
     "depth?": "0 <= number.integer <= 10",
     "raw?": "boolean",
+  }).onUndeclaredKey("reject"),
+  SelectionRanges: type({
+    ...observedFileInput,
+    position: positionInput.or(
+      positionInput.array().atLeastLength(1),
+    ).configure({
+      description:
+        "One source position, or multiple positions to inspect together.",
+    }),
   }).onUndeclaredKey("reject"),
 });
 
@@ -45,6 +61,40 @@ export const registerDocumentTools = (
       const { textDocument, report } = await createCodeIntelligence(workspace)
         .diagnostics(file, signal);
       return textResult(formatDiagnostics(textDocument.uri, report, root));
+    },
+  );
+
+  server.registerTool(
+    "document_links",
+    {
+      title: "Document links",
+      description:
+        "Return resolved links discovered by the active language service in a Markdown or JSON document.",
+      inputSchema: input.DocumentLinks,
+      annotations: readOnlyToolAnnotations,
+    },
+    async ({
+      workspace: root,
+      file,
+      includeDiagnostics,
+    }, { mcpReq: { signal } }) => {
+      const workspace = await workspaces.get(root);
+      const intelligence = createCodeIntelligence(workspace);
+      const { textDocument, links } = await intelligence.documentLinks(
+        file,
+        signal,
+      );
+      const diagnosticContext = requestDiagnosticContext(
+        workspace,
+        textDocument,
+        root,
+        includeDiagnostics,
+        signal,
+      );
+      return appendDiagnosticContext(
+        textResult(formatDocumentLinks(textDocument.uri, links, root)),
+        await diagnosticContext,
+      );
     },
   );
 
@@ -82,6 +132,45 @@ export const registerDocumentTools = (
         : projectDocumentSymbols(symbols, depth);
       return appendDiagnosticContext(
         textResult(formatDocumentSymbols(textDocument.uri, output, root)),
+        await diagnosticContext,
+      );
+    },
+  );
+
+  server.registerTool(
+    "selection_ranges",
+    {
+      title: "Selection ranges",
+      description:
+        "Return the nested structural ranges an editor expands through from one or more source positions.",
+      inputSchema: input.SelectionRanges,
+      annotations: readOnlyToolAnnotations,
+    },
+    async ({
+      workspace: root,
+      file,
+      position,
+      includeDiagnostics,
+    }, { mcpReq: { signal } }) => {
+      const workspace = await workspaces.get(root);
+      const positions = Array.isArray(position) ? position : [position];
+      const intelligence = createCodeIntelligence(workspace);
+      const { textDocument, ranges } = await intelligence.selectionRanges(
+        file,
+        positions,
+        signal,
+      );
+      const diagnosticContext = requestDiagnosticContext(
+        workspace,
+        textDocument,
+        root,
+        includeDiagnostics,
+        signal,
+      );
+      return appendDiagnosticContext(
+        textResult(
+          formatSelectionRanges(textDocument.uri, positions, ranges, root),
+        ),
         await diagnosticContext,
       );
     },

@@ -11,6 +11,7 @@ import {
   type DocumentDiagnosticReport,
   type DocumentHighlight,
   DocumentHighlightKind,
+  type DocumentLink,
   type DocumentSymbol,
   type Hover,
   type InlayHint,
@@ -20,6 +21,7 @@ import {
   type MarkupContent,
   type Position,
   type Range,
+  type SelectionRange,
   type SignatureHelp,
   type SymbolInformation,
   SymbolKind,
@@ -273,6 +275,54 @@ export const formatDocumentSymbols = (
   );
   return [`Symbols (${symbols.length} top-level) · ${file}`, ...lines].join("\n");
 };
+
+const documentLinkTarget = (target: string, workspaceRoot: string) => {
+  const uri = URI.parse(target);
+  const file = workspacePath(
+    uri.with({ query: null, fragment: null }).toString(),
+    workspaceRoot,
+  );
+  return `${file}${uri.query ? `?${uri.query}` : ""}${
+    uri.fragment ? `#${uri.fragment}` : ""
+  }`;
+};
+
+export const formatDocumentLinks = (
+  uri: string,
+  links: readonly DocumentLink[],
+  workspaceRoot: string,
+) => [
+  `Links (${links.length}) · ${workspacePath(uri, workspaceRoot)}`,
+  ...links.map((link) =>
+    `${rangeText(link.range)} -> ${
+      link.target
+        ? documentLinkTarget(link.target, workspaceRoot)
+        : "unresolved"
+    }${link.tooltip ? `\n${indent(link.tooltip)}` : ""}`
+  ),
+].join("\n");
+
+const selectionRangeChain = (
+  selection: SelectionRange | undefined,
+): readonly Range[] =>
+  selection
+    ? [selection.range, ...selectionRangeChain(selection.parent)]
+    : [];
+
+export const formatSelectionRanges = (
+  uri: string,
+  positions: readonly Position[],
+  selections: readonly SelectionRange[] | null | undefined,
+  workspaceRoot: string,
+) => [
+  `Selection ranges (${selections?.length ?? 0}) · ${
+    workspacePath(uri, workspaceRoot)
+  }`,
+  ...(selections ?? []).flatMap((selection, index) => [
+    positionText(positions[index]),
+    ...selectionRangeChain(selection).map((range) => `  ${rangeText(range)}`),
+  ]),
+].join("\n");
 
 const workspaceSymbolText = (
   symbol: WorkspaceSymbol | SymbolInformation,

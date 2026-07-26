@@ -124,42 +124,44 @@ const runSourceAction = async (
 ) => {
   const workspace = await workspaces.get(root);
   const textDocument = await workspace.getTextDocument(file);
-  const [report] = await Promise.all([
+  const [diagnosticReport, resolved] = await Promise.all([
     workspace.sendRequest(
       DocumentDiagnosticRequest.type,
       { textDocument },
       signal,
     ),
-    setFormattingOptions(workspace, textDocument, options, signal),
+    workspace.runResolverSequence(async () => {
+      await setFormattingOptions(workspace, textDocument, options, signal);
+      const actions = await workspace.sendRequest(
+        CodeActionRequest.type,
+        {
+          textDocument,
+          range: Range.create(0, 0, 0, 0),
+          context: {
+            diagnostics: [],
+            only: [kind],
+            triggerKind: CodeActionTriggerKind.Invoked,
+          },
+        },
+        signal,
+      ) ?? [];
+      const selected = actions.find(
+        (action): action is CodeAction => !Command.is(action),
+      );
+      return !selected || selected.data === undefined
+        ? selected
+        : workspace.sendRequest(CodeActionResolveRequest.type, selected, signal);
+    }, signal),
   ]);
   const diagnosticContext = includeDiagnostics
     ? formatDiagnosticMode(
       textDocument.uri,
-      report,
+      diagnosticReport,
       root,
       includeDiagnostics,
     )
     : undefined;
-  const actions = await workspace.sendRequest(
-    CodeActionRequest.type,
-    {
-      textDocument,
-      range: Range.create(0, 0, 0, 0),
-      context: {
-        diagnostics: [],
-        only: [kind],
-        triggerKind: CodeActionTriggerKind.Invoked,
-      },
-    },
-    signal,
-  ) ?? [];
-  const selected = actions.find(
-    (action): action is CodeAction => !Command.is(action),
-  );
-  if (!selected) return appendDiagnosticContext(textResult(empty), diagnosticContext);
-  const resolved = selected.data === undefined
-    ? selected
-    : await workspace.sendRequest(CodeActionResolveRequest.type, selected, signal);
+  if (!resolved) return appendDiagnosticContext(textResult(empty), diagnosticContext);
   if (resolved.disabled) throw new Error(resolved.disabled.reason);
   if (!resolved.edit) {
     return appendDiagnosticContext(textResult(empty), diagnosticContext);
@@ -202,102 +204,104 @@ export const registerCodeActionTools = (
       { mcpReq: { signal } },
     ) => {
       const workspace = await workspaces.get(root);
-      const textDocument = await workspace.getTextDocument(file);
-      const [report] = await Promise.all([
-        workspace.sendRequest(
-          DocumentDiagnosticRequest.type,
-          { textDocument },
-          signal,
-        ),
-        setFormattingOptions(
-          workspace,
-          textDocument,
-          { tabSize, insertSpaces },
-          signal,
-        ),
-      ]);
-      const diagnostics = report?.kind === "full"
-        ? report.items.filter((diagnostic) => diagnosticIntersects(diagnostic, range))
-        : [];
-      const diagnosticContext = includeDiagnostics
-        ? formatDiagnosticMode(
-          textDocument.uri,
-          report,
-          root,
-          includeDiagnostics,
-          range,
-        )
-        : undefined;
-      const actions = await workspace.sendRequest(
-        CodeActionRequest.type,
-        {
-          textDocument,
-          range,
-          context: {
-            diagnostics,
-            ...(only ? { only: [only] } : {}),
-            triggerKind: CodeActionTriggerKind.Invoked,
+      return workspace.runResolverSequence(async () => {
+        const textDocument = await workspace.getTextDocument(file);
+        const [report] = await Promise.all([
+          workspace.sendRequest(
+            DocumentDiagnosticRequest.type,
+            { textDocument },
+            signal,
+          ),
+          setFormattingOptions(
+            workspace,
+            textDocument,
+            { tabSize, insertSpaces },
+            signal,
+          ),
+        ]);
+        const diagnostics = report?.kind === "full"
+          ? report.items.filter((diagnostic) => diagnosticIntersects(diagnostic, range))
+          : [];
+        const diagnosticContext = includeDiagnostics
+          ? formatDiagnosticMode(
+            textDocument.uri,
+            report,
+            root,
+            includeDiagnostics,
+            range,
+          )
+          : undefined;
+        const actions = await workspace.sendRequest(
+          CodeActionRequest.type,
+          {
+            textDocument,
+            range,
+            context: {
+              diagnostics,
+              ...(only ? { only: [only] } : {}),
+              triggerKind: CodeActionTriggerKind.Invoked,
+            },
           },
-        },
-        signal,
-      ) ?? [];
-      const visibleActions = includeUnavailable
-        ? actions
-        : actions.filter((item) => Command.is(item) || !item.disabled);
-      if (action === undefined) {
-        if (!visibleActions.length) {
-          const diagnosticCount = diagnostics.length
-            ? ` for ${diagnostics.length} ${diagnostics.length === 1 ? "diagnostic" : "diagnostics"}`
-            : "";
-          const scope = only === CodeActionKind.QuickFix
-            ? `quick fixes${diagnosticCount}`
-            : only?.startsWith(CodeActionKind.Refactor)
-            ? "refactors"
-            : "code actions";
+          signal,
+        ) ?? [];
+        const visibleActions = includeUnavailable
+          ? actions
+          : actions.filter((item) => Command.is(item) || !item.disabled);
+        if (action === undefined) {
+          if (!visibleActions.length) {
+            const diagnosticCount = diagnostics.length
+              ? ` for ${diagnostics.length} ${diagnostics.length === 1 ? "diagnostic" : "diagnostics"}`
+              : "";
+            const scope = only === CodeActionKind.QuickFix
+              ? `quick fixes${diagnosticCount}`
+              : only?.startsWith(CodeActionKind.Refactor)
+              ? "refactors"
+              : "code actions";
+            return appendDiagnosticContext(
+              textResult(`No ${scope} in this range.`),
+              diagnosticContext,
+            );
+          }
+          return appendDiagnosticContext(textResult(visibleActions.map((item, index) => {
+            const command = Command.is(item);
+            const kind = command ? " [editor command]" : item.kind ? ` [${item.kind}]` : "";
+            const disabled = !command && item.disabled
+              ? ` — unavailable: ${item.disabled.reason}`
+              : "";
+            return `${index + 1}. ${item.title}${kind}${disabled}`;
+          }).join("\n")), diagnosticContext);
+        }
+        const selected = visibleActions[action - 1];
+        if (!selected) throw new Error(`Code action ${action} is not available.`);
+        if (Command.is(selected)) {
           return appendDiagnosticContext(
-            textResult(`No ${scope} in this range.`),
+            textResult(`Editor command: ${selected.command}`),
             diagnosticContext,
           );
         }
-        return appendDiagnosticContext(textResult(visibleActions.map((item, index) => {
-          const command = Command.is(item);
-          const kind = command ? " [editor command]" : item.kind ? ` [${item.kind}]` : "";
-          const disabled = !command && item.disabled
-            ? ` — unavailable: ${item.disabled.reason}`
-            : "";
-          return `${index + 1}. ${item.title}${kind}${disabled}`;
-        }).join("\n")), diagnosticContext);
-      }
-      const selected = visibleActions[action - 1];
-      if (!selected) throw new Error(`Code action ${action} is not available.`);
-      if (Command.is(selected)) {
+        const resolved = selected.data === undefined
+          ? selected
+          : await workspace.sendRequest(CodeActionResolveRequest.type, selected, signal);
+        if (resolved.disabled) throw new Error(resolved.disabled.reason);
+        if (!resolved.edit) {
+          return appendDiagnosticContext(
+            textResult(
+              resolved.command
+                ? `Editor command: ${resolved.command.command}`
+                : `${resolved.title} produced no edit.`,
+            ),
+            diagnosticContext,
+          );
+        }
         return appendDiagnosticContext(
-          textResult(`Editor command: ${selected.command}`),
-          diagnosticContext,
-        );
-      }
-      const resolved = selected.data === undefined
-        ? selected
-        : await workspace.sendRequest(CodeActionResolveRequest.type, selected, signal);
-      if (resolved.disabled) throw new Error(resolved.disabled.reason);
-      if (!resolved.edit) {
-        return appendDiagnosticContext(
-          textResult(
-            resolved.command
-              ? `Editor command: ${resolved.command.command}`
-              : `${resolved.title} produced no edit.`,
+          formatPatchResult(
+            resolved.title,
+            await renderWorkspaceEdit(workspace, root, resolved.edit),
+            editorCommandText(resolved.command),
           ),
           diagnosticContext,
         );
-      }
-      return appendDiagnosticContext(
-        formatPatchResult(
-          resolved.title,
-          await renderWorkspaceEdit(workspace, root, resolved.edit),
-          editorCommandText(resolved.command),
-        ),
-        diagnosticContext,
-      );
+      }, signal);
     },
   );
 

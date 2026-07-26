@@ -1,6 +1,7 @@
 import type { VolarWorkspacePool } from "@featuretype/code-intelligence";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { type } from "arktype";
+import { createDependencySearch } from "./dependency-search.ts";
 import { createRetrievalIntelligence } from "./intelligence.ts";
 import { readOnlyToolAnnotations } from "./metadata.ts";
 import { textResult } from "./mcp-result.ts";
@@ -10,18 +11,34 @@ import { positionInput } from "./tool-input.ts";
 
 const resultLimit = type("1 <= number.integer <= 20").configure({
   default: 5,
-  description: "Maximum retrieval matches returned.",
+  description: "Maximum retrieval matches returned (1-20).",
 });
 
 const snippetLines = type("null | 0 <= number.integer <= 30").configure({
   default: 10,
   description:
-    "Source lines included for each retrieval match; pass null for the complete chunk.",
+    "Source lines included for each retrieval match (0-30); pass null for the complete chunk.",
 });
 
 const investigationResultLimit = type("1 <= number.integer <= 20").configure({
   default: 3,
-  description: "Maximum retrieval matches returned.",
+  description: "Maximum retrieval matches returned (1-20).",
+});
+
+const investigationInspectionLimit = type(
+  "1 <= number.integer <= 5",
+).configure({
+  default: 2,
+  description:
+    "Maximum distinct retrieved candidates given verified relationships (1-5). Exact identifier matches inspect only that symbol.",
+});
+
+const investigationRelatedLimit = type(
+  "0 <= number.integer <= 20",
+).configure({
+  default: 0,
+  description:
+    "Optional structurally similar results derived from the first inspected candidate (0-20).",
 });
 
 const investigationSnippetLines = type(
@@ -29,7 +46,7 @@ const investigationSnippetLines = type(
 ).configure({
   default: 6,
   description:
-    "Source lines included for each retrieval match; pass null for the complete chunk.",
+    "Source lines included for each retrieval match (0-30); pass null for the complete chunk.",
 });
 
 const scope = type("string >= 1").configure({
@@ -55,13 +72,27 @@ const exploreOptions = {
   }),
   "limit?": type("1 <= number.integer <= 100").configure({
     default: 12,
-    description: "Maximum verified relationships shown per section.",
+    description: "Maximum verified relationships shown per section (1-100).",
   }),
   "relatedLimit?": investigationResultLimit,
   "snippetLines?": investigationSnippetLines,
 } as const;
 
 const input = type.module({
+  DependencySearch: type({
+    ...fileInput,
+    package: type("string >= 1").or(
+      type("string >= 1").array().atLeastLength(1),
+    ).configure({
+      description:
+        "Installed package name, or package names, resolved from the importing file.",
+    }),
+    query: type("string >= 1").configure({
+      description: "Behavior, concept, or identifier to find in package code.",
+    }),
+    "limit?": resultLimit,
+    "snippetLines?": snippetLines,
+  }).onUndeclaredKey("reject"),
   Search: type({
     workspace: fileInput.workspace,
     "scope?": scope,
@@ -98,15 +129,16 @@ const input = type.module({
       description: "Implementation question or behavior to investigate.",
     }),
     "candidateLimit?": investigationResultLimit,
-    "relatedLimit?": investigationResultLimit,
+    "inspectionLimit?": investigationInspectionLimit,
+    "relatedLimit?": investigationRelatedLimit,
     "relationshipLimit?": type("1 <= number.integer <= 100").configure({
-      default: 8,
-      description: "Maximum verified relationships shown per section.",
+      default: 4,
+      description: "Maximum verified relationships shown per section (1-100).",
     }),
     "snippetLines?": investigationSnippetLines,
     "includeSource?": type("boolean").configure({
       default: false,
-      description: "Include the complete primary symbol body.",
+      description: "Include complete source for the inspected symbol or symbols.",
     }),
   }).onUndeclaredKey("reject"),
 });
@@ -117,6 +149,35 @@ export const registerIntelligenceTools = (
   semble: Semble,
 ): void => {
   const intelligence = createRetrievalIntelligence({ semble, workspaces });
+  const searchDependencies = createDependencySearch({ semble, workspaces });
+
+  server.registerTool(
+    "search_dependency_code",
+    {
+      title: "Search dependency code",
+      description:
+        "Search one or more installed packages without indexing all of node_modules. The importing file selects the exact package versions visible to that project.",
+      inputSchema: input.DependencySearch,
+      annotations: readOnlyToolAnnotations,
+    },
+    async ({
+      workspace,
+      file,
+      package: packages,
+      query,
+      limit = 5,
+      snippetLines = 10,
+    }, { mcpReq: { signal } }) =>
+      textResult(await searchDependencies({
+        workspace,
+        file,
+        packages: Array.isArray(packages) ? packages : [packages],
+        query,
+        limit,
+        snippetLines,
+        signal,
+      })),
+  );
 
   server.registerTool(
     "search_code",
@@ -217,7 +278,7 @@ export const registerIntelligenceTools = (
     {
       title: "Investigate code",
       description:
-        "Retrieve code for an implementation question, inspect the primary symbol's verified relationships, and find related code from the question-specific match. Verified relationships and similarity are separate.",
+        "Retrieve ranked code for an implementation question and attach verified relationships to the exact identifier match or a bounded set of distinct candidates. Structural similarity is optional and remains separate.",
       inputSchema: input.Investigate,
       annotations: readOnlyToolAnnotations,
     },
@@ -226,8 +287,9 @@ export const registerIntelligenceTools = (
       scope,
       question,
       candidateLimit = 3,
-      relatedLimit = 3,
-      relationshipLimit = 8,
+      inspectionLimit = 2,
+      relatedLimit = 0,
+      relationshipLimit = 4,
       snippetLines = 6,
       includeSource = false,
     }, { mcpReq: { signal } }) =>
@@ -236,6 +298,7 @@ export const registerIntelligenceTools = (
         scope,
         question,
         candidateLimit,
+        inspectionLimit,
         relatedLimit,
         relationshipLimit,
         snippetLines,

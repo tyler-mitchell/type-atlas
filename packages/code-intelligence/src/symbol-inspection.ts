@@ -310,7 +310,7 @@ export const inspectSymbol = async (
 
   const selected = "symbol" in target ? matches[0]! : undefined;
   const position = "position" in target ? target.position : selected!.selectionRange.start;
-  const [project, hover, definitionResult, implementationResult, references, items] =
+  const [project, hover, definitionResult, implementationResult, references, hierarchy] =
     await Promise.all([
       workspace.sendRequest(GetMatchTsConfigRequest.type, textDocument, signal),
       workspace.sendRequest(HoverRequest.type, { textDocument, position }, signal),
@@ -321,10 +321,38 @@ export const inspectSymbol = async (
         { textDocument, position, context: { includeDeclaration: true } },
         signal,
       ),
-      workspace.sendRequest(CallHierarchyPrepareRequest.type, { textDocument, position }, signal),
+      workspace.runResolverSequence(async () => {
+        const items = await workspace.sendRequest(
+          CallHierarchyPrepareRequest.type,
+          { textDocument, position },
+          signal,
+        );
+        const [incoming, outgoing] = await Promise.all([
+          items
+            ? Promise.all(items.map((item) =>
+              workspace.sendRequest(
+                CallHierarchyIncomingCallsRequest.type,
+                { item },
+                signal,
+              )
+            ))
+            : null,
+          items
+            ? Promise.all(items.map((item) =>
+              workspace.sendRequest(
+                CallHierarchyOutgoingCallsRequest.type,
+                { item },
+                signal,
+              )
+            ))
+            : null,
+        ]);
+        return { items, incoming, outgoing };
+      }, signal),
     ]);
-  const definitions = unique(navigationItems(definitionResult).map(locate), key);
-  const implementations = unique(navigationItems(implementationResult).map(locate), key);
+  const { items, incoming, outgoing } = hierarchy;
+  const definitions = navigationItems(definitionResult).map(locate);
+  const implementations = navigationItems(implementationResult).map(locate);
   const callable = items?.[0];
   const definedSymbol = !selected && !callable
     ? await symbolAtDefinition(workspace, root, definitions[0], signal)
@@ -362,19 +390,13 @@ export const inspectSymbol = async (
       ? { range: declaration.range, selectionRange: declaration.selectionRange }
       : {}),
   };
-  const [incoming, outgoing, source, typeResult] = await Promise.all([
-    items ? Promise.all(items.map((item) =>
-      workspace.sendRequest(CallHierarchyIncomingCallsRequest.type, { item }, signal)
-    )) : null,
-    items ? Promise.all(items.map((item) =>
-      workspace.sendRequest(CallHierarchyOutgoingCallsRequest.type, { item }, signal)
-    )) : null,
+  const [source, typeResult] = await Promise.all([
     options.includeSource ? excerpt(workspace, primary) : undefined,
     options.includeTypeDefinitions || !items?.length
       ? workspace.sendRequest(TypeDefinitionRequest.type, { textDocument, position }, signal)
       : null,
   ]);
-  const typeDefinitions = unique(navigationItems(typeResult).map(locate), key);
+  const typeDefinitions = navigationItems(typeResult).map(locate);
   const callers = unique(
     incoming?.flatMap((calls) => calls?.map((call) => ({
       item: call.from,
@@ -401,10 +423,9 @@ export const inspectSymbol = async (
       sites.map((range) => key({ uri: siteUri, range, selectionRange: range }))
     ),
   ]);
-  const allReferences = unique(
-    references?.map(({ uri, range }) => ({ uri, range, selectionRange: range })) ?? [],
-    key,
-  );
+  const allReferences =
+    references?.map(({ uri, range }) => ({ uri, range, selectionRange: range })) ??
+      [];
   const otherReferences = allReferences.filter((reference) =>
     !represented.has(key(reference))
   );

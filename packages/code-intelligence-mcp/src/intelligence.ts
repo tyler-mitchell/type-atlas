@@ -35,6 +35,9 @@ type RetrievalMatch = {
   readonly displayFile: string;
   readonly path?: readonly SymbolPathItem[];
   readonly selected?: SymbolPathItem;
+  readonly exactIdentifier: boolean;
+  readonly content?: string;
+  readonly contentStartLine: number;
   readonly hover?: Hover | null;
 };
 
@@ -107,12 +110,17 @@ const enrichPage = async (
     readonly root: string;
     readonly searchRoot: string;
     readonly includeTypes: boolean;
+    readonly snippetLines: number | null;
     readonly workspaces: VolarWorkspacePool;
     readonly signal: AbortSignal;
   },
 ): Promise<RetrievalPage> => {
   const workspace = await input.workspaces.get(input.root);
   const intelligence = createCodeIntelligence(workspace);
+  const queryIdentifiers = new Set(
+    (input.page.query.match(/[$_\p{ID_Start}][$_\p{ID_Continue}]*/gu) ?? [])
+      .filter((identifier) => /[$_\p{Lu}]/u.test(identifier)),
+  );
   return {
     page: input.page,
     root: input.root,
@@ -122,7 +130,7 @@ const enrichPage = async (
       const { symbols } = await intelligence.documentSymbols(file, input.signal);
       const startLine = result.start_line - 1;
       const endLine = result.end_line - 1;
-      const symbolPath = [...overlappingSymbolPaths(
+      const symbolPaths = [...overlappingSymbolPaths(
         symbols ?? [],
         startLine,
         endLine,
@@ -130,8 +138,22 @@ const enrichPage = async (
         overlapLength(right.at(-1)!.range, startLine, endLine) -
           overlapLength(left.at(-1)!.range, startLine, endLine) ||
         right.length - left.length
-      )[0];
+      );
+      const symbolPath = symbolPaths.find((path) =>
+        queryIdentifiers.has(path.at(-1)!.symbol.name)
+      ) ?? symbolPaths[0];
       const selected = symbolPath?.at(-1);
+      const contentLines = result.content?.split("\n") ?? [];
+      const snippetStart = input.snippetLines === null
+        ? 0
+        : Math.min(
+          Math.max(0, contentLines.length - input.snippetLines),
+          Math.max(
+            0,
+            (selected?.selection.start.line ?? startLine) - startLine -
+              Math.floor(input.snippetLines / 2),
+          ),
+        );
       const hover = selected && input.includeTypes
         ? (await intelligence.hover(
           file,
@@ -145,6 +167,17 @@ const enrichPage = async (
         displayFile: workspacePath(URI.file(file).toString(), input.root),
         path: symbolPath,
         selected,
+        exactIdentifier: !!selected &&
+          queryIdentifiers.has(selected.symbol.name),
+        content: input.snippetLines === 0
+          ? undefined
+          : contentLines.slice(
+            snippetStart,
+            input.snippetLines === null
+              ? undefined
+              : snippetStart + input.snippetLines,
+          ).join("\n"),
+        contentStartLine: startLine + snippetStart,
         hover,
       };
     })),
@@ -178,9 +211,9 @@ const formatMatch = (match: RetrievalMatch): string => [
   ...(match.hover
     ? [hoverContentsText(match.hover.contents) ?? "No hover content."]
     : []),
-  ...(match.result.content
-    ? match.result.content.split("\n").map((line, index) =>
-      `${match.result.start_line - 1 + index}|${line}`
+  ...(match.content
+    ? match.content.split("\n").map((line, index) =>
+      `${match.contentStartLine + index}|${line}`
     )
     : []),
 ].join("\n");
@@ -192,6 +225,7 @@ const formatPage = (
       readonly file: string;
       readonly position: Range["start"];
     };
+    readonly explainRelevance?: boolean;
     readonly limit?: number;
   },
 ): string => {
@@ -206,12 +240,20 @@ const formatPage = (
       )
     )
   ).slice(0, input.limit);
+  const topScore = matches[0]?.result.score;
   return [
     `Search: ${input.retrieval.page.query}`,
-    `${matches.length} ${matches.length === 1 ? "match" : "matches"}`,
+    `${matches.length} ${matches.length === 1 ? "match" : "matches"}${matches.length &&
+        input.explainRelevance !== false
+      ? " · relevance is relative to the top result shown"
+      : ""}`,
     "",
     ...matches.flatMap((match, index) => [
-      `## ${index + 1}`,
+      `## ${index + 1} · relevance ${
+        topScore && topScore > 0
+          ? Math.round((match.result.score / topScore) * 100)
+          : 0
+      }%`,
       formatMatch(match),
       "",
     ]),
@@ -241,12 +283,13 @@ export const createRetrievalIntelligence = (
         repo: searchRoot,
         query: request.query,
         limit: request.limit,
-        snippetLines: request.snippetLines,
+        snippetLines: null,
         signal: request.signal,
       }),
       root: request.root,
       searchRoot,
       includeTypes: request.includeTypes,
+      snippetLines: request.snippetLines,
       workspaces: dependencies.workspaces,
       signal: request.signal,
     });
@@ -275,7 +318,7 @@ export const createRetrievalIntelligence = (
       file: platformRelative(searchRoot, file),
       line: request.line + 1,
       limit: request.fetchLimit ?? request.limit,
-      snippetLines: request.snippetLines,
+      snippetLines: null,
       signal: request.signal,
     });
     return await enrichPage({
@@ -288,6 +331,7 @@ export const createRetrievalIntelligence = (
       root: request.root,
       searchRoot,
       includeTypes: request.includeTypes,
+      snippetLines: request.snippetLines,
       workspaces: dependencies.workspaces,
       signal: request.signal,
     });
@@ -357,6 +401,7 @@ export const createRetrievalIntelligence = (
         readonly scope?: string;
         readonly question: string;
         readonly candidateLimit: number;
+        readonly inspectionLimit: number;
         readonly relatedLimit: number;
         readonly relationshipLimit: number;
         readonly snippetLines: number | null;
@@ -369,56 +414,131 @@ export const createRetrievalIntelligence = (
         scope: request.scope,
         query: request.question,
         includeTypes: false,
-        limit: request.candidateLimit,
+        limit: Math.min(request.candidateLimit * 3, 20),
         snippetLines: request.snippetLines,
         signal: request.signal,
       });
-      const searchText = formatPage({ retrieval });
-      const primary = retrieval.matches.find(({ selected }) => selected);
-      if (!primary?.selected) return searchText;
-      const inspected = primary.path?.[0] ?? primary.selected;
-      const anchor = {
-        file: primary.file,
-        position: inspected.selection.start,
-      };
+      const searchText = formatPage({
+        retrieval,
+        limit: request.candidateLimit,
+      });
+      const anchored = retrieval.matches
+        .filter((
+          match,
+        ): match is RetrievalMatch & { readonly selected: SymbolPathItem } =>
+          !!match.selected
+        )
+        .filter((match, index, matches) =>
+          matches.findIndex((candidate) =>
+            sameAnchor(
+              {
+                file: match.file,
+                position: match.selected.selection.start,
+              },
+              {
+                file: candidate.file,
+                position: candidate.selected.selection.start,
+              },
+            )
+          ) === index
+      );
+      const exact = anchored.find(({ exactIdentifier }) => exactIdentifier);
+      const primary = anchored[0];
+      const primaryContainer = primary?.path?.[0] ?? primary?.selected;
+      const coherent = exact
+        ? [exact]
+        : primary && primaryContainer
+        ? anchored.filter((candidate) =>
+          candidate === primary ||
+          candidate.path?.some(({ selection }) =>
+            sameAnchor(
+              {
+                file: primary.file,
+                position: primaryContainer.selection.start,
+              },
+              {
+                file: candidate.file,
+                position: selection.start,
+              },
+            )
+          )
+        )
+        : [];
+      const deepest = Math.max(
+        ...coherent.map(({ path }) => path?.length ?? 1),
+      );
+      const candidates = coherent.filter(({ path }) =>
+        (path?.length ?? 1) === deepest
+      ).slice(
+        0,
+        request.inspectionLimit,
+      );
+      if (!candidates.length) return searchText;
       const workspace = await dependencies.workspaces.get(request.root);
-      const [inspection, related] = await Promise.all([
+      const inspections = await Promise.all(candidates.map((candidate) =>
         inspectSymbol(
           workspace,
           request.root,
-          primary.file,
-          { position: anchor.position },
+          candidate.file,
+          { position: candidate.selected.selection.start },
           {
             includeSource: request.includeSource,
             includeTypeDefinitions: false,
             limit: request.relationshipLimit,
           },
           request.signal,
-        ),
-        findRelated({
+        )
+      ));
+      const related = request.relatedLimit
+        ? await findRelated({
           root: request.root,
           scope: request.scope,
-          file: primary.file,
-          line: primary.result.start_line - 1,
+          file: candidates[0]!.file,
+          line: candidates[0]!.selected.selection.start.line,
           includeTypes: false,
           limit: request.relatedLimit,
           fetchLimit: Math.min(request.relatedLimit * 3, 20),
           snippetLines: request.snippetLines,
           signal: request.signal,
-        }),
-      ]);
+        })
+        : undefined;
+      const candidateRanks = candidates.map((candidate) =>
+        retrieval.matches.indexOf(candidate) + 1
+      );
       return [
         searchText,
         "",
-        "Verified relationships for the primary match",
-        inspection.text,
-        "",
-        "Related code · similarity is not a call or reference relationship",
-        formatPage({
-          retrieval: related,
-          exclude: anchor,
-          limit: request.relatedLimit,
-        }),
+        `Verified relationships for ${
+          exact
+            ? `the exact identifier match · retrieved candidate ${candidateRanks[0]}`
+            : `structurally connected retrieved ${
+              inspections.length === 1 ? "candidate" : "candidates"
+            } ${candidateRanks.join(", ")}`
+        }`,
+        ...inspections.flatMap((inspection, index) => [
+          ...(inspections.length > 1
+            ? [
+              "",
+              `### Retrieved candidate ${candidateRanks[index]}`,
+            ]
+            : []),
+          inspection.text,
+        ]),
+        ...(related
+          ? [
+            "",
+            "Related code · similarity is not a call or reference relationship",
+            formatPage({
+              retrieval: related,
+              exclude: {
+                file: candidates[0]!.file,
+                position: candidates[0]!.selected.selection.start,
+              },
+              explainRelevance: false,
+              limit: request.relatedLimit,
+            }),
+          ]
+          : []),
       ].join("\n");
     },
   };

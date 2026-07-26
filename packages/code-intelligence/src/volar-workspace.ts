@@ -2,6 +2,7 @@ import { fork } from "node:child_process";
 import { stat } from "node:fs/promises";
 import { watch } from "chokidar";
 import * as path from "pathe";
+import PQueue from "p-queue";
 import {
   CancellationTokenSource,
   ConfigurationRequest,
@@ -52,6 +53,7 @@ const matchesWatcher = (
 const startVolarWorkspace = async (
   workspaceRoot: string,
   languageServerEntry: URL,
+  release: () => void,
 ) => {
   const workspaceStat = await stat(workspaceRoot).catch(() => undefined);
   if (!workspaceStat?.isDirectory()) {
@@ -84,7 +86,12 @@ const startVolarWorkspace = async (
     new IPCMessageReader(languageServer),
     new IPCMessageWriter(languageServer),
   );
-  languageServer.once("close", () => connection.dispose());
+  const resolverSequences = new PQueue({ concurrency: 1 });
+  let idleTimer: ReturnType<typeof setTimeout> | undefined;
+  languageServer.once("close", () => {
+    clearTimeout(idleTimer);
+    connection.dispose();
+  });
   connection.listen();
   connection.onRequest(
     ConfigurationRequest.type,
@@ -208,9 +215,49 @@ const startVolarWorkspace = async (
     }
     return URI.file(filePath).toString();
   };
-  const readTextDocumentUri = async (uri: string) => {
+  const sendRequest = async <Params, Result, Error>(
+    request: RequestType<Params, Result, Error>,
+    params: Params,
+    signal?: AbortSignal,
+  ): Promise<Result> => {
     if (watcherError) throw watcherError;
-    const source = await connection.sendRequest(ReadFileRequest.type, { uri });
+    clearTimeout(idleTimer);
+    const cancellation = signal ? new CancellationTokenSource() : undefined;
+    const cancel = () => cancellation?.cancel();
+    signal?.addEventListener("abort", cancel, { once: true });
+    if (signal?.aborted) cancel();
+
+    try {
+      return await connection.sendRequest(
+        request.method,
+        params,
+        cancellation?.token,
+      );
+    } catch (error) {
+      if (signal?.aborted) {
+        throw signal.reason instanceof Error
+          ? signal.reason
+          : new Error("Code intelligence request was cancelled.");
+      }
+      throw error;
+    } finally {
+      signal?.removeEventListener("abort", cancel);
+      cancellation?.dispose();
+      if (
+        !connection.hasPendingResponse() &&
+        !disposed &&
+        isLanguageServerRunning()
+      ) {
+        idleTimer = setTimeout(() => {
+          release();
+          void dispose().catch(() => undefined);
+        }, 60_000);
+        idleTimer.unref();
+      }
+    }
+  };
+  const readTextDocumentUri = async (uri: string) => {
+    const source = await sendRequest(ReadFileRequest.type, { uri });
     if (source === null) {
       throw new Error(`Source document is unavailable: ${uri}`);
     }
@@ -218,35 +265,7 @@ const startVolarWorkspace = async (
   };
   return {
     closed: languageServerExit,
-    async sendRequest<Params, Result, Error>(
-      request: RequestType<Params, Result, Error>,
-      params: Params,
-      signal: AbortSignal,
-    ): Promise<Result> {
-      if (watcherError) throw watcherError;
-      const cancellation = new CancellationTokenSource();
-      const cancel = () => cancellation.cancel();
-      signal.addEventListener("abort", cancel, { once: true });
-      if (signal.aborted) cancel();
-
-      try {
-        return await connection.sendRequest(
-          request.method,
-          params,
-          cancellation.token,
-        );
-      } catch (error) {
-        if (signal.aborted) {
-          throw signal.reason instanceof Error
-            ? signal.reason
-            : new Error("Code intelligence request was cancelled.");
-        }
-        throw error;
-      } finally {
-        signal.removeEventListener("abort", cancel);
-        cancellation.dispose();
-      }
-    },
+    sendRequest,
     async getTextDocument(file: string) {
       return (await readTextDocumentUri(getWorkspaceUri(file))).textDocument;
     },
@@ -255,33 +274,39 @@ const startVolarWorkspace = async (
     },
     readTextDocumentUri,
     getWorkspaceUri,
-    async dispose() {
-      if (disposed) return;
-      disposed = true;
-      await watcher.close();
-      const shutdownTimer = setTimeout(terminateLanguageServer, 2_000);
-      shutdownTimer.unref();
-      try {
-        if (isLanguageServerRunning()) {
-          await connection.sendRequest(ShutdownRequest.type);
-          await connection.sendNotification(ExitNotification.type);
-          await languageServerExit;
-        }
-      } finally {
-        clearTimeout(shutdownTimer);
-        connection.dispose();
-        terminateLanguageServer();
+    runResolverSequence<T>(task: () => Promise<T>, signal?: AbortSignal) {
+      return resolverSequences.add(task, { signal });
+    },
+    dispose,
+  };
+
+  async function dispose() {
+    if (disposed) return;
+    disposed = true;
+    clearTimeout(idleTimer);
+    await watcher.close();
+    const shutdownTimer = setTimeout(terminateLanguageServer, 2_000);
+    shutdownTimer.unref();
+    try {
+      if (isLanguageServerRunning()) {
+        await connection.sendRequest(ShutdownRequest.type);
+        await connection.sendNotification(ExitNotification.type);
         await languageServerExit;
       }
-    },
-  };
+    } finally {
+      clearTimeout(shutdownTimer);
+      connection.dispose();
+      terminateLanguageServer();
+      await languageServerExit;
+    }
+  }
 };
 
 export type VolarWorkspace = Awaited<ReturnType<typeof startVolarWorkspace>>;
 
 export type VolarWorkspacePool = ReturnType<typeof createVolarWorkspaces>;
 
-/** Owns one long-lived Volar workspace per workspace root. */
+/** Owns one active Volar process per workspace root. */
 export const createVolarWorkspaces = (languageServer: URL) => {
   const entries = new Map<string, Promise<VolarWorkspace>>();
 
@@ -290,18 +315,19 @@ export const createVolarWorkspaces = (languageServer: URL) => {
     const existing = entries.get(workspaceRoot);
     if (existing) return existing;
 
-    const workspace = startVolarWorkspace(workspaceRoot, languageServer);
+    const workspace = startVolarWorkspace(workspaceRoot, languageServer, remove);
     entries.set(workspaceRoot, workspace);
-    const remove = () => {
-      if (entries.get(workspaceRoot) === workspace) {
-        entries.delete(workspaceRoot);
-      }
-    };
     void workspace.then(
       ({ closed }) => closed.then(remove),
       remove,
     );
     return workspace;
+
+    function remove() {
+      if (entries.get(workspaceRoot) === workspace) {
+        entries.delete(workspaceRoot);
+      }
+    }
   };
 
   return {

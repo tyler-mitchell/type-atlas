@@ -108,20 +108,60 @@ The enrichment layer asks the Volar workspace for document symbols and
 optional hover information. It does not alter Semble indexing, chunking,
 ranking, freshness, or cache behavior.
 
+`investigate_code` may retrieve up to three times its displayed candidate limit
+without changing Semble order. Exact identifier matches retain their native
+rank. For conceptual questions, only retrieved symbols sharing the first
+candidate's top-level Volar declaration are eligible for bounded relationship
+expansion; the deepest native declaration wins. Unrelated ranked candidates
+remain visible as retrieval evidence but are not expanded by default.
+
+Dependency search resolves each requested package through the consumer
+document's active Volar TypeScript project. The language server injects the
+project's TypeScript language service and host, then passes its compiler
+settings, filesystem, and the consumer source file's module mode to TypeScript's
+standard resolver. TypeScript's `noDtsResolution` option selects implementation
+source without preferring a separate declaration package. If no implementation
+is available, a second lookup uses the unmodified project options and
+module-resolution cache for declaration-only packages. Native
+`resolvedFileName` and `packageId` identify the installed distribution and
+exact consumer-visible version; Code Intelligence does not read package
+manifests, inspect lockfiles, or traverse `node_modules`.
+
+The native identity can differ from the requested specifier, and the tool
+reports the resolved name and version rather than inventing package identity.
+`diff` resolves to the runtime distribution at `diff@7.0.0`; an explicit
+`@types/diff` request resolves to the declaration distribution at
+`@types/diff@7.0.2`.
+
+TypeScript's `packageId.subModuleName` is the resolved file path relative to the
+package directory. Semble always ignores nested `dist/` and `build/`
+directories, so dependency search makes the resolved file's top-level package
+directory the Semble root. This indexes the visible installed distribution
+without overriding Semble ignore policy or indexing unrelated dependencies.
+
+One official MCP client held the same Code Intelligence stdio process across a
+real pnpm dependency installation. `arktype` was initially unresolved, then
+resolved and searched as `arktype@2.2.3` on the next call without a freshness
+notification or process restart. A separate request selected `diff@7.0.0`
+implementation source and `@types/diff@7.0.2` declaration source independently.
+
 Status: runtime-proven on macOS
 
 ## Adopted public affordances
 
 ```text
 Semble MCP max_snippet_lines = None   -> full chunk
-Code Intelligence snippetLines       -> integer 0..30 or null
+Code Intelligence snippetLines       -> integer 0..30 centered on the Volar anchor, or null
 
 Semble local chunk path on Windows    -> native pathlib separator
 Code Intelligence related seed path  -> native node:path separator
 ```
 
-`snippetLines: null` now passes Semble's complete-chunk mode through every
-intelligence tool. Defaults remain bounded.
+Code Intelligence requests Semble's complete chunk so a bounded view is not
+forced to begin at the chunk boundary. `snippetLines` then selects the same
+number of lines around the exact overlapping Volar symbol; `null` preserves the
+complete chunk. This changes neither Semble ranking nor agent-visible token
+budgets.
 
 `related_code` now derives the seed with the platform-native `node:path`
 `relative` function. The previous `pathe.relative` always emitted `/`, while
@@ -455,6 +495,9 @@ Code Intelligence consequence:
 - Do not label or threshold the score as confidence.
 - Omission of the raw numeric score from the agent-facing combined tools avoids
   presenting false precision.
+- Agent-facing pages normalize the top displayed score to `100%` and show every
+  other result relative to it. This preserves within-query ordering without
+  implying confidence; explain that scale once per response, not per result.
 - Search results must remain explicitly “retrieved candidates” until Volar
   establishes an exact code relationship.
 
@@ -593,6 +636,13 @@ Each directory contributes its own `.gitignore` and `.sembleignore` patterns to
 descendants. Semble also always excludes common VCS, dependency, environment,
 cache, and build directories, including `.git`, `node_modules`, `.venv`,
 `.cache`, `.semble`, `.next`, `dist`, and `build`.
+
+This matters for installed dependency search: a package root whose executable
+code lives only under `dist` produces no index, while using that resolved
+entrypoint's top-level directory as the repository root indexes the same
+published code normally. Code Intelligence resolves the package from the
+consumer file, then gives Semble only that package-local executable directory;
+it never widens the index to `node_modules`.
 
 A negated ignore pattern ending in a file extension, such as `!*.proto`, can
 force files past the configured content-type extension filter. Symlinks are

@@ -101,6 +101,149 @@ completed after this adapter correction.
 
 Status: upstream pattern and native dynamic-tool result observed.
 
+## Structural ancestry is a native cross-language request
+
+The installed TypeScript, Markdown, and JSON services all advertise
+`selectionRangeProvider` and return their own nested syntax-aware ranges. The
+headless client only needs to advertise support and forward
+`textDocument/selectionRange`.
+
+```js
+// volar-service-typescript@0.0.71 — lib/plugins/syntactic.js
+capabilities: {
+  foldingRangeProvider: true,
+  selectionRangeProvider: true,
+  documentSymbolProvider: true,
+}
+```
+
+```js
+// volar-service-markdown@0.0.71 — index.js
+provideSelectionRanges(document, positions, token) {
+  if (prepare(document)) {
+    return mdLs.getSelectionRanges(document, positions, token)
+  }
+}
+```
+
+```js
+// volar-service-json@0.0.71 — index.js
+provideSelectionRanges(document, positions) {
+  return worker(document, jsonDocument =>
+    jsonLs.getSelectionRanges(document, positions, jsonDocument)
+  )
+}
+```
+
+Project consequence: expose the returned parent chain directly as
+`selection_ranges`. Do not infer an enclosing function, object member, Markdown
+section, or JSON property from text, symbols, folding ranges, or a custom parser.
+
+Status: installed providers and client/server request path confirmed on
+2026-07-26; source-level MCP behavior observed after implementation.
+
+## Document-link discovery and resolution are native requests
+
+The installed server advertises document links whenever a configured language
+service provides them. It retains the language service used for discovery and
+routes the standard resolve request back to that service.
+
+```js
+// @volar/language-server@2.4.28 — lib/features/languageFeatures.js
+server.connection.onDocumentLinks(async (params, token) => {
+  const uri = URI.parse(params.textDocument.uri)
+  return await worker(uri, token, languageService => {
+    lastDocumentLinkLs = languageService
+    return languageService.getDocumentLinks(uri, token)
+  })
+})
+
+server.connection.onDocumentLinkResolve(async (link, token) => {
+  return await lastDocumentLinkLs?.resolveDocumentLink(link, token)
+})
+```
+
+```js
+// volar-service-markdown@0.0.71 — index.js
+async provideDocumentLinks(document, token) {
+  if (prepare(document)) {
+    return await mdLs.getDocumentLinks(document, token)
+  }
+}
+
+async resolveDocumentLink(link, token) {
+  return await mdLs.resolveDocumentLink(link, token) ?? link
+}
+```
+
+```js
+// volar-service-json@0.0.71 — index.js
+provideDocumentLinks(document) {
+  return worker(document, jsonDocument =>
+    jsonLs.findLinks(document, jsonDocument)
+  )
+}
+```
+
+Project consequence: `document_links` forwards discovery and resolves only
+unresolved results through the standard LSP request. Path parsing remains a
+presentation concern; link discovery and target resolution remain entirely
+language-service-owned.
+
+Status: installed providers and server routing confirmed on 2026-07-26;
+source-level MCP behavior observed after implementation.
+
+## Markdown diagnostics require the native configuration value
+
+The installed Markdown service advertises pull diagnostics, but deliberately
+does not compute them until its `getDiagnosticOptions` hook returns the
+language-service-native `DiagnosticOptions` object.
+
+```js
+// volar-service-markdown@0.0.71 — index.js
+getDiagnosticOptions = async (_document, context) => {
+  return await context.env.getConfiguration?.('markdown.validate')
+}
+
+async provideDiagnostics(document, token) {
+  if (prepare(document)) {
+    const configuration = await getDiagnosticOptions(document, context)
+    if (configuration) {
+      return mdLs.computeDiagnostics(document, configuration, token)
+    }
+  }
+}
+```
+
+```ts
+// vscode-markdown-languageservice@0.5.0-alpha.6
+export interface DiagnosticOptions {
+  readonly validateReferences: DiagnosticLevel | undefined
+  readonly validateFragmentLinks: DiagnosticLevel | undefined
+  readonly validateFileLinks: DiagnosticLevel | undefined
+  readonly validateMarkdownFileLinkFragments: DiagnosticLevel | undefined
+  readonly validateUnusedLinkDefinitions: DiagnosticLevel | undefined
+  readonly validateDuplicateLinkDefinitions: DiagnosticLevel | undefined
+  readonly ignoreLinks: readonly string[]
+}
+```
+
+Project consequence: answer the existing standard `workspace/configuration`
+request for `markdown.validate` with that exact object. Do not add a Markdown
+parser, link checker, diagnostic adapter, or separate validation tool. The
+service remains responsible for link discovery, filesystem observation,
+severity, ranges, messages, and related code actions.
+
+Status: installed provider contract and configured behavior observed through one
+official-client stdio session on 2026-07-26. Duplicate definitions now produce
+native warnings with related locations, and unused definitions produce native
+hints. Missing-file diagnostics remain blocked by an installed provider defect:
+`volar-service-markdown@0.0.71` returns `{ isDirectory: undefined }` when
+`context.env.fs.stat(resource)` returns `undefined`, which
+`vscode-markdown-languageservice` treats as an existing path. Do not replace the
+native checker in the MCP; correct or upgrade that provider boundary when the
+upstream package exposes a fixed contract.
+
 ## TypeScript must remain a physical runtime dependency
 
 TypeScript locates its standard library relative to the executing TypeScript
@@ -764,6 +907,82 @@ routing, feature eligibility, authored-range mapping, cancellation, and result
 deduplication. Direct injection is justified only for a capability that the
 complete Volar/LSP surface does not expose.
 
+Dependency-source discovery has that narrow protocol gap, but module resolution
+itself does not. The language server selects the document's Volar project and
+injects its TypeScript language service, host, and document filename from
+`volar-service-typescript`.
+
+```ts
+const sourceFile = languageService.getProgram()?.getSourceFile(fileName)
+const options = host.getCompilationSettings()
+
+const source = ts.resolveModuleName(
+  moduleName,
+  fileName,
+  { ...options, noDtsResolution: true },
+  host,
+  undefined,
+  undefined,
+  sourceFile?.impliedNodeFormat,
+).resolvedModule
+
+const resolved = source ?? ts.resolveModuleName(
+  moduleName,
+  fileName,
+  options,
+  host,
+  host.getModuleResolutionCache?.(),
+  undefined,
+  sourceFile?.impliedNodeFormat,
+).resolvedModule
+```
+
+TypeScript's standard resolver therefore runs over Volar's active filesystem,
+compiler settings and the consumer source file's native module mode.
+`noDtsResolution` is TypeScript's own switch for resolving implementation files
+instead of preferring declarations; that source lookup cannot reuse the
+project's module cache because it intentionally changes the compiler options.
+Declaration-only packages use a second standard lookup with the unmodified
+project options and module cache. `LanguageServiceHost.resolveModuleNames` is
+deprecated. `resolveModuleNameLiterals` is intended for real import AST nodes
+and `@volar/typescript` calls `getModeForUsageLocation` on those nodes;
+fabricating one for an arbitrary package-search input would counterfeit source
+context.
+The native result supplies `resolvedFileName` and `packageId`
+(`name`, `subModuleName`, exact `version`, and peer identity). The MCP does not
+resolve packages, read manifests or lockfiles, or traverse `node_modules`; it
+only selects the package-local distribution directory that Semble indexes.
+Native identity is authoritative. `diff` resolves to its consumer-visible
+runtime distribution at `diff@7.0.0`; an explicit or declaration-only
+`@types/diff` request resolves to `@types/diff@7.0.2`.
+
+TypeScript derives `subModuleName` from the resolved file and the package
+directory it already discovered:
+
+```js
+// typescript@5.9.3/lib/typescript.js — withPackageId
+subModuleName:
+  r.path.slice(packageInfo.packageDirectory.length + directorySeparator.length)
+```
+
+Semble always ignores nested `dist/` and `build/` directories. Dependency search
+therefore uses the first directory component of that native relative path as
+the Semble repository root; making the distribution directory itself the root
+keeps its contents eligible without overriding Semble's index policy. A
+root-level resolved file uses the package directory directly. This path
+selection is the only dependency-layout responsibility outside Volar and
+Semble.
+
+One official MCP client kept the same stdio process alive while a disposable
+TypeScript workspace changed from having no `arktype` dependency to installing
+`arktype@2.2.3` with pnpm. The first dependency search returned the native
+unresolved result; the next call, without notification or restart, resolved and
+searched the new runtime distribution. A separate call resolved `diff@7.0.0`
+and `@types/diff@7.0.2` independently, confirming the implementation/declaration
+selection.
+
+Status: installed-source and official-client stdio behavior observed.
+
 The same project context already has a Volar-native request for identifying the
 configured project that owns a document.
 
@@ -834,7 +1053,10 @@ a tsconfig or supply inferred root files and does not expose the full standard
 LSP feature surface. The language-server project remains the upstream
 composition for multi-project semantic navigation; kit is evidence that the
 same language and project contexts are public, not a replacement runtime for
-this MCP.
+this MCP. Its returned checker has no `dispose`, `shutdown`, or process-lifetime
+operation, and its filesystem snapshots are module-scoped. It therefore does
+not provide a lifecycle boundary that could replace graceful language-server
+process release.
 
 Status: installed-source observed; direct LSP requests observed.
 
@@ -2383,15 +2605,20 @@ MCP process is not a VS Code extension host, and the installed Volar packages
 do not expose an alternative headless implementation of
 `workspace.createFileSystemWatcher`.
 
-Volar's reload notification is not an event-free equivalent. The handler calls
-only the project cache boundary:
+Volar's reload notification is not an event-free equivalent. Volar exports the
+notification descriptor and its VS Code adapter sends it, but the generic
+language server does not register a handler. The generic server invokes the
+project cache boundary only during shutdown:
 
 ```js
+// @volar/language-server@2.4.28/protocol.js
+ReloadProjectNotification.type =
+  new protocol.NotificationType('volar/client/reloadProject')
+
 // @volar/language-server@2.4.28/lib/server.js
-connection.onNotification(ReloadProjectNotification.type, () => {
+shutdown() {
   state.project.reload()
-  state.languageFeatures.requestRefresh(true)
-})
+}
 
 // @volar/language-server@2.4.28/lib/project/typescriptProject.js
 reload() {
@@ -2412,6 +2639,43 @@ The client must not retain `knownWatchedFiles`, recursively pre-enumerate the
 workspace, classify events by comparing two custom sets, choose project-shape
 filenames, or ask agents to call a notification tool. Actual dependency-file
 events replace the current partial lockfile reload notification.
+
+The same boundary is not sufficient to bound process memory.
+`createTypeScriptProject` retains configured and inferred projects until
+`reload()` or shutdown, but `typescriptProjectLs.js` also owns the module-level
+`fsFileSnapshots` map outside those disposable projects. A production Codex
+session crossed several monorepo projects and three language-server processes
+terminated in `v8::internal::V8::FatalProcessOutOfMemory`; each pending request
+surfaced `Pending response rejected since connection got disposed`. A direct
+official-client run bound the native reload notification, sent it after one
+minute of request idleness, and reproduced the same OOM on the next project.
+The ineffective reload policy was removed rather than retained as a recovery
+layer.
+
+Process lifetime is therefore the narrow remaining client responsibility.
+`packages/code-intelligence/src/volar-workspace.ts` removes an idle workspace
+from its pool, then uses the standard LSP `shutdown` request and `exit`
+notification. Volar's `server.shutdown()` performs project disposal; exiting the
+child also releases the unexported module-level caches. A subsequent request
+starts the same canonical language server with a clean process.
+
+One official MCP client and stdio process called `read_file`, remained
+connected across the idle boundary, and called `read_file` again:
+
+```txt
+first result keys       content
+before idle             MCP process + Volar child
+after 60 seconds idle   MCP process only
+second result keys      content
+after second request    same MCP process + new Volar child
+```
+
+Both results contained the requested source. Closing the official client then
+removed the MCP process and its active child.
+
+The activity boundary covers both semantic LSP requests and Volar-backed source
+reads, so a read-only agent session cannot leave its language-server process
+permanently resident.
 
 ### Implementation responsibility map
 
@@ -2936,7 +3200,7 @@ not complete, so closing the MCP transport cannot leave a language-server
 process or the MCP shutdown awaiting it indefinitely.
 
 ```ts
-// packages/code-intelligence-mcp/src/volar-workspace.ts
+// packages/code-intelligence/src/volar-workspace.ts
 const shutdownTimer = setTimeout(terminateLanguageServer, 2_000)
 shutdownTimer.unref()
 
@@ -2952,6 +3216,24 @@ finally {
   await languageServerExit
 }
 ```
+
+`vscode-jsonrpc` already owns the pending-response registry and exposes its
+state. The client adapter does not maintain a parallel request counter:
+
+```ts
+// vscode-jsonrpc@8.2.0/lib/common/connection.js
+hasPendingResponse: () => responsePromises.size > 0
+
+// packages/code-intelligence/src/volar-workspace.ts
+if (!connection.hasPendingResponse() && isLanguageServerRunning()) {
+  idleTimer = setTimeout(release, 60_000)
+}
+```
+
+JSON-RPC exposes close, error, disposal, and pending-response observations, but
+no idle duration or child-process release policy. The timer therefore owns only
+the headless host's memory boundary; request concurrency remains entirely owned
+by the protocol connection.
 
 Status: upstream source at revision
 `a7605732a9d0e5f2598ed2e4051119209589bb22`, installed protocol source, and
@@ -3003,7 +3285,8 @@ refresh support and its no-op request handlers were removed.
 | Prompts, resources, and resource templates are distinct MCP surfaces rather than alternate tool metadata. | MCP `Prompt`, `Resource`, and `ResourceTemplate` types; `@modelcontextprotocol/server@2.0.0-beta.4` `registerPrompt`, `registerResource`, `ResourceTemplate`; Codex `0.145.0-alpha.18` generated status schema and resource handlers | Prompts produce reusable user/assistant messages and accept Standard Schema arguments. Resources expose stable URI-addressed content. A `ResourceTemplate` adds a URI pattern plus optional listing and per-variable completion, while resource registration can attach a 2026 read-cache hint. Codex lists, completes, and reads these surfaces independently from tools. | Code intelligence results depend on a workspace, file, position, and live semantic request, so registering prompts or resources would create a second, less direct interface or duplicate tool output. Advertise only tools until the server owns genuinely stable URI-addressed content or a canonical reusable prompt. | Native surfaces inventoried; intentionally unused |
 | Workspace symbols provide implementation ranges. | `@volar/language-service@2.4.28/lib/features/provideWorkspaceSymbols.js`; `volar-service-typescript@0.0.71/lib/plugins/semantic.js` — `provideWorkspaceSymbols`; `lib/utils/lspConverters.js` — `convertNavigateToItem` | TypeScript `getNavigateToItems` results become `WorkspaceSymbol` values and Volar maps their locations from embedded code to source code. | The MCP returns the mapped native symbols and only applies paging unless `raw` is requested. | Reuse |
 | Document symbols provide compiler-derived identifier and declaration ranges. | `volar-service-typescript@0.0.71/lib/plugins/syntactic.js` — `provideDocumentSymbols`; `lib/utils/lspConverters.js` — `convertNavTree` | TypeScript's navigation tree becomes `DocumentSymbol` values whose declaration `range` includes the navigation span and whose `selectionRange` comes directly from `nameSpan`. | The MCP returns the hierarchy directly; it performs no source-text symbol search. | Reuse |
-| Document symbols do not select an enclosing declaration for an arbitrary source range. | LSP `DocumentSymbolParams`; `@volar/language-service@2.4.28/lib/features/provideDocumentSymbols.js`; `volar-service-typescript@0.0.71/lib/plugins/syntactic.js` — `provideDocumentSymbols`; direct built-stdio MCP use on retrieved TypeScript ranges | The request accepts a document, not a source range, and returns the complete mapped declaration hierarchy. Its ranges are sufficient for a consumer to determine which declaration contains an externally retrieved range, but Volar exposes no separate range-to-symbol request. | Intelligence tools select the native document symbol with the greatest overlap, using hierarchy depth only to break ties. They retain the full symbol ancestry for display and inspect the enclosing top-level declaration when a nested anonymous callback has no useful language-service relationships. No source parsing or symbol inference is added. | Required composition boundary; built stdio verified |
+| Document symbols do not select an enclosing declaration for an arbitrary source range. | LSP `DocumentSymbolParams`; `@volar/language-service@2.4.28/lib/features/provideDocumentSymbols.js`; `volar-service-typescript@0.0.71/lib/plugins/syntactic.js` — `provideDocumentSymbols`; direct built-stdio MCP use on retrieved TypeScript ranges | The request accepts a document, not a source range, and returns the complete mapped declaration hierarchy. Its ranges are sufficient for a consumer to determine which declaration contains an externally retrieved range, but Volar exposes no separate range-to-symbol request. | Intelligence tools select the native document symbol with the greatest overlap, using hierarchy depth only to break ties. When a retrieval query contains an exact code-shaped identifier, the matching overlapping document symbol becomes the anchor without changing Semble result order. Investigation preserves that selected native symbol instead of widening back to its top-level ancestor. Bounded snippets are selected from Semble's complete native chunk around that exact source range, so improving the anchor does not expand the response. No source parsing, secondary ranking, or symbol inference is added. | Required composition boundary; exact nested-symbol search, bounded source, and investigation verified through built stdio |
+| Ranked retrieval candidates can be grouped by exact declaration ancestry without changing their retrieval rank. | Native Semble result order and source ranges; hierarchical LSP document-symbol paths; direct built-stdio conceptual and identifier investigations | Semble provides approximate ranked chunks and Volar provides exact declaration ancestry, but neither claims that the first semantic candidate is the answer. | `investigate_code` displays only the requested native result page while internally retrieving up to three times that count. Exact code-shaped identifiers inspect only their matching symbol. Conceptual questions inspect the deepest retrieved symbol or symbols sharing candidate one's top-level Volar declaration, preserving their original ranks in the heading. Structurally unrelated candidates are not expanded; related-code similarity is opt-in. | Required composition boundary; broad filesystem-freshness question selected `sendFileChanges` at native rank 7 without displaying extra candidates |
 | Folding ranges already traverse the complete TypeScript and virtual-code pipeline. | `vscode-languageserver-protocol@3.17.5` — `FoldingRangeRequest`; `@volar/language-server@2.4.28/lib/features/languageFeatures.js`; `@volar/language-service@2.4.28/lib/features/provideFoldingRanges.js` and `lib/utils/transform.js` — `transformFoldingRanges`; `volar-service-typescript@0.0.71/lib/plugins/syntactic.js` — `provideFoldingRanges`; `lib/utils/lspConverters.js` — `convertOutliningSpan` and `adjustFoldingEnd` | The TypeScript service calls `getOutliningSpans`; Volar converts the spans to LSP ranges, maps embedded ranges back to source, preserves optional fields such as `collapsedText`, and preserves `imports`, `comment`, and `region` kinds. The TypeScript converter already moves fold ends before closing `}`, `]`, `)`, and backticks. | A folded reader should send the native request, use provider-supplied collapsed text when present, and must not parse TypeScript, derive fold boundaries, reproduce closing-delimiter rules, or perform source-map work. | Reuse |
 | Volar service plugins are the multi-language extension boundary. | `volar-service-json@0.0.71`; `volar-service-markdown@0.0.71`; `vscode-json-languageservice`; `vscode-markdown-languageservice@0.5.0-alpha.6`; direct official-client MCP use | The JSON plugin selects `json` and `jsonc` documents and provides native completion, definition, diagnostics, hover, links, symbols, colors, folding, selection, and formatting. The Markdown plugin selects Markdown documents and provides native code actions, completion, definition, diagnostics, highlights, links, symbols, folding, hover, references, file references, rename, file-rename edits, selection, and workspace symbols. Both expose standard `LanguageServicePlugin` values for the same service array already used by TypeScript. The Markdown plugin's `~0.5.0-alpha.6` dependency currently resolves to an incompatible ESM `0.5.0` release whose own `vscode-uri` default import terminates Node; the exact CommonJS provider version consumed by the plugin loads correctly. | Register the canonical plugins once in the shared language server and pin the Markdown provider version the published plugin targets. Existing LSP-backed tools then acquire language-appropriate observations without file-extension branches, custom parsers, or MCP-specific providers; source reading through the shared Volar server filesystem remains language-independent. | Reuse; native Markdown and JSON reads, folds, symbols, diagnostics, correction, rename, JSONC, and deletion verified in one stdio process |
 | Language plugins resolve unopened-file language IDs. | `@volar/language-core@2.4.28/lib/types.d.ts` — `LanguagePlugin.getLanguageId`; `@volar/language-server@2.4.28/lib/project/typescriptProjectLs.js`; `@volar/typescript@2.4.28/lib/common.js`; direct official-client MCP use | Volar documents `getLanguageId` specifically for files whose language ID was not synchronized because they are not open in an IDE. The TypeScript project consults synchronized documents, configured language plugins, then `@volar/typescript.resolveFileLanguageId`; the last resolver recognizes JavaScript, TypeScript, JSX, TSX, and JSON, but not Markdown or JSONC. A real Markdown document therefore returned no symbols even with the Markdown service registered, while the same process returned the native JSON property hierarchy. | Supply one standard language plugin for the service-backed extensions missing from the TypeScript resolver. Keep the TypeScript project and service plugins unchanged; do not emulate editor open/close state or combine independent project providers. | Reuse; Markdown and JSONC routing directly verified without document-open notifications |
@@ -3033,9 +3316,11 @@ refresh support and its no-op request handlers were removed.
 | Volar's server filesystem is the authoritative source-content boundary for language observations. | `@volar/language-server@2.4.28/lib/features/fileSystem.js` and `lib/project/simpleProject.js`; `@volar/typescript@2.4.28/lib/protocol/createSys.js`; `volar-service-typescript@0.0.71/lib/plugins/semantic.js` — `getTextDocument`; direct official-client rename reproduction | The server caches `readFile` results and invalidates them from `didChangeWatchedFiles`. `createLanguageServiceEnvironment` passes that same filesystem to `@volar/typescript.createSys`, and the TypeScript service converts file-rename changes to ranges with documents backed by those snapshots. A separate client-side `stat` or `readFile` can therefore observe a newer filesystem instant than the edit or range it is interpreting. Standard LSP workspace edits do not carry source text or expose the server filesystem. | Expose `server.fileSystem.readFile` through one narrow internal request and use it for source rendering, range excerpts, and workspace-edit application. Keep folding, navigation, rename calculation, snapshots, caching, and invalidation in Volar; the protocol only serializes the already-owned source string across the process boundary. | Reuse with required process-boundary request; stale dependent rename, automatic deletion convergence, folded read, applied move patch, and external dependency excerpt directly verified in one MCP process |
 | Source-mapped text edits are already grouped by document. | `@volar/language-service@2.4.28/lib/utils/transform.js` — `transformWorkspaceEdit`, `pushEditToDocumentChanges`; `lib/features/provideRenameEdits.js` — `mergeWorkspaceEdits` | Workspace-edit transformation finds an existing `TextDocumentEdit` for the same URI and appends mapped edits to it; rename merges provider results before returning the source edit. The legacy `changes` lane is inherently keyed by URI. | The host adapter consumes the returned groups as-is and rejects repeated document groups rather than merging or deduplicating them itself. | Reuse; directly exercised |
 | `@volar/typescript` is already the TypeScript project substrate. | `@volar/language-server@2.4.28/lib/project/typescriptProjectLs.js`; `@volar/typescript@2.4.28/lib/protocol/createSys.js`; `lib/protocol/createProject.js`; installed dependency graph | The language server calls `createSys` and `createLanguageServiceHost` to supply versioned filesystem state, project scripts, virtual service scripts, snapshots, and module resolution to `volar-service-typescript`. The package exports project and TypeScript-plugin infrastructure, not an additional LSP observation surface. | Keep ownership in `createTypeScriptProject`; a direct MCP dependency or import would duplicate the project boundary without unlocking a native request. | Reuse transitively |
-| Volar deduplicates mapped semantic results. | `@volar/language-service@2.4.28/lib/utils/dedupe.js`; `provideDefinition.js`; `provideReferences.js`; `provideCodeActions.js`; `provideFileRenameEdits.js`; `provideCallHierarchyItems.js` | Definitions, references, diagnostics, code actions, file-rename document changes, ranges, and incoming/outgoing call targets are deduplicated after embedded-to-source transformation. | The MCP does not repeat URI/range deduplication. | Reuse |
+| Volar exposes its active TypeScript resolver inputs without exposing a dependency-source LSP request. | `volar-service-typescript@0.0.71/lib/plugins/semantic.d.ts` and `semantic.js` — injected language service, host, and document filename; `@volar/typescript@2.4.28/lib/protocol/createProject.js`; `typescript@5.9.3` `resolveModuleName` and `noDtsResolution` | The injected host carries Volar's filesystem, project compiler settings, and module cache; the language-service program supplies the consumer file's module mode. TypeScript's `noDtsResolution` selects implementation files, while ordinary resolution covers declaration-only packages. Standard LSP has no request for resolving an arbitrary dependency specifier to that native package result. | One internal request selects the active project, calls TypeScript's resolver, and returns `ResolvedModuleFull` unchanged. The MCP does not resolve packages or read manifests; it only chooses the Semble root from native `packageId.subModuleName`. | Reuse with required process-boundary request; runtime/declaration selection and same-session installation directly verified |
+| Volar deduplicates mapped semantic results. | `@volar/language-service@2.4.28/lib/utils/dedupe.js`; `provideDefinition.js`; `provideReferences.js`; `provideCodeActions.js`; `provideFileRenameEdits.js`; `provideCallHierarchyItems.js` | Definitions, references, diagnostics, code actions, file-rename document changes, ranges, prepared call-hierarchy items, and incoming/outgoing call targets are deduplicated after embedded-to-source transformation. | Consume each native result as returned; do not re-deduplicate definitions, type definitions, implementations, or references in `inspect_symbol`. Its only remaining call-group deduplication is across the multiple independently prepared roots that the composed request aggregates, and `Other references` excludes locations already represented by another section rather than altering the native reference result. | Reuse |
 | Workspace-symbol query matching is already TypeScript semantic navigation. | `volar-service-typescript@0.0.71/lib/plugins/semantic.js` — `provideWorkspaceSymbols` | Volar delegates the query to TypeScript `getNavigateToItems(query)` and maps the returned symbols to source locations. | The MCP preserves Volar's result order and only applies an optional page boundary. | Reuse |
 | MCP request cancellation propagates through the protocol boundary. | `@modelcontextprotocol/server@2.0.0-beta.4` — `ServerContext.mcpReq.signal`; `vscode-languageserver-protocol` `CancellationTokenSource`; direct official-client MCP use | The MCP server aborts the request context signal and the protocol connection translates it into `$/cancelRequest`. | Each request forwards `ctx.mcpReq.signal` to the LSP request. Workspace-process lifetime remains session-scoped and is not tied to one request. | Reuse |
+| JSON-RPC already owns concurrent-request state. | `vscode-jsonrpc@8.2.0/lib/common/connection.d.ts` and `connection.js` — `MessageConnection.hasPendingResponse` | The connection reports whether its private `responsePromises` registry is non-empty; response handling removes an entry before settling its promise. It exposes no idle duration or child-process release policy. | Clear the idle timer before sending a request and schedule process release only when `hasPendingResponse()` is false. Do not maintain a second active-request counter. | Reuse pending state; retain host idle policy |
 | JSON-RPC request descriptors are runtime-bearing across dependency instances. | `vscode-jsonrpc@8.2.0` and `9.0.1` `connection.js`; `@volar/language-server@2.4.28/protocol.js`; clean installation of the packed MCP and language-server packages | A clean dependency graph can load the MCP transport from `vscode-languageserver-protocol@3.17.5` while Volar's exported request descriptors come from `3.18.2`. Passing the foreign descriptor object makes JSON-RPC reject its distinct `ParameterStructures.auto` instance; the wire method and params remain fully compatible. Version `3.18.2` also replaces the legacy `node.js` package subpath with an exported `node` subpath. | Pin the MCP's node transport dependency to `3.17.5`, retain Volar's native typed request descriptors at the API boundary, and dispatch their standard `method` string through the connection. This preserves native requests without depending on package-instance identity. | Required package-boundary normalization; verified from a packed clean install |
 
 ## VS Code adapter affordances
@@ -3045,7 +3330,7 @@ refresh support and its no-op request handlers were removed.
 | Volar editor commands require client argument conversion. | `@volar/vscode@2.4.28/index.js` — `middleware`, `parseServerCommand`; `@volar/language-service@2.4.28/lib/languageService.js` — command factories | Converts rename and show-references URI/position/location arguments into VS Code objects; `setSelection` is also an editor command. | The MCP returns these commands as explicit follow-up metadata and never sends them to the language server as advertised server commands. | Host-bound |
 | Document-drop application requires VS Code data-transfer APIs. | `@volar/vscode@2.4.28/lib/features/documentDropEdits.js` | Converts `additionalEdit`, resolves string/file transfer data through client requests, and supplies binary initial contents for created files. | It is not reusable for headless source patching. | Host-bound |
 | Auto insertion requires VS Code snippet insertion. | `@volar/vscode@2.4.28/lib/features/autoInsertion.js` | Requests a Volar auto-insert snippet and inserts it through the active editor. | It is not a plain `WorkspaceEdit` executor. | Host-bound |
-| The exported reload-project adapter sends the official notification. | `@volar/vscode@2.4.28/lib/features/reloadProject.js`; `index.js` export | Sends `ReloadProjectNotification` for the active editor document. | Confirms the protocol is intended for explicit project recovery. It is not a filesystem-cache invalidation mechanism and is not used for automatic dependency freshness. | Reuse only for explicit project recovery |
+| The exported reload-project adapter sends the official notification. | `@volar/vscode@2.4.28/lib/features/reloadProject.js`; `@volar/language-server@2.4.28/protocol.js`; `lib/project/typescriptProject.js`; `lib/project/typescriptProjectLs.js` | The client sends `ReloadProjectNotification`; an owning server may bind it to `project.reload()`, which disposes configured and inferred language services but not the module-level filesystem snapshot map. | Project reload remains valid for explicit recovery, but direct multi-project use proved it does not bound this headless server's memory. It is not used for automatic freshness or memory reclamation. | Insufficient for process memory |
 | `writeVirtualFiles.js` is not a usable installed affordance. | `@volar/vscode@2.4.28/lib/features/writeVirtualFiles.js`, package `index.js`, and `protocol.js` | The file references `WriteVirtualFilesNotification`, but the symbol is absent from the installed protocol and the feature is not exported by the package index. | FeatureType does not rely on it. | Not an exported contract |
 | Virtual-code laboratory requests are inspection/state controls. | `@volar/language-server@2.4.28/lib/features/editorFeatures.js`; protocol `GetVirtualFileRequest`, `GetVirtualCodeRequest`, state notifications | Returns generated content/mappings and toggles virtual-code or service-plugin state. It performs no disk edit. | The generic TypeScript server supplies no virtual-code-producing language plugin, and the raw request did not complete in direct stdio use. These requests are not exposed by the initial MCP surface. | Deferred |
 
@@ -3053,6 +3338,7 @@ refresh support and its no-op request handlers were removed.
 
 | Finding | Installed source inspected | Objective behavior | FeatureType consequence | Status |
 | --- | --- | --- | --- | --- |
+| Volar's resolvable requests retain the last selected language service. | `@volar/language-server@2.4.28/lib/features/languageFeatures.js` — `lastCompleteLs`, `lastCodeActionLs`, `lastCallHierarchyLs`, `lastDocumentLinkLs`, and their discovery/follow-up handlers | Completion, code-action, call-hierarchy, and document-link follow-ups are routed through server-local “last language service” slots rather than an identifier carried by the returned item. Concurrent discovery in another TypeScript project can replace that slot before the first request resolves. In one official-client stdio process, a resolved completion page returned full types and documentation alone, then lost both when another project's completion ran concurrently. | Keep each native discovery/follow-up sequence atomic per workspace while leaving independent LSP requests parallel. `VolarWorkspace.runResolverSequence` delegates the cancellation-aware FIFO to `p-queue`; the completion, code-action, call-hierarchy, document-link, and composed symbol-inspection consumers use that boundary without changing any native item. | Upstream server constraint; concurrent before/after behavior directly observed |
 | The VS Code/JSON-RPC semaphore cannot cancel queued work. | `vscode-jsonrpc@8.2.0/lib/common/semaphore.js`; `vscode-languageclient@9.0.1/lib/common/utils/async.js` | FIFO queue with capacity and `lock(thunk)` only; no abort signal, timeout, or queued-item removal. The JSON-RPC package main API does not export the semaphore. | FeatureType retains a per-root cancellation-aware queue. | Insufficient contract |
 | MCP progress is request-scoped. | `@modelcontextprotocol/sdk@1.28.0/shared/protocol` — `RequestHandlerExtra.sendNotification`; MCP progress schemas | A caller supplies a progress token; related notifications carry progress, total, and message. | Mutation tools report bounded lock/generation/confirmation/prepare/commit/refresh/completion phases only when requested. | Reuse |
 | MCP roots are client-owned and change-notified. | MCP SDK `Server.listRoots`; `RootsListChangedNotificationSchema` | A capable client answers `roots/list` and can notify changes. | FeatureType lazily adopts file roots and refreshes them on list changes; manual attachment remains an override. | Reuse |

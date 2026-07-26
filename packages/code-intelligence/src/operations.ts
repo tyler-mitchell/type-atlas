@@ -1,11 +1,14 @@
 import {
   DefinitionRequest,
   DocumentDiagnosticRequest,
+  DocumentLinkRequest,
+  DocumentLinkResolveRequest,
   DocumentSymbolRequest,
   FoldingRangeRequest,
   GetMatchTsConfigRequest,
   HoverRequest,
   ReferencesRequest,
+  SelectionRangeRequest,
   WorkspaceSymbolRequest,
 } from "@volar/language-server/protocol.js";
 import type { Position } from "vscode-languageserver-protocol";
@@ -42,6 +45,45 @@ export const createCodeIntelligence = (workspace: VolarWorkspace) => ({
       signal,
     );
     return { textDocument, symbols };
+  },
+
+  async documentLinks(file: string, signal: AbortSignal) {
+    const textDocument = await workspace.getTextDocument(file);
+    return {
+      textDocument,
+      links: await workspace.runResolverSequence(async () => {
+        const links = await workspace.sendRequest(
+          DocumentLinkRequest.type,
+          { textDocument },
+          signal,
+        );
+        return await Promise.all(
+          (links ?? []).map((link) =>
+            link.target
+              ? link
+              : workspace.sendRequest(
+                DocumentLinkResolveRequest.type,
+                link,
+                signal,
+              )
+          ),
+        );
+      }, signal),
+    };
+  },
+
+  async selectionRanges(
+    file: string,
+    positions: readonly Position[],
+    signal: AbortSignal,
+  ) {
+    const textDocument = await workspace.getTextDocument(file);
+    const ranges = await workspace.sendRequest(
+      SelectionRangeRequest.type,
+      { textDocument, positions: [...positions] },
+      signal,
+    );
+    return { textDocument, ranges };
   },
 
   async hover(file: string, position: Position, signal: AbortSignal) {
