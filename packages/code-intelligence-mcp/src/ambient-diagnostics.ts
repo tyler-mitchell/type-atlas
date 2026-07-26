@@ -1,21 +1,38 @@
 import {
+  type DocumentDiagnosticReport,
   DocumentDiagnosticRequest,
   type Position,
   type Range,
   type TextDocumentIdentifier,
 } from "@volar/language-server/protocol.js";
-import { formatDiagnosticContext } from "@featuretype/code-intelligence/text";
+import {
+  formatDiagnosticContext,
+  formatDiagnostics,
+} from "@featuretype/code-intelligence/text";
 import type { VolarWorkspace } from "@featuretype/code-intelligence";
+
+export type DiagnosticMode = boolean | "verbose";
+
+export const formatDiagnosticMode = (
+  uri: string,
+  report: DocumentDiagnosticReport | null | undefined,
+  workspaceRoot: string,
+  mode: DiagnosticMode,
+  focus?: Position | Range,
+): string | undefined => mode === "verbose"
+  ? formatDiagnostics(uri, report, workspaceRoot) || undefined
+  : formatDiagnosticContext(uri, report, workspaceRoot, focus);
 
 export function requestDiagnosticContext(
   workspace: VolarWorkspace,
   textDocument: TextDocumentIdentifier,
   workspaceRoot: string,
-  includeDiagnostics: boolean,
+  includeDiagnostics: DiagnosticMode | undefined,
   signal: AbortSignal,
   focus?: Position | Range,
 ): Promise<string | undefined> {
-  if (!includeDiagnostics) {
+  const mode = includeDiagnostics ?? true;
+  if (!mode) {
     return Promise.resolve(undefined);
   }
 
@@ -24,11 +41,11 @@ export function requestDiagnosticContext(
     { textDocument },
     signal,
   ).then(
-    (report) =>
-      formatDiagnosticContext(
+    (report) => formatDiagnosticMode(
         textDocument.uri,
         report,
         workspaceRoot,
+        mode,
         focus,
       ),
     () => undefined,

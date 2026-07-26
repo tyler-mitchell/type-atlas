@@ -9,7 +9,7 @@ import { type } from "arktype";
 import { requestDiagnosticContext } from "./ambient-diagnostics.ts";
 import { textResult } from "./mcp-result.ts";
 import { readOnlyToolAnnotations } from "./metadata.ts";
-import { fileInput } from "./tool-input.ts";
+import { diagnosticModeInput, fileInput } from "./tool-input.ts";
 
 const readFileTarget = type({
   path: "string >= 1",
@@ -23,12 +23,7 @@ const readFileInput = type({
   file: type("string >= 1").or(readFileTarget).or(
     type("string >= 1").or(readFileTarget).array().atLeastLength(1),
   ).configure({ description: "A file path, or file views to read together." }),
-  "includeDiagnostics?": type("boolean")
-    .configure({
-      default: true,
-      description:
-        "Include actionable diagnostics from each queried file when present.",
-    }),
+  "includeDiagnostics?": diagnosticModeInput,
   "fold?": type("boolean")
     .configure({
       default: true,

@@ -51,11 +51,13 @@
   "dependencies": {
     "@featuretype/code-intelligence": "workspace:*",
     "@featuretype/code-intelligence-language-server": "workspace:*",
-    "@modelcontextprotocol/server": "2.0.0-beta.4",
+    "@modelcontextprotocol/client": "2.0.0-beta.5",
+    "@modelcontextprotocol/server": "2.0.0-beta.5",
     "@volar/language-server": "2.4.28",
     "arktype": "^2.2.3",
     "citty": "^0.2.2",
     "diff": "^7.0.0",
+    "pathe": "^2.0.3",
     "vscode-languageserver-protocol": "3.17.5",
     "vscode-languageserver-textdocument": "^1.0.12",
     "vscode-uri": "^3.0.8"

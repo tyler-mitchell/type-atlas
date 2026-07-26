@@ -93,13 +93,22 @@ const diagnosticOrigin = (diagnostic: Diagnostic) => {
   return `${source}${code}`;
 };
 
-const diagnosticSummaryText = (diagnostic: Diagnostic) => {
+const diagnosticSummaryText = (
+  diagnostic: Diagnostic,
+  workspaceRoot: string,
+) => {
   const origin = diagnosticOrigin(diagnostic);
+  const related = diagnostic.relatedInformation?.map((info) =>
+    `related ${
+      workspaceRange(info.location.uri, info.location.range, workspaceRoot)
+    }\n${indent(info.message, "    ")}`
+  ) ?? [];
   return [
     `${diagnosticSeverityText(diagnostic)}${origin ? ` ${origin}` : ""} ${
       rangeText(diagnostic.range)
     }`,
     indent(diagnostic.message),
+    ...related.map((line) => indent(line)),
   ].join("\n");
 };
 
@@ -138,13 +147,15 @@ export const formatDiagnosticContext = (
       ? `${warnings} ${warnings === 1 ? "warning" : "warnings"}`
       : undefined,
   ].filter((count): count is string => !!count).join(", ");
-  const focused = focus
-    ? actionable.find((diagnostic) => diagnosticIntersects(diagnostic, focus))
-    : undefined;
+  const preview = (
+    focus
+      ? actionable.find((diagnostic) => diagnosticIntersects(diagnostic, focus))
+      : undefined
+  ) ?? actionable[0];
 
   return [
     `Diagnostics: ${counts} · ${workspacePath(uri, workspaceRoot)}`,
-    ...(focused ? [diagnosticSummaryText(focused)] : []),
+    diagnosticSummaryText(preview, workspaceRoot),
     "Full report: diagnostics",
   ].join("\n");
 };

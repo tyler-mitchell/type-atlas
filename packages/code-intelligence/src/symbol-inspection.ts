@@ -240,6 +240,33 @@ const symbolAtDefinition = async (
   );
 };
 
+const enclosingSymbolAt = async (
+  workspace: VolarWorkspace,
+  textDocument: { readonly uri: string },
+  position: Position,
+  signal: AbortSignal,
+) =>
+  flattenSymbols(
+    await workspace.sendRequest(
+      DocumentSymbolRequest.type,
+      { textDocument },
+      signal,
+    ),
+    textDocument.uri,
+  ).filter(({ range }) =>
+    (range.start.line < position.line ||
+      (range.start.line === position.line &&
+        range.start.character <= position.character)) &&
+    (position.line < range.end.line ||
+      (position.line === range.end.line &&
+        position.character < range.end.character))
+  ).sort((left, right) =>
+    right.range.start.line - left.range.start.line ||
+    right.range.start.character - left.range.start.character ||
+    left.range.end.line - right.range.end.line ||
+    left.range.end.character - right.range.end.character
+  )[0];
+
 export const inspectSymbol = async (
   workspace: VolarWorkspace,
   root: string,
@@ -302,7 +329,10 @@ export const inspectSymbol = async (
   const definedSymbol = !selected && !callable
     ? await symbolAtDefinition(workspace, root, definitions[0], signal)
     : undefined;
-  const base: Located = selected ?? definedSymbol ?? (callable
+  const enclosingSymbol = !selected && !callable && !definedSymbol
+    ? await enclosingSymbolAt(workspace, textDocument, position, signal)
+    : undefined;
+  const base: Located = selected ?? definedSymbol ?? enclosingSymbol ?? (callable
     ? {
       uri: callable.uri,
       name: callable.name,

@@ -21,9 +21,13 @@ export const fileInput = {
   ),
 } as const;
 
+export const diagnosticModeInput = type("boolean | 'verbose'").configure({
+  default: true,
+  description:
+    "Include one complete diagnostic plus file totals when present, use 'verbose' for the full report, or false to omit diagnostics.",
+});
+
 export const observedFileInput = {
   ...fileInput,
-  includeDiagnostics: type("boolean")
-    .describe("Include actionable diagnostics from the queried file when present.")
-    .default(true),
+  "includeDiagnostics?": diagnosticModeInput,
 } as const;

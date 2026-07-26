@@ -2,10 +2,12 @@ import { McpServer } from "@modelcontextprotocol/server";
 import { serveStdio } from "@modelcontextprotocol/server/stdio";
 import { createVolarWorkspaces } from "@featuretype/code-intelligence";
 import { serverInfo } from "./metadata.ts";
+import { createSemble, type Semble } from "./semble.ts";
 import { registerTools } from "./tools.ts";
 
 const createServer = (
   workspaces: ReturnType<typeof createVolarWorkspaces>,
+  semble: Semble,
 ): McpServer => {
   const server = new McpServer(serverInfo, {
     capabilities: { tools: { listChanged: false } },
@@ -13,7 +15,7 @@ const createServer = (
       "tools/list": { ttlMs: 60_000, cacheScope: "public" },
     },
   });
-  registerTools(server, workspaces);
+  registerTools(server, workspaces, semble);
   return server;
 };
 
@@ -22,7 +24,8 @@ export const startMcpServer = (): void => {
   const workspaces = createVolarWorkspaces(new URL(
     import.meta.resolve("@featuretype/code-intelligence-language-server/node"),
   ));
-  const handle = serveStdio(() => createServer(workspaces), {
+  const semble = createSemble();
+  const handle = serveStdio(() => createServer(workspaces, semble), {
     onerror: (error) => console.error(error),
   });
 
@@ -31,7 +34,10 @@ export const startMcpServer = (): void => {
     if (shuttingDown) return;
     shuttingDown = true;
     void handle.close()
-      .finally(workspaces.dispose)
+      .finally(() => Promise.allSettled([
+        workspaces.dispose(),
+        semble.dispose(),
+      ]))
       .then(
         () => process.exit(0),
         (error) => {
