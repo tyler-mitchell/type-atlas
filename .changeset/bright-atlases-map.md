@@ -4,4 +4,4 @@
 "@typeatlas/mcp": minor
 ---
 
-Establish the TypeAtlas package suite and its production release toolchain.
+Establish the Type Atlas package suite and its production release toolchain.

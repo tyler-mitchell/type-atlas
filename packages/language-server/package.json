@@ -1,7 +1,7 @@
 {
   "name": "@typeatlas/language-server",
   "version": "0.0.0",
-  "description": "Volar-based TypeScript, Markdown, and JSON language server for TypeAtlas.",
+  "description": "Volar-based TypeScript, Markdown, and JSON language server for Type Atlas.",
   "keywords": [
     "json",
     "language-server",

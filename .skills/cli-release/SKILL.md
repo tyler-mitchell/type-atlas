@@ -1,9 +1,9 @@
 ---
 name: cli-release
-description: Release the TypeAtlas npm package suite through Changesets and the GitHub Actions trusted-publishing workflow. Use when adding release notes, preparing or reviewing a version pull request, publishing a release, verifying published artifacts, or recovering an interrupted TypeAtlas release.
+description: Release the Type Atlas npm package suite through Changesets and the GitHub Actions trusted-publishing workflow. Use when adding release notes, preparing or reviewing a version pull request, publishing a release, verifying published artifacts, or recovering an interrupted Type Atlas release.
 ---
 
-# Release TypeAtlas
+# Release Type Atlas
 
 Release `@typeatlas/core`, `@typeatlas/language-server`, and `@typeatlas/mcp`
 as one fixed-version package suite. Keep versions, changelogs, tags, and npm
