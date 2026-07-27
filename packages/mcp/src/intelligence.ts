@@ -1,5 +1,7 @@
 import {
   createTypeAtlas,
+  containingGitSubmodule,
+  findGitSubmoduleRoots,
   inspectSymbol,
   type InspectSymbolTarget,
   type VolarWorkspacePool,
@@ -74,11 +76,20 @@ const overlappingSymbolPaths = (
 const overlapLength = (range: Range, startLine: number, endLine: number): number =>
   Math.max(0, Math.min(range.end.line, endLine) - Math.max(range.start.line, startLine) + 1);
 
-const resolveSearchRoot = (root: string, scope: string | undefined): string => {
+const resolveSearchRoot = async (root: string, scope: string | undefined): Promise<string> => {
   const workspaceRoot = path.resolve(root);
   const searchRoot = path.resolve(workspaceRoot, scope ?? ".");
   if (searchRoot !== workspaceRoot && !isFileInDir(searchRoot, workspaceRoot)) {
     throw new Error(`Search scope is outside the workspace: ${scope}`);
+  }
+  const submoduleRoots = await findGitSubmoduleRoots(workspaceRoot);
+  const submoduleRoot =
+    containingGitSubmodule(searchRoot, submoduleRoots) ??
+    submoduleRoots.find((candidate) => isFileInDir(candidate, searchRoot));
+  if (submoduleRoot) {
+    throw new Error(
+      `Search scope contains nested workspace ${path.relative(workspaceRoot, submoduleRoot)}. Use that path as workspace or choose a narrower parent-workspace scope.`,
+    );
   }
   return searchRoot;
 };
@@ -251,7 +262,7 @@ export const createRetrievalIntelligence = (dependencies: {
     readonly snippetLines: number | null;
     readonly signal: AbortSignal;
   }): Promise<RetrievalPage> => {
-    const searchRoot = resolveSearchRoot(request.root, request.scope);
+    const searchRoot = await resolveSearchRoot(request.root, request.scope);
     return await enrichPage({
       page: await dependencies.semble.search({
         repo: searchRoot,
@@ -280,7 +291,7 @@ export const createRetrievalIntelligence = (dependencies: {
     readonly snippetLines: number | null;
     readonly signal: AbortSignal;
   }): Promise<RetrievalPage> => {
-    const searchRoot = resolveSearchRoot(request.root, request.scope);
+    const searchRoot = await resolveSearchRoot(request.root, request.scope);
     const file = path.resolve(request.root, request.file);
     if (!isFileInDir(file, searchRoot)) {
       throw new Error(`Related-code seed is outside the search scope: ${request.file}`);

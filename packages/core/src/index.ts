@@ -16,3 +16,4 @@ export {
   type InspectSymbolResult,
   type InspectSymbolTarget,
 } from "./symbol-inspection.ts";
+export { containingGitSubmodule, findGitSubmoduleRoots } from "./git-submodules.ts";

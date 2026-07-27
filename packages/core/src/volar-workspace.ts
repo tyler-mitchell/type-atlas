@@ -31,6 +31,7 @@ import { isFileInDir } from "@volar/language-server/node.js";
 import { ReadFileRequest } from "@typeatlas/language-server/protocol";
 import { URI } from "vscode-uri";
 import { clientCapabilities, getClientConfiguration } from "./language-client.ts";
+import { containingGitSubmodule, findGitSubmoduleRoots } from "./git-submodules.ts";
 
 const watchKind = (type: FileChangeType): WatchKind =>
   type === FileChangeType.Created
@@ -54,6 +55,7 @@ const startVolarWorkspace = async (
   if (!workspaceStat?.isDirectory()) {
     throw new Error(`Workspace is not a directory: ${workspaceRoot}`);
   }
+  const submoduleRoots = await findGitSubmoduleRoots(workspaceRoot);
 
   const languageServer = fork(languageServerEntry, ["--node-ipc"], {
     cwd: workspaceRoot,
@@ -124,6 +126,8 @@ const startVolarWorkspace = async (
 
   let watcherError: Error | undefined;
   const watcher = watch(workspaceRoot, {
+    ignored: (file) =>
+      containingGitSubmodule(path.resolve(workspaceRoot, file), submoduleRoots) !== undefined,
     ignoreInitial: true,
     followSymlinks: false,
   });
@@ -199,6 +203,12 @@ const startVolarWorkspace = async (
     const filePath = path.resolve(workspaceRoot, file);
     if (!isFileInDir(filePath, workspaceRoot)) {
       throw new Error(`File is outside the workspace: ${file}`);
+    }
+    const submoduleRoot = containingGitSubmodule(filePath, submoduleRoots);
+    if (submoduleRoot) {
+      throw new Error(
+        `File belongs to nested workspace ${path.relative(workspaceRoot, submoduleRoot)}. Use that path as workspace.`,
+      );
     }
     return URI.file(filePath).toString();
   };
