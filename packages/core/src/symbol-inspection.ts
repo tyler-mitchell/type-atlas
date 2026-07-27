@@ -13,6 +13,7 @@ import {
   type Position,
   type Range,
   ReferencesRequest,
+  SymbolKind,
   type SymbolInformation,
   type DocumentSymbol,
   TypeDefinitionRequest,
@@ -138,13 +139,14 @@ const callGroups = (calls: readonly RelatedCall[], root: string, sharedSiteUri?:
       const selection = rangeText(item.selectionRange);
       const body = rangeText(item.range);
       const callSites = sites.map(rangeText).join(", ");
-      return `  ${item.name} [${symbolKind(item.kind)}] selection ${selection}${
-        body === selection ? "" : ` · body ${body}`
-      } · calls ${
+      const bodyLocation = body === selection ? "" : ` · body ${body}`;
+      const location =
+        item.kind === SymbolKind.Module ? "" : ` selection ${selection}${bodyLocation}`;
+      return `  ${item.name} [${symbolKind(item.kind)}]${location} · calls ${
         siteUri === sharedSiteUri || siteUri === item.uri
           ? callSites
           : `${workspacePath(siteUri, root)}:${callSites}`
-      }${item.detail ? ` — ${item.detail}` : ""}`;
+      }${item.detail && item.kind !== SymbolKind.Module ? ` — ${item.detail}` : ""}`;
     }),
   ]);
 
@@ -202,22 +204,23 @@ const symbolChoice = (
   symbol: string,
   fileUri: string,
   candidates: readonly Located[],
+  total: number,
   root: string,
-  limit: number,
 ) => {
-  const shown = candidates.slice(0, limit);
   return [
     `Symbol "${symbol}" is ${status} · ${workspacePath(fileUri, root)}`,
-    ...(shown.length
+    ...(candidates.length
       ? [
-          `Candidates (${shown.length === candidates.length ? shown.length : `${shown.length}/${candidates.length}`})`,
-          ...shown.map(
+          `Candidates (${candidates.length === total ? candidates.length : `${candidates.length}/${total}`})`,
+          ...candidates.map(
             (candidate) =>
               `  ${candidate.name} [${symbolKind(candidate.kind!)}] ${locationText(
                 candidate,
-              )}${candidate.detail ? ` — ${candidate.detail}` : ""}`,
+              )}${candidate.detail ? ` — ${candidate.detail}` : ""}${
+                candidate.sourceLine ? `  ${candidate.sourceLine.trim()}` : ""
+              }`,
           ),
-          ...(shown.length < candidates.length ? [`${candidates.length - shown.length} more`] : []),
+          ...(candidates.length < total ? [`${total - candidates.length} more`] : []),
         ]
       : []),
   ].join("\n");
@@ -315,15 +318,16 @@ export const inspectSymbol = async (
     const candidates = matches.length
       ? matches
       : symbols.filter(({ name }) => name?.toLowerCase().includes(target.symbol.toLowerCase()));
+    const shownCandidates = await withSourceLines(workspace, candidates.slice(0, options.limit));
     return {
       textDocument,
       text: symbolChoice(
         matches.length ? "ambiguous" : "not found",
         target.symbol,
         textDocument.uri,
-        candidates,
+        shownCandidates,
+        candidates.length,
         root,
-        options.limit,
       ),
     };
   }
