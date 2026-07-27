@@ -32,6 +32,11 @@ import type { VolarWorkspacePool } from "@typeatlas/core";
 
 const inspectOptions = {
   ...observedFileInput,
+  "includeExternalCalls?": type("boolean").configure({
+    default: false,
+    description:
+      "Include full dependency and JavaScript runtime call targets. By default they are summarized while workspace calls retain exact ranges.",
+  }),
   includeSource: type("boolean").describe("Include the complete symbol body.").default(false),
   includeTypeDefinitions: type("boolean")
     .describe("Include callable type-definition targets.")
@@ -106,6 +111,7 @@ export const registerNavigationTools = (
         workspace: root,
         file,
         includeDiagnostics,
+        includeExternalCalls = false,
         includeSource = false,
         includeTypeDefinitions = false,
         limit = 20,
@@ -119,7 +125,7 @@ export const registerNavigationTools = (
         root,
         file,
         "symbol" in target ? { symbol: target.symbol } : { position: target.position },
-        { includeSource, includeTypeDefinitions, limit },
+        { includeExternalCalls, includeSource, includeTypeDefinitions, limit },
         signal,
       );
       const diagnosticContext = requestDiagnosticContext(

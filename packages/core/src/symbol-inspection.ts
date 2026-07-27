@@ -27,6 +27,7 @@ export type InspectSymbolTarget = { readonly position: Position } | { readonly s
 
 /** Controls expensive source and type sections and bounds repeated relationships. */
 export type InspectSymbolOptions = {
+  readonly includeExternalCalls?: boolean;
   readonly includeSource: boolean;
   readonly includeTypeDefinitions: boolean;
   readonly limit: number;
@@ -147,20 +148,52 @@ const callGroups = (calls: readonly RelatedCall[], root: string, sharedSiteUri?:
     }),
   ]);
 
-const callSection = (
-  name: string,
-  calls: readonly RelatedCall[],
-  limit: number,
-  root: string,
-  sharedSiteUri?: string,
-) => {
-  const shown = calls.slice(0, limit);
+const callSection = (input: {
+  readonly calls: readonly RelatedCall[];
+  readonly includeExternal?: boolean;
+  readonly limit: number;
+  readonly name: string;
+  readonly root: string;
+  readonly sharedSiteUri?: string;
+}) => {
+  const classified = input.calls.map((call) => {
+    const uri = URI.parse(call.item.uri);
+    return {
+      call,
+      external: !isFileInDir(uri.fsPath, input.root) || uri.path.includes("/node_modules/"),
+    };
+  });
+  const external = input.includeExternal
+    ? []
+    : classified.filter(({ external }) => external).map(({ call }) => call);
+  const calls = input.includeExternal
+    ? input.calls
+    : classified.filter(({ external }) => !external).map(({ call }) => call);
+  const shown = calls.slice(0, input.limit);
+  const externalNames = [...new Set(external.map(({ item }) => item.name))];
+  if (!shown.length && !external.length) return [];
+  const shownCount =
+    shown.length === calls.length ? `${calls.length}` : `${shown.length}/${calls.length}`;
+  const count = input.includeExternal
+    ? shownCount
+    : `${shownCount} workspace${external.length ? ` · ${external.length} dependency/runtime` : ""}`;
   return [
-    `${name} (${shown.length === calls.length ? calls.length : `${shown.length}/${calls.length}`})${
-      sharedSiteUri ? ` · call sites in ${workspacePath(sharedSiteUri, root)}` : ""
+    `${input.name} (${count})${
+      input.sharedSiteUri
+        ? ` · call sites in ${workspacePath(input.sharedSiteUri, input.root)}`
+        : ""
     }`,
-    ...callGroups(shown, root, sharedSiteUri),
+    ...callGroups(shown, input.root, input.sharedSiteUri),
     ...(shown.length < calls.length ? [`${calls.length - shown.length} more`] : []),
+    ...(external.length
+      ? [
+          `Dependency/runtime: ${externalNames.slice(0, input.limit).join(", ")}${
+            externalNames.length > input.limit
+              ? ` · ${externalNames.length - input.limit} more`
+              : ""
+          }`,
+        ]
+      : []),
   ];
 };
 
@@ -459,23 +492,44 @@ export const inspectSymbol = async (
       ...((options.includeTypeDefinitions || !items?.length) && distinctTypes.length
         ? ["", `Type definitions (${distinctTypes.length})`, ...locationGroups(distinctTypes, root)]
         : []),
-      ...(items?.length
+      ...(items?.length && callers.length
         ? [
             "",
-            ...callSection("Callers", callers, options.limit, root),
-            "",
-            ...callSection("Calls", callees, options.limit, root, sharedSiteUri),
+            ...callSection({
+              name: "Callers",
+              calls: callers,
+              limit: options.limit,
+              root,
+              includeExternal: true,
+            }),
           ]
-        : ["", "Call hierarchy: not applicable"]),
-      "",
-      `Other references (${
-        shownReferences.length === otherReferences.length
-          ? `${otherReferences.length} of ${allReferences.length} total`
-          : `${shownReferences.length}/${otherReferences.length} other · ${allReferences.length} total`
-      })`,
-      ...locationGroups(shownReferences, root),
-      ...(shownReferences.length < otherReferences.length
-        ? [`${otherReferences.length - shownReferences.length} more`]
+        : []),
+      ...(items?.length && callees.length
+        ? [
+            "",
+            ...callSection({
+              name: "Calls",
+              calls: callees,
+              limit: options.limit,
+              root,
+              sharedSiteUri,
+              includeExternal: options.includeExternalCalls,
+            }),
+          ]
+        : []),
+      ...(otherReferences.length
+        ? [
+            "",
+            `Other references (${
+              shownReferences.length === otherReferences.length
+                ? `${otherReferences.length} of ${allReferences.length} total`
+                : `${shownReferences.length}/${otherReferences.length} other · ${allReferences.length} total`
+            })`,
+            ...locationGroups(shownReferences, root),
+            ...(shownReferences.length < otherReferences.length
+              ? [`${otherReferences.length - shownReferences.length} more`]
+              : []),
+          ]
         : []),
       ...(source
         ? [
