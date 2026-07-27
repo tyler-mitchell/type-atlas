@@ -1,7 +1,0 @@
-src/**
-scripts/**
-tsconfig.json
-.turbo/**
-node_modules/**
-!dist/**
-dist/*.vsix

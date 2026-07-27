@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "typeatlas": {
+      "command": "npx",
+      "args": ["--yes", "@typeatlas/mcp@latest"]
+    }
+  }
+}

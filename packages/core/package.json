@@ -1,28 +1,83 @@
 {
-  "name": "@featuretype/core",
+  "name": "@typeatlas/core",
   "version": "0.0.0",
-  "private": true,
-  "type": "module",
-  "main": "dist/index.cjs",
-  "module": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
-    }
+  "description": "Headless TypeScript, Markdown, and JSON code intelligence powered by Volar.js.",
+  "keywords": [
+    "code-intelligence",
+    "json",
+    "language-server",
+    "markdown",
+    "typescript",
+    "volar"
+  ],
+  "homepage": "https://github.com/tyler-mitchell/typeatlas/tree/main/packages/core",
+  "bugs": {
+    "url": "https://github.com/tyler-mitchell/typeatlas/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tyler-mitchell/typeatlas.git",
+    "directory": "packages/core"
   },
   "files": [
     "dist"
   ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "development": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./text": {
+      "development": "./src/plain-text.ts",
+      "types": "./dist/plain-text.d.ts",
+      "import": "./dist/plain-text.js"
+    },
+    "./folded-source": {
+      "development": "./src/folded-source.ts",
+      "types": "./dist/folded-source.d.ts",
+      "import": "./dist/folded-source.js"
+    }
+  },
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      },
+      "./text": {
+        "types": "./dist/plain-text.d.ts",
+        "import": "./dist/plain-text.js"
+      },
+      "./folded-source": {
+        "types": "./dist/folded-source.d.ts",
+        "import": "./dist/folded-source.js"
+      }
+    },
+    "access": "public"
+  },
   "scripts": {
-    "build": "tsup src/index.ts --format esm,cjs --dts",
+    "build": "tsdown src/index.ts src/plain-text.ts src/folded-source.ts",
     "check-types": "tsc --noEmit -p tsconfig.json",
-    "lint": "tsc --noEmit -p tsconfig.json",
-    "test": "vitest run"
+    "prepack": "pnpm run build"
   },
   "dependencies": {
-    "micromark": "4.0.2"
+    "@typeatlas/language-server": "workspace:*",
+    "@volar/language-server": "catalog:",
+    "chokidar": "catalog:",
+    "p-queue": "catalog:",
+    "pathe": "catalog:",
+    "vscode-languageserver-protocol": "catalog:",
+    "vscode-uri": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:"
+  },
+  "engines": {
+    "node": ">=22.20"
   }
 }

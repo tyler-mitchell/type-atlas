@@ -2,9 +2,9 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "rootDir": ".",
-    "outDir": "dist",
-    "types": ["node"]
+    "types": ["node"],
+    "allowImportingTsExtensions": true,
+    "outDir": "dist"
   },
-  "include": ["src/**/*.ts", "test/**/*.ts"]
+  "include": ["src", "test"]
 }
-

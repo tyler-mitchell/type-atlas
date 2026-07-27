@@ -1,42 +1,121 @@
 import {
-  createConnection,
+  type Connection,
+  type LanguagePlugin,
   createServer,
   createTypeScriptProject,
-  loadTsdkByPath,
 } from "@volar/language-server/node.js";
-import { create as createTypeScriptServices } from "volar-service-typescript";
+import ts from "typescript";
+import { URI } from "vscode-uri";
+import { create as createJsonService } from "volar-service-json";
+// Keep vscode-markdown-languageservice pinned to 0.5.0-alpha.12 in the workspace config.
+// volar-service-markdown's prerelease range also accepts incompatible later releases.
+import { create as createMarkdownService } from "volar-service-markdown";
 import {
-  createFeatureTypeServicePlugin,
-  featureTypeLanguagePlugin,
-} from "@featuretype/service";
+  create as createTypeScriptServices,
+  type Provide as TypeScriptService,
+} from "volar-service-typescript";
+import { ReadFileRequest, ResolveDependencySourceRequest } from "./protocol.ts";
 
-const connection = createConnection();
-const server = createServer(connection);
+const markdownFileExtensions = [
+  "md",
+  "mkd",
+  "mdwn",
+  "mdown",
+  "markdown",
+  "markdn",
+  "mdtxt",
+  "mdtext",
+  "workbook",
+] as const;
 
-connection.onInitialize((params) => {
-  const tsdkPath = params.initializationOptions?.typescript?.tsdk;
-  if (typeof tsdkPath !== "string") {
-    throw new Error("Missing initialization option typescript.tsdk");
-  }
+const documentLanguagePlugin = {
+  getLanguageId: ({ path }) => {
+    const extension = path.slice(path.lastIndexOf(".") + 1).toLowerCase();
+    return extension === "jsonc"
+      ? "jsonc"
+      : markdownFileExtensions.some((candidate) => candidate === extension)
+        ? "markdown"
+        : undefined;
+  },
+} satisfies LanguagePlugin<URI>;
 
-  const tsdk = loadTsdkByPath(tsdkPath, params.locale);
+/** Registers Volar's standard language services on an LSP connection. */
+export const registerLanguageServer = (connection: Connection): void => {
+  const server = createServer(connection);
+  let watchedFiles: { dispose(): void } | undefined;
 
-  return server.initialize(
-    params,
-    createTypeScriptProject(tsdk.typescript, tsdk.diagnosticMessages, () => ({
-      languagePlugins: [featureTypeLanguagePlugin],
-    })),
-    [
-      ...createTypeScriptServices(tsdk.typescript),
-      createFeatureTypeServicePlugin(),
-    ],
+  server.onInitialize(() => {
+    connection.onRequest(
+      ReadFileRequest.type,
+      async ({ uri }) => (await server.fileSystem.readFile(URI.parse(uri))) ?? null,
+    );
+    connection.onRequest(
+      ResolveDependencySourceRequest.type,
+      async ({ textDocument, moduleName }) => {
+        const uri = URI.parse(textDocument.uri);
+        const service = await server.project.getLanguageService(uri);
+        const languageService = service.context.inject<
+          TypeScriptService,
+          "typescript/languageService"
+        >("typescript/languageService");
+        const host = service.context.inject<TypeScriptService, "typescript/languageServiceHost">(
+          "typescript/languageServiceHost",
+        );
+        const fileName = service.context.inject<TypeScriptService, "typescript/documentFileName">(
+          "typescript/documentFileName",
+          uri,
+        );
+        if (!languageService || !host || !fileName) return null;
+
+        const options = host.getCompilationSettings();
+        const mode = languageService.getProgram()?.getSourceFile(fileName)?.impliedNodeFormat;
+        const source = ts.resolveModuleName(
+          moduleName,
+          fileName,
+          { ...options, noDtsResolution: true },
+          host,
+          undefined,
+          undefined,
+          mode,
+        ).resolvedModule;
+        return (
+          source ??
+          ts.resolveModuleName(
+            moduleName,
+            fileName,
+            options,
+            host,
+            host.getModuleResolutionCache?.(),
+            undefined,
+            mode,
+          ).resolvedModule ??
+          null
+        );
+      },
+    );
+  });
+
+  connection.onInitialize((params) =>
+    server.initialize(
+      params,
+      createTypeScriptProject(ts, undefined, () => ({
+        languagePlugins: [documentLanguagePlugin],
+      })),
+      [
+        ...createTypeScriptServices(ts),
+        createJsonService(),
+        createMarkdownService({
+          fileExtensions: [...markdownFileExtensions],
+        }),
+      ],
+    ),
   );
-});
-
-connection.onInitialized(() => {
-  server.initialized();
-  server.fileWatcher.watchFiles(["**/*.{featuretype,ts,tsx,js,jsx,json}"]);
-});
-
-connection.onShutdown(server.shutdown);
-connection.listen();
+  connection.onInitialized(async () => {
+    server.initialized();
+    watchedFiles = await server.fileWatcher.watchFiles(["**/*"]);
+  });
+  connection.onShutdown(() => {
+    watchedFiles?.dispose();
+    server.shutdown();
+  });
+};

@@ -1,26 +1,12 @@
 import { defineCommand, runMain } from "citty";
+import { startMcpServer } from "./server.ts";
 
-import { startServer } from "./server.js";
-
-const featureTypeCommand = defineCommand({
+const command = defineCommand({
   meta: {
-    name: "featuretype-mcp",
-    description: "FeatureType MCP server",
+    name: "typeatlas",
+    description: "Run the TypeAtlas MCP server over stdio.",
   },
-  args: {
-    projectRoot: {
-      type: "positional",
-      required: false,
-      description: "Optional project root to attach on startup",
-    },
-  },
-  run: async ({ args }) => {
-    await startServer(args.projectRoot);
-  },
+  run: startMcpServer,
 });
 
-export const runCli = async (
-  rawArgs: readonly string[] = process.argv.slice(2),
-): Promise<void> => {
-  await runMain(featureTypeCommand, { rawArgs: [...rawArgs] });
-};
+await runMain(command);

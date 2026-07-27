@@ -1,0 +1,45 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".changeset/**"
+      - ".github/workflows/release.yml"
+  workflow_dispatch:
+
+concurrency: release
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      id-token: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+          registry-url: https://registry.npmjs.org
+      - run: pnpm install --frozen-lockfile
+      - uses: changesets/action@63a615b9cd06ba9a3e6d13796c7fbcb080a60a0b # v1
+        with:
+          commitMode: github-api
+          publish: pnpm release
+          setupGitUser: false
+          version: pnpm release:version
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

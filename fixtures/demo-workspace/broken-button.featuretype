@@ -1,8 +1,0 @@
-# Broken Button
-
-```tsx
-// ./broken-button.example.tsx
-import { Button } from "./components"
-
-export const brokenButton = <Button tone="destructive">Delete</Button>
-```

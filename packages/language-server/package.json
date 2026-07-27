@@ -1,32 +1,95 @@
 {
-  "name": "@featuretype/language-server",
+  "name": "@typeatlas/language-server",
   "version": "0.0.0",
-  "private": true,
-  "bin": {
-    "featuretype-language-server": "./bin/featuretype-language-server.cjs"
+  "description": "Volar-based TypeScript, Markdown, and JSON language server for TypeAtlas.",
+  "keywords": [
+    "json",
+    "language-server",
+    "lsp",
+    "markdown",
+    "typescript",
+    "volar"
+  ],
+  "homepage": "https://github.com/tyler-mitchell/typeatlas/tree/main/packages/language-server",
+  "bugs": {
+    "url": "https://github.com/tyler-mitchell/typeatlas/issues"
   },
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tyler-mitchell/typeatlas.git",
+    "directory": "packages/language-server"
+  },
+  "bin": {
+    "typeatlas-language-server": "./bin/typeatlas-language-server.cjs"
+  },
   "files": [
     "bin",
     "dist"
   ],
+  "type": "module",
+  "sideEffects": [
+    "./bin/typeatlas-language-server.cjs",
+    "./dist/node.js",
+    "./src/node.ts"
+  ],
+  "exports": {
+    ".": {
+      "development": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./node": {
+      "development": "./src/node.ts",
+      "types": "./dist/node.d.ts",
+      "import": "./dist/node.js",
+      "default": "./dist/node.js"
+    },
+    "./protocol": {
+      "development": "./src/protocol.ts",
+      "types": "./dist/protocol.d.ts",
+      "import": "./dist/protocol.js"
+    }
+  },
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      },
+      "./node": {
+        "types": "./dist/node.d.ts",
+        "import": "./dist/node.js",
+        "default": "./dist/node.js"
+      },
+      "./protocol": {
+        "types": "./dist/protocol.d.ts",
+        "import": "./dist/protocol.js"
+      }
+    },
+    "access": "public"
+  },
   "scripts": {
-    "build": "tsup src/index.ts src/server.ts --format cjs --dts --outDir dist",
+    "build": "tsdown src/index.ts src/node.ts src/protocol.ts",
     "check-types": "tsc --noEmit -p tsconfig.json",
-    "lint": "tsc --noEmit -p tsconfig.json",
-    "test": "vitest run"
+    "prepack": "pnpm run build",
+    "test": "pnpm run build && vitest run"
   },
   "dependencies": {
-    "@featuretype/service": "workspace:*",
-    "@volar/kit": "2.4.28",
-    "@volar/language-server": "2.4.28",
-    "volar-service-typescript": "0.0.65",
-    "vscode-jsonrpc": "^8.2.0",
-    "vscode-languageserver-protocol": "^3.17.5",
-    "vscode-uri": "^3.0.8"
+    "@volar/language-server": "catalog:",
+    "typescript": "catalog:",
+    "volar-service-json": "catalog:",
+    "volar-service-markdown": "catalog:",
+    "volar-service-typescript": "catalog:",
+    "vscode-markdown-languageservice": "catalog:",
+    "vscode-uri": "catalog:"
   },
   "devDependencies": {
-    "@volar/test-utils": "2.4.28"
+    "@types/node": "catalog:",
+    "@volar/test-utils": "catalog:",
+    "tsdown": "catalog:",
+    "vitest": "catalog:"
+  },
+  "engines": {
+    "node": ">=22.20"
   }
 }

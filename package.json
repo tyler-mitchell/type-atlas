@@ -1,51 +1,29 @@
 {
-  "name": "featuretype",
+  "name": "typeatlas",
   "private": true,
-  "packageManager": "pnpm@9.15.4",
+  "type": "module",
   "scripts": {
-    "build": "turbo run build",
-    "dev": "turbo run dev",
-    "test": "turbo run test",
-    "check-types": "turbo run check-types",
-    "lint": "turbo run lint",
-    "verify:volar": "pnpm run verify:volar:mapping && pnpm run verify:volar:lsp && pnpm run verify:volar:vscode",
-    "verify:volar:mapping": "pnpm --filter @featuretype/service test -- src/languagePlugin.test.ts",
-    "verify:volar:lsp": "pnpm --filter @featuretype/language-server test",
-    "verify:volar:vscode": "pnpm --filter featuretype-language-features test:vscode",
-    "build:mcp": "turbo run build --filter=@featuretype/mcp",
-    "mcp:stdio:source": "pnpm exec tsx packages/mcp/src/dev.ts",
-    "mcp:stdio:dist": "node packages/mcp/dist/index.cjs",
-    "mcp:dev": "pnpm run mcp:stdio:source",
-    "start:mcp": "pnpm run mcp:stdio:dist",
-    "start:mcp:dev": "pnpm run mcp:stdio:source"
+    "build": "pnpm --recursive --if-present run build",
+    "check": "pnpm lint && pnpm check-types && pnpm test",
+    "check-types": "pnpm build && pnpm --recursive --if-present run check-types",
+    "changeset": "changeset",
+    "dev": "pnpm --filter @typeatlas/mcp run dev",
+    "format": "oxlint --fix . && oxfmt .",
+    "lint": "oxlint . && oxfmt --check .",
+    "release": "pnpm check && changeset publish",
+    "release:version": "changeset version && pnpm install --lockfile-only --no-frozen-lockfile",
+    "test": "pnpm --recursive --if-present run test"
   },
   "devDependencies": {
-    "@types/react": "^19.0.10",
-    "@types/node": "^22.13.10",
-    "mocha": "^11.1.0",
-    "react": "^19.0.0",
-    "tsup": "^8.4.0",
-    "tsx": "^4.19.3",
-    "turbo": "^2.4.0",
-    "typescript": "^5.7.0",
-    "vitest": "^2.1.8"
+    "@arethetypeswrong/core": "catalog:",
+    "@changesets/cli": "catalog:",
+    "oxfmt": "catalog:",
+    "oxlint": "catalog:",
+    "publint": "catalog:",
+    "tsdown": "catalog:"
   },
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "directories": {
-    "doc": "docs"
+  "engines": {
+    "node": ">=22.20"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/tyler-mitchell/featuretype.git"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
-  "bugs": {
-    "url": "https://github.com/tyler-mitchell/featuretype/issues"
-  },
-  "homepage": "https://github.com/tyler-mitchell/featuretype#readme"
+  "packageManager": "pnpm@11.17.0"
 }

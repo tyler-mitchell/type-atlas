@@ -1,49 +1,77 @@
 {
-  "name": "@featuretype/mcp",
+  "name": "@typeatlas/mcp",
   "version": "0.0.0",
-  "private": true,
-  "type": "module",
-  "bin": {
-    "featuretype-mcp": "./bin/featuretype-mcp.cjs"
+  "description": "Editor-grade TypeScript, Markdown, and JSON intelligence for coding agents.",
+  "keywords": [
+    "code-intelligence",
+    "coding-agents",
+    "json",
+    "language-server",
+    "lsp",
+    "markdown",
+    "mcp",
+    "model-context-protocol",
+    "typeatlas",
+    "typescript",
+    "volar"
+  ],
+  "homepage": "https://github.com/tyler-mitchell/typeatlas/tree/main/packages/mcp",
+  "bugs": {
+    "url": "https://github.com/tyler-mitchell/typeatlas/issues"
   },
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tyler-mitchell/typeatlas.git",
+    "directory": "packages/mcp"
+  },
+  "bin": {
+    "typeatlas": "./bin/typeatlas.cjs"
+  },
   "files": [
+    "assets",
     "bin",
     "dist"
   ],
+  "type": "module",
+  "sideEffects": [
+    "./bin/typeatlas.cjs",
+    "./dist/cli.js"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
-    "build": "tsup src/index.ts --format cjs --dts --outDir dist",
-    "precheck-types": "pnpm --filter @featuretype/language-server build",
+    "build": "tsdown src/index.ts src/cli.ts",
     "check-types": "tsc --noEmit -p tsconfig.json",
-    "dev": "tsx ./src/dev.ts",
-    "pretest": "pnpm --filter @featuretype/language-server build",
-    "test": "vitest run --passWithNoTests",
-    "pretest:integration": "pnpm --filter @featuretype/language-server build",
-    "test:integration": "vitest run src/integration.test.ts",
-    "probe:stdio": "node --import tsx ./src/smoke.ts",
-    "probe:in-memory": "node --import tsx ./src/smoke.ts --transport=in-memory",
-    "smoke": "pnpm run probe:stdio",
-    "smoke:in-memory": "pnpm run probe:in-memory"
+    "dev": "node --conditions=development src/cli.ts",
+    "prepack": "pnpm run build"
   },
   "dependencies": {
-    "@featuretype/core": "workspace:*",
-    "@featuretype/language-server": "workspace:*",
-    "@featuretype/service": "workspace:*",
-    "@modelcontextprotocol/sdk": "^1.12.1",
-    "@volar/language-core": "2.4.28",
-    "@volar/language-service": "2.4.28",
-    "@volar/typescript": "2.4.28",
-    "citty": "^0.2.2",
-    "diff": "^7.0.0",
-    "volar-service-typescript": "0.0.65",
-    "vscode-languageserver-protocol": "^3.17.5",
-    "vscode-languageserver-textdocument": "^1.0.12",
-    "vscode-uri": "^3.0.8",
-    "zod": "^3.24.0"
+    "@modelcontextprotocol/client": "catalog:",
+    "@modelcontextprotocol/server": "catalog:",
+    "@typeatlas/core": "workspace:*",
+    "@typeatlas/language-server": "workspace:*",
+    "@volar/language-server": "catalog:",
+    "arktype": "catalog:",
+    "citty": "catalog:",
+    "diff": "catalog:",
+    "pathe": "catalog:",
+    "vscode-languageserver-protocol": "catalog:",
+    "vscode-languageserver-textdocument": "catalog:",
+    "vscode-uri": "catalog:"
   },
   "devDependencies": {
-    "@types/diff": "^7.0.0",
-    "typescript": "^5.7.0"
+    "@types/node": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:"
+  },
+  "engines": {
+    "node": ">=22.20"
   }
 }

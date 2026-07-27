@@ -1,7 +1,0 @@
-#V2
-INFO FOR ROOT;
-DEFINE NAMESPACE codex_probe_20260415;
-USE NS codex_probe_20260415 DB adx_validation;
-DEFINE TABLE heartbeat SCHEMALESS;
-CREATE heartbeat SET created_at = time::now(), source = 'codex', note = 'cloud api probe';
-INFO FOR DB;

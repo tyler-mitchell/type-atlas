@@ -1,3 +1,1 @@
-import { runCli } from "./cli.js";
-
-void runCli();
+export { startMcpServer } from "./server.ts";

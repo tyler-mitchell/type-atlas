@@ -1,16 +1,25 @@
 node_modules/
 .pnpm-store/
 dist/
-.turbo/
-.vscode-test/
+.claude/
+.vscode/
 coverage/
-*.vsix
+.DS_Store
+*.local
+*.log
+*.tgz
 *.tsbuildinfo
 .env
 .env.*
-.tmp-mcp-tests*/
-.agent-relay
-.featuretype-browser/
-.featuretype-diagnostics/
-*.scip
+.mcp.json
 index.db
+
+# Local implementation research
+docs/semble-affordances.md
+docs/volar-affordance-evidence.md
+docs/archive/volar-ecosystem-research.md
+docs/discovery/volar-markdown-code-fence-mvp-affordances.md
+docs/discovery/volarjs-testing-verification.md
+
+# Local legacy implementation reference
+.legacy/featuretype/

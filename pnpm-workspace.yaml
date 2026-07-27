@@ -1,3 +1,39 @@
 packages:
-  - "packages/*"
-  - "apps/*"
+  - packages/core
+  - packages/language-server
+  - packages/mcp
+
+catalogMode: prefer
+
+overrides:
+  linkify-it: 5.0.2
+  markdown-it: 14.3.0
+  # Volar's range also admits alpha.13 and 0.5.0, whose vscode-uri import fails in Node.
+  vscode-markdown-languageservice: 0.5.0-alpha.12
+catalog:
+  "@arethetypeswrong/core": ^0.18.5
+  "@changesets/cli": ^2.31.1
+  "@modelcontextprotocol/client": 2.0.0-beta.5
+  "@modelcontextprotocol/server": 2.0.0-beta.5
+  "@types/node": ^22.20.1
+  "@volar/language-server": 2.4.28
+  "@volar/test-utils": 2.4.28
+  arktype: ^2.2.3
+  chokidar: ^3.6.0
+  citty: ^0.2.2
+  diff: ^8.0.3
+  oxfmt: ^0.60.0
+  oxlint: ^1.75.0
+  p-queue: ^9.3.3
+  pathe: ^2.0.3
+  publint: ^0.3.22
+  tsdown: ^0.22.14
+  typescript: 5.9.3
+  vitest: ^4.1.10
+  volar-service-json: 0.0.71
+  volar-service-markdown: 0.0.71
+  volar-service-typescript: 0.0.71
+  vscode-languageserver-protocol: 3.17.5
+  vscode-languageserver-textdocument: ^1.0.12
+  vscode-markdown-languageservice: 0.5.0-alpha.12
+  vscode-uri: ^3.0.8
