@@ -28,7 +28,7 @@ export type InspectSymbolTarget = { readonly position: Position } | { readonly s
 
 /** Controls expensive source and type sections and bounds repeated relationships. */
 export type InspectSymbolOptions = {
-  readonly includeExternalCalls?: boolean;
+  readonly compactExternalCalls?: boolean;
   readonly includeSource: boolean;
   readonly includeTypeDefinitions: boolean;
   readonly limit: number;
@@ -152,7 +152,7 @@ const callGroups = (calls: readonly RelatedCall[], root: string, sharedSiteUri?:
 
 const callSection = (input: {
   readonly calls: readonly RelatedCall[];
-  readonly includeExternal?: boolean;
+  readonly includeExternalDetails?: boolean;
   readonly limit: number;
   readonly name: string;
   readonly root: string;
@@ -165,10 +165,10 @@ const callSection = (input: {
       external: !isFileInDir(uri.fsPath, input.root) || uri.path.includes("/node_modules/"),
     };
   });
-  const external = input.includeExternal
+  const external = input.includeExternalDetails
     ? []
     : classified.filter(({ external }) => external).map(({ call }) => call);
-  const calls = input.includeExternal
+  const calls = input.includeExternalDetails
     ? input.calls
     : classified.filter(({ external }) => !external).map(({ call }) => call);
   const shown = calls.slice(0, input.limit);
@@ -176,7 +176,7 @@ const callSection = (input: {
   if (!shown.length && !external.length) return [];
   const shownCount =
     shown.length === calls.length ? `${calls.length}` : `${shown.length}/${calls.length}`;
-  const count = input.includeExternal
+  const count = input.includeExternalDetails
     ? shownCount
     : `${shownCount} workspace${external.length ? ` · ${external.length} dependency/runtime` : ""}`;
   return [
@@ -504,7 +504,7 @@ export const inspectSymbol = async (
               calls: callers,
               limit: options.limit,
               root,
-              includeExternal: true,
+              includeExternalDetails: true,
             }),
           ]
         : []),
@@ -517,7 +517,7 @@ export const inspectSymbol = async (
               limit: options.limit,
               root,
               sharedSiteUri,
-              includeExternal: options.includeExternalCalls,
+              includeExternalDetails: options.compactExternalCalls === false,
             }),
           ]
         : []),
