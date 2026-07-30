@@ -452,22 +452,27 @@ export const formatCompletions = (page: CompletionPage | null | undefined) => {
   ].join("\n");
 };
 
-const moduleExportText = (item: CompletionItem) => {
+const moduleExportText = (item: CompletionItem, includeDocs: boolean) => {
   const kind = enumName(CompletionItemKind, item.kind, "export");
   const deprecated =
     (item as { readonly deprecated?: boolean }).deprecated || item.tags?.includes(1)
       ? " [deprecated]"
       : "";
-  const documentation = markupText(item.documentation);
+  const documentation = includeDocs ? markupText(item.documentation) : "";
+  const escapedLabel = item.label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const detail = item.detail
+    ?.replace(/\(alias\) /g, "")
+    .replace(new RegExp(`\\b[\\w$]+_exports\\.${escapedLabel}\\b`, "g"), item.label)
+    .replace(/\nexport [^\n]+$/g, "");
   return [
-    `${item.label} [${kind}]${deprecated}${item.detail ? ` — ${item.detail}` : ""}`,
+    `${item.label}${detail ? ` — ${detail}` : ` [${kind}]`}${deprecated}`,
     ...(documentation ? [indent(documentation)] : []),
   ].join("\n");
 };
 
 export const formatModuleExports = (page: ModuleExportPage) => {
   const context = [
-    page.module,
+    [page.module, ...page.path].join("."),
     page.surface,
     ...(page.query ? [`query ${JSON.stringify(page.query)}`] : []),
     ...(page.isIncomplete ? ["more available"] : []),
@@ -477,7 +482,14 @@ export const formatModuleExports = (page: ModuleExportPage) => {
     ...(page.resolved === false
       ? ["Module could not be resolved from the selected project context."]
       : []),
-    ...page.items.map(moduleExportText),
+    ...page.items.map((item) => moduleExportText(item, page.includeDocs)),
+    ...(page.subpaths.length
+      ? [
+          "",
+          `Subpaths (${page.subpaths.length})`,
+          ...page.subpaths.map((subpath) => `${page.module}/${subpath}`),
+        ]
+      : []),
   ].join("\n");
 };
 

@@ -70,6 +70,7 @@
     "chokidar": "catalog:",
     "p-queue": "catalog:",
     "pathe": "catalog:",
+    "pkg-types": "catalog:",
     "vscode-languageserver-protocol": "catalog:",
     "vscode-uri": "catalog:"
   },

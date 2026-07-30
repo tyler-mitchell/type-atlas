@@ -42,12 +42,16 @@ const input = type.module({
     module: type("string >= 1").describe(
       "Module specifier to inspect, such as react, @scope/package, or ./local-module.js.",
     ),
-    "fromFile?": type("string >= 1").describe(
-      "Workspace-relative or absolute importing file that determines module resolution. Recommended for monorepos and relative modules.",
+    fromFile: type("string >= 1").describe(
+      "Workspace-relative or absolute importing file that determines the exact TypeScript project and package versions.",
     ),
+    "path?": type("string[]").configure({
+      description: 'Nested runtime export path to inspect, such as ["d"] or ["default"].',
+    }),
     "surface?": type("'runtime' | 'all'").configure({
       default: "runtime",
-      description: "Runtime exports by default; use all to include type-only exports.",
+      description:
+        "Runtime exports by default; use all to include top-level type exports. Nested paths are runtime surfaces.",
     }),
     "query?": type("string").configure({
       default: "",
@@ -58,13 +62,20 @@ const input = type.module({
       description: "Zero-based offset into the completion results.",
     }),
     "limit?": type("1 <= number.integer <= 100").configure({
-      default: 25,
+      default: 15,
       description: "Maximum exports returned.",
+    }),
+    "includeDetails?": type("boolean").configure({
+      default: true,
+      description: "Resolve the displayed exports to include signatures and declared shapes.",
     }),
     "includeDocs?": type("boolean").configure({
       default: false,
-      description:
-        "Resolve the displayed completion items to include upstream types and documentation.",
+      description: "Include upstream documentation for the displayed exports.",
+    }),
+    "includeSubpaths?": type("boolean").configure({
+      default: true,
+      description: "Include declared importable subpaths when inspecting a package root.",
     }),
   }).onUndeclaredKey("reject"),
 });
@@ -243,9 +254,9 @@ export const registerAssistanceTools = (
   server.registerTool(
     "list_module_exports",
     {
-      title: "List module exports",
+      title: "Inspect module",
       description:
-        "List the runtime or complete export surface visible from a TypeScript file using Volar's native completion and completion-resolution pipeline.",
+        "Inspect the module surface visible from an importing TypeScript file. Returns signatures by default, declared package subpaths at package roots, nested runtime paths on request, and type-only exports as an opt-in.",
       inputSchema: input.ModuleExports,
       annotations: readOnlyToolAnnotations,
     },
@@ -254,11 +265,14 @@ export const registerAssistanceTools = (
         workspace: root,
         module,
         fromFile,
+        path = [],
         surface = "runtime",
         query = "",
         offset = 0,
-        limit = 25,
+        limit = 15,
+        includeDetails = true,
         includeDocs = false,
+        includeSubpaths = true,
       },
       { mcpReq: { signal } },
     ) => {
@@ -269,11 +283,14 @@ export const registerAssistanceTools = (
             workspace,
             module,
             fromFile,
+            path,
             surface,
             query,
             offset,
             limit,
+            includeDetails,
             includeDocs,
+            includeSubpaths,
             signal,
           }),
         ),

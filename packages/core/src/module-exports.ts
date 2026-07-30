@@ -4,8 +4,8 @@ import {
   CompletionItemKind,
   CompletionRequest,
   CompletionResolveRequest,
-  DefinitionRequest,
 } from "@volar/language-server/protocol.js";
+import { readPackageJSON } from "pkg-types";
 import { page } from "./projection.ts";
 import type { VolarWorkspace } from "./volar-workspace.ts";
 
@@ -13,38 +13,40 @@ export type ModuleExportSurface = "runtime" | "all";
 
 export type ModuleExportPage = {
   readonly module: string;
+  readonly path: readonly string[];
   readonly surface: ModuleExportSurface;
   readonly query: string;
   readonly isIncomplete: boolean;
   readonly total: number;
   readonly offset: number;
   readonly items: readonly CompletionItem[];
+  readonly subpaths: readonly string[];
+  readonly includeDocs: boolean;
   readonly nextOffset?: number;
   readonly resolved?: boolean;
 };
 
 const probe = ({
   moduleName,
+  path,
   surface,
 }: {
   readonly moduleName: string;
+  readonly path: readonly string[];
   readonly surface: ModuleExportSurface;
 }) => {
-  const prefix =
-    surface === "runtime"
-      ? `import * as __module from ${JSON.stringify(moduleName)};\n__module.`
-      : "import { ";
-  const suffix = surface === "runtime" ? "" : ` } from ${JSON.stringify(moduleName)};`;
+  const access = path.map((segment) => `[${JSON.stringify(segment)}]`).join("");
+  if (surface === "runtime") {
+    const expression = `__module${access}.`;
+    return {
+      source: `import * as __module from ${JSON.stringify(moduleName)};\n${expression}`,
+      position: { line: 1, character: expression.length },
+    };
+  }
+  const prefix = "import { ";
   return {
-    source: `${prefix}${suffix}`,
-    position:
-      surface === "runtime"
-        ? { line: 1, character: "__module.".length }
-        : { line: 0, character: prefix.length },
-    modulePosition: {
-      line: 0,
-      character: prefix.indexOf(JSON.stringify(moduleName)) + 1,
-    },
+    source: `${prefix}} from ${JSON.stringify(moduleName)};`,
+    position: { line: 0, character: prefix.length },
   };
 };
 
@@ -55,58 +57,66 @@ const probe = ({
  * members; `all` mode additionally includes type-only exports. Documentation
  * resolution is limited to the returned page.
  *
- * When `fromFile` is provided, module resolution uses that file's configured
- * TypeScript project. Calls sharing a workspace are serialized with the
- * synchronized query document and released when the workspace is disposed.
+ * The importing file selects the configured TypeScript project and exact
+ * dependency version. Package subpaths come from that resolved package's
+ * declared export map.
  */
 export const listModuleExports = async ({
   workspace,
   module: moduleName,
   fromFile,
+  path,
   surface,
   query,
   offset,
   limit,
+  includeDetails,
   includeDocs,
+  includeSubpaths,
   signal,
 }: {
   readonly workspace: VolarWorkspace;
   readonly module: string;
-  readonly fromFile?: string;
+  readonly fromFile: string;
+  readonly path: readonly string[];
   readonly surface: ModuleExportSurface;
   readonly query: string;
   readonly offset: number;
   readonly limit: number;
+  readonly includeDetails: boolean;
   readonly includeDocs: boolean;
+  readonly includeSubpaths: boolean;
   readonly signal: AbortSignal;
 }): Promise<ModuleExportPage> => {
-  const resolvedModule = fromFile
+  const uri = workspace.getWorkspaceUri(fromFile);
+  const effectiveSurface = path.length ? "runtime" : surface;
+  const { source, position } = probe({
+    moduleName,
+    path,
+    surface: effectiveSurface,
+  });
+  const resolvedModule = includeSubpaths
     ? await workspace.sendRequest(
         ResolveDependencySourceRequest.type,
         {
-          textDocument: { uri: workspace.getWorkspaceUri(fromFile) },
+          textDocument: { uri },
           moduleName,
         },
         signal,
       )
     : undefined;
-  if (resolvedModule === null) {
-    return {
-      module: moduleName,
-      surface,
-      query,
-      isIncomplete: false,
-      total: 0,
-      offset,
-      items: [],
-      resolved: false,
-    };
-  }
-  const uri = workspace.getWorkspaceUri(".typeatlas-module-exports.ts");
-  const { source, position, modulePosition } = probe({
-    moduleName: resolvedModule?.resolvedFileName ?? moduleName,
-    surface,
-  });
+  const packageJson = resolvedModule
+    ? await readPackageJSON(resolvedModule.resolvedFileName)
+    : undefined;
+  const exports =
+    !path.length && packageJson?.name === moduleName ? packageJson.exports : undefined;
+  const subpaths =
+    exports && typeof exports === "object" && !Array.isArray(exports)
+      ? Object.keys(exports)
+          .filter((key) => key.startsWith("./") && key !== "./package.json")
+          .map((key) => key.slice(2))
+          .filter(Boolean)
+      : [];
 
   return workspace.withTextDocument({
     uri,
@@ -132,34 +142,25 @@ export const listModuleExports = async ({
           )
         : exportItems;
       const resultPage = page(matchingItems, offset, limit);
-      const selectedItems = includeDocs
-        ? await Promise.all(
-            resultPage.items.map((item) =>
-              workspace.sendRequest(CompletionResolveRequest.type, item, signal),
-            ),
-          )
-        : resultPage.items;
-      const definition =
-        matchingItems.length || resolvedModule
-          ? undefined
-          : await workspace.sendRequest(
-              DefinitionRequest.type,
-              { textDocument, position: modulePosition },
-              signal,
-            );
-
+      const selectedItems =
+        includeDetails || includeDocs
+          ? await Promise.all(
+              resultPage.items.map((item) =>
+                workspace.sendRequest(CompletionResolveRequest.type, item, signal),
+              ),
+            )
+          : resultPage.items;
       return {
         module: moduleName,
-        surface,
+        path,
+        surface: effectiveSurface,
         query,
+        includeDocs,
+        subpaths,
         isIncomplete: Array.isArray(completion) ? false : (completion?.isIncomplete ?? false),
         ...resultPage,
         items: selectedItems,
-        ...(resolvedModule
-          ? { resolved: true }
-          : definition === undefined
-            ? {}
-            : { resolved: Array.isArray(definition) ? !!definition.length : true }),
+        resolved: completion !== null,
       };
     },
   });
