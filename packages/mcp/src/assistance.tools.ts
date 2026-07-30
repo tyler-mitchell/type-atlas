@@ -45,8 +45,13 @@ const input = type.module({
     fromFile: type("string >= 1").describe(
       "Workspace-relative or absolute importing file that determines the exact TypeScript project and package versions.",
     ),
+    "type?": type("string >= 1").configure({
+      description:
+        "Module-scoped exported type expression whose instance members to inspect, such as TgpuRoot or TgpuBuffer<any>. Type-only surfaces are opt-in.",
+    }),
     "path?": type("string[]").configure({
-      description: 'Nested runtime export path to inspect, such as ["d"] or ["default"].',
+      description:
+        'Nested member path to inspect, such as ["d"], ["default"], or ["device"] with an exported type.',
     }),
     "surface?": type("'runtime' | 'all'").configure({
       default: "runtime",
@@ -256,7 +261,7 @@ export const registerAssistanceTools = (
     {
       title: "Inspect module",
       description:
-        "Inspect the module surface visible from an importing TypeScript file. Returns signatures by default, declared package subpaths at package roots, nested runtime paths on request, and type-only exports as an opt-in.",
+        "Inspect the usable module surface visible from an importing TypeScript file. Returns runtime signatures by default, declared package subpaths at package roots, nested runtime paths on request, and exported types or their members as opt-ins.",
       inputSchema: input.ModuleExports,
       annotations: readOnlyToolAnnotations,
     },
@@ -265,6 +270,7 @@ export const registerAssistanceTools = (
         workspace: root,
         module,
         fromFile,
+        type,
         path = [],
         surface = "runtime",
         query = "",
@@ -283,6 +289,7 @@ export const registerAssistanceTools = (
             workspace,
             module,
             fromFile,
+            type,
             path,
             surface,
             query,

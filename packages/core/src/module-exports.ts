@@ -13,6 +13,7 @@ export type ModuleExportSurface = "runtime" | "all";
 
 export type ModuleExportPage = {
   readonly module: string;
+  readonly type?: string;
   readonly path: readonly string[];
   readonly surface: ModuleExportSurface;
   readonly query: string;
@@ -28,14 +29,23 @@ export type ModuleExportPage = {
 
 const probe = ({
   moduleName,
+  type,
   path,
   surface,
 }: {
   readonly moduleName: string;
+  readonly type?: string;
   readonly path: readonly string[];
   readonly surface: ModuleExportSurface;
 }) => {
   const access = path.map((segment) => `[${JSON.stringify(segment)}]`).join("");
+  if (type) {
+    const expression = `__target${access}.`;
+    return {
+      source: `import type * as __module from ${JSON.stringify(moduleName)};\ndeclare const __target: __module.${type};\n${expression}`,
+      position: { line: 2, character: expression.length },
+    };
+  }
   if (surface === "runtime") {
     const expression = `__module${access}.`;
     return {
@@ -65,6 +75,7 @@ export const listModuleExports = async ({
   workspace,
   module: moduleName,
   fromFile,
+  type,
   path,
   surface,
   query,
@@ -78,6 +89,7 @@ export const listModuleExports = async ({
   readonly workspace: VolarWorkspace;
   readonly module: string;
   readonly fromFile: string;
+  readonly type?: string;
   readonly path: readonly string[];
   readonly surface: ModuleExportSurface;
   readonly query: string;
@@ -89,9 +101,10 @@ export const listModuleExports = async ({
   readonly signal: AbortSignal;
 }): Promise<ModuleExportPage> => {
   const uri = workspace.getWorkspaceUri(fromFile);
-  const effectiveSurface = path.length ? "runtime" : surface;
+  const effectiveSurface = type || path.length ? "runtime" : surface;
   const { source, position } = probe({
     moduleName,
+    type,
     path,
     surface: effectiveSurface,
   });
@@ -109,7 +122,7 @@ export const listModuleExports = async ({
     ? await readPackageJSON(resolvedModule.resolvedFileName)
     : undefined;
   const exports =
-    !path.length && packageJson?.name === moduleName ? packageJson.exports : undefined;
+    !type && !path.length && packageJson?.name === moduleName ? packageJson.exports : undefined;
   const subpaths =
     exports && typeof exports === "object" && !Array.isArray(exports)
       ? Object.keys(exports)
@@ -152,6 +165,7 @@ export const listModuleExports = async ({
           : resultPage.items;
       return {
         module: moduleName,
+        type,
         path,
         surface: effectiveSurface,
         query,

@@ -471,14 +471,15 @@ const moduleExportText = (item: CompletionItem, includeDocs: boolean) => {
 };
 
 export const formatModuleExports = (page: ModuleExportPage) => {
+  const target = [page.module, ...(page.type ? [page.type] : []), ...page.path].join(".");
   const context = [
-    [page.module, ...page.path].join("."),
-    page.surface,
+    target,
+    page.type ? "type members" : page.surface,
     ...(page.query ? [`query ${JSON.stringify(page.query)}`] : []),
     ...(page.isIncomplete ? ["more available"] : []),
   ].join(" · ");
   return [
-    `${pageHeader("exports", page)} · ${context}`,
+    `${pageHeader(page.type ? "members" : "exports", page)} · ${context}`,
     ...(page.resolved === false
       ? ["Module could not be resolved from the selected project context."]
       : []),
