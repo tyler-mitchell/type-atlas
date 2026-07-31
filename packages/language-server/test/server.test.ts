@@ -1,6 +1,8 @@
+import { once } from "node:events";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { ExitNotification } from "@volar/language-server";
 import { startLanguageServer } from "@volar/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
 import { URI } from "vscode-uri";
@@ -76,6 +78,10 @@ describe("language server", () => {
         }),
       ).toBe(source);
     } finally {
+      await handle.shutdown();
+      const exited = once(handle.process, "exit");
+      await handle.connection.sendNotification(ExitNotification.type);
+      await exited;
       handle.connection.dispose();
     }
   });
