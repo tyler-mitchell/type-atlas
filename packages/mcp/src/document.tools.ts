@@ -12,6 +12,7 @@ import {
   formatSelectionRanges,
 } from "@typeatlas/core/text";
 import { appendDiagnosticContext, textResult } from "./mcp-result.ts";
+import { registerTool } from "./tool.ts";
 import { fileInput, observedFileInput, positionInput } from "./tool-input.ts";
 import type { VolarWorkspacePool } from "@typeatlas/core";
 
@@ -32,7 +33,8 @@ const input = type.module({
 });
 
 export const registerDocumentTools = (server: McpServer, workspaces: VolarWorkspacePool): void => {
-  server.registerTool(
+  registerTool(
+    server,
     "diagnostics",
     {
       title: "Diagnostics",
@@ -48,7 +50,8 @@ export const registerDocumentTools = (server: McpServer, workspaces: VolarWorksp
     },
   );
 
-  server.registerTool(
+  registerTool(
+    server,
     "document_links",
     {
       title: "Document links",
@@ -75,7 +78,8 @@ export const registerDocumentTools = (server: McpServer, workspaces: VolarWorksp
     },
   );
 
-  server.registerTool(
+  registerTool(
+    server,
     "document_symbols",
     {
       title: "Document symbols",
@@ -106,7 +110,8 @@ export const registerDocumentTools = (server: McpServer, workspaces: VolarWorksp
     },
   );
 
-  server.registerTool(
+  registerTool(
+    server,
     "selection_ranges",
     {
       title: "Selection ranges",
@@ -134,7 +139,8 @@ export const registerDocumentTools = (server: McpServer, workspaces: VolarWorksp
     },
   );
 
-  server.registerTool(
+  registerTool(
+    server,
     "project_config",
     {
       title: "Project configuration",

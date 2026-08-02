@@ -8,6 +8,7 @@ import { textResult } from "./mcp-result.ts";
 import type { Semble } from "./semble.ts";
 import { fileInput } from "./tool-input.ts";
 import { positionInput } from "./tool-input.ts";
+import { registerTool } from "./tool.ts";
 
 const resultLimit = type("1 <= number.integer <= 20").configure({
   default: 5,
@@ -81,6 +82,19 @@ const input = type.module({
     query: type("string >= 1").configure({
       description: "Behavior, concept, or identifier to find in package code.",
     }),
+    "path?": type("string >= 1")
+      .array()
+      .configure({
+        default: () => [],
+        description: 'Nested runtime export path to search, such as ["Effect"] or ["default"].',
+      }),
+    "surface?": type("'runtime' | 'all'").configure({
+      default: "runtime",
+      description: "Runtime exports by default; use all when type-only exports are relevant.",
+    }),
+    "type?": type("string >= 1").configure({
+      description: "Exported type whose instance or chained methods should be searched.",
+    }),
     "limit?": resultLimit,
     "snippetLines?": snippetLines,
   }).onUndeclaredKey("reject"),
@@ -146,17 +160,28 @@ export const registerIntelligenceTools = (
   const intelligence = createRetrievalIntelligence({ semble, workspaces });
   const searchDependencies = createDependencySearch({ semble, workspaces });
 
-  server.registerTool(
+  registerTool(
+    server,
     "search_dependency_code",
     {
       title: "Search dependency code",
       description:
-        "Search one or more installed packages without indexing all of node_modules. The importing file selects the exact package versions visible to that project.",
+        "Search installed package code and its matching public runtime API without indexing all of node_modules. Use path for a known namespace or type for instance and chained methods. The importing file selects the exact package versions visible to that project.",
       inputSchema: input.DependencySearch,
       annotations: readOnlyToolAnnotations,
     },
     async (
-      { workspace, file, package: packages, query, limit = 5, snippetLines = 10 },
+      {
+        workspace,
+        file,
+        package: packages,
+        query,
+        path = [],
+        surface = "runtime",
+        type,
+        limit = 5,
+        snippetLines = 10,
+      },
       { mcpReq: { signal } },
     ) =>
       textResult(
@@ -165,6 +190,9 @@ export const registerIntelligenceTools = (
           file,
           packages: Array.isArray(packages) ? packages : [packages],
           query,
+          path,
+          surface,
+          type,
           limit,
           snippetLines,
           signal,
@@ -172,7 +200,8 @@ export const registerIntelligenceTools = (
       ),
   );
 
-  server.registerTool(
+  registerTool(
+    server,
     "search_code",
     {
       title: "Search code",
@@ -198,7 +227,8 @@ export const registerIntelligenceTools = (
       ),
   );
 
-  server.registerTool(
+  registerTool(
+    server,
     "related_code",
     {
       title: "Related code",
@@ -225,7 +255,8 @@ export const registerIntelligenceTools = (
       ),
   );
 
-  server.registerTool(
+  registerTool(
+    server,
     "explore_symbol",
     {
       title: "Explore symbol",
@@ -264,7 +295,8 @@ export const registerIntelligenceTools = (
       ),
   );
 
-  server.registerTool(
+  registerTool(
+    server,
     "investigate_code",
     {
       title: "Investigate code",

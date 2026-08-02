@@ -1,3 +1,4 @@
+import { FileSizesRequest } from "@typeatlas/language-server/protocol";
 import {
   DefinitionRequest,
   DocumentDiagnosticRequest,
@@ -22,8 +23,16 @@ import type { VolarWorkspace } from "./volar-workspace.ts";
  * through the supplied signal. The caller retains ownership of the workspace.
  */
 export const createTypeAtlas = (workspace: VolarWorkspace) => ({
+  sourceSizes(files: readonly string[], signal: AbortSignal) {
+    return workspace.sendRequest(
+      FileSizesRequest.type,
+      { uris: files.map((file) => workspace.getWorkspaceUri(file)) },
+      signal,
+    );
+  },
+
   async readSource(file: string, fold: boolean, signal: AbortSignal) {
-    const { textDocument, source } = await workspace.readTextDocument(file);
+    const { textDocument, source } = await workspace.readTextDocument(file, signal);
     const foldingRanges = fold
       ? await workspace.sendRequest(FoldingRangeRequest.type, { textDocument }, signal)
       : [];

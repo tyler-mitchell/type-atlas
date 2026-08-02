@@ -64,6 +64,7 @@
     "diff": "catalog:",
     "fdir": "catalog:",
     "globby": "catalog:",
+    "p-queue": "catalog:",
     "pathe": "catalog:",
     "picomatch": "catalog:",
     "vscode-languageserver-protocol": "catalog:",

@@ -4,8 +4,10 @@ import {
   CompletionItemKind,
   CompletionRequest,
   CompletionResolveRequest,
+  TypeDefinitionRequest,
 } from "@volar/language-server/protocol.js";
 import { readPackageJSON } from "pkg-types";
+import { URI } from "vscode-uri";
 import { page } from "./projection.ts";
 import type { VolarWorkspace } from "./volar-workspace.ts";
 
@@ -21,6 +23,7 @@ export type ModuleExportPage = {
   readonly total: number;
   readonly offset: number;
   readonly items: readonly CompletionItem[];
+  readonly definitionUris: readonly string[];
   readonly subpaths: readonly string[];
   readonly includeDocs: boolean;
   readonly nextOffset?: number;
@@ -41,22 +44,34 @@ const probe = ({
   const access = path.map((segment) => `[${JSON.stringify(segment)}]`).join("");
   if (type) {
     const expression = `__target${access}.`;
+    const declarationPrefix = "declare const __target: __module.";
     return {
-      source: `import type * as __module from ${JSON.stringify(moduleName)};\ndeclare const __target: __module.${type};\n${expression}`,
+      source: `import type * as __module from ${JSON.stringify(moduleName)};\n${declarationPrefix}${type};\n${expression}`,
       position: { line: 2, character: expression.length },
+      definitionPosition: { line: 1, character: declarationPrefix.length },
     };
   }
   if (surface === "runtime") {
     const expression = `__module${access}.`;
+    const importSource = `import * as __module from ${JSON.stringify(moduleName)};`;
+    const finalSegment = path.at(-1);
     return {
-      source: `import * as __module from ${JSON.stringify(moduleName)};\n${expression}`,
+      source: `${importSource}\n${expression}`,
       position: { line: 1, character: expression.length },
+      definitionPosition: finalSegment
+        ? { line: 1, character: expression.lastIndexOf(JSON.stringify(finalSegment)) + 1 }
+        : { line: 1, character: 1 },
     };
   }
   const prefix = "import { ";
+  const source = `${prefix}} from ${JSON.stringify(moduleName)};`;
   return {
-    source: `${prefix}} from ${JSON.stringify(moduleName)};`,
+    source,
     position: { line: 0, character: prefix.length },
+    definitionPosition: {
+      line: 0,
+      character: source.indexOf(JSON.stringify(moduleName)) + 1,
+    },
   };
 };
 
@@ -65,7 +80,8 @@ const probe = ({
  *
  * Results preserve Volar's completion order. Runtime mode observes namespace
  * members; `all` mode additionally includes type-only exports. Documentation
- * resolution is limited to the returned page.
+ * resolution is limited to the returned page. Explicit labels filter the
+ * completion page before resolution.
  *
  * The importing file selects the configured TypeScript project and exact
  * dependency version. Package subpaths come from that resolved package's
@@ -79,11 +95,13 @@ export const listModuleExports = async ({
   path,
   surface,
   query,
+  labels = [],
   offset,
   limit,
   includeDetails,
   includeDocs,
   includeSubpaths,
+  includeDefinition = false,
   signal,
 }: {
   readonly workspace: VolarWorkspace;
@@ -93,16 +111,20 @@ export const listModuleExports = async ({
   readonly path: readonly string[];
   readonly surface: ModuleExportSurface;
   readonly query: string;
+  readonly labels?: readonly string[];
   readonly offset: number;
   readonly limit: number;
   readonly includeDetails: boolean;
   readonly includeDocs: boolean;
   readonly includeSubpaths: boolean;
+  readonly includeDefinition?: boolean;
   readonly signal: AbortSignal;
 }): Promise<ModuleExportPage> => {
   const uri = workspace.getWorkspaceUri(fromFile);
+  const parsedUri = URI.parse(uri);
+  const probeUri = parsedUri.with({ path: `${parsedUri.path}.typeatlas.ts` }).toString();
   const effectiveSurface = type || path.length ? "runtime" : surface;
-  const { source, position } = probe({
+  const { source, position, definitionPosition } = probe({
     moduleName,
     type,
     path,
@@ -132,16 +154,21 @@ export const listModuleExports = async ({
       : [];
 
   return workspace.withTextDocument({
-    uri,
+    uri: probeUri,
     languageId: "typescript",
     source,
     signal,
     task: async (textDocument) => {
-      const completion = await workspace.sendRequest(
-        CompletionRequest.type,
-        { textDocument, position },
-        signal,
-      );
+      const [completion, definitions] = await Promise.all([
+        workspace.sendRequest(CompletionRequest.type, { textDocument, position }, signal),
+        includeDefinition
+          ? workspace.sendRequest(
+              TypeDefinitionRequest.type,
+              { textDocument, position: definitionPosition },
+              signal,
+            )
+          : undefined,
+      ]);
       const items =
         completion === null ? [] : Array.isArray(completion) ? completion : completion.items;
       const exportItems =
@@ -149,11 +176,14 @@ export const listModuleExports = async ({
           ? items.filter((item) => item.kind !== CompletionItemKind.Keyword)
           : items;
       const normalizedQuery = query.toLocaleLowerCase();
-      const matchingItems = normalizedQuery
+      const queriedItems = normalizedQuery
         ? exportItems.filter((item) =>
             (item.filterText ?? item.label).toLocaleLowerCase().includes(normalizedQuery),
           )
         : exportItems;
+      const matchingItems = labels.length
+        ? queriedItems.filter((item) => labels.includes(item.label))
+        : queriedItems;
       const resultPage = page(matchingItems, offset, limit);
       const selectedItems =
         includeDetails || includeDocs
@@ -170,6 +200,12 @@ export const listModuleExports = async ({
         surface: effectiveSurface,
         query,
         includeDocs,
+        definitionUris:
+          definitions === undefined || definitions === null
+            ? []
+            : (Array.isArray(definitions) ? definitions : [definitions]).map((definition) =>
+                "uri" in definition ? definition.uri : definition.targetUri,
+              ),
         subpaths,
         isIncomplete: Array.isArray(completion) ? false : (completion?.isIncomplete ?? false),
         ...resultPage,

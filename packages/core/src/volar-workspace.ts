@@ -237,8 +237,8 @@ const startVolarWorkspace = async (
       }
     }
   };
-  const readTextDocumentUri = async (uri: string) => {
-    const source = await sendRequest(ReadFileRequest.type, { uri });
+  const readTextDocumentUri = async (uri: string, signal?: AbortSignal) => {
+    const source = await sendRequest(ReadFileRequest.type, { uri }, signal);
     if (source === null) {
       throw new Error(`Source document is unavailable: ${uri}`);
     }
@@ -250,8 +250,8 @@ const startVolarWorkspace = async (
     async getTextDocument(file: string) {
       return (await readTextDocumentUri(getWorkspaceUri(file))).textDocument;
     },
-    readTextDocument(file: string) {
-      return readTextDocumentUri(getWorkspaceUri(file));
+    readTextDocument(file: string, signal?: AbortSignal) {
+      return readTextDocumentUri(getWorkspaceUri(file), signal);
     },
     readTextDocumentUri,
     getWorkspaceUri,

@@ -11,6 +11,7 @@ const isNonCodeRange = ({ kind }: FoldingRange) =>
 type SourceView = {
   readonly startLine?: number;
   readonly endLine?: number;
+  readonly sourceStartLine?: number;
 };
 
 /**
@@ -26,17 +27,18 @@ export const formatFoldedSource = (
   view: SourceView = {},
 ): string => {
   const lines = source === "" ? [] : source.replace(/\r?\n$/, "").split(/\r?\n/);
-  const startLine = view.startLine ?? 1;
-  const requestedEndLine = view.endLine ?? lines.length;
-  if (startLine > requestedEndLine) {
+  const sourceStartLine = view.sourceStartLine ?? 1;
+  const startLine = view.startLine ?? sourceStartLine;
+  const requestedEndLine = view.endLine ?? sourceStartLine + lines.length - 1;
+  if (view.endLine !== undefined && startLine > requestedEndLine) {
     throw new Error("startLine must be less than or equal to endLine.");
   }
-  if (!lines.length || startLine > lines.length) return "";
-  const endLine = Math.min(requestedEndLine, lines.length);
+  if (!lines.length || startLine > sourceStartLine + lines.length - 1) return "";
+  const endLine = Math.min(requestedEndLine, sourceStartLine + lines.length - 1);
 
-  const startIndex = startLine - 1;
+  const startIndex = startLine - sourceStartLine;
   const viewLineCount = endLine - startLine + 1;
-  const width = String(lines.length).length;
+  const width = String(sourceStartLine + lines.length - 1).length;
   const nonCode = ranges.filter(isNonCodeRange);
   const folds =
     viewLineCount > minimumViewLines
@@ -69,7 +71,7 @@ export const formatFoldedSource = (
         fold?.collapsedText ?? (fold ? `... ${line + 2}-${fold.endLine + 1}` : undefined);
       const indentation = lines[line + 1]?.match(/^\s*/)?.[0] ?? "";
       return [
-        `${String(line + 1).padStart(width)}|${text}`,
+        `${String(sourceStartLine + line).padStart(width)}|${text}`,
         ...(placeholder ? [`${" ".repeat(width)}|${indentation}${placeholder}`] : []),
       ];
     })

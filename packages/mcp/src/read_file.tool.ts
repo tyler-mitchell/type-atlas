@@ -3,10 +3,18 @@ import { formatFoldedSource } from "@typeatlas/core/folded-source";
 import { workspacePath } from "@typeatlas/core/text";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { type } from "arktype";
+import { createReadStream } from "node:fs";
+import { createInterface } from "node:readline";
+import { URI } from "vscode-uri";
 import { requestDiagnosticContext } from "./ambient-diagnostics.ts";
 import { textResult } from "./mcp-result.ts";
 import { readOnlyToolAnnotations } from "./metadata.ts";
+import { registerTool } from "./tool.ts";
 import { diagnosticModeInput, fileInput } from "./tool-input.ts";
+
+const maxFileBytes = 16 * 1024 * 1024;
+const maxBatchBytes = 32 * 1024 * 1024;
+const maxLargeFileLines = 10_000;
 
 const readFileTarget = type({
   path: "string >= 1",
@@ -19,7 +27,7 @@ const readFileInput = type({
   workspace: fileInput.workspace,
   file: type("string >= 1")
     .or(readFileTarget)
-    .or(type("string >= 1").or(readFileTarget).array().atLeastLength(1))
+    .or(type("string >= 1").or(readFileTarget).array().atLeastLength(1).atMostLength(50))
     .configure({ description: "A file path, or file views to read together." }),
   "includeDiagnostics?": diagnosticModeInput,
   "fold?": type("boolean").configure({
@@ -34,8 +42,41 @@ const readFileInput = type({
   }),
 }).onUndeclaredKey("reject");
 
+const readFileRange = async ({
+  uri,
+  startLine,
+  endLine,
+  signal,
+}: {
+  readonly uri: string;
+  readonly startLine: number;
+  readonly endLine: number;
+  readonly signal: AbortSignal;
+}): Promise<string> => {
+  const parsed = URI.parse(uri);
+  if (parsed.scheme !== "file") throw new Error(`Ranged source is not a file: ${uri}`);
+  const stream = createReadStream(parsed.fsPath, { encoding: "utf8", signal });
+  const lines = createInterface({ input: stream, crlfDelay: Infinity });
+  const source: string[] = [];
+  let lineNumber = 0;
+
+  try {
+    for await (const line of lines) {
+      lineNumber += 1;
+      if (lineNumber >= startLine) source.push(line);
+      if (lineNumber >= endLine) break;
+    }
+  } finally {
+    lines.close();
+    stream.destroy();
+  }
+
+  return source.join("\n");
+};
+
 export const registerReadFileTool = (server: McpServer, workspaces: VolarWorkspacePool): void => {
-  server.registerTool(
+  registerTool(
+    server,
     "read_file",
     {
       title: "Read files",
@@ -54,38 +95,83 @@ export const registerReadFileTool = (server: McpServer, workspaces: VolarWorkspa
       } = request;
       const files = Array.isArray(request.file) ? request.file : [request.file];
       const workspace = await workspaces.get(root);
-      const intelligence = createTypeAtlas(workspace);
+      const typeAtlas = createTypeAtlas(workspace);
+      const targets = files.map((entry) => {
+        const target = typeof entry === "string" ? { path: entry } : entry;
+        const targetStartLine = target.startLine ?? startLine;
+        const targetEndLine = target.endLine ?? endLine;
+        if (
+          targetStartLine !== undefined &&
+          targetEndLine !== undefined &&
+          targetStartLine > targetEndLine
+        ) {
+          throw new Error("startLine must be less than or equal to endLine.");
+        }
+        return {
+          file: target.path,
+          startLine: targetStartLine,
+          endLine: targetEndLine,
+          fold: target.fold ?? fold,
+        };
+      });
+      const sizes = await typeAtlas.sourceSizes(
+        targets.map(({ file }) => file),
+        signal,
+      );
+      const views = targets.map((target, index) => ({ ...target, size: sizes[index] ?? null }));
+      const batchBytes = views.reduce(
+        (total, { size }) => total + (size !== null && size <= maxFileBytes ? size : 0),
+        0,
+      );
+      if (batchBytes > maxBatchBytes) {
+        throw new Error(
+          `Broad read is ${(batchBytes / 1024 / 1024).toFixed(1)} MiB across ${views.length} files; the per-call limit is ${maxBatchBytes / 1024 / 1024} MiB. Split the request into smaller batches.`,
+        );
+      }
       const sections = await Promise.all(
-        files.map(async (entry) => {
-          const target = typeof entry === "string" ? { path: entry } : entry;
-          const file = target.path;
-          const targetStartLine = target.startLine ?? startLine;
-          const targetEndLine = target.endLine ?? endLine;
-          const targetFold = target.fold ?? fold;
+        views.map(async (target) => {
           try {
-            if (
-              targetStartLine !== undefined &&
-              targetEndLine !== undefined &&
-              targetStartLine > targetEndLine
-            ) {
-              throw new Error("startLine must be less than or equal to endLine.");
+            const size = target.size;
+            const oversized = size !== null && size > maxFileBytes;
+            const boundedLineCount =
+              target.startLine !== undefined && target.endLine !== undefined
+                ? target.endLine - target.startLine + 1
+                : undefined;
+            const readLargeRange =
+              oversized && boundedLineCount !== undefined && boundedLineCount <= maxLargeFileLines;
+            if (oversized && !readLargeRange) {
+              throw new Error(
+                `${target.file} is ${(size / 1024 / 1024).toFixed(1)} MiB; broad reads are limited to ${maxFileBytes / 1024 / 1024} MiB. Pass { path, startLine, endLine } with at most ${maxLargeFileLines.toLocaleString()} lines.`,
+              );
             }
-            const { textDocument, source, foldingRanges } = await intelligence.readSource(
-              file,
-              targetFold,
+            if (readLargeRange) {
+              const uri = workspace.getWorkspaceUri(target.file);
+              const source = await readFileRange({
+                uri,
+                startLine: target.startLine!,
+                endLine: target.endLine!,
+                signal,
+              });
+              return {
+                file: workspacePath(uri, root),
+                text: formatFoldedSource(source, [], { sourceStartLine: target.startLine }),
+              };
+            }
+            const { textDocument, source, foldingRanges } = await typeAtlas.readSource(
+              target.file,
+              target.fold,
               signal,
             );
-            const diagnosticContext = requestDiagnosticContext(
+            const context = await requestDiagnosticContext(
               workspace,
               textDocument,
               root,
               includeDiagnostics,
               signal,
             );
-            const context = await diagnosticContext;
             const text = formatFoldedSource(source, foldingRanges, {
-              startLine: targetStartLine,
-              endLine: targetEndLine,
+              startLine: target.startLine,
+              endLine: target.endLine,
             });
             return {
               file: workspacePath(textDocument.uri, root),
@@ -95,7 +181,7 @@ export const registerReadFileTool = (server: McpServer, workspaces: VolarWorkspa
             signal.throwIfAborted();
             if (files.length === 1) throw error;
             return {
-              file,
+              file: target.file,
               text: `Error: ${error instanceof Error ? error.message : String(error)}`,
             };
           }

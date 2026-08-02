@@ -231,6 +231,9 @@ importers:
       globby:
         specifier: 'catalog:'
         version: 16.2.2
+      p-queue:
+        specifier: 'catalog:'
+        version: 9.3.3
       pathe:
         specifier: 'catalog:'
         version: 2.0.3

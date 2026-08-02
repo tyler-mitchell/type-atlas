@@ -27,6 +27,7 @@ import {
   formatWorkspaceSymbols,
 } from "@typeatlas/core/text";
 import { appendDiagnosticContext, textResult } from "./mcp-result.ts";
+import { registerTool } from "./tool.ts";
 import { fileInput, observedFileInput, positionInput } from "./tool-input.ts";
 import type { VolarWorkspacePool } from "@typeatlas/core";
 
@@ -97,7 +98,8 @@ export const registerNavigationTools = (
   server: McpServer,
   workspaces: VolarWorkspacePool,
 ): void => {
-  server.registerTool(
+  registerTool(
+    server,
     "inspect_symbol",
     {
       title: "Inspect symbol",
@@ -140,7 +142,8 @@ export const registerNavigationTools = (
     },
   );
 
-  server.registerTool(
+  registerTool(
+    server,
     "workspace_symbols",
     {
       title: "Workspace symbols",
@@ -173,7 +176,8 @@ export const registerNavigationTools = (
     },
   );
 
-  server.registerTool(
+  registerTool(
+    server,
     "definitions",
     {
       title: "Definitions",
@@ -203,7 +207,8 @@ export const registerNavigationTools = (
     },
   );
 
-  server.registerTool(
+  registerTool(
+    server,
     "type_definitions",
     {
       title: "Type definitions",
@@ -234,7 +239,8 @@ export const registerNavigationTools = (
     },
   );
 
-  server.registerTool(
+  registerTool(
+    server,
     "implementations",
     {
       title: "Implementations",
@@ -265,7 +271,8 @@ export const registerNavigationTools = (
     },
   );
 
-  server.registerTool(
+  registerTool(
+    server,
     "callers",
     {
       title: "Callers",
@@ -319,7 +326,8 @@ export const registerNavigationTools = (
     },
   );
 
-  server.registerTool(
+  registerTool(
+    server,
     "callees",
     {
       title: "Callees",
@@ -373,7 +381,8 @@ export const registerNavigationTools = (
     },
   );
 
-  server.registerTool(
+  registerTool(
+    server,
     "references",
     {
       title: "References",
@@ -432,7 +441,8 @@ export const registerNavigationTools = (
     },
   );
 
-  server.registerTool(
+  registerTool(
+    server,
     "file_references",
     {
       title: "File references",
@@ -478,7 +488,8 @@ export const registerNavigationTools = (
     },
   );
 
-  server.registerTool(
+  registerTool(
+    server,
     "document_highlights",
     {
       title: "Document highlights",

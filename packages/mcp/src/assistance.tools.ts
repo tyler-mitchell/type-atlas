@@ -17,6 +17,7 @@ import {
   formatSignatureHelp,
 } from "@typeatlas/core/text";
 import { appendDiagnosticContext, textResult } from "./mcp-result.ts";
+import { registerTool } from "./tool.ts";
 import { observedFileInput, positionInput, rangeInput } from "./tool-input.ts";
 import type { VolarWorkspacePool } from "@typeatlas/core";
 
@@ -89,7 +90,8 @@ export const registerAssistanceTools = (
   server: McpServer,
   workspaces: VolarWorkspacePool,
 ): void => {
-  server.registerTool(
+  registerTool(
+    server,
     "hover",
     {
       title: "Hover",
@@ -119,7 +121,8 @@ export const registerAssistanceTools = (
     },
   );
 
-  server.registerTool(
+  registerTool(
+    server,
     "signature_help",
     {
       title: "Signature help",
@@ -150,7 +153,8 @@ export const registerAssistanceTools = (
     },
   );
 
-  server.registerTool(
+  registerTool(
+    server,
     "completions",
     {
       title: "Completions",
@@ -225,7 +229,8 @@ export const registerAssistanceTools = (
     },
   );
 
-  server.registerTool(
+  registerTool(
+    server,
     "inlay_hints",
     {
       title: "Inlay hints",
@@ -256,7 +261,8 @@ export const registerAssistanceTools = (
     },
   );
 
-  server.registerTool(
+  registerTool(
+    server,
     "list_module_exports",
     {
       title: "Inspect module",

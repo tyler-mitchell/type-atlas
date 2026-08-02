@@ -151,7 +151,7 @@ export const formatDiagnosticContext = (
   ].join("\n");
 };
 
-const markupText = (
+export const markupText = (
   value:
     | string
     | MarkupContent
@@ -452,23 +452,75 @@ export const formatCompletions = (page: CompletionPage | null | undefined) => {
   ].join("\n");
 };
 
-const moduleExportText = (item: CompletionItem, includeDocs: boolean) => {
-  const kind = enumName(CompletionItemKind, item.kind, "export");
+const moduleDeclaration = (input: {
+  readonly item: CompletionItem;
+  readonly qualifier: string;
+  readonly includeDocs: boolean;
+  readonly documentationLimit?: number;
+}) => {
+  const { item, qualifier, includeDocs, documentationLimit } = input;
+  const rawDocumentation = includeDocs ? markupText(item.documentation) : undefined;
+  const documentation =
+    documentationLimit === undefined
+      ? rawDocumentation
+      : rawDocumentation
+          ?.split(/\n\s*\n/u)[0]
+          ?.replace(/\s+/gu, " ")
+          .replace(/\s+([,.;:!?])/gu, "$1")
+          .trim();
+  const boundedDocumentation =
+    documentationLimit !== undefined && documentation && documentation.length > documentationLimit
+      ? `${documentation.slice(0, documentationLimit - 1).trimEnd()}…`
+      : documentation;
   const deprecated =
-    (item as { readonly deprecated?: boolean }).deprecated || item.tags?.includes(1)
-      ? " [deprecated]"
-      : "";
-  const documentation = includeDocs ? markupText(item.documentation) : "";
+    (item as { readonly deprecated?: boolean }).deprecated || item.tags?.includes(1);
+  const comment = [deprecated ? "@deprecated" : undefined, boundedDocumentation]
+    .filter(Boolean)
+    .join("\n");
   const escapedLabel = item.label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const detail = item.detail
-    ?.replace(/\(alias\) /g, "")
+    ?.replace(/^\([^)]+\)\s*/u, "")
     .replace(new RegExp(`\\b[\\w$]+_exports\\.${escapedLabel}\\b`, "g"), item.label)
-    .replace(/\nexport [^\n]+$/g, "");
-  return [
-    `${item.label}${detail ? ` — ${detail}` : ` [${kind}]`}${deprecated}`,
-    ...(documentation ? [indent(documentation)] : []),
-  ].join("\n");
+    .replace(/\b__module\./gu, "")
+    .replace(new RegExp(`^[^\\n]*\\.${escapedLabel}(?=\\s*[:(<])`, "u"), item.label)
+    .replace(/\nexport[^\n]*$/u, "");
+  const unqualified = detail?.startsWith(`${qualifier}.`)
+    ? detail.slice(qualifier.length + 1)
+    : detail;
+  const rootDeclaration = unqualified ? `export ${unqualified}` : `export { ${item.label} };`;
+  const declaration = qualifier ? (unqualified ?? item.label) : rootDeclaration;
+  const terminated = qualifier && !declaration.endsWith(";") ? `${declaration};` : declaration;
+  const singleLineJSDoc = comment ? `/** ${comment.replace(/\*\//gu, "*\\/")} */` : undefined;
+  const multilineJSDoc = comment
+    ? [
+        "/**",
+        ...comment.split("\n").map((line) => ` * ${line.replace(/\*\//gu, "*\\/")}`),
+        " */",
+      ].join("\n")
+    : undefined;
+  const jsdoc = comment?.includes("\n") ? multilineJSDoc : singleLineJSDoc;
+  return [...(jsdoc ? [jsdoc] : []), terminated].join("\n");
 };
+
+export const formatModuleDeclarations = (input: {
+  readonly items: readonly CompletionItem[];
+  readonly qualifier?: string;
+  readonly includeDocs: boolean;
+  readonly documentationLimit?: number;
+}) =>
+  [
+    "```ts",
+    ...input.items.flatMap((item, index) => [
+      moduleDeclaration({
+        item,
+        qualifier: input.qualifier ?? "",
+        includeDocs: input.includeDocs,
+        documentationLimit: input.documentationLimit,
+      }),
+      ...(index + 1 < input.items.length ? [""] : []),
+    ]),
+    "```",
+  ].join("\n");
 
 export const formatModuleExports = (page: ModuleExportPage) => {
   const target = [page.module, ...(page.type ? [page.type] : []), ...page.path].join(".");
@@ -483,7 +535,15 @@ export const formatModuleExports = (page: ModuleExportPage) => {
     ...(page.resolved === false
       ? ["Module could not be resolved from the selected project context."]
       : []),
-    ...page.items.map((item) => moduleExportText(item, page.includeDocs)),
+    ...(page.items.length
+      ? [
+          formatModuleDeclarations({
+            items: page.items,
+            qualifier: [page.type, ...page.path].filter(Boolean).join("."),
+            includeDocs: page.includeDocs,
+          }),
+        ]
+      : []),
     ...(page.subpaths.length
       ? [
           "",

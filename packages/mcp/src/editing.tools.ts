@@ -14,6 +14,7 @@ import { fileInput, positionInput } from "./tool-input.ts";
 import type { VolarWorkspacePool } from "@typeatlas/core";
 import { type FileMove, renderWorkspaceEdit } from "./workspace-edit.ts";
 import { formatPatchResult } from "./edit-result.ts";
+import { registerTool } from "./tool.ts";
 
 const input = type.module({
   RenameSymbol: type({
@@ -42,7 +43,8 @@ const input = type.module({
 });
 
 export const registerEditingTools = (server: McpServer, workspaces: VolarWorkspacePool): void => {
-  server.registerTool(
+  registerTool(
+    server,
     "rename_symbol",
     {
       title: "Rename symbol",
@@ -67,7 +69,8 @@ export const registerEditingTools = (server: McpServer, workspaces: VolarWorkspa
     },
   );
 
-  server.registerTool(
+  registerTool(
+    server,
     "rename_files",
     {
       title: "Rename files",
@@ -96,7 +99,8 @@ export const registerEditingTools = (server: McpServer, workspaces: VolarWorkspa
     },
   );
 
-  server.registerTool(
+  registerTool(
+    server,
     "format_document",
     {
       title: "Format document",

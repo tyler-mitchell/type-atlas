@@ -14,7 +14,7 @@ import {
   create as createTypeScriptServices,
   type Provide as TypeScriptService,
 } from "volar-service-typescript";
-import { ReadFileRequest, ResolveDependencySourceRequest } from "./protocol.ts";
+import { FileSizesRequest, ReadFileRequest, ResolveDependencySourceRequest } from "./protocol.ts";
 
 const markdownFileExtensions = [
   "md",
@@ -49,6 +49,11 @@ export const registerLanguageServer = (connection: Connection): void => {
       ReadFileRequest.type,
       async ({ uri }) => (await server.fileSystem.readFile(URI.parse(uri))) ?? null,
     );
+    connection.onRequest(FileSizesRequest.type, ({ uris }) =>
+      Promise.all(
+        uris.map(async (uri) => (await server.fileSystem.stat(URI.parse(uri)))?.size ?? null),
+      ),
+    );
     connection.onRequest(
       ResolveDependencySourceRequest.type,
       async ({ textDocument, moduleName }) => {
@@ -69,23 +74,23 @@ export const registerLanguageServer = (connection: Connection): void => {
 
         const options = host.getCompilationSettings();
         const mode = languageService.getProgram()?.getSourceFile(fileName)?.impliedNodeFormat;
-        const source = ts.resolveModuleName(
+        const declaration = ts.resolveModuleName(
           moduleName,
           fileName,
-          { ...options, noDtsResolution: true },
+          options,
           host,
-          undefined,
+          host.getModuleResolutionCache?.(),
           undefined,
           mode,
         ).resolvedModule;
         return (
-          source ??
+          declaration ??
           ts.resolveModuleName(
             moduleName,
             fileName,
-            options,
+            { ...options, noDtsResolution: true },
             host,
-            host.getModuleResolutionCache?.(),
+            undefined,
             undefined,
             mode,
           ).resolvedModule ??

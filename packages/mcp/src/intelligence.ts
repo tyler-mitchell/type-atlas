@@ -27,7 +27,7 @@ type SymbolPathItem = {
   readonly selection: Range;
 };
 
-type RetrievalMatch = {
+export type RetrievalMatch = {
   readonly result: SembleSearchPage["results"][number];
   readonly file: string;
   readonly displayFile: string;
@@ -39,7 +39,7 @@ type RetrievalMatch = {
   readonly hover?: Hover | null;
 };
 
-type RetrievalPage = {
+export type RetrievalPage = {
   readonly page: SembleSearchPage;
   readonly root: string;
   readonly searchRoot: string;
@@ -97,22 +97,25 @@ const resolveSearchRoot = async (root: string, scope: string | undefined): Promi
 const sourceRange = (range: Range): string =>
   `${range.start.line}:${range.start.character}-${range.end.line}:${range.end.character}`;
 
-const enrichPage = async (input: {
+export const enrichRetrievalPage = async (input: {
   readonly page: SembleSearchPage;
   readonly root: string;
   readonly searchRoot: string;
   readonly includeTypes: boolean;
   readonly snippetLines: number | null;
+  readonly anchorIdentifiers?: readonly string[];
   readonly workspaces: VolarWorkspacePool;
   readonly signal: AbortSignal;
 }): Promise<RetrievalPage> => {
   const workspace = await input.workspaces.get(input.root);
   const intelligence = createTypeAtlas(workspace);
-  const queryIdentifiers = new Set(
-    (input.page.query.match(/[$_\p{ID_Start}][$_\p{ID_Continue}]*/gu) ?? []).filter((identifier) =>
-      /[$_\p{Lu}]/u.test(identifier),
+  const anchorIdentifiers = new Set(input.anchorIdentifiers ?? []);
+  const queryIdentifiers = new Set([
+    ...(input.page.query.match(/[$_\p{ID_Start}][$_\p{ID_Continue}]*/gu) ?? []).filter(
+      (identifier) => /[$_\p{Lu}]/u.test(identifier),
     ),
-  );
+    ...(input.anchorIdentifiers ?? []),
+  ]);
   return {
     page: input.page,
     root: input.root,
@@ -121,18 +124,33 @@ const enrichPage = async (input: {
       input.page.results.map(async (result) => {
         const file = path.resolve(input.searchRoot, result.file_path);
         const { symbols } = await intelligence.documentSymbols(file, input.signal);
-        const startLine = result.start_line - 1;
-        const endLine = result.end_line - 1;
-        const symbolPaths = [...overlappingSymbolPaths(symbols ?? [], startLine, endLine)].sort(
+        const resultStartLine = result.start_line - 1;
+        const resultEndLine = result.end_line - 1;
+        const symbolPaths = [
+          ...overlappingSymbolPaths(symbols ?? [], resultStartLine, resultEndLine),
+        ].sort(
           (left, right) =>
-            overlapLength(right.at(-1)!.range, startLine, endLine) -
-              overlapLength(left.at(-1)!.range, startLine, endLine) || right.length - left.length,
+            overlapLength(right.at(-1)!.range, resultStartLine, resultEndLine) -
+              overlapLength(left.at(-1)!.range, resultStartLine, resultEndLine) ||
+            right.length - left.length,
         );
         const symbolPath =
           symbolPaths.find((path) => queryIdentifiers.has(path.at(-1)!.symbol.name)) ??
           symbolPaths[0];
         const selected = symbolPath?.at(-1);
-        const contentLines = result.content?.split("\n") ?? [];
+        const exactSource = anchorIdentifiers.size
+          ? await workspace.readTextDocument(file, input.signal)
+          : undefined;
+        const contentLines = exactSource?.source.split("\n") ?? result.content?.split("\n") ?? [];
+        const contentStartLine = exactSource ? 0 : resultStartLine;
+        const anchorLine = contentLines.findIndex(
+          (line) =>
+            !/^\s*(?:\/\/|\/\*|\*)/u.test(line) &&
+            (line.match(/[$_\p{ID_Start}][$_\p{ID_Continue}]*/gu) ?? []).some((identifier) =>
+              anchorIdentifiers.has(identifier),
+            ),
+        );
+        const anchorSourceLine = anchorLine < 0 ? undefined : contentStartLine + anchorLine;
         const snippetStart =
           input.snippetLines === null
             ? 0
@@ -140,8 +158,8 @@ const enrichPage = async (input: {
                 Math.max(0, contentLines.length - input.snippetLines),
                 Math.max(
                   0,
-                  (selected?.selection.start.line ?? startLine) -
-                    startLine -
+                  (anchorSourceLine ?? selected?.selection.start.line ?? resultStartLine) -
+                    contentStartLine -
                     Math.floor(input.snippetLines / 2),
                 ),
               );
@@ -165,7 +183,7 @@ const enrichPage = async (input: {
                     input.snippetLines === null ? undefined : snippetStart + input.snippetLines,
                   )
                   .join("\n"),
-          contentStartLine: startLine + snippetStart,
+          contentStartLine: contentStartLine + snippetStart,
           hover,
         };
       }),
@@ -263,7 +281,7 @@ export const createRetrievalIntelligence = (dependencies: {
     readonly signal: AbortSignal;
   }): Promise<RetrievalPage> => {
     const searchRoot = await resolveSearchRoot(request.root, request.scope);
-    return await enrichPage({
+    return await enrichRetrievalPage({
       page: await dependencies.semble.search({
         repo: searchRoot,
         query: request.query,
@@ -304,7 +322,7 @@ export const createRetrievalIntelligence = (dependencies: {
       snippetLines: null,
       signal: request.signal,
     });
-    return await enrichPage({
+    return await enrichRetrievalPage({
       page: {
         ...page,
         query: `Related to ${workspacePath(

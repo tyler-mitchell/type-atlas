@@ -17,6 +17,7 @@ import { type } from "arktype";
 import { formatPatchResult } from "./edit-result.ts";
 import { appendDiagnosticContext, textResult } from "./mcp-result.ts";
 import { readOnlyToolAnnotations } from "./metadata.ts";
+import { registerTool } from "./tool.ts";
 import { observedFileInput, rangeInput } from "./tool-input.ts";
 import { renderWorkspaceEdit } from "./workspace-edit.ts";
 import { type DiagnosticMode, formatDiagnosticMode } from "./ambient-diagnostics.ts";
@@ -159,7 +160,8 @@ export const registerCodeActionTools = (
   server: McpServer,
   workspaces: VolarWorkspacePool,
 ): void => {
-  server.registerTool(
+  registerTool(
+    server,
     "code_actions",
     {
       title: "Code actions",
@@ -280,7 +282,8 @@ export const registerCodeActionTools = (
   );
 
   for (const sourceAction of sourceActions) {
-    server.registerTool(
+    registerTool(
+      server,
       sourceAction.name,
       {
         title: sourceAction.title,
