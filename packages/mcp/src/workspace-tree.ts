@@ -48,11 +48,11 @@ export const workspaceTree = async (input: {
         ignore: ["**/.git/**", "**/node_modules/**"],
       });
   const crawler = new fdir()
+    .withPathSeparator("/")
     .withRelativePaths()
     .withMaxDepth(input.depth - 1)
     .withErrors()
     .withAbortSignal(input.signal)
-    .normalize()
     .globWithOptions([...(input.glob ?? ["**/*"])], { dot: input.includeHidden })
     .filter((file) => file === "." || file.length === 0 || !isIgnored(file))
     .exclude((name, absolute) => {
