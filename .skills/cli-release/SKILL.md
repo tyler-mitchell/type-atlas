@@ -55,6 +55,16 @@ only one package.
 After a changeset reaches `main`, `.github/workflows/release.yml` creates or
 updates the Changesets version pull request.
 
+GitHub may hold the first CI run from the bot-authored version pull request for
+maintainer approval. If the run reports `action_required` without creating any
+jobs, approve it, then wait for CI:
+
+```sh
+gh api --method POST repos/tyler-mitchell/type-atlas/actions/runs/<run-id>/approve
+```
+
+This is an approval gate, not a failed check.
+
 Review that pull request for:
 
 - the intended unified version;
