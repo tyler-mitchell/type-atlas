@@ -5,8 +5,8 @@ import {
   inspectSymbol,
   type InspectSymbolTarget,
   type VolarWorkspacePool,
-} from "@typeatlas/core";
-import { hoverContentsText, symbolKind, workspacePath } from "@typeatlas/core/text";
+} from "@type-atlas/core";
+import { hoverContentsText, symbolKind, workspacePath } from "@type-atlas/core/text";
 import { isFileInDir } from "@volar/language-server/node.js";
 import { relative as platformRelative } from "node:path";
 import * as path from "pathe";

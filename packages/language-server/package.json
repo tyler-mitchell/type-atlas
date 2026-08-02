@@ -1,5 +1,5 @@
 {
-  "name": "@typeatlas/language-server",
+  "name": "@type-atlas/language-server",
   "version": "0.0.0",
   "description": "Volar-based TypeScript, Markdown, and JSON language server for Type Atlas.",
   "keywords": [
@@ -10,25 +10,29 @@
     "typescript",
     "volar"
   ],
-  "homepage": "https://github.com/tyler-mitchell/typeatlas/tree/main/packages/language-server",
+  "homepage": "https://github.com/tyler-mitchell/type-atlas/tree/main/packages/language-server",
   "bugs": {
-    "url": "https://github.com/tyler-mitchell/typeatlas/issues"
+    "url": "https://github.com/tyler-mitchell/type-atlas/issues"
   },
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/tyler-mitchell/typeatlas.git",
+    "url": "git+https://github.com/tyler-mitchell/type-atlas.git",
     "directory": "packages/language-server"
   },
   "bin": {
-    "typeatlas-language-server": "./bin/typeatlas-language-server.cjs"
+    "type-atlas-language-server": "./bin/type-atlas-language-server.cjs"
   },
   "files": [
     "bin",
-    "dist"
+    "CHANGELOG.md",
+    "dist",
+    "LICENSE",
+    "README.md"
   ],
   "type": "module",
   "sideEffects": [
-    "./bin/typeatlas-language-server.cjs",
+    "./bin/type-atlas-language-server.cjs",
     "./dist/node.js",
     "./src/node.ts"
   ],

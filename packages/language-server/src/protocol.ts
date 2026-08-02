@@ -3,13 +3,13 @@ import type ts from "typescript";
 
 /** Reads the current server-side text for a document URI. */
 export const ReadFileRequest = {
-  type: new RequestType<TextDocumentIdentifier, string | null, never>("typeatlas/readFile"),
+  type: new RequestType<TextDocumentIdentifier, string | null, never>("type-atlas/readFile"),
 } as const;
 
 /** Returns the current server-side byte sizes for document URIs. */
 export const FileSizesRequest = {
   type: new RequestType<{ readonly uris: readonly string[] }, readonly (number | null)[], never>(
-    "typeatlas/fileSizes",
+    "type-atlas/fileSizes",
   ),
 } as const;
 
@@ -22,5 +22,5 @@ export const ResolveDependencySourceRequest = {
     },
     ts.ResolvedModuleFull | null,
     never
-  >("typeatlas/resolveDependencySource"),
+  >("type-atlas/resolveDependencySource"),
 } as const;

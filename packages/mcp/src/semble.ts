@@ -56,7 +56,7 @@ export type Semble = {
 
 export const createSemble = (): Semble => {
   const client = new Client({
-    name: "typeatlas",
+    name: "type-atlas",
     version: packageJson.version,
   });
   const transport = new StdioClientTransport({

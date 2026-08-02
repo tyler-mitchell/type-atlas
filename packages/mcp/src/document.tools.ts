@@ -1,5 +1,5 @@
 import { GetMatchTsConfigRequest } from "@volar/language-server/protocol.js";
-import { createTypeAtlas, projectDocumentSymbols } from "@typeatlas/core";
+import { createTypeAtlas, projectDocumentSymbols } from "@type-atlas/core";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { type } from "arktype";
 import { requestDiagnosticContext } from "./ambient-diagnostics.ts";
@@ -10,11 +10,11 @@ import {
   formatDocumentSymbols,
   formatProjectConfig,
   formatSelectionRanges,
-} from "@typeatlas/core/text";
+} from "@type-atlas/core/text";
 import { appendDiagnosticContext, textResult } from "./mcp-result.ts";
 import { registerTool } from "./tool.ts";
 import { fileInput, observedFileInput, positionInput } from "./tool-input.ts";
-import type { VolarWorkspacePool } from "@typeatlas/core";
+import type { VolarWorkspacePool } from "@type-atlas/core";
 
 const input = type.module({
   File: type(fileInput).onUndeclaredKey("reject"),

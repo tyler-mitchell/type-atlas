@@ -1,5 +1,5 @@
 {
-  "name": "@typeatlas/mcp",
+  "name": "@type-atlas/mcp",
   "version": "0.0.0",
   "description": "Editor-grade TypeScript, Markdown, and JSON intelligence for coding agents.",
   "keywords": [
@@ -11,30 +11,34 @@
     "markdown",
     "mcp",
     "model-context-protocol",
-    "typeatlas",
+    "type-atlas",
     "typescript",
     "volar"
   ],
-  "homepage": "https://github.com/tyler-mitchell/typeatlas/tree/main/packages/mcp",
+  "homepage": "https://github.com/tyler-mitchell/type-atlas#readme",
   "bugs": {
-    "url": "https://github.com/tyler-mitchell/typeatlas/issues"
+    "url": "https://github.com/tyler-mitchell/type-atlas/issues"
   },
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/tyler-mitchell/typeatlas.git",
+    "url": "git+https://github.com/tyler-mitchell/type-atlas.git",
     "directory": "packages/mcp"
   },
   "bin": {
-    "typeatlas": "./bin/typeatlas.cjs"
+    "type-atlas": "./bin/type-atlas.cjs"
   },
   "files": [
     "assets",
     "bin",
-    "dist"
+    "CHANGELOG.md",
+    "dist",
+    "LICENSE",
+    "README.md"
   ],
   "type": "module",
   "sideEffects": [
-    "./bin/typeatlas.cjs",
+    "./bin/type-atlas.cjs",
     "./dist/cli.js"
   ],
   "exports": {
@@ -56,8 +60,8 @@
   "dependencies": {
     "@modelcontextprotocol/client": "catalog:",
     "@modelcontextprotocol/server": "catalog:",
-    "@typeatlas/core": "workspace:*",
-    "@typeatlas/language-server": "workspace:*",
+    "@type-atlas/core": "workspace:*",
+    "@type-atlas/language-server": "workspace:*",
     "@volar/language-server": "catalog:",
     "arktype": "catalog:",
     "citty": "catalog:",
@@ -79,5 +83,6 @@
   },
   "engines": {
     "node": ">=22.20"
-  }
+  },
+  "mcpName": "io.github.tyler-mitchell/type-atlas"
 }

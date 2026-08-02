@@ -5,8 +5,8 @@ import {
   type Range,
   type TextDocumentIdentifier,
 } from "@volar/language-server/protocol.js";
-import { formatDiagnosticContext, formatDiagnostics } from "@typeatlas/core/text";
-import type { VolarWorkspace } from "@typeatlas/core";
+import { formatDiagnosticContext, formatDiagnostics } from "@type-atlas/core/text";
+import type { VolarWorkspace } from "@type-atlas/core";
 
 export type DiagnosticMode = boolean | "verbose";
 

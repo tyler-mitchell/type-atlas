@@ -11,7 +11,7 @@ import {
   TypeDefinitionRequest,
   type WorkspaceSymbol,
 } from "@volar/language-server/protocol.js";
-import { createTypeAtlas, inspectSymbol, page } from "@typeatlas/core";
+import { createTypeAtlas, inspectSymbol, page } from "@type-atlas/core";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { type } from "arktype";
 import { requestDiagnosticContext } from "./ambient-diagnostics.ts";
@@ -25,11 +25,11 @@ import {
   formatProjectScope,
   formatWorkspaceSymbolScope,
   formatWorkspaceSymbols,
-} from "@typeatlas/core/text";
+} from "@type-atlas/core/text";
 import { appendDiagnosticContext, textResult } from "./mcp-result.ts";
 import { registerTool } from "./tool.ts";
 import { fileInput, observedFileInput, positionInput } from "./tool-input.ts";
-import type { VolarWorkspacePool } from "@typeatlas/core";
+import type { VolarWorkspacePool } from "@type-atlas/core";
 
 const inspectOptions = {
   ...observedFileInput,

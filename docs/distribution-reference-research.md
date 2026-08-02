@@ -1,6 +1,6 @@
 # MCP distribution reference research
 
-Retrieved: 2026-07-30
+Retrieved: 2026-07-30; primary contracts revalidated 2026-08-02
 
 ## Objective
 
@@ -28,14 +28,14 @@ required access to a user's local working tree.
 
 ## Candidate coverage
 
-| Candidate | Why examine it | Status |
-| --- | --- | --- |
-| Microsoft Playwright MCP | Mature local stdio server with broad client setup | Reviewed |
-| Chrome DevTools MCP | Modern official npm-distributed local MCP | Reviewed |
-| Context7 | Popular npm MCP with local and hosted installation paths | Reviewed |
-| GitHub MCP Server | Polished multi-client distribution with binary/container/remote modes | Reviewed; not comparable |
-| Sentry MCP | Strong hosted install and client onboarding | Reviewed; not comparable |
-| Official MCP Registry and MCPB | Canonical discovery and bundle formats | Reviewed |
+| Candidate                      | Why examine it                                                        | Status                   |
+| ------------------------------ | --------------------------------------------------------------------- | ------------------------ |
+| Microsoft Playwright MCP       | Mature local stdio server with broad client setup                     | Reviewed                 |
+| Chrome DevTools MCP            | Modern official npm-distributed local MCP                             | Reviewed                 |
+| Context7                       | Popular npm MCP with local and hosted installation paths              | Reviewed                 |
+| GitHub MCP Server              | Polished multi-client distribution with binary/container/remote modes | Reviewed; not comparable |
+| Sentry MCP                     | Strong hosted install and client onboarding                           | Reviewed; not comparable |
+| Official MCP Registry and MCPB | Canonical discovery and bundle formats                                | Reviewed                 |
 
 ## Current synthesis
 
@@ -196,23 +196,23 @@ Evidence:
 Verified against current client documentation and source on 2026-07-30:
 
 - Canonical runtime command:
-  `npx -y @typeatlas/mcp@latest`.
+  `npx -y @type-atlas/mcp@latest`.
 - Codex:
-  `codex mcp add typeatlas -- npx -y @typeatlas/mcp@latest`.
+  `codex mcp add type-atlas -- npx -y @type-atlas/mcp@latest`.
   Codex's current CLI source declares the stdio form as
   `codex mcp add [OPTIONS] <NAME> -- <COMMAND>...`.
 - Claude Code, user scope:
-  `claude mcp add --scope user typeatlas -- npx -y @typeatlas/mcp@latest`.
+  `claude mcp add --scope user type-atlas -- npx -y @type-atlas/mcp@latest`.
   Claude documents that all options precede the server name and `--` separates
   the executable and its arguments.
 - VS Code:
-  `code --add-mcp '{"name":"typeatlas","command":"npx","args":["-y","@typeatlas/mcp@latest"]}'`.
+  `code --add-mcp '{"name":"type-atlas","command":"npx","args":["-y","@type-atlas/mcp@latest"]}'`.
   Publishing to the MCP Registry also makes gallery-based discovery possible
   for clients that consume the Registry.
 - Other stdio clients receive the same command and arguments through their
   native installer, install link, or standard configuration shape.
 - On Windows, clients that cannot launch npm's command shim directly should use
-  `cmd /c npx -y @typeatlas/mcp@latest`. This is a host registration concern,
+  `cmd /c npx -y @type-atlas/mcp@latest`. This is a host registration concern,
   not a separate Type Atlas runtime.
 
 Evidence:
@@ -221,28 +221,31 @@ Evidence:
 - <https://code.claude.com/docs/en/mcp>
 - <https://code.visualstudio.com/docs/agent-customization/mcp-servers>
 
-## Type Atlas distribution gap
+## Implemented distribution contract
 
-The existing package already has the correct basic shape: scoped npm identity,
-one `typeatlas` binary, a small package allowlist, Changesets, and npm trusted
-publishing permissions. The remaining first-release distribution work is
-bounded:
+| Build need                   | Owning artifact                                       | Contract                                                                 | Status         |
+| ---------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------ | -------------- |
+| Executable package           | `packages/mcp/package.json`                           | `@type-atlas/mcp` exposes `type-atlas`; packed files are allowlisted     | runtime-proven |
+| Registry discovery           | `server.json`                                         | `io.github.tyler-mitchell/type-atlas` resolves to the npm stdio package  | runtime-proven |
+| Version identity             | `scripts/sync-server-manifest.ts`                     | Changesets versions the suite; the version command synchronizes Registry | runtime-proven |
+| Packed consumer verification | `packages/mcp/scripts/verify-distribution.ts`         | pack all packages, install them cleanly, run the CLI, list MCP tools     | runtime-proven |
+| Cross-platform verification  | `.github/workflows/ci.yml`                            | the packed consumer path runs on Linux, macOS, and Windows               | generated      |
+| Secure publication           | `.github/workflows/release.yml`                       | npm publishes with OIDC before Registry publication with GitHub OIDC     | generated      |
+| Consumer setup               | `README.md` and `packages/mcp/README.md`              | native client commands resolve to the same npm executable                | observed       |
+| Change discipline            | `AGENTS.md`, `CONTRIBUTING.md`, `.skills/cli-release` | public changes carry Changesets; generated versions are not hand-edited  | observed       |
 
-1. Add the Registry identity to `packages/mcp/package.json` and add a matching
-   `server.json`.
-2. Include the project README and license in the published tarball. The current
-   `npm pack --dry-run --json` contains the runtime, declarations, maps, icon,
-   and manifest, but neither document.
-3. Add an explicit package-content verification step derived from Chrome
-   DevTools MCP before publication.
-4. Publish the MCP Registry record after npm publication using GitHub OIDC.
-5. Make the root README lead with the canonical `npx -y` runtime plus the native
-   Codex and Claude commands. Put the generic JSON shape and less common clients
-   after those paths.
-6. Verify the documented install from a clean consumer on macOS/Linux and
-   Windows rather than only invoking the workspace build.
+The local verification command exercises the distributed artifact rather than
+the workspace entrypoint:
 
-A custom `typeatlas setup` command is not justified for the first release.
+```sh
+pnpm check:distribution
+```
+
+```text
+Packed packages install cleanly and expose the Type Atlas MCP.
+```
+
+A custom `type-atlas setup` command is not justified for the first release.
 Codex, Claude Code, and VS Code already own their configuration formats and
 provide native registration commands. If direct usage later shows that client
 selection is still a real barrier, a setup command may orchestrate those native
@@ -264,10 +267,10 @@ The desired user experience is:
 
 ```sh
 # Codex
-codex mcp add typeatlas -- npx -y @typeatlas/mcp@latest
+codex mcp add type-atlas -- npx -y @type-atlas/mcp@latest
 
 # Claude Code
-claude mcp add --scope user typeatlas -- npx -y @typeatlas/mcp@latest
+claude mcp add --scope user type-atlas -- npx -y @type-atlas/mcp@latest
 ```
 
 Every other supported client should resolve to the same npm executable. There

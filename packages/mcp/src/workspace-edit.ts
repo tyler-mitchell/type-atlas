@@ -6,8 +6,8 @@ import {
 } from "vscode-languageserver-protocol";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import { URI } from "vscode-uri";
-import { workspacePath } from "@typeatlas/core/text";
-import type { VolarWorkspace } from "@typeatlas/core";
+import { workspacePath } from "@type-atlas/core/text";
+import type { VolarWorkspace } from "@type-atlas/core";
 
 export type FileMove = {
   readonly oldUri: string;

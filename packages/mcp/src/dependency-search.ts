@@ -1,6 +1,10 @@
-import { listModuleExports, type ModuleExportPage, type VolarWorkspacePool } from "@typeatlas/core";
-import { formatModuleDeclarations, workspacePath } from "@typeatlas/core/text";
-import { ResolveDependencySourceRequest } from "@typeatlas/language-server/protocol";
+import {
+  listModuleExports,
+  type ModuleExportPage,
+  type VolarWorkspacePool,
+} from "@type-atlas/core";
+import { formatModuleDeclarations, workspacePath } from "@type-atlas/core/text";
+import { ResolveDependencySourceRequest } from "@type-atlas/language-server/protocol";
 import * as path from "pathe";
 import PQueue from "p-queue";
 import { URI } from "vscode-uri";

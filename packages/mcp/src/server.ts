@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/server";
 import { serveStdio } from "@modelcontextprotocol/server/stdio";
-import { createVolarWorkspaces } from "@typeatlas/core";
+import { createVolarWorkspaces } from "@type-atlas/core";
 import { serverInfo } from "./metadata.ts";
 import { createSemble, type Semble } from "./semble.ts";
 import { registerTools } from "./tools.ts";
@@ -22,7 +22,7 @@ const createServer = (
 /** Starts the MCP server over standard input and output. */
 export const startMcpServer = (): void => {
   const workspaces = createVolarWorkspaces(
-    new URL(import.meta.resolve("@typeatlas/language-server/node")),
+    new URL(import.meta.resolve("@type-atlas/language-server/node")),
   );
   const semble = createSemble();
   const handle = serveStdio(() => createServer(workspaces, semble), {

@@ -35,7 +35,8 @@ jobs:
           package-manager-cache: false
           registry-url: https://registry.npmjs.org
       - run: pnpm install --frozen-lockfile
-      - uses: changesets/action@63a615b9cd06ba9a3e6d13796c7fbcb080a60a0b # v1
+      - id: changesets
+        uses: changesets/action@63a615b9cd06ba9a3e6d13796c7fbcb080a60a0b # v1
         with:
           commitMode: github-api
           publish: pnpm release
@@ -43,3 +44,20 @@ jobs:
           version: pnpm release:version
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install MCP Registry publisher
+        if: steps.changesets.outputs.published == 'true'
+        env:
+          MCP_PUBLISHER_VERSION: v1.8.0
+        run: |
+          curl --fail --location --silent --show-error \
+            "https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}/mcp-publisher_linux_amd64.tar.gz" \
+            | tar xz mcp-publisher
+      - name: Validate MCP Registry metadata
+        if: steps.changesets.outputs.published == 'true'
+        run: ./mcp-publisher validate
+      - name: Authenticate to the MCP Registry
+        if: steps.changesets.outputs.published == 'true'
+        run: ./mcp-publisher login github-oidc
+      - name: Publish to the MCP Registry
+        if: steps.changesets.outputs.published == 'true'
+        run: ./mcp-publisher publish

@@ -8,10 +8,10 @@ const packageRoot = fileURLToPath(new URL("..", import.meta.url));
 const workspaceRoot = resolve(packageRoot, "../..");
 
 test("serves workspace files through the packaged stdio entrypoint", async () => {
-  const client = new Client({ name: "typeatlas-test", version: "1.0.0" });
+  const client = new Client({ name: "type-atlas-test", version: "1.0.0" });
   const transport = new StdioClientTransport({
     command: process.execPath,
-    args: ["bin/typeatlas.cjs"],
+    args: ["bin/type-atlas.cjs"],
     cwd: packageRoot,
     stderr: "pipe",
   });
@@ -31,7 +31,7 @@ test("serves workspace files through the packaged stdio entrypoint", async () =>
 
     expect(content).toMatchObject({
       type: "text",
-      text: expect.stringContaining('"name": "@typeatlas/mcp"'),
+      text: expect.stringContaining('"name": "@type-atlas/mcp"'),
     });
 
     const structure = await client.callTool({

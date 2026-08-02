@@ -27,7 +27,7 @@ import {
   WatchKind,
 } from "vscode-languageserver-protocol/node.js";
 import { isFileInDir } from "@volar/language-server/node.js";
-import { ReadFileRequest } from "@typeatlas/language-server/protocol";
+import { ReadFileRequest } from "@type-atlas/language-server/protocol";
 import { URI } from "vscode-uri";
 import { clientCapabilities, getClientConfiguration } from "./language-client.ts";
 import { containingGitSubmodule, findGitSubmoduleRoots } from "./git-submodules.ts";

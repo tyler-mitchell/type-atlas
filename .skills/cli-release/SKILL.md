@@ -1,11 +1,11 @@
 ---
 name: cli-release
-description: Release the Type Atlas npm package suite through Changesets and the GitHub Actions trusted-publishing workflow. Use when adding release notes, preparing or reviewing a version pull request, publishing a release, verifying published artifacts, or recovering an interrupted Type Atlas release.
+description: Release the Type Atlas npm package suite and MCP Registry record through Changesets and GitHub OIDC. Use when finalizing a public package change, preparing or reviewing a version pull request, publishing a release, verifying published artifacts, or recovering an interrupted Type Atlas release.
 ---
 
 # Release Type Atlas
 
-Release `@typeatlas/core`, `@typeatlas/language-server`, and `@typeatlas/mcp`
+Release `@type-atlas/core`, `@type-atlas/language-server`, and `@type-atlas/mcp`
 as one fixed-version package suite. Keep versions, changelogs, tags, and npm
 publication under Changesets ownership.
 
@@ -21,6 +21,11 @@ Select every package whose public behavior changed and choose the appropriate
 SemVer impact. Write the summary for package consumers. Commit the generated
 `.changeset/*.md` file with the implementation.
 
+A change is releasable when it can alter a package's API, MCP tool contract,
+runtime behavior, output, dependencies, executable, metadata, packed contents,
+installation, or update experience. Record the Changeset before declaring the
+implementation complete; do not defer it to the version pull request.
+
 Do not add a changeset for repository-only maintenance that cannot affect a
 published package.
 
@@ -29,6 +34,7 @@ Before merging, run:
 ```sh
 pnpm install --frozen-lockfile
 pnpm check
+pnpm check:distribution
 pnpm changeset status
 ```
 
@@ -49,25 +55,34 @@ Review that pull request for:
 - the expected lockfile changes;
 - removal of the consumed changeset files.
 
-Merge the version pull request. The same workflow then runs `pnpm release`,
-which validates the repository and publishes the packages in dependency order.
-Do not publish the packages individually or create release tags manually.
+Merging the version pull request makes the same workflow run `pnpm release`,
+which validates the repository and packed consumer experience before publishing
+the packages in dependency order. After npm succeeds, the workflow authenticates
+to the MCP Registry with GitHub OIDC and publishes the version-matched
+`server.json`. Do not publish packages individually, publish Registry metadata
+before npm, or create release tags manually.
 
 ## Verify the release
 
 Confirm that npm exposes the same version for the complete suite:
 
 ```sh
-npm view @typeatlas/language-server version
-npm view @typeatlas/core version
-npm view @typeatlas/mcp version
+npm view @type-atlas/language-server version
+npm view @type-atlas/core version
+npm view @type-atlas/mcp version
 ```
 
 Confirm that a clean consumer can resolve the CLI:
 
 ```sh
-npx --yes @typeatlas/mcp@latest --help
+npx --yes @type-atlas/mcp@latest --help
 ```
+
+Confirm that the MCP Registry exposes the same release under
+`io.github.tyler-mitchell/type-atlas`. A missing Registry entry after successful
+npm publication is an interrupted release; manually dispatch the `Release`
+workflow from the version commit after correcting Registry authentication or
+metadata.
 
 Treat a partial suite publication as an interrupted release. Correct the
 publishing configuration, then manually dispatch the `Release` workflow from
@@ -82,33 +97,28 @@ behavior. Publish a follow-up patch changeset instead.
 Complete these owner-controlled requirements before the first automated
 release:
 
-1. Make `tyler-mitchell/typeatlas` public and ensure every package
+1. Own or create the `type-atlas` organization on npm and confirm the release
+   maintainer can publish public packages under the `@type-atlas` scope.
+2. Make `tyler-mitchell/type-atlas` public and ensure every package
    `repository.url` exactly matches it.
-2. Add the selected open-source license to the repository and package
-   manifests.
+3. Confirm that the Apache-2.0 license is present in every packed package.
 
 npm cannot configure a trusted publisher until a package exists. Bootstrap
-each name once from an empty directory outside this repository:
+the package names with the verified `0.0.0` suite rather than publishing empty
+placeholder packages:
 
 ```sh
-mkdir typeatlas-package-bootstrap
-cd typeatlas-package-bootstrap
-npm init --yes
-npm pkg set name=@typeatlas/core version=0.0.0
-npm publish --access public
-npm pkg set name=@typeatlas/language-server
-npm publish --access public
-npm pkg set name=@typeatlas/mcp
-npm publish --access public
-cd ..
-rm -rf typeatlas-package-bootstrap
+npm login
+pnpm install --frozen-lockfile
+pnpm check:distribution
+pnpm --recursive publish --access public
 ```
 
 Then configure a GitHub Actions trusted publisher in the npm package settings
 for each package:
 
 - owner: `tyler-mitchell`
-- repository: `typeatlas`
+- repository: `type-atlas`
 - workflow: `release.yml`
 - environment: leave empty
 - allowed action: `npm publish`
@@ -117,4 +127,6 @@ After one successful OIDC release, require two-factor authentication and
 disallow token-based publication for every package.
 
 The release workflow must retain `id-token: write`, use a GitHub-hosted runner,
-and install npm 11.5.1 or newer. Do not add a long-lived npm publication token.
+and install npm 11.5.1 or newer. The MCP Registry publisher also uses GitHub
+OIDC and requires no repository secret. Do not add a long-lived npm or MCP
+Registry publication token.

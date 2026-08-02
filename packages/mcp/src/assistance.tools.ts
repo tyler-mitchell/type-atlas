@@ -4,7 +4,7 @@ import {
   InlayHintRequest,
   SignatureHelpRequest,
 } from "@volar/language-server/protocol.js";
-import { createTypeAtlas, listModuleExports } from "@typeatlas/core";
+import { createTypeAtlas, listModuleExports } from "@type-atlas/core";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { type } from "arktype";
 import { requestDiagnosticContext } from "./ambient-diagnostics.ts";
@@ -15,11 +15,11 @@ import {
   formatInlayHints,
   formatModuleExports,
   formatSignatureHelp,
-} from "@typeatlas/core/text";
+} from "@type-atlas/core/text";
 import { appendDiagnosticContext, textResult } from "./mcp-result.ts";
 import { registerTool } from "./tool.ts";
 import { observedFileInput, positionInput, rangeInput } from "./tool-input.ts";
-import type { VolarWorkspacePool } from "@typeatlas/core";
+import type { VolarWorkspacePool } from "@type-atlas/core";
 
 const input = type.module({
   Position: type({

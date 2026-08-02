@@ -1,4 +1,4 @@
-import { ResolveDependencySourceRequest } from "@typeatlas/language-server/protocol";
+import { ResolveDependencySourceRequest } from "@type-atlas/language-server/protocol";
 import {
   type CompletionItem,
   CompletionItemKind,
@@ -122,7 +122,7 @@ export const listModuleExports = async ({
 }): Promise<ModuleExportPage> => {
   const uri = workspace.getWorkspaceUri(fromFile);
   const parsedUri = URI.parse(uri);
-  const probeUri = parsedUri.with({ path: `${parsedUri.path}.typeatlas.ts` }).toString();
+  const probeUri = parsedUri.with({ path: `${parsedUri.path}.type-atlas.ts` }).toString();
   const effectiveSurface = type || path.length ? "runtime" : surface;
   const { source, position, definitionPosition } = probe({
     moduleName,

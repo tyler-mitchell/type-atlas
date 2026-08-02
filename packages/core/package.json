@@ -1,5 +1,5 @@
 {
-  "name": "@typeatlas/core",
+  "name": "@type-atlas/core",
   "version": "0.0.0",
   "description": "Headless TypeScript, Markdown, and JSON code intelligence powered by Volar.js.",
   "keywords": [
@@ -10,17 +10,21 @@
     "typescript",
     "volar"
   ],
-  "homepage": "https://github.com/tyler-mitchell/typeatlas/tree/main/packages/core",
+  "homepage": "https://github.com/tyler-mitchell/type-atlas/tree/main/packages/core",
   "bugs": {
-    "url": "https://github.com/tyler-mitchell/typeatlas/issues"
+    "url": "https://github.com/tyler-mitchell/type-atlas/issues"
   },
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/tyler-mitchell/typeatlas.git",
+    "url": "git+https://github.com/tyler-mitchell/type-atlas.git",
     "directory": "packages/core"
   },
   "files": [
-    "dist"
+    "CHANGELOG.md",
+    "dist",
+    "LICENSE",
+    "README.md"
   ],
   "type": "module",
   "sideEffects": false,
@@ -65,7 +69,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@typeatlas/language-server": "workspace:*",
+    "@type-atlas/language-server": "workspace:*",
     "@volar/language-server": "catalog:",
     "chokidar": "catalog:",
     "p-queue": "catalog:",

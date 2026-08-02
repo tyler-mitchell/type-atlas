@@ -1,4 +1,4 @@
-import type { VolarWorkspacePool } from "@typeatlas/core";
+import type { VolarWorkspacePool } from "@type-atlas/core";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { type } from "arktype";
 import { createDependencySearch } from "./dependency-search.ts";

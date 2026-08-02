@@ -8,10 +8,10 @@ import {
 } from "@volar/language-server/protocol.js";
 import { type } from "arktype";
 import { readOnlyToolAnnotations } from "./metadata.ts";
-import { formatProjectScope } from "@typeatlas/core/text";
+import { formatProjectScope } from "@type-atlas/core/text";
 import { textResult } from "./mcp-result.ts";
 import { fileInput, positionInput } from "./tool-input.ts";
-import type { VolarWorkspacePool } from "@typeatlas/core";
+import type { VolarWorkspacePool } from "@type-atlas/core";
 import { type FileMove, renderWorkspaceEdit } from "./workspace-edit.ts";
 import { formatPatchResult } from "./edit-result.ts";
 import { registerTool } from "./tool.ts";

@@ -13,7 +13,7 @@ afterEach(async () => {
 
 describe("git submodules", () => {
   it("derives nested workspace boundaries from Git configuration", async () => {
-    const root = await mkdtemp(path.join(tmpdir(), "typeatlas-submodules-"));
+    const root = await mkdtemp(path.join(tmpdir(), "type-atlas-submodules-"));
     temporaryRoots.add(root);
     await writeFile(
       path.join(root, ".gitmodules"),

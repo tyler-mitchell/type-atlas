@@ -1,6 +1,6 @@
-import { createTypeAtlas, type VolarWorkspacePool } from "@typeatlas/core";
-import { formatFoldedSource } from "@typeatlas/core/folded-source";
-import { workspacePath } from "@typeatlas/core/text";
+import { createTypeAtlas, type VolarWorkspacePool } from "@type-atlas/core";
+import { formatFoldedSource } from "@type-atlas/core/folded-source";
+import { workspacePath } from "@type-atlas/core/text";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { type } from "arktype";
 import { createReadStream } from "node:fs";

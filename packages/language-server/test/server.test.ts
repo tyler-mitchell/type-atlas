@@ -39,7 +39,7 @@ describe("language server", () => {
     await writeFile(file, "export const value = 1;\n");
 
     const handle = startLanguageServer(
-      path.join(packageRoot, "bin", "typeatlas-language-server.cjs"),
+      path.join(packageRoot, "bin", "type-atlas-language-server.cjs"),
       packageRoot,
     );
     try {

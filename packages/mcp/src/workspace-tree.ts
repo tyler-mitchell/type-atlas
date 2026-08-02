@@ -1,5 +1,5 @@
 import { realpath } from "node:fs/promises";
-import { containingGitSubmodule, findGitSubmoduleRoots } from "@typeatlas/core";
+import { containingGitSubmodule, findGitSubmoduleRoots } from "@type-atlas/core";
 import { isFileInDir } from "@volar/language-server/node.js";
 import { fdir } from "fdir";
 import { isGitIgnored } from "globby";

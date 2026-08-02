@@ -1,4 +1,4 @@
-import { FileSizesRequest } from "@typeatlas/language-server/protocol";
+import { FileSizesRequest } from "@type-atlas/language-server/protocol";
 import {
   DefinitionRequest,
   DocumentDiagnosticRequest,

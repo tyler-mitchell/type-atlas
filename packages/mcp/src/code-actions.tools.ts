@@ -11,8 +11,8 @@ import {
   Range,
   type TextDocumentIdentifier,
 } from "@volar/language-server/protocol.js";
-import type { VolarWorkspace, VolarWorkspacePool } from "@typeatlas/core";
-import { diagnosticIntersects } from "@typeatlas/core/text";
+import type { VolarWorkspace, VolarWorkspacePool } from "@type-atlas/core";
+import { diagnosticIntersects } from "@type-atlas/core/text";
 import { type } from "arktype";
 import { formatPatchResult } from "./edit-result.ts";
 import { appendDiagnosticContext, textResult } from "./mcp-result.ts";

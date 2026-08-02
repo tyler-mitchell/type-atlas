@@ -1,6 +1,6 @@
 import { CompletionItemKind } from "vscode-languageserver-protocol";
 import { expect, test, vi } from "vitest";
-import type { VolarWorkspacePool } from "@typeatlas/core";
+import type { VolarWorkspacePool } from "@type-atlas/core";
 import { createDependencySearch } from "../src/dependency-search.ts";
 import type { Semble } from "../src/semble.ts";
 

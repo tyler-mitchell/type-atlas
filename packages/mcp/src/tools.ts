@@ -8,7 +8,7 @@ import { registerNavigationTools } from "./navigation.tools.ts";
 import { registerReadFileTool } from "./read_file.tool.ts";
 import { registerWorkspaceTools } from "./workspace.tools.ts";
 import type { Semble } from "./semble.ts";
-import type { VolarWorkspacePool } from "@typeatlas/core";
+import type { VolarWorkspacePool } from "@type-atlas/core";
 
 export const registerTools = (
   server: McpServer,

@@ -5,7 +5,7 @@ import { expect, test, vi } from "vitest";
 import { registerTool } from "../src/tool.ts";
 
 test("ends tool calls at the server deadline without closing the session", async () => {
-  const server = new McpServer({ name: "typeatlas-test", version: "1.0.0" });
+  const server = new McpServer({ name: "type-atlas-test", version: "1.0.0" });
   registerTool(
     server,
     "wait",
@@ -19,7 +19,7 @@ test("ends tool calls at the server deadline without closing the session", async
     ({ text }) => ({ content: [{ type: "text", text }] }),
   );
 
-  const client = new Client({ name: "typeatlas-test", version: "1.0.0" });
+  const client = new Client({ name: "type-atlas-test", version: "1.0.0" });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   await Promise.all([client.connect(clientTransport), server.connect(serverTransport)]);
 
