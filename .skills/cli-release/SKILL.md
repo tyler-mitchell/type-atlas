@@ -9,6 +9,16 @@ Release `@type-atlas/core`, `@type-atlas/language-server`, and `@type-atlas/mcp`
 as one fixed-version package suite. Keep versions, changelogs, tags, and npm
 publication under Changesets ownership.
 
+## Interpret the request
+
+- `commit` means finalize the in-scope source change, add its Changeset when
+  consumer-visible, stage the intended commit, run `pnpm check:changeset`, and
+  commit. Do not push or publish unless requested.
+- `push` means push the prepared commit. Allow the version pull request to be
+  created or updated, but do not merge it unless release was requested.
+- `release` means carry the prepared change through the version pull request,
+  npm publication, MCP Registry publication, and public verification.
+
 ## Record a releasable change
 
 Run:
@@ -33,9 +43,7 @@ Before merging, run:
 
 ```sh
 pnpm install --frozen-lockfile
-pnpm check
-pnpm check:distribution
-pnpm changeset status
+pnpm release:preflight
 ```
 
 Do not edit package versions or changelogs manually. The fixed Changesets group

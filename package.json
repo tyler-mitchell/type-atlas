@@ -6,13 +6,15 @@
   "scripts": {
     "build": "pnpm --recursive --if-present run build",
     "check": "pnpm lint && pnpm check-types && pnpm test",
+    "check:changeset": "changeset status --since=HEAD",
     "check:distribution": "pnpm build && node packages/mcp/scripts/verify-distribution.ts",
     "check-types": "pnpm build && pnpm --recursive --if-present run check-types",
     "changeset": "changeset",
     "dev": "pnpm --filter @type-atlas/mcp run dev",
     "format": "oxlint --fix . && oxfmt .",
     "lint": "oxlint . && oxfmt --check .",
-    "release": "pnpm check && node packages/mcp/scripts/verify-distribution.ts && changeset publish",
+    "release": "pnpm release:preflight && changeset publish",
+    "release:preflight": "pnpm check && node packages/mcp/scripts/verify-distribution.ts && changeset status",
     "release:version": "changeset version && node scripts/sync-server-manifest.ts && pnpm install --lockfile-only --no-frozen-lockfile",
     "test": "pnpm --recursive --if-present run test"
   },

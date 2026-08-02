@@ -25,8 +25,11 @@ MCP Output Design:
 - If type-like exports matter, expose an explicit opt-in such as `surface="all"` instead of making type-heavy output the default.
 
 Release Discipline:
+- Treat a request to commit as authorization to finalize and commit only. Before committing, classify the in-scope change, add an accurate Changeset for every consumer-visible package change, stage the intended commit, and run `pnpm check:changeset`. A commit request does not authorize pushing, merging the version pull request, or publishing.
+- Treat a request to push as authorization to push the prepared commit. The release workflow may create or update the Changesets version pull request, but do not merge it without an explicit release request.
+- Treat an explicit request to release as authorization to carry the prepared change through the Changesets version pull request, npm publication, MCP Registry publication, and public verification. Follow `.skills/cli-release/SKILL.md` through completion.
 - Before finalizing any consumer-visible change under `packages/`, add a Changeset in the same change. This includes MCP tools, schemas, output, metadata, executables, runtime behavior, dependencies, and installation behavior.
 - Select every directly affected package and describe the change for package consumers. Use patch for compatible fixes, minor for compatible capabilities, and major for incompatible public changes.
 - Do not add a Changeset only when the work cannot affect a packed package or its consumers. Treat build, packaging, and release changes as consumer-visible when they can alter published artifacts.
 - Never edit package versions, changelogs, or Registry versions manually. Changesets owns package versions and changelogs; `pnpm release:version` synchronizes `server.json`.
-- Before handing off a distribution or release change, run `pnpm check:distribution` in addition to the normal repository checks.
+- Before handing off a distribution change, run `pnpm check:distribution` in addition to the normal repository checks. Before publication, run `pnpm release:preflight`.

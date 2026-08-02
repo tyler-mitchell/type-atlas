@@ -26,6 +26,17 @@ Repository-only maintenance that cannot affect packed artifacts or consumers
 does not require a Changeset. Do not use that exemption for tests or build
 changes that expose a release defect.
 
+Before committing, stage the intended commit and verify it with Changesets'
+native comparison:
+
+```sh
+pnpm check:changeset
+```
+
+This fails when a public package changed without a Changeset. For package-local
+work that intentionally has no release impact, record that decision with
+`pnpm changeset add --empty`.
+
 Before a change is ready for review:
 
 ```sh
@@ -36,6 +47,10 @@ pnpm changeset status
 Do not edit package versions or changelogs manually.
 
 ## Releases
+
+A commit or push request does not authorize publication. An explicit release
+request carries the prepared change through the version pull request and public
+verification.
 
 Changesets opens a version pull request after unreleased Changesets reach
 `main`. Merging that pull request publishes the fixed package suite to npm with
