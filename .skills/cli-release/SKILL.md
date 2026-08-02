@@ -114,14 +114,22 @@ pnpm check:distribution
 pnpm --recursive publish --access public
 ```
 
-Then configure a GitHub Actions trusted publisher in the npm package settings
-for each package:
+Configure each package's GitHub Actions trusted publisher with npm's supported
+CLI. Use a current npm release under a supported Node LTS rather than delegating
+this routine setup to the npm website:
 
-- owner: `tyler-mitchell`
-- repository: `type-atlas`
-- workflow: `release.yml`
-- environment: leave empty
-- allowed action: `npm publish`
+```sh
+npx --yes --package=node@24 --package=npm@latest -c 'npm trust github @type-atlas/language-server --file release.yml --repository tyler-mitchell/type-atlas --allow-publish --yes'
+npx --yes --package=node@24 --package=npm@latest -c 'npm trust github @type-atlas/core --file release.yml --repository tyler-mitchell/type-atlas --allow-publish --yes'
+npx --yes --package=node@24 --package=npm@latest -c 'npm trust github @type-atlas/mcp --file release.yml --repository tyler-mitchell/type-atlas --allow-publish --yes'
+```
+
+The first settings mutation may require a one-time npm browser approval. Select
+npm's short-lived option to skip repeated challenges and run all three commands
+inside that authenticated window. Each command's successful creation response
+is the setup evidence; the first automated OIDC publication is the end-to-end
+verification. Do not invoke `npm trust list` as routine verification because npm
+requires another proof-of-presence challenge for that settings read.
 
 After one successful OIDC release, require two-factor authentication and
 disallow token-based publication for every package.
