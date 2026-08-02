@@ -62,7 +62,10 @@
     "arktype": "catalog:",
     "citty": "catalog:",
     "diff": "catalog:",
+    "fdir": "catalog:",
+    "globby": "catalog:",
     "pathe": "catalog:",
+    "picomatch": "catalog:",
     "vscode-languageserver-protocol": "catalog:",
     "vscode-languageserver-textdocument": "catalog:",
     "vscode-uri": "catalog:"

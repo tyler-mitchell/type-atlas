@@ -6,6 +6,7 @@ import { registerEditingTools } from "./editing.tools.ts";
 import { registerIntelligenceTools } from "./intelligence.tools.ts";
 import { registerNavigationTools } from "./navigation.tools.ts";
 import { registerReadFileTool } from "./read_file.tool.ts";
+import { registerWorkspaceTools } from "./workspace.tools.ts";
 import type { Semble } from "./semble.ts";
 import type { VolarWorkspacePool } from "@typeatlas/core";
 
@@ -15,6 +16,7 @@ export const registerTools = (
   semble: Semble,
 ): void => {
   registerReadFileTool(server, workspaces);
+  registerWorkspaceTools(server);
   registerDocumentTools(server, workspaces);
   registerAssistanceTools(server, workspaces);
   registerNavigationTools(server, workspaces);
