@@ -1,5 +1,13 @@
 # @type-atlas/mcp
 
+## 0.1.1
+
+### Patch Changes
+
+- b37d065: Clarify automatic updates and exact-version pinning in the MCP installation guide.
+  - @type-atlas/core@0.1.1
+  - @type-atlas/language-server@0.1.1
+
 ## 0.1.0
 
 ### Minor Changes
