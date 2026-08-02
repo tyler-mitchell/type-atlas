@@ -4,6 +4,6 @@
 "@type-atlas/mcp": minor
 ---
 
-Add bounded workspace structure navigation and harden code-intelligence,
-dependency-discovery, editing, freshness, and agent-facing output behavior for
-production repository use.
+Add bounded, Windows-safe workspace structure navigation and harden
+code-intelligence, dependency-discovery, editing, freshness, and agent-facing
+output behavior for production repository use.

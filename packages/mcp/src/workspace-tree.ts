@@ -24,7 +24,10 @@ export const workspaceTree = async (input: {
   if (directory !== root && !isFileInDir(directory, root)) {
     throw new Error(`Directory is outside the workspace: ${input.directory}`);
   }
-  const [realRoot, realDirectory] = await Promise.all([realpath(root), realpath(directory)]);
+  const [realRoot, realDirectory] = await Promise.all([
+    realpath(root).then(path.normalize),
+    realpath(directory).then(path.normalize),
+  ]);
   if (realDirectory !== realRoot && !isFileInDir(realDirectory, realRoot)) {
     throw new Error(`Directory resolves outside the workspace: ${input.directory}`);
   }
