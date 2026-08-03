@@ -15,6 +15,8 @@ import {
 import type { Position } from "vscode-languageserver-protocol";
 import type { VolarWorkspace } from "./volar-workspace.ts";
 
+const sourceCodeUri = /\.(?:[cm]?[jt]s|[jt]sx)$/i;
+
 /**
  * Creates project-aware language operations backed by an active workspace.
  *
@@ -133,7 +135,11 @@ export const createTypeAtlas = (workspace: VolarWorkspace) => ({
     const textDocument = await workspace.getTextDocument(file);
     const project = await workspace.sendRequest(GetMatchTsConfigRequest.type, textDocument, signal);
     const symbols = await workspace.sendRequest(WorkspaceSymbolRequest.type, { query }, signal);
-    return { textDocument, project, symbols };
+    return {
+      textDocument,
+      project,
+      symbols: symbols?.filter((symbol) => sourceCodeUri.test(symbol.location.uri)) ?? symbols,
+    };
   },
 });
 

@@ -298,6 +298,11 @@ export const formatSelectionRanges = (
     ]),
   ].join("\n");
 
+const workspaceSymbolLabel = (value: string) => {
+  const line = value.replace(/\s+/g, " ").trim();
+  return line.length <= 200 ? line : `${line.slice(0, 199)}…`;
+};
+
 const workspaceSymbolText = (
   symbol: WorkspaceSymbol | SymbolInformation,
   workspaceRoot: string,
@@ -307,9 +312,9 @@ const workspaceSymbolText = (
     "range" in location && location.range
       ? workspaceRange(location.uri, location.range, workspaceRoot)
       : workspacePath(location.uri, workspaceRoot);
-  return `${symbol.name} [${symbolKind(symbol.kind)}]${deprecatedSymbol(
+  return `${workspaceSymbolLabel(symbol.name)} [${symbolKind(symbol.kind)}]${deprecatedSymbol(
     symbol,
-  )} ${target}${symbol.containerName ? ` — ${symbol.containerName}` : ""}`;
+  )} ${target}${symbol.containerName ? ` — ${workspaceSymbolLabel(symbol.containerName)}` : ""}`;
 };
 
 export const formatWorkspaceSymbols = (
