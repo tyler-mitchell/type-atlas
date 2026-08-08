@@ -44,6 +44,16 @@ const matchesWatcher = (watcher: FileSystemWatcher, relativePath: string, type: 
     0 &&
   path.matchesGlob(relativePath, watcher.globPattern);
 
+/**
+ * How long an unused workspace keeps its language server.
+ *
+ * Reloading a disposed workspace rebuilds its TypeScript program, which costs
+ * seconds on a monorepo, so this has to outlast the gaps between an agent's
+ * calls. Agents pause far longer than a person typing: they reason between
+ * tool calls and interleave reads, edits, and shell commands.
+ */
+const idleWorkspaceTimeout = 30 * 60_000;
+
 const startVolarWorkspace = async (
   workspaceRoot: string,
   languageServerEntry: URL,
@@ -230,7 +240,7 @@ const startVolarWorkspace = async (
         idleTimer = setTimeout(() => {
           release();
           void dispose().catch(() => undefined);
-        }, 60_000);
+        }, idleWorkspaceTimeout);
         idleTimer.unref();
       }
     }
