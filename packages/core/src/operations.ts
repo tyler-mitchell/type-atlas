@@ -18,6 +18,18 @@ import type { VolarWorkspace } from "./volar-workspace.ts";
 const sourceCodeUri = /\.(?:[cm]?[jt]s|[jt]sx)$/i;
 
 /**
+ * Matches generated declaration files.
+ *
+ * TypeScript's navigate-to API accepts `excludeDtsFiles`, but
+ * `volar-service-typescript` calls `getNavigateToItems(query)` with no further
+ * arguments and exposes no setting for them, so the choice cannot be made
+ * upstream. Declarations are excluded here instead: a workspace package
+ * consumed through its build output otherwise reports the generated
+ * declaration next to the source it was generated from.
+ */
+const declarationUri = /\.d\.[cm]?ts$/i;
+
+/**
  * Creates project-aware language operations backed by an active workspace.
  *
  * File paths may be absolute or relative to the workspace root. Operations
@@ -140,7 +152,11 @@ export const createTypeAtlas = (workspace: VolarWorkspace) => ({
     return {
       textDocument,
       project,
-      symbols: symbols?.filter((symbol) => sourceCodeUri.test(symbol.location.uri)) ?? symbols,
+      symbols:
+        symbols?.filter(
+          (symbol) =>
+            sourceCodeUri.test(symbol.location.uri) && !declarationUri.test(symbol.location.uri),
+        ) ?? symbols,
     };
   },
 });
