@@ -292,24 +292,19 @@ export const registerNavigationTools = (
         signal,
         position,
       );
-      const { items, incomingCalls } = await workspace.runResolverSequence(async () => {
-        const items = await workspace.sendRequest(
-          CallHierarchyPrepareRequest.type,
-          { textDocument, position },
-          signal,
-        );
-        return {
-          items,
-          incomingCalls:
-            items === null
-              ? null
-              : await Promise.all(
-                  items.map((item) =>
-                    workspace.sendRequest(CallHierarchyIncomingCallsRequest.type, { item }, signal),
-                  ),
-                ),
-        };
-      }, signal);
+      const items = await workspace.sendRequest(
+        CallHierarchyPrepareRequest.type,
+        { textDocument, position },
+        signal,
+      );
+      const incomingCalls =
+        items === null
+          ? null
+          : await Promise.all(
+              items.map((item) =>
+                workspace.sendRequest(CallHierarchyIncomingCallsRequest.type, { item }, signal),
+              ),
+            );
       return appendDiagnosticContext(
         textResult(
           formatCallHierarchy(
@@ -347,24 +342,19 @@ export const registerNavigationTools = (
         signal,
         position,
       );
-      const { items, outgoingCalls } = await workspace.runResolverSequence(async () => {
-        const items = await workspace.sendRequest(
-          CallHierarchyPrepareRequest.type,
-          { textDocument, position },
-          signal,
-        );
-        return {
-          items,
-          outgoingCalls:
-            items === null
-              ? null
-              : await Promise.all(
-                  items.map((item) =>
-                    workspace.sendRequest(CallHierarchyOutgoingCallsRequest.type, { item }, signal),
-                  ),
-                ),
-        };
-      }, signal);
+      const items = await workspace.sendRequest(
+        CallHierarchyPrepareRequest.type,
+        { textDocument, position },
+        signal,
+      );
+      const outgoingCalls =
+        items === null
+          ? null
+          : await Promise.all(
+              items.map((item) =>
+                workspace.sendRequest(CallHierarchyOutgoingCallsRequest.type, { item }, signal),
+              ),
+            );
       return appendDiagnosticContext(
         textResult(
           formatCallHierarchy(
@@ -387,7 +377,7 @@ export const registerNavigationTools = (
     {
       title: "References",
       description:
-        "Return a bounded page of reference locations from the TypeScript project selected by file. Set raw to return every project-scoped reference.",
+        "Return a bounded page of reference locations from the TypeScript project selected by file. Set raw to return every project-scoped reference. Results stop at that project boundary, so in a multi-project workspace this is a scoped answer rather than a complete usage audit.",
       inputSchema: input.References,
       annotations: readOnlyToolAnnotations,
     },
