@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/server";
 import { serveStdio } from "@modelcontextprotocol/server/stdio";
 import { createVolarWorkspaces } from "@type-atlas/core";
-import { serverInfo } from "./metadata.ts";
+import { serverInfo, serverInstructions } from "./metadata.ts";
 import { createSemble, type Semble } from "./semble.ts";
 import { registerTools } from "./tools.ts";
 
@@ -10,6 +10,7 @@ const createServer = (
   semble: Semble,
 ): McpServer => {
   const server = new McpServer(serverInfo, {
+    instructions: serverInstructions,
     capabilities: { tools: { listChanged: false } },
     cacheHints: {
       "tools/list": { ttlMs: 60_000, cacheScope: "public" },

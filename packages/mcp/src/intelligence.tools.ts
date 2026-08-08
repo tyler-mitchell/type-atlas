@@ -112,9 +112,11 @@ const input = type.module({
     ...fileInput,
     "scope?": scope,
     "includeTypes?": includeTypes,
-    line: type("number.integer >= 0").configure({
-      description: "Zero-based source line from a search result or known location.",
-    }),
+    line: type("number.integer >= 1")
+      .pipe((line) => line - 1)
+      .configure({
+        description: "One-based source line from a search result or known location.",
+      }),
     "limit?": resultLimit,
     "snippetLines?": snippetLines,
   }).onUndeclaredKey("reject"),
@@ -206,7 +208,7 @@ export const registerIntelligenceTools = (
     {
       title: "Search code",
       description:
-        "Find code by behavior, concept, or identifier and anchor each match to an exact language-server symbol. Use workspace_symbols for an exact known name.",
+        "Find code by behavior or concept and anchor each match to an exact language-server symbol. Matching is semantic, not textual: this will not reliably locate an exact string literal, error message, or comment. Use workspace_symbols for an exact known name. Relevance is relative to the top result shown, so the first match is always 100%.",
       inputSchema: input.Search,
       annotations: readOnlyToolAnnotations,
     },
