@@ -267,6 +267,25 @@ const formatPage = (input: {
     .trimEnd();
 };
 
+/**
+ * Renders the optional similarity section without discarding a completed
+ * inspection when retrieval is unavailable.
+ *
+ * Cancellation still propagates so timeouts and aborts are not reported as a
+ * missing similarity provider.
+ */
+const relatedCodeSection = async (
+  render: () => Promise<string>,
+  signal: AbortSignal,
+): Promise<readonly string[]> => {
+  try {
+    return ["Related code · similarity is not a call or reference relationship", await render()];
+  } catch (error) {
+    if (signal.aborted) throw error;
+    return [`Related code unavailable · ${error instanceof Error ? error.message : String(error)}`];
+  }
+};
+
 export const createRetrievalIntelligence = (dependencies: {
   readonly semble: Semble;
   readonly workspaces: VolarWorkspacePool;
@@ -328,7 +347,7 @@ export const createRetrievalIntelligence = (dependencies: {
         query: `Related to ${workspacePath(
           URI.file(file).toString(),
           request.root,
-        )}:${request.line}`,
+        )}:${request.line + 1}`,
       },
       root: request.root,
       searchRoot,
@@ -369,30 +388,34 @@ export const createRetrievalIntelligence = (dependencies: {
         },
         request.signal,
       );
-      if (!inspection.position) return inspection.text;
+      const { position } = inspection;
+      if (!position) return inspection.text;
       const anchor = {
         file: path.resolve(request.root, request.file),
-        position: inspection.position,
+        position,
       };
       return [
         inspection.text,
         "",
-        "Related code · similarity is not a call or reference relationship",
-        formatPage({
-          retrieval: await findRelated({
-            root: request.root,
-            scope: request.scope,
-            file: request.file,
-            line: inspection.position.line,
-            includeTypes: false,
-            limit: request.relatedLimit,
-            fetchLimit: Math.min(request.relatedLimit * 3, 20),
-            snippetLines: request.snippetLines,
-            signal: request.signal,
-          }),
-          exclude: anchor,
-          limit: request.relatedLimit,
-        }),
+        ...(await relatedCodeSection(
+          async () =>
+            formatPage({
+              retrieval: await findRelated({
+                root: request.root,
+                scope: request.scope,
+                file: request.file,
+                line: position.line,
+                includeTypes: false,
+                limit: request.relatedLimit,
+                fetchLimit: Math.min(request.relatedLimit * 3, 20),
+                snippetLines: request.snippetLines,
+                signal: request.signal,
+              }),
+              exclude: anchor,
+              limit: request.relatedLimit,
+            }),
+          request.signal,
+        )),
       ].join("\n");
     },
     investigate: async (request: {
