@@ -19,6 +19,61 @@ publication under Changesets ownership.
 - `release` means carry the prepared change through the version pull request,
   npm publication, MCP Registry publication, and public verification.
 
+## Read the release state first
+
+Run:
+
+```sh
+pnpm release:status
+```
+
+It reports the working version, pending changesets, the published npm version of
+every package, and the MCP Registry version, then names the state. Start here
+for any release request, and again before concluding one. The suite publishes as
+one fixed-version group, so any disagreement between those sources is an
+interrupted release rather than normal drift.
+
+## Never move the working tree
+
+The working tree is shared. Another agent may be editing it, so a release must
+not change the checked-out branch, and must not leave the repository on a branch
+it did not start on.
+
+Every step after a changeset reaches `main` is remote: creating and merging pull
+requests, watching CI, and reading npm and the Registry. None of it requires a
+local checkout.
+
+- Do not `git checkout` or `git switch` to release.
+- Do not pass `--delete-branch` to `gh pr merge`. It rewrites the local
+  checkout, and on a rebase merge it leaves the repository on a stale `main`
+  while reporting `fatal: Not possible to fast-forward`, which reads as a failed
+  merge that in fact succeeded. Delete the remote branch directly instead:
+
+  ```sh
+  gh api -X DELETE repos/tyler-mitchell/type-atlas/git/refs/heads/<branch>
+  ```
+
+- When a release genuinely needs new commits, author them in a worktree so the
+  primary checkout keeps its branch and its uncommitted work:
+
+  ```sh
+  git worktree add -b <branch> <path> origin/main
+  git worktree remove <path>
+  ```
+
+- After merging, sync the local repository without checking anything out:
+
+  ```sh
+  git fetch origin
+  ```
+
+## Confirm the version before merging
+
+`changeset version` promotes a `major` on a `0.x` package straight to `1.0.0`,
+not to `0.2.0`. Read the version the pull request actually produces rather than
+predicting it, and confirm that a first stable release is intended before
+merging. Versions cannot be unpublished.
+
 ## Record a releasable change
 
 Run:
@@ -38,6 +93,10 @@ implementation complete; do not defer it to the version pull request.
 
 Do not add a changeset for repository-only maintenance that cannot affect a
 published package.
+
+`pnpm check:changeset` compares against `origin/main`, so it reports the
+packages a branch changes and whether a changeset covers them. Fetch first when
+the comparison must reflect the current remote.
 
 Before merging, run:
 
@@ -82,13 +141,16 @@ before npm, or create release tags manually.
 
 ## Verify the release
 
-Confirm that npm exposes the same version for the complete suite:
+Confirm that npm and the Registry agree on one version for the complete suite:
 
 ```sh
-npm view @type-atlas/language-server version
-npm view @type-atlas/core version
-npm view @type-atlas/mcp version
+pnpm release:status
 ```
+
+A `released and consistent` state is the check. Any other state names the
+defect, and `interrupted release — the MCP Registry is behind npm` means npm
+published but Registry publication did not, which the workflow only attempts
+when Changesets reports `published == 'true'`.
 
 Confirm that a clean consumer can resolve the CLI:
 
