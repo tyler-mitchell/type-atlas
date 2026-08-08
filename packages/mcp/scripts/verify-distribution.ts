@@ -97,6 +97,27 @@ try {
     throw new Error("package.json and server.json identities or versions differ");
   }
 
+  // The suite publishes as one fixed Changesets group. A version that differs
+  // between packages means versioning did not complete, and publishing would
+  // release a split suite. Publication preflight runs from main, where the
+  // version pull request has already consumed the changesets, so the pending
+  // release plan is empty and cannot carry this check.
+  const suite = await Promise.all(
+    packageRequirements.map(async ({ directory }) => {
+      const manifest = JSON.parse(
+        await readFile(join(repositoryRoot, directory, "package.json"), "utf8"),
+      ) as { name: string; version: string };
+      return manifest;
+    }),
+  );
+  if (new Set(suite.map(({ version }) => version)).size !== 1) {
+    throw new Error(
+      `Packages must share one version: ${suite
+        .map(({ name, version }) => `${name} ${version}`)
+        .join(", ")}`,
+    );
+  }
+
   const tarballs = await Promise.all(packageRequirements.map(pack));
   await writeFile(
     join(temporaryDirectory, "package.json"),
