@@ -10,10 +10,13 @@ Implementation Planning:
 - Trace each affordance through every owning layer before concluding it is absent: LSP protocol and client feature, `@volar/language-server`, `@volar/language-service`, `volar-service-typescript`, `@volar/typescript`, `@volar/kit`, and `@volar/vscode` when host behavior is relevant. A custom boundary requires both installed-source evidence that these layers do not provide it and an executable reproduction of the remaining gap.
 
 Type Atlas MCP Usage:
-- When a user says to use the "live", "actual", or "direct" MCP, they mean Type Atlas attached to the current Codex session as first-class tools.
+- When a user says to use the "live", "actual", or "direct" MCP, they mean Type Atlas attached to the current agent session as first-class tools.
 - Do not claim to have used the live/direct MCP when using a shell-launched process, external client, probe, or harness.
 - If the session-attached MCP is unavailable, say so plainly.
-- Before claiming post-restart readiness, build `@type-atlas/language-server`, `@type-atlas/core`, and `@type-atlas/mcp`; the live Codex configuration uses built `dist` output.
+
+- In Codex, use `$local-mcp-development` exactly for local MCP development and verification; do not improvise the client lifecycle. That skill depends on Codex's `code_mod` tool and has no Claude Code equivalent.
+- In Claude Code, attach the source entry as a project MCP server and restart, because MCP servers are loaded once at session start and cannot be hot-reloaded: `claude mcp add --scope project type-atlas-local -- node --conditions=development <repo>/packages/mcp/src/cli.ts`. Source edits also require a restart before the attached tools reflect them. `.mcp.json` is gitignored, so this configuration stays local.
+- Before claiming post-restart readiness, build `@type-atlas/language-server`, `@type-atlas/core`, and `@type-atlas/mcp` whenever the client is configured against built `dist` output; the source entry above runs from `src` and needs no build.
 
 MCP Output Design:
 - For agent-facing exploratory tools, prefer text as the canonical result view and keep it actually useful for agent decision-making.

@@ -16,3 +16,11 @@ For Claude Code, VS Code, native Windows, and generic MCP client setup, see the
 
 Requires Node.js 22.20 or newer. The `type-atlas` executable writes MCP protocol
 messages to stdout and operational errors to stderr.
+
+Navigation, diagnostics, code actions, and reads work with Node.js alone. The
+retrieval tools `search_code`, `related_code`, `investigate_code`, and
+`search_dependency_code` additionally require
+[uv](https://docs.astral.sh/uv/getting-started/installation/), which supplies
+the `uvx` command used to run the semantic index. Without it those four tools
+report that `uvx` is missing, and `explore_symbol` returns its language-server
+inspection without the related-code section.
