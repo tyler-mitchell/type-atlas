@@ -1,6 +1,6 @@
 {
   "name": "@type-atlas/mcp",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Editor-grade TypeScript, Markdown, and JSON intelligence for coding agents.",
   "keywords": [
     "code-intelligence",
