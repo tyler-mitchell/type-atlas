@@ -150,19 +150,42 @@ export const formatDiagnosticContext = (
   ].join("\n");
 };
 
-export const markupText = (
-  value:
-    | string
-    | MarkupContent
-    | {
-        readonly language: string;
-        readonly value: string;
-      }
-    | undefined,
-) => {
+type Markup =
+  | string
+  | MarkupContent
+  | {
+      readonly language: string;
+      readonly value: string;
+    }
+  | undefined;
+
+/**
+ * Renders documentation markup as prose.
+ *
+ * Fences are removed because these values carry only documentation, where a
+ * code block adds structure the text does not have.
+ */
+export const markupText = (value: Markup) => {
   const text = typeof value === "string" ? value : value?.value;
   return text?.replace(/^```[^\n]*\n?/gm, "").trim();
 };
+
+/**
+ * Renders hover markup, keeping the fence that separates the declaration from
+ * its documentation.
+ *
+ * A hover carries both a signature and prose. Removing the fence runs them
+ * together, so an agent cannot tell which lines are the declaration and which
+ * are the doc comment.
+ */
+export const hoverMarkupText = (value: Markup) =>
+  value === undefined
+    ? undefined
+    : typeof value === "string"
+      ? value.trim()
+      : "language" in value
+        ? `\`\`\`${value.language}\n${value.value.trim()}\n\`\`\``
+        : value.value.trim();
 
 const countHeader = (noun: string, count: number | string) =>
   `${noun[0]?.toUpperCase()}${noun.slice(1)} (${count})`;
@@ -361,8 +384,8 @@ export const formatWorkspaceSymbols = (
 
 export const hoverContentsText = (contents: Hover["contents"]) =>
   Array.isArray(contents)
-    ? contents.map(markupText).filter(Boolean).join("\n\n")
-    : markupText(contents);
+    ? contents.map(hoverMarkupText).filter(Boolean).join("\n\n")
+    : hoverMarkupText(contents);
 
 export const formatHover = (
   uri: string,
