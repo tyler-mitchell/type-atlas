@@ -1,5 +1,5 @@
 import { GetMatchTsConfigRequest } from "@volar/language-server/protocol.js";
-import { createTypeAtlas, projectDocumentSymbols } from "@type-atlas/core";
+import { createTypeAtlas, page, projectDocumentSymbols } from "@type-atlas/core";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { type } from "arktype";
 import { requestDiagnosticContext } from "./ambient-diagnostics.ts";
@@ -9,14 +9,30 @@ import {
   formatDocumentLinks,
   formatDocumentSymbols,
   formatProjectConfig,
+  formatProjectDiagnostics,
   formatSelectionRanges,
 } from "@type-atlas/core/text";
 import { appendDiagnosticContext, textResult } from "./mcp-result.ts";
 import { registerTool } from "./tool.ts";
-import { fileInput, observedFileInput, positionInput } from "./tool-input.ts";
+import { fileInput, observedFileInput, positionsInput } from "./tool-input.ts";
 import type { VolarWorkspacePool } from "@type-atlas/core";
 
 const input = type.module({
+  Diagnostics: type({
+    ...fileInput,
+    "scope?": type.enumerated("file", "project").configure({
+      default: "project",
+      description:
+        "Inspect the TypeScript project selected by this file, or explicitly request the file alone.",
+    }),
+    "offset?": type("number.integer >= 0").configure({
+      description: "First project diagnostic returned; applies only to project scope.",
+    }),
+    "limit?": type("1 <= number.integer <= 1000").configure({
+      default: 100,
+      description: "Maximum project diagnostics returned; applies only to project scope.",
+    }),
+  }).onUndeclaredKey("reject"),
   File: type(fileInput).onUndeclaredKey("reject"),
   DocumentLinks: type(observedFileInput).onUndeclaredKey("reject"),
   DocumentSymbols: type({
@@ -26,7 +42,7 @@ const input = type.module({
   }).onUndeclaredKey("reject"),
   SelectionRanges: type({
     ...observedFileInput,
-    position: positionInput.or(positionInput.array().atLeastLength(1)).configure({
+    position: positionsInput.configure({
       description: "One source position, or multiple positions to inspect together.",
     }),
   }).onUndeclaredKey("reject"),
@@ -39,14 +55,40 @@ export const registerDocumentTools = (server: McpServer, workspaces: VolarWorksp
     {
       title: "Diagnostics",
       description:
-        "Return the full diagnostic report for a file. File-scoped tools already surface ambient errors and warnings; use this only to expand that notice or deliberately inspect diagnostics. A clean report returns no content.",
-      inputSchema: input.File,
+        "Return a bounded diagnostic page for the exact TypeScript project selected by file. Normal file tools already surface complete ambient errors and warnings; use file scope only when deliberately requesting every diagnostic for one file. A clean report returns no content.",
+      inputSchema: input.Diagnostics,
       annotations: readOnlyToolAnnotations,
     },
-    async ({ workspace: root, file }, { mcpReq: { signal } }) => {
+    async (
+      { workspace: root, file, scope = "project", offset = 0, limit = 100 },
+      { mcpReq: { signal } },
+    ) => {
       const workspace = await workspaces.get(root);
-      const { textDocument, report } = await createTypeAtlas(workspace).diagnostics(file, signal);
-      return textResult(formatDiagnostics(textDocument.uri, report, root));
+      const intelligence = createTypeAtlas(workspace);
+      if (scope === "file") {
+        const { textDocument, report } = await intelligence.diagnostics(file, signal);
+        return textResult(formatDiagnostics(textDocument.uri, report, root));
+      }
+
+      const { project } = await intelligence.projectDiagnostics(file, signal);
+      const diagnostics =
+        project?.documents.flatMap(({ uri, diagnostics }) =>
+          diagnostics.map((diagnostic) => ({ uri, diagnostic })),
+        ) ?? [];
+      const prioritized = [...diagnostics].sort(
+        (left, right) =>
+          (left.diagnostic.severity ?? Number.POSITIVE_INFINITY) -
+          (right.diagnostic.severity ?? Number.POSITIVE_INFINITY),
+      );
+      return textResult(
+        formatProjectDiagnostics(
+          project?.configFile ?? null,
+          project?.fileCount ?? 0,
+          project?.documents.length ?? 0,
+          page(prioritized, offset, limit),
+          root,
+        ),
+      );
     },
   );
 

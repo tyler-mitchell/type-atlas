@@ -259,7 +259,7 @@ test.each([
   expect(output).not.toContain("unrelated");
 });
 
-test("limits concurrent dependency searches across tool calls", async () => {
+test("does not serialize independent dependency searches", async () => {
   const activity = { current: 0, maximum: 0 };
   const workspace = {
     getWorkspaceUri: () => "file:///workspace/source.ts",
@@ -303,5 +303,5 @@ test("limits concurrent dependency searches across tool calls", async () => {
 
   await Promise.all([search(request), search(request), search(request)]);
 
-  expect(activity.maximum).toBe(2);
+  expect(activity.maximum).toBe(3);
 });

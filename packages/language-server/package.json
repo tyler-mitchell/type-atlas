@@ -88,8 +88,10 @@
     "vscode-uri": "catalog:"
   },
   "devDependencies": {
+    "@effect/language-service": "catalog:",
     "@types/node": "catalog:",
     "@volar/test-utils": "catalog:",
+    "effect": "catalog:",
     "tsdown": "catalog:",
     "vitest": "catalog:"
   },

@@ -72,7 +72,6 @@
     "@type-atlas/language-server": "workspace:*",
     "@volar/language-server": "catalog:",
     "chokidar": "catalog:",
-    "p-queue": "catalog:",
     "pathe": "catalog:",
     "pkg-types": "catalog:",
     "vscode-languageserver-protocol": "catalog:",

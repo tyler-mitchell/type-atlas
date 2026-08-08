@@ -1,4 +1,4 @@
-import { FileSizesRequest } from "@type-atlas/language-server/protocol";
+import { FileSizesRequest, ProjectDiagnosticsRequest } from "@type-atlas/language-server/protocol";
 import {
   DefinitionRequest,
   DocumentDiagnosticRequest,
@@ -51,6 +51,16 @@ export const createTypeAtlas = (workspace: VolarWorkspace) => ({
     return { textDocument, report };
   },
 
+  async projectDiagnostics(file: string, signal: AbortSignal) {
+    const textDocument = await workspace.getTextDocument(file);
+    const project = await workspace.sendRequest(
+      ProjectDiagnosticsRequest.type,
+      textDocument,
+      signal,
+    );
+    return { textDocument, project };
+  },
+
   async documentSymbols(file: string, signal: AbortSignal) {
     const textDocument = await workspace.getTextDocument(file);
     const symbols = await workspace.sendRequest(
@@ -63,22 +73,14 @@ export const createTypeAtlas = (workspace: VolarWorkspace) => ({
 
   async documentLinks(file: string, signal: AbortSignal) {
     const textDocument = await workspace.getTextDocument(file);
+    const links = await workspace.sendRequest(DocumentLinkRequest.type, { textDocument }, signal);
     return {
       textDocument,
-      links: await workspace.runResolverSequence(async () => {
-        const links = await workspace.sendRequest(
-          DocumentLinkRequest.type,
-          { textDocument },
-          signal,
-        );
-        return await Promise.all(
-          (links ?? []).map((link) =>
-            link.target
-              ? link
-              : workspace.sendRequest(DocumentLinkResolveRequest.type, link, signal),
-          ),
-        );
-      }, signal),
+      links: await Promise.all(
+        (links ?? []).map((link) =>
+          link.target ? link : workspace.sendRequest(DocumentLinkResolveRequest.type, link, signal),
+        ),
+      ),
     };
   },
 
