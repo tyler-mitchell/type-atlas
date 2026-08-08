@@ -2,7 +2,6 @@ import { fork } from "node:child_process";
 import { stat } from "node:fs/promises";
 import { watch } from "chokidar";
 import * as path from "pathe";
-import PQueue from "p-queue";
 import {
   CancellationTokenSource,
   ConfigurationRequest,
@@ -78,7 +77,6 @@ const startVolarWorkspace = async (
     new IPCMessageReader(languageServer),
     new IPCMessageWriter(languageServer),
   );
-  const resolverSequences = new PQueue({ concurrency: 1 });
   let idleTimer: ReturnType<typeof setTimeout> | undefined;
   languageServer.once("close", () => {
     clearTimeout(idleTimer);
@@ -255,7 +253,7 @@ const startVolarWorkspace = async (
     },
     readTextDocumentUri,
     getWorkspaceUri,
-    withTextDocument<T>({
+    async withTextDocument<T>({
       uri,
       languageId,
       source,
@@ -268,24 +266,17 @@ const startVolarWorkspace = async (
       readonly signal?: AbortSignal;
       readonly task: (textDocument: { readonly uri: string }) => Promise<T>;
     }) {
-      return resolverSequences.add(
-        async () => {
-          await connection.sendNotification(DidOpenTextDocumentNotification.type, {
-            textDocument: { uri, languageId, version: 1, text: source },
-          });
-          try {
-            return await task({ uri });
-          } finally {
-            await connection.sendNotification(DidCloseTextDocumentNotification.type, {
-              textDocument: { uri },
-            });
-          }
-        },
-        { signal },
-      );
-    },
-    runResolverSequence<T>(task: () => Promise<T>, signal?: AbortSignal) {
-      return resolverSequences.add(task, { signal });
+      signal?.throwIfAborted();
+      await connection.sendNotification(DidOpenTextDocumentNotification.type, {
+        textDocument: { uri, languageId, version: 1, text: source },
+      });
+      try {
+        return await task({ uri });
+      } finally {
+        await connection.sendNotification(DidCloseTextDocumentNotification.type, {
+          textDocument: { uri },
+        });
+      }
     },
     dispose,
   };
@@ -299,7 +290,6 @@ const startVolarWorkspace = async (
     shutdownTimer.unref();
     try {
       if (isLanguageServerRunning()) {
-        await resolverSequences.onIdle();
         await connection.sendRequest(ShutdownRequest.type);
         await connection.sendNotification(ExitNotification.type);
         await languageServerExit;

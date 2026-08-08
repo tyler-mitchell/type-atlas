@@ -189,27 +189,25 @@ export const registerAssistanceTools = (
         signal,
         position,
       );
-      const result = await workspace.runResolverSequence(async () => {
-        const completion = await workspace.sendRequest(
-          CompletionRequest.type,
-          { textDocument, position },
-          signal,
-        );
-        const items =
-          completion === null ? [] : Array.isArray(completion) ? completion : completion.items;
-        const end = Math.min(offset + limit, items.length);
-        const selectedItems = raw
-          ? items
-          : resolve
-            ? await Promise.all(
-                items
-                  .slice(offset, end)
-                  .map((item) =>
-                    workspace.sendRequest(CompletionResolveRequest.type, item, signal),
-                  ),
-              )
-            : items.slice(offset, end);
-        return completion === null
+      const completion = await workspace.sendRequest(
+        CompletionRequest.type,
+        { textDocument, position },
+        signal,
+      );
+      const items =
+        completion === null ? [] : Array.isArray(completion) ? completion : completion.items;
+      const end = Math.min(offset + limit, items.length);
+      const selectedItems = raw
+        ? items
+        : resolve
+          ? await Promise.all(
+              items
+                .slice(offset, end)
+                .map((item) => workspace.sendRequest(CompletionResolveRequest.type, item, signal)),
+            )
+          : items.slice(offset, end);
+      const result =
+        completion === null
           ? null
           : {
               isIncomplete: Array.isArray(completion) ? false : completion.isIncomplete,
@@ -221,7 +219,6 @@ export const registerAssistanceTools = (
                 : {}),
               ...(!raw && end < items.length ? { nextOffset: end } : {}),
             };
-      }, signal);
       return appendDiagnosticContext(
         textResult(formatCompletions(result)),
         await diagnosticContext,

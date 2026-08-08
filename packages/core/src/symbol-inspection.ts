@@ -334,7 +334,7 @@ export const inspectSymbol = async (
 
   const selected = "symbol" in target ? matches[0]! : undefined;
   const position = "position" in target ? target.position : selected!.selectionRange.start;
-  const [project, hover, definitionResult, implementationResult, references, hierarchy] =
+  const [project, hover, definitionResult, implementationResult, references, items] =
     await Promise.all([
       workspace.sendRequest(GetMatchTsConfigRequest.type, textDocument, signal),
       workspace.sendRequest(HoverRequest.type, { textDocument, position }, signal),
@@ -345,32 +345,24 @@ export const inspectSymbol = async (
         { textDocument, position, context: { includeDeclaration: true } },
         signal,
       ),
-      workspace.runResolverSequence(async () => {
-        const items = await workspace.sendRequest(
-          CallHierarchyPrepareRequest.type,
-          { textDocument, position },
-          signal,
-        );
-        const [incoming, outgoing] = await Promise.all([
-          items
-            ? Promise.all(
-                items.map((item) =>
-                  workspace.sendRequest(CallHierarchyIncomingCallsRequest.type, { item }, signal),
-                ),
-              )
-            : null,
-          items
-            ? Promise.all(
-                items.map((item) =>
-                  workspace.sendRequest(CallHierarchyOutgoingCallsRequest.type, { item }, signal),
-                ),
-              )
-            : null,
-        ]);
-        return { items, incoming, outgoing };
-      }, signal),
+      workspace.sendRequest(CallHierarchyPrepareRequest.type, { textDocument, position }, signal),
     ]);
-  const { items, incoming, outgoing } = hierarchy;
+  const [incoming, outgoing] = await Promise.all([
+    items
+      ? Promise.all(
+          items.map((item) =>
+            workspace.sendRequest(CallHierarchyIncomingCallsRequest.type, { item }, signal),
+          ),
+        )
+      : null,
+    items
+      ? Promise.all(
+          items.map((item) =>
+            workspace.sendRequest(CallHierarchyOutgoingCallsRequest.type, { item }, signal),
+          ),
+        )
+      : null,
+  ]);
   const definitions = navigationItems(definitionResult).map(locate);
   const implementations = navigationItems(implementationResult).map(locate);
   const callable = items?.[0];

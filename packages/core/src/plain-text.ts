@@ -62,7 +62,7 @@ export const workspacePath = (uri: string, workspaceRoot: string) => {
   }
 };
 
-export const positionText = ({ line, character }: Position) => `${line}:${character}`;
+export const positionText = ({ line, character }: Position) => `${line + 1}:${character + 1}`;
 
 export const rangeText = ({ start, end }: Range) => `${positionText(start)}-${positionText(end)}`;
 
@@ -147,7 +147,6 @@ export const formatDiagnosticContext = (
   return [
     `Diagnostics: ${counts} · ${workspacePath(uri, workspaceRoot)}`,
     diagnosticSummaryText(preview, workspaceRoot),
-    "Full report: diagnostics",
   ].join("\n");
 };
 
@@ -215,6 +214,38 @@ export const formatDiagnostics = (
     ].join("\n");
   });
   return [`${countHeader("diagnostics", report.items.length)} · ${file}`, ...items].join("\n\n");
+};
+
+export const formatProjectDiagnostics = (
+  project: string | null,
+  fileCount: number,
+  affectedFileCount: number,
+  diagnostics: Page<{ readonly uri: string; readonly diagnostic: Diagnostic }>,
+  workspaceRoot: string,
+): string => {
+  if (!diagnostics.total) return "";
+  const grouped = new Map<string, { readonly uri: string; readonly diagnostic: Diagnostic }[]>();
+  for (const item of diagnostics.items) {
+    grouped.set(item.uri, [...(grouped.get(item.uri) ?? []), item]);
+  }
+  const body = [...grouped].map(([uri, items]) => {
+    const report = {
+      kind: "full" as const,
+      items: items.map(({ diagnostic }) => diagnostic),
+    };
+    return formatDiagnostics(uri, report, workspaceRoot);
+  });
+  return [
+    `Project diagnostics (${diagnostics.total}) · ${grouped.size} shown · ${affectedFileCount} affected · ${fileCount} files · ${
+      project ? workspacePath(project, workspaceRoot) : "inferred project"
+    }`,
+    diagnostics.offset || diagnostics.nextOffset !== undefined
+      ? `${pageHeader("diagnostics", diagnostics)}`
+      : undefined,
+    ...body,
+  ]
+    .filter((line): line is string => line !== undefined)
+    .join("\n\n");
 };
 
 export const symbolKind = (kind: number) => enumName(SymbolKind, kind, "symbol");

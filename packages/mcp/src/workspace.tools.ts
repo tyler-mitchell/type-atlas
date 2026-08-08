@@ -15,9 +15,11 @@ const input = type({
   "depth?": type("1 <= number.integer <= 10").configure({
     description: "Directory levels to include. Defaults to 10 with glob and 1 otherwise.",
   }),
-  "glob?": type("(string >= 1)[] >= 1").configure({
-    description: "One or more OR-combined Picomatch patterns relative to the selected directory.",
-  }),
+  "glob?": type("(string >= 1) | ((string >= 1)[] >= 1)")
+    .pipe((glob) => (typeof glob === "string" ? [glob] : glob))
+    .configure({
+      description: "One or more OR-combined Picomatch patterns relative to the selected directory.",
+    }),
   "includeHidden?": type("boolean").configure({
     default: false,
     description: "Include paths whose names begin with a dot.",

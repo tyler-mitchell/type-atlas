@@ -4,8 +4,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ExitNotification } from "@volar/language-server";
 import { startLanguageServer } from "@volar/test-utils";
+import ts from "typescript";
 import { afterEach, describe, expect, it } from "vitest";
 import { URI } from "vscode-uri";
+import { withEffectLanguageService } from "../src/effect-language-service.ts";
 import { ReadFileRequest } from "../src/protocol.ts";
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -24,6 +26,57 @@ afterEach(async () => {
 });
 
 describe("language server", () => {
+  it("resolves a configured Effect language service from the selected project", async () => {
+    const root = await mkdtemp(path.join(packageRoot, ".language-server-test-"));
+    temporaryRoots.add(root);
+    const file = path.join(root, "effect.ts");
+    const configFile = path.join(root, "tsconfig.json");
+    await writeFile(file, 'import * as Effect from "effect/Effect";\nEffect.succeed(1);\n');
+    const config = {
+      compilerOptions: {
+        module: "NodeNext",
+        moduleResolution: "NodeNext",
+        plugins: [{ name: "@effect/language-service" }],
+        strict: true,
+        target: "ES2022",
+      },
+      files: [file],
+    };
+    await writeFile(configFile, JSON.stringify(config));
+    const parsed = ts.parseJsonConfigFileContent(config, ts.sys, root, undefined, configFile);
+    const languageService = withEffectLanguageService(ts).createLanguageService({
+      fileExists: ts.sys.fileExists,
+      getCompilationSettings: () => parsed.options,
+      getCurrentDirectory: () => path.parse(packageRoot).root,
+      getDefaultLibFileName: ts.getDefaultLibFilePath,
+      getDirectories: ts.sys.getDirectories,
+      getScriptFileNames: () => parsed.fileNames,
+      getScriptSnapshot: (fileName) => {
+        const source = ts.sys.readFile(fileName);
+        return source === undefined ? undefined : ts.ScriptSnapshot.fromString(source);
+      },
+      getScriptVersion: () => "0",
+      readDirectory: ts.sys.readDirectory,
+      readFile: ts.sys.readFile,
+    });
+
+    try {
+      const program = languageService.getProgram();
+      const sourceFile = program?.getSourceFile(file);
+      expect(sourceFile).toBeDefined();
+      expect(program?.getSemanticDiagnostics(sourceFile)).toEqual([
+        expect.objectContaining({
+          messageText: expect.stringMatching(
+            /neither yielded nor used in an assignment.*effect\(floatingEffect\)/,
+          ),
+          source: "effect",
+        }),
+      ]);
+    } finally {
+      languageService.dispose();
+    }
+  });
+
   it("serves TypeScript and source documents through the Volar process entrypoint", async () => {
     const root = await mkdtemp(path.join(packageRoot, ".language-server-test-"));
     temporaryRoots.add(root);

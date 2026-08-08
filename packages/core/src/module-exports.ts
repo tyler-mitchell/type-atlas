@@ -1,4 +1,5 @@
 import { ResolveDependencySourceRequest } from "@type-atlas/language-server/protocol";
+import { randomUUID } from "node:crypto";
 import {
   type CompletionItem,
   CompletionItemKind,
@@ -122,7 +123,9 @@ export const listModuleExports = async ({
 }): Promise<ModuleExportPage> => {
   const uri = workspace.getWorkspaceUri(fromFile);
   const parsedUri = URI.parse(uri);
-  const probeUri = parsedUri.with({ path: `${parsedUri.path}.type-atlas.ts` }).toString();
+  const probeUri = parsedUri
+    .with({ path: `${parsedUri.path}.type-atlas-${randomUUID()}.ts` })
+    .toString();
   const effectiveSurface = type || path.length ? "runtime" : surface;
   const { source, position, definitionPosition } = probe({
     moduleName,
