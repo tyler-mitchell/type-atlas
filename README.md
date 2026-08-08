@@ -11,6 +11,13 @@ actually changing.
 Type Atlas requires Node.js 22.20 or newer. No global package installation is
 required.
 
+Navigation, diagnostics, code actions, and reads work with Node.js alone. The
+retrieval tools `search_code`, `related_code`, `investigate_code`, and
+`search_dependency_code` additionally require [uv](https://docs.astral.sh/uv/getting-started/installation/),
+which supplies the `uvx` command used to run the semantic index. Without it
+those four tools report that `uvx` is missing, and `explore_symbol` returns its
+language-server inspection without the related-code section.
+
 ### Codex
 
 ```sh
@@ -55,7 +62,9 @@ claude mcp add --scope user type-atlas -- cmd /c npx --yes @type-atlas/mcp@lates
 For JSON configuration, use `"command": "cmd"` and
 `"args": ["/c", "npx", "--yes", "@type-atlas/mcp@latest"]`.
 
-Restart the MCP server after changing its configuration. Configurations using
+Restart your MCP client after changing its configuration; clients load MCP
+servers at startup, so a newly added server appears only in a new session.
+Configurations using
 `@latest` start the current npm release; pin an exact version when reproducible
 tool behavior is more important than automatic upgrades.
 
