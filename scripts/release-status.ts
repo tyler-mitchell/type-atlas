@@ -66,10 +66,24 @@ const publishedVersions = async () =>
     }),
   );
 
+type RegistryEntry = {
+  readonly server?: { readonly version?: string };
+  readonly _meta?: {
+    readonly "io.modelcontextprotocol.registry/official"?: { readonly isLatest?: boolean };
+  };
+};
+
+/**
+ * The Registry returns every published version, oldest first, so the current
+ * release is the entry flagged `isLatest` rather than the first one.
+ */
 const registryVersion = async () => {
-  const found = await fetchJson(registryUrl);
-  return (found as { servers?: { server?: { version?: string } }[] } | undefined)?.servers?.[0]
-    ?.server?.version;
+  const found = (await fetchJson(registryUrl)) as { servers?: RegistryEntry[] } | undefined;
+  const entries = found?.servers ?? [];
+  const latest = entries.find(
+    (entry) => entry._meta?.["io.modelcontextprotocol.registry/official"]?.isLatest,
+  );
+  return (latest ?? entries.at(-1))?.server?.version;
 };
 
 const unique = (values: readonly (string | undefined)[]) => [...new Set(values)];
