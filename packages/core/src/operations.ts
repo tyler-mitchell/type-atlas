@@ -30,6 +30,33 @@ const sourceCodeUri = /\.(?:[cm]?[jt]s|[jt]sx)$/i;
 const declarationUri = /\.d\.[cm]?ts$/i;
 
 /**
+ * Recovers the resource an editor command target encodes.
+ *
+ * `vscode-markdown-languageservice` resolves a link to a directory, or to a
+ * file with a fragment, into a VS Code command URI rather than a plain target
+ * (`out/languageFeatures/documentLinks.js:555` and `:562`). Those are
+ * instructions to an editor host: they mean nothing outside a VS Code window,
+ * and they carry the resource inside a percent-encoded JSON payload.
+ *
+ * The service takes no option to suppress them, and its plain-target API,
+ * `resolveLinkTarget`, is not surfaced by `volar-service-markdown`, so the
+ * encoding is reversed here. A target that cannot be recovered is dropped: an
+ * agent cannot act on a command it has no host to run.
+ */
+const commandTargetResource = (target: string): string | undefined => {
+  const separator = target.indexOf("?");
+  if (!target.startsWith("command:") || separator < 0) return undefined;
+  try {
+    const payload: unknown = JSON.parse(decodeURIComponent(target.slice(separator + 1)));
+    const resource = Array.isArray(payload) ? payload[0] : payload;
+    const external = (resource as { readonly external?: unknown } | null)?.external;
+    return typeof external === "string" ? external : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+/**
  * Creates project-aware language operations backed by an active workspace.
  *
  * File paths may be absolute or relative to the workspace root. Operations
@@ -86,13 +113,18 @@ export const createTypeAtlas = (workspace: VolarWorkspace) => ({
   async documentLinks(file: string, signal: AbortSignal) {
     const textDocument = await workspace.getTextDocument(file);
     const links = await workspace.sendRequest(DocumentLinkRequest.type, { textDocument }, signal);
+    const resolved = await Promise.all(
+      (links ?? []).map((link) =>
+        link.target ? link : workspace.sendRequest(DocumentLinkResolveRequest.type, link, signal),
+      ),
+    );
     return {
       textDocument,
-      links: await Promise.all(
-        (links ?? []).map((link) =>
-          link.target ? link : workspace.sendRequest(DocumentLinkResolveRequest.type, link, signal),
-        ),
-      ),
+      links: resolved.flatMap((link) => {
+        if (!link?.target?.startsWith("command:")) return link ? [link] : [];
+        const target = commandTargetResource(link.target);
+        return target ? [{ ...link, target }] : [];
+      }),
     };
   },
 

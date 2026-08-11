@@ -1,4 +1,6 @@
 import {
+  DocumentLinkRequest,
+  DocumentLinkResolveRequest,
   GetMatchTsConfigRequest,
   SymbolKind,
   WorkspaceSymbolRequest,
@@ -6,6 +8,8 @@ import {
 import { expect, test, vi } from "vitest";
 import { createTypeAtlas } from "../src/operations.ts";
 import type { VolarWorkspace } from "../src/volar-workspace.ts";
+
+const RANGE = { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } };
 
 test("keeps workspace symbol results within source-code files", async () => {
   const sendRequest = vi.fn(async (request) => {
@@ -38,4 +42,40 @@ test("keeps workspace symbol results within source-code files", async () => {
   );
 
   expect(result.symbols?.map(({ name }) => name)).toEqual(["TimelineCompositionAtInput"]);
+});
+
+test("recovers the resource behind an editor command document link", async () => {
+  const folder = "file:///workspace/packages/mcp";
+  const command = `command:revealInExplorer?${encodeURIComponent(
+    JSON.stringify([
+      { $mid: 1, fsPath: "/workspace/packages/mcp", external: folder, scheme: "file" },
+    ]),
+  )}`;
+  const sendRequest = vi.fn(async (request, params) => {
+    if (request === DocumentLinkRequest.type) {
+      return [
+        { range: RANGE, target: "https://example.com" },
+        { range: RANGE, data: "folder" },
+        { range: RANGE, data: "unrecoverable" },
+      ];
+    }
+    if (request === DocumentLinkResolveRequest.type) {
+      const link = params as { data: string };
+      return link.data === "folder"
+        ? { range: RANGE, target: command }
+        : { range: RANGE, target: "command:noArguments" };
+    }
+    throw new Error("Unexpected request");
+  });
+  const workspace = {
+    getTextDocument: async () => ({ uri: "file:///workspace/README.md" }),
+    sendRequest,
+  } as unknown as VolarWorkspace;
+
+  const { links } = await createTypeAtlas(workspace).documentLinks(
+    "README.md",
+    new AbortController().signal,
+  );
+
+  expect(links.map(({ target }) => target)).toEqual(["https://example.com", folder]);
 });
