@@ -23,24 +23,6 @@ const readFileTarget = type({
   "endLine?": "number.integer >= 1",
 }).onUndeclaredKey("reject");
 
-/**
- * Reads a file entry that arrived as text.
- *
- * `file` accepts a path or a `{ path, startLine, endLine, fold }` view, and a
- * caller reconstructing that union sometimes sends the view JSON-encoded. A
- * path never parses as a JSON object, so recovering one costs nothing and
- * turns a request that would resolve to a nonexistent encoded path into the
- * read that was meant.
- */
-const asFileView = (entry: string) => {
-  if (!entry.startsWith("{")) return { path: entry };
-  const decoded = readFileTarget(JSON.parse(entry) as unknown);
-  if (decoded instanceof type.errors) {
-    throw new Error(`file must be a path or a { path, startLine, endLine, fold } view: ${entry}`);
-  }
-  return decoded;
-};
-
 const readFileInput = type({
   workspace: fileInput.workspace,
   file: type("string >= 1")
@@ -115,7 +97,7 @@ export const registerReadFileTool = (server: McpServer, workspaces: VolarWorkspa
       const workspace = await workspaces.get(root);
       const typeAtlas = createTypeAtlas(workspace);
       const targets = files.map((entry) => {
-        const target = typeof entry === "string" ? asFileView(entry) : entry;
+        const target = typeof entry === "string" ? { path: entry } : entry;
         const targetStartLine = target.startLine ?? startLine;
         const targetEndLine = target.endLine ?? endLine;
         if (
