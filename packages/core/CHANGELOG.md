@@ -1,5 +1,49 @@
 # @type-atlas/core
 
+## 0.3.0
+
+### Patch Changes
+
+- 4314ad0: Keep a workspace's language server alive across the gaps between an agent's
+  calls. The idle window was 60 seconds, which suits an editor but not an agent:
+  agents reason between tool calls and interleave reads, edits, and shell
+  commands, so the window expired constantly and the next call rebuilt the whole
+  TypeScript program.
+
+  Measured on this repository, a call following a 65 second pause took 1625ms and
+  now takes 25ms. Calls made in quick succession were already fast and are
+  unchanged.
+
+- 37d55e3: Return document links an agent can act on. Markdown links pointing at a
+  directory, or at a file with a fragment, were resolved into VS Code command
+  URIs such as
+  `command:revealInExplorer?[{"$mid":1,"fsPath":"…","external":"file:///…"}]` —
+  editor-host instructions that mean nothing outside a VS Code window and cost
+  roughly 240 characters each.
+
+  The resource is now recovered from the command payload, so a link to
+  `packages/mcp` renders as `packages/mcp`. `document_links` on this repository's
+  README drops from 1,279 to 515 characters with all nine links intact. A command
+  target whose resource cannot be recovered is omitted, since an agent has no host
+  on which to run it.
+
+  `vscode-markdown-languageservice` hardcodes these command URIs with no option to
+  suppress them, and its plain-target `resolveLinkTarget` API is not surfaced by
+  `volar-service-markdown`, so the encoding is reversed on the returned links.
+
+- 0a8369e: Exclude generated declarations from `workspace_symbols`. A workspace package
+  consumed through its build output reported the generated declaration next to
+  the source it was generated from, so searching `inspectSymbol` in this
+  repository returned eight results where four were `dist` duplicates of the
+  other four.
+
+  TypeScript's navigate-to API accepts `excludeDtsFiles`, but
+  `volar-service-typescript` calls it with only the query and exposes no setting
+  for that argument, so the equivalent selection is applied to the returned
+  locations.
+
+  - @type-atlas/language-server@0.3.0
+
 ## 0.2.0
 
 ### Minor Changes

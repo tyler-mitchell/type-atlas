@@ -1,5 +1,89 @@
 # @type-atlas/mcp
 
+## 0.3.0
+
+### Minor Changes
+
+- 93092f4: Publish every tool as a canonical MCP object schema, so agents can see the
+  arguments each tool takes.
+
+  `inspect_symbol` and `explore_symbol` selected their target with a schema union
+  — either `{file, position}` or `{file, symbol}`. MCP publishes a tool's input as
+  an object schema, and a union has no properties to publish, so both tools were
+  advertised as taking no arguments at all. Clients sent none, and every call
+  failed reporting that `file` was missing. Both now take one object with
+  `position` and `symbol` optional, and require exactly one of them in the
+  handler, where the error names what was actually wrong.
+
+  Parameters that accept several values were published without a type, so clients
+  serialized arrays into strings. `read_file` now takes `file` as an array,
+  `search_dependency_code` takes `package` as an array, `list_files` takes `glob`
+  as an array, and `selection_ranges` takes `position` as an array. A `read_file`
+  entry is a path, or a `{ path, startLine, endLine, fold }` view bounding that one
+  file, and the top-level `startLine`, `endLine`, and `fold` apply to entries that
+  set none of their own.
+
+  `includeDiagnostics` was `boolean | 'verbose'`, which published no type. It is
+  now `'summary' | 'verbose' | 'off'`, defaulting to `summary`; `off` replaces
+  `false` and `summary` replaces `true`.
+
+  Enumerated parameters — `scope`, `view`, `surface`, and `only` — published
+  nothing at all, because attaching metadata to a union distributes it across the
+  branches and loses the enum. They now publish their allowed values. Defaults
+  that could not be serialized, including the `path` default that reached agents
+  as the literal string `"$ark.default"`, are gone or expressed as scalars, and
+  defaults declared through `.describe().default()` are now published rather than
+  silently dropped.
+
+  Every published parameter now carries a description, and undeclared keys are
+  ignored rather than failing the call.
+
+### Patch Changes
+
+- 4314ad0: Keep a workspace's language server alive across the gaps between an agent's
+  calls. The idle window was 60 seconds, which suits an editor but not an agent:
+  agents reason between tool calls and interleave reads, edits, and shell
+  commands, so the window expired constantly and the next call rebuilt the whole
+  TypeScript program.
+
+  Measured on this repository, a call following a 65 second pause took 1625ms and
+  now takes 25ms. Calls made in quick succession were already fast and are
+  unchanged.
+
+- 37d55e3: Return document links an agent can act on. Markdown links pointing at a
+  directory, or at a file with a fragment, were resolved into VS Code command
+  URIs such as
+  `command:revealInExplorer?[{"$mid":1,"fsPath":"…","external":"file:///…"}]` —
+  editor-host instructions that mean nothing outside a VS Code window and cost
+  roughly 240 characters each.
+
+  The resource is now recovered from the command payload, so a link to
+  `packages/mcp` renders as `packages/mcp`. `document_links` on this repository's
+  README drops from 1,279 to 515 characters with all nine links intact. A command
+  target whose resource cannot be recovered is omitted, since an agent has no host
+  on which to run it.
+
+  `vscode-markdown-languageservice` hardcodes these command URIs with no option to
+  suppress them, and its plain-target `resolveLinkTarget` API is not surfaced by
+  `volar-service-markdown`, so the encoding is reversed on the returned links.
+
+- 0a8369e: Exclude generated declarations from `workspace_symbols`. A workspace package
+  consumed through its build output reported the generated declaration next to
+  the source it was generated from, so searching `inspectSymbol` in this
+  repository returned eight results where four were `dist` duplicates of the
+  other four.
+
+  TypeScript's navigate-to API accepts `excludeDtsFiles`, but
+  `volar-service-typescript` calls it with only the query and exposes no setting
+  for that argument, so the equivalent selection is applied to the returned
+  locations.
+
+- Updated dependencies [4314ad0]
+- Updated dependencies [37d55e3]
+- Updated dependencies [0a8369e]
+  - @type-atlas/core@0.3.0
+  - @type-atlas/language-server@0.3.0
+
 ## 0.2.0
 
 ### Minor Changes
