@@ -16,25 +16,40 @@ const maxFileBytes = 16 * 1024 * 1024;
 const maxBatchBytes = 32 * 1024 * 1024;
 const maxLargeFileLines = 10_000;
 
+/**
+ * One entry of `read_file`'s batch: a path, or a path with its own bounds.
+ *
+ * The entry union sits under `items`, so the array itself still publishes
+ * `type: "array"` and survives transport. Only the item shape is a choice, and
+ * a client that drops it still forwards each entry as the JSON value it is.
+ */
+const readFileView = type({
+  path: type("string >= 1").describe("Workspace-relative or absolute file path."),
+  "startLine?": type("number.integer >= 1").describe("First 1-based line for this path."),
+  "endLine?": type("number.integer >= 1").describe("Last inclusive 1-based line for this path."),
+  "fold?": type("boolean").describe("Folding for this path."),
+});
+
 const readFileInput = type({
   workspace: fileInput.workspace,
-  file: type("(string >= 1)[]").atLeastLength(1).atMostLength(50).configure(
-    {
-      description:
-        "One or more workspace-relative or absolute file paths, read together in one call.",
-    },
-    "self",
-  ),
+  file: type("string >= 1")
+    .or(readFileView)
+    .array()
+    .atLeastLength(1)
+    .atMostLength(50)
+    .describe(
+      'One or more files to read together: a path, or { path, startLine, endLine, fold } to bound a single file. Mixing both is allowed, as in ["a.ts", { "path": "b.ts", "startLine": 1, "endLine": 40 }].',
+    ),
   "includeDiagnostics?": diagnosticModeInput,
   "fold?": type("boolean").configure({
     default: true,
-    description: "Fold function bodies to their signatures.",
+    description: "Fold function bodies to their signatures, for entries that do not set their own.",
   }),
   "startLine?": type("number.integer >= 1").configure({
-    description: "First 1-based source line to read, applied to every path in this call.",
+    description: "First 1-based source line, for entries that do not set their own.",
   }),
   "endLine?": type("number.integer >= 1").configure({
-    description: "Last inclusive 1-based source line to read, applied to every path in this call.",
+    description: "Last inclusive 1-based source line, for entries that do not set their own.",
   }),
 });
 
@@ -90,12 +105,26 @@ export const registerReadFileTool = (server: McpServer, workspaces: VolarWorkspa
         endLine,
         includeDiagnostics = "summary",
       } = request;
-      if (startLine !== undefined && endLine !== undefined && startLine > endLine) {
-        throw new Error("startLine must be less than or equal to endLine.");
-      }
       const workspace = await workspaces.get(root);
       const typeAtlas = createTypeAtlas(workspace);
-      const targets = files.map((file) => ({ file, startLine, endLine, fold }));
+      const targets = files.map((entry) => {
+        const view = typeof entry === "string" ? { path: entry } : entry;
+        const targetStartLine = view.startLine ?? startLine;
+        const targetEndLine = view.endLine ?? endLine;
+        if (
+          targetStartLine !== undefined &&
+          targetEndLine !== undefined &&
+          targetStartLine > targetEndLine
+        ) {
+          throw new Error("startLine must be less than or equal to endLine.");
+        }
+        return {
+          file: view.path,
+          startLine: targetStartLine,
+          endLine: targetEndLine,
+          fold: view.fold ?? fold,
+        };
+      });
       const sizes = await typeAtlas.sourceSizes(
         targets.map(({ file }) => file),
         signal,

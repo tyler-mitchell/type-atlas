@@ -25,7 +25,9 @@ MCP Tool Input Schemas:
 - Pass the `"self"` selector when configuring a union or enum — `.configure(meta, "self")`. Without it arktype attaches the metadata to every branch and the enum becomes a list of annotated constants, losing the allowed values.
 - Give `default` a scalar. arktype cannot serialize a function or an array default and publishes an internal marker such as `$ark.default` as the literal default value.
 - Use `.describe()` on a type built with `.pipe()`. `.configure(meta, "self")` after a pipe attaches to the morph, and the published input schema is the pre-morph side, so the description is lost.
-- Describe every property. The description is the only guidance an agent has when choosing arguments, and `test/tool-schemas.test.ts` asserts all of the above against the packaged server's real `tools/list` output.
+- Describe every property. The description is the only guidance an agent has when choosing arguments.
+- Nothing upstream enforces any of this. Standard Schema requires a `validate` function and a `jsonSchema` converter and says nothing about the resulting shape; arktype converts unions to correct JSON Schema; the SDK publishes whatever it receives. A schema MCP cannot represent therefore compiles, registers, starts, and validates arguments normally. A clean typecheck and a green build are not evidence that a tool is callable.
+- Verify against the published surface, never the arktype definition, because the loss happens between them. `pnpm --filter @type-atlas/mcp test` runs `test/tool-schemas.test.ts`, which connects to the packaged server over stdio and asserts every rule above against its real `tools/list` response. Run it after any tool schema change.
 
 MCP Output Design:
 - For agent-facing exploratory tools, prefer text as the canonical result view and keep it actually useful for agent decision-making.
