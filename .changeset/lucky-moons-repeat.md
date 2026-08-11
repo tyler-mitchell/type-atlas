@@ -14,11 +14,12 @@ failed reporting that `file` was missing. Both now take one object with
 handler, where the error names what was actually wrong.
 
 Parameters that accept several values were published without a type, so clients
-serialized arrays into strings. `read_file` now takes `file` as an array of
-paths, `search_dependency_code` takes `package` as an array, `list_files` takes
-`glob` as an array, and `selection_ranges` takes `position` as an array.
-`read_file` applies `startLine`, `endLine`, and `fold` to every path in the call;
-per-file ranges are no longer accepted.
+serialized arrays into strings. `read_file` now takes `file` as an array,
+`search_dependency_code` takes `package` as an array, `list_files` takes `glob`
+as an array, and `selection_ranges` takes `position` as an array. A `read_file`
+entry is a path, or a `{ path, startLine, endLine, fold }` view bounding that one
+file, and the top-level `startLine`, `endLine`, and `fold` apply to entries that
+set none of their own.
 
 `includeDiagnostics` was `boolean | 'verbose'`, which published no type. It is
 now `'summary' | 'verbose' | 'off'`, defaulting to `summary`; `off` replaces
