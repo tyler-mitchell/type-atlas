@@ -8,6 +8,7 @@ import { textResult } from "./mcp-result.ts";
 import type { Semble } from "./semble.ts";
 import { fileInput } from "./tool-input.ts";
 import { positionInput } from "./tool-input.ts";
+import { symbolTarget } from "./navigation.tools.ts";
 import { registerTool } from "./tool.ts";
 
 const resultLimit = type("1 <= number.integer <= 20").configure({
@@ -76,28 +77,35 @@ const exploreOptions = {
 const input = type.module({
   DependencySearch: type({
     ...fileInput,
-    package: type("string >= 1").or(type("string >= 1").array().atLeastLength(1)).configure({
-      description: "Installed package name, or package names, resolved from the importing file.",
-    }),
+    package: type("(string >= 1)[]").atLeastLength(1).configure(
+      {
+        description: "One or more installed package names, resolved from the importing file.",
+      },
+      "self",
+    ),
     query: type("string >= 1").configure({
       description: "Behavior, concept, or identifier to find in package code.",
     }),
-    "path?": type("string >= 1")
-      .array()
-      .configure({
-        default: () => [],
-        description: 'Nested runtime export path to search, such as ["Effect"] or ["default"].',
-      }),
-    "surface?": type("'runtime' | 'all'").configure({
-      default: "runtime",
-      description: "Runtime exports by default; use all when type-only exports are relevant.",
-    }),
+    "path?": type("(string >= 1)[]").configure(
+      {
+        description:
+          'Nested runtime export path to search, such as ["Effect"] or ["default"]. Defaults to the top-level exports.',
+      },
+      "self",
+    ),
+    "surface?": type("'runtime' | 'all'").configure(
+      {
+        default: "runtime",
+        description: "Runtime exports by default; use all when type-only exports are relevant.",
+      },
+      "self",
+    ),
     "type?": type("string >= 1").configure({
       description: "Exported type whose instance or chained methods should be searched.",
     }),
     "limit?": resultLimit,
     "snippetLines?": snippetLines,
-  }).onUndeclaredKey("reject"),
+  }),
   Search: type({
     workspace: fileInput.workspace,
     "scope?": scope,
@@ -107,7 +115,7 @@ const input = type.module({
     }),
     "limit?": resultLimit,
     "snippetLines?": snippetLines,
-  }).onUndeclaredKey("reject"),
+  }),
   Related: type({
     ...fileInput,
     "scope?": scope,
@@ -119,20 +127,16 @@ const input = type.module({
       }),
     "limit?": resultLimit,
     "snippetLines?": snippetLines,
-  }).onUndeclaredKey("reject"),
+  }),
   Explore: type({
     ...exploreOptions,
-    position: positionInput,
-  })
-    .onUndeclaredKey("reject")
-    .or(
-      type({
-        ...exploreOptions,
-        symbol: type("string >= 1").configure({
-          description: "Exact document-symbol name in the file.",
-        }),
-      }).onUndeclaredKey("reject"),
+    "position?": positionInput.describe(
+      "Source position of the symbol, as a one-based { line, character }. Pass either this or symbol, not both.",
     ),
+    "symbol?": type("string >= 1").describe(
+      "Exact document-symbol name in the file. Pass either this or position, not both.",
+    ),
+  }),
   Investigate: type({
     workspace: fileInput.workspace,
     "scope?": scope,
@@ -151,7 +155,7 @@ const input = type.module({
       default: false,
       description: "Include complete source for the inspected symbol or symbols.",
     }),
-  }).onUndeclaredKey("reject"),
+  }),
 });
 
 export const registerIntelligenceTools = (
@@ -190,7 +194,7 @@ export const registerIntelligenceTools = (
         await searchDependencies({
           workspace,
           file,
-          packages: Array.isArray(packages) ? packages : [packages],
+          packages,
           query,
           path,
           surface,
@@ -286,7 +290,7 @@ export const registerIntelligenceTools = (
           root: workspace,
           scope,
           file,
-          target: "symbol" in target ? { symbol: target.symbol } : { position: target.position },
+          target: symbolTarget(target),
           includeSource,
           includeTypeDefinitions,
           limit,

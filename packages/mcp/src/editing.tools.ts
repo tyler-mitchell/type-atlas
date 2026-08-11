@@ -20,26 +20,44 @@ const input = type.module({
   RenameSymbol: type({
     ...fileInput,
     position: positionInput,
-    newName: "string >= 1",
-  }).onUndeclaredKey("reject"),
+    newName: type("string >= 1").describe("New identifier for the symbol at that position."),
+  }),
   RenameFiles: type({
     workspace: fileInput.workspace,
     files: type({
-      from: "string >= 1",
-      to: "string >= 1",
+      from: type("string >= 1").describe("Current workspace-relative or absolute path."),
+      to: type("string >= 1").describe("Destination path for the move."),
     })
-      .onUndeclaredKey("reject")
       .array()
-      .atLeastLength(1),
-  }).onUndeclaredKey("reject"),
+      .atLeastLength(1)
+      .configure(
+        {
+          description:
+            "One or more { from, to } file moves applied together, so references are updated across the whole set.",
+        },
+        "self",
+      ),
+  }),
   FormatDocument: type({
     ...fileInput,
-    tabSize: type("number.integer >= 1").default(2),
-    insertSpaces: type("boolean").default(true),
-    "trimTrailingWhitespace?": "boolean",
-    "insertFinalNewline?": "boolean",
-    "trimFinalNewlines?": "boolean",
-  }).onUndeclaredKey("reject"),
+    "tabSize?": type("number.integer >= 1").configure({
+      default: 2,
+      description: "Columns per indentation level.",
+    }),
+    "insertSpaces?": type("boolean").configure({
+      default: true,
+      description: "Indent with spaces rather than tabs.",
+    }),
+    "trimTrailingWhitespace?": type("boolean").configure({
+      description: "Remove trailing whitespace from every line.",
+    }),
+    "insertFinalNewline?": type("boolean").configure({
+      description: "Ensure the file ends with a newline.",
+    }),
+    "trimFinalNewlines?": type("boolean").configure({
+      description: "Collapse repeated trailing newlines at the end of the file.",
+    }),
+  }),
 });
 
 export const registerEditingTools = (server: McpServer, workspaces: VolarWorkspacePool): void => {
@@ -109,12 +127,15 @@ export const registerEditingTools = (server: McpServer, workspaces: VolarWorkspa
       inputSchema: input.FormatDocument,
       annotations: readOnlyToolAnnotations,
     },
-    async ({ workspace: root, file, ...options }, { mcpReq: { signal } }) => {
+    async (
+      { workspace: root, file, tabSize = 2, insertSpaces = true, ...rest },
+      { mcpReq: { signal } },
+    ) => {
       const workspace = await workspaces.get(root);
       const textDocument = await workspace.getTextDocument(file);
       const edits = await workspace.sendRequest(
         DocumentFormattingRequest.type,
-        { textDocument, options },
+        { textDocument, options: { tabSize, insertSpaces, ...rest } },
         signal,
       );
       if (!edits?.length) return textResult("");

@@ -49,7 +49,7 @@ const input = type.module({
         CodeActionKind.RefactorInline,
         CodeActionKind.RefactorRewrite,
       )
-      .configure({ description: "Restrict discovery to quick fixes or refactors." }),
+      .configure({ description: "Restrict discovery to quick fixes or refactors." }, "self"),
     "action?": type("number.integer >= 1").configure({
       description: "Resolve the corresponding action number from discovery.",
     }),
@@ -57,11 +57,11 @@ const input = type.module({
       default: false,
       description: "Include actions that the language service marks unavailable.",
     }),
-  }).onUndeclaredKey("reject"),
+  }),
   Source: type({
     ...observedFileInput,
     ...formattingInput,
-  }).onUndeclaredKey("reject"),
+  }),
 });
 
 const setFormattingOptions = (
@@ -143,9 +143,10 @@ const runSourceAction = async (
       ? selected
       : await workspace.sendRequest(CodeActionResolveRequest.type, selected, signal);
   const diagnosticReport = await diagnosticReportRequest;
-  const diagnosticContext = includeDiagnostics
-    ? formatDiagnosticMode(textDocument.uri, diagnosticReport, root, includeDiagnostics)
-    : undefined;
+  const diagnosticContext =
+    includeDiagnostics === "off"
+      ? undefined
+      : formatDiagnosticMode(textDocument.uri, diagnosticReport, root, includeDiagnostics);
   if (!resolved) return appendDiagnosticContext(textResult(empty), diagnosticContext);
   if (resolved.disabled) throw new Error(resolved.disabled.reason);
   if (!resolved.edit) {
@@ -184,7 +185,7 @@ export const registerCodeActionTools = (
         action,
         tabSize = 2,
         insertSpaces = true,
-        includeDiagnostics = true,
+        includeDiagnostics = "summary",
         includeUnavailable = false,
       },
       { mcpReq: { signal } },
@@ -199,9 +200,11 @@ export const registerCodeActionTools = (
         report?.kind === "full"
           ? report.items.filter((diagnostic) => diagnosticIntersects(diagnostic, range))
           : [];
-      const diagnosticContext = includeDiagnostics
-        ? formatDiagnosticMode(textDocument.uri, report, root, includeDiagnostics, range)
-        : undefined;
+      const diagnosticMode = includeDiagnostics ?? "summary";
+      const diagnosticContext =
+        diagnosticMode === "off"
+          ? undefined
+          : formatDiagnosticMode(textDocument.uri, report, root, diagnosticMode, range);
       const actions =
         (await workspace.sendRequest(
           CodeActionRequest.type,
@@ -295,7 +298,7 @@ export const registerCodeActionTools = (
         annotations: readOnlyToolAnnotations,
       },
       (
-        { workspace, file, tabSize = 2, insertSpaces = true, includeDiagnostics = true },
+        { workspace, file, tabSize = 2, insertSpaces = true, includeDiagnostics = "summary" },
         { mcpReq: { signal } },
       ) =>
         runSourceAction(

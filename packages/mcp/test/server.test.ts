@@ -22,9 +22,9 @@ test("serves workspace files through the packaged stdio entrypoint", async () =>
       name: "read_file",
       arguments: {
         workspace: workspaceRoot,
-        file: "packages/mcp/package.json",
+        file: ["packages/mcp/package.json"],
         fold: false,
-        includeDiagnostics: false,
+        includeDiagnostics: "off",
       },
     });
     const content = result.content.find((item) => item.type === "text");

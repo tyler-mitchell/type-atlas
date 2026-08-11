@@ -20,11 +20,14 @@ import type { VolarWorkspacePool } from "@type-atlas/core";
 const input = type.module({
   Diagnostics: type({
     ...fileInput,
-    "scope?": type.enumerated("file", "project").configure({
-      default: "project",
-      description:
-        "Inspect the TypeScript project selected by this file, or explicitly request the file alone.",
-    }),
+    "scope?": type.enumerated("file", "project").configure(
+      {
+        default: "project",
+        description:
+          "One of: project (the TypeScript project selected by this file, the default), file (that file alone).",
+      },
+      "self",
+    ),
     "offset?": type("number.integer >= 0").configure({
       description: "First project diagnostic returned; applies only to project scope.",
     }),
@@ -32,20 +35,27 @@ const input = type.module({
       default: 100,
       description: "Maximum project diagnostics returned; applies only to project scope.",
     }),
-  }).onUndeclaredKey("reject"),
-  File: type(fileInput).onUndeclaredKey("reject"),
-  DocumentLinks: type(observedFileInput).onUndeclaredKey("reject"),
+  }),
+  File: type(fileInput),
+  DocumentLinks: type(observedFileInput),
   DocumentSymbols: type({
     ...observedFileInput,
-    "depth?": "0 <= number.integer <= 10",
-    "raw?": "boolean",
-  }).onUndeclaredKey("reject"),
+    "depth?": type("0 <= number.integer <= 10").configure({
+      description:
+        "Levels of nested symbols to include. Defaults to top-level declarations only, which is usually what an agent wants.",
+    }),
+    "raw?": type("boolean").configure({
+      description:
+        "Return the complete symbol hierarchy, including object properties and anonymous callbacks. Potentially far larger than the source file.",
+    }),
+  }),
   SelectionRanges: type({
     ...observedFileInput,
-    position: positionsInput.configure({
-      description: "One source position, or multiple positions to inspect together.",
-    }),
-  }).onUndeclaredKey("reject"),
+    position: positionsInput.configure(
+      { description: "One or more source positions to inspect together." },
+      "self",
+    ),
+  }),
 });
 
 export const registerDocumentTools = (server: McpServer, workspaces: VolarWorkspacePool): void => {

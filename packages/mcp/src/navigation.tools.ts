@@ -28,7 +28,7 @@ import {
 } from "@type-atlas/core/text";
 import { appendDiagnosticContext, textResult } from "./mcp-result.ts";
 import { registerTool } from "./tool.ts";
-import { fileInput, observedFileInput, positionInput } from "./tool-input.ts";
+import { fileInput, observedFileInput, paginationInput, positionInput } from "./tool-input.ts";
 import type { VolarWorkspacePool } from "@type-atlas/core";
 
 const inspectOptions = {
@@ -38,61 +38,81 @@ const inspectOptions = {
     description:
       "Summarize dependency and JavaScript runtime call targets while workspace calls retain exact ranges. Pass false for complete external call details.",
   }),
-  includeSource: type("boolean").describe("Include the complete symbol body.").default(false),
-  includeTypeDefinitions: type("boolean")
-    .describe("Include callable type-definition targets.")
-    .default(false),
-  limit: type("1 <= number.integer <= 100")
-    .describe("Maximum callers, callees, references, and ambiguity candidates shown per section.")
-    .default(20),
+  "includeSource?": type("boolean").configure({
+    default: false,
+    description: "Include the complete symbol body.",
+  }),
+  "includeTypeDefinitions?": type("boolean").configure({
+    default: false,
+    description: "Include callable type-definition targets.",
+  }),
+  "limit?": type("1 <= number.integer <= 100").configure({
+    default: 20,
+    description:
+      "Maximum callers, callees, references, and ambiguity candidates shown per section.",
+  }),
 } as const;
 
 const input = type.module({
   Position: type({
     ...observedFileInput,
     position: positionInput,
-  }).onUndeclaredKey("reject"),
+  }),
   References: type({
     ...observedFileInput,
     position: positionInput,
-    "includeDeclaration?": "boolean",
-    "offset?": "number.integer >= 0",
-    "limit?": "1 <= number.integer <= 100",
-    "raw?": "boolean",
-  }).onUndeclaredKey("reject"),
+    "includeDeclaration?": type("boolean").configure({
+      description: "Include the symbol's own declaration among the results.",
+    }),
+    ...paginationInput,
+  }),
   FileReferences: type({
     ...observedFileInput,
-    "offset?": "number.integer >= 0",
-    "limit?": "1 <= number.integer <= 100",
-    "raw?": "boolean",
-  }).onUndeclaredKey("reject"),
+    ...paginationInput,
+  }),
   WorkspaceSymbols: type({
     ...fileInput,
     query: type("string").describe(
       "Use a specific symbol name; avoid broad speculative queries in large workspaces.",
     ),
-    "offset?": "number.integer >= 0",
+    "offset?": paginationInput["offset?"],
     "limit?": type("1 <= number.integer <= 100").describe(
       "Maximum results returned; this does not reduce the underlying workspace search.",
     ),
     "raw?": type("boolean").describe(
       "Return every matching symbol; potentially very large in monorepos.",
     ),
-  }).onUndeclaredKey("reject"),
+  }),
   InspectSymbol: type({
     ...inspectOptions,
-    position: positionInput,
-  })
-    .onUndeclaredKey("reject")
-    .or(
-      type({
-        ...inspectOptions,
-        symbol: type("string >= 1").describe(
-          "Exact document-symbol name in the file. Ambiguous matches are returned as candidates.",
-        ),
-      }).onUndeclaredKey("reject"),
+    "position?": positionInput.describe(
+      "Source position of the symbol, as a one-based { line, character }. Pass either this or symbol, not both.",
     ),
+    "symbol?": type("string >= 1").describe(
+      "Exact document-symbol name in the file, such as createServer. Pass either this or position, not both. Ambiguous matches are returned as candidates.",
+    ),
+  }),
 });
+
+/**
+ * Resolves the one selector `inspect_symbol` and `explore_symbol` accept.
+ *
+ * A schema union would state this exactly, but MCP publishes tool input as an
+ * object schema and cannot express a choice between shapes, so both selectors
+ * are optional keys and the requirement is enforced here — where the message
+ * can name what was actually wrong.
+ */
+export const symbolTarget = (target: {
+  readonly position?: { readonly line: number; readonly character: number };
+  readonly symbol?: string;
+}) => {
+  if (target.symbol !== undefined && target.position !== undefined) {
+    throw new Error("Pass either symbol or position, not both.");
+  }
+  if (target.symbol !== undefined) return { symbol: target.symbol };
+  if (target.position !== undefined) return { position: target.position };
+  throw new Error("Pass symbol (an exact document-symbol name) or position to select a symbol.");
+};
 
 export const registerNavigationTools = (
   server: McpServer,
@@ -126,7 +146,7 @@ export const registerNavigationTools = (
         workspace,
         root,
         file,
-        "symbol" in target ? { symbol: target.symbol } : { position: target.position },
+        symbolTarget(target),
         { compactExternalCalls, includeSource, includeTypeDefinitions, limit },
         signal,
       );

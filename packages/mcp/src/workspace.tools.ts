@@ -15,11 +15,12 @@ const input = type({
   "depth?": type("1 <= number.integer <= 10").configure({
     description: "Directory levels to include. Defaults to 10 with glob and 1 otherwise.",
   }),
-  "glob?": type("(string >= 1) | ((string >= 1)[] >= 1)")
-    .pipe((glob) => (typeof glob === "string" ? [glob] : glob))
-    .configure({
+  "glob?": type("(string >= 1)[]").atLeastLength(1).configure(
+    {
       description: "One or more OR-combined Picomatch patterns relative to the selected directory.",
-    }),
+    },
+    "self",
+  ),
   "includeHidden?": type("boolean").configure({
     default: false,
     description: "Include paths whose names begin with a dot.",
@@ -36,8 +37,14 @@ const input = type({
     default: 500,
     description: "Maximum files or directories returned.",
   }),
-  "view?": type.enumerated("directories", "files"),
-}).onUndeclaredKey("reject");
+  "view?": type.enumerated("directories", "files").configure(
+    {
+      description:
+        "One of: files (edit targets grouped by directory, the default), directories (compact architecture orientation).",
+    },
+    "self",
+  ),
+});
 
 export const registerWorkspaceTools = (server: McpServer): void => {
   registerTool(

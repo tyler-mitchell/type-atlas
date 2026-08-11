@@ -16,31 +16,27 @@ const maxFileBytes = 16 * 1024 * 1024;
 const maxBatchBytes = 32 * 1024 * 1024;
 const maxLargeFileLines = 10_000;
 
-const readFileTarget = type({
-  path: "string >= 1",
-  "fold?": "boolean",
-  "startLine?": "number.integer >= 1",
-  "endLine?": "number.integer >= 1",
-}).onUndeclaredKey("reject");
-
 const readFileInput = type({
   workspace: fileInput.workspace,
-  file: type("string >= 1")
-    .or(readFileTarget)
-    .or(type("string >= 1").or(readFileTarget).array().atLeastLength(1).atMostLength(50))
-    .configure({ description: "A file path, or file views to read together." }),
+  file: type("(string >= 1)[]").atLeastLength(1).atMostLength(50).configure(
+    {
+      description:
+        "One or more workspace-relative or absolute file paths, read together in one call.",
+    },
+    "self",
+  ),
   "includeDiagnostics?": diagnosticModeInput,
   "fold?": type("boolean").configure({
     default: true,
-    description: "Default folding behavior for file views that do not override it.",
+    description: "Fold function bodies to their signatures.",
   }),
   "startLine?": type("number.integer >= 1").configure({
-    description: "Default first 1-based source line for file views.",
+    description: "First 1-based source line to read, applied to every path in this call.",
   }),
   "endLine?": type("number.integer >= 1").configure({
-    description: "Default last inclusive 1-based source line for file views.",
+    description: "Last inclusive 1-based source line to read, applied to every path in this call.",
   }),
-}).onUndeclaredKey("reject");
+});
 
 const readFileRange = async ({
   uri,
@@ -81,39 +77,25 @@ export const registerReadFileTool = (server: McpServer, workspaces: VolarWorkspa
     {
       title: "Read files",
       description:
-        "Read one or more UTF-8 text files, including source, Markdown, and JSON, with stable line numbers. Pass a path or { path, startLine, endLine, fold } view, or an array of either. Native folding is used when available.",
+        "Read one or more UTF-8 text files, including source, Markdown, and JSON, with stable line numbers. Pass every path in one call rather than calling repeatedly. Function bodies fold to their signatures by default; startLine, endLine, and fold apply to every path in the call.",
       inputSchema: readFileInput,
       annotations: readOnlyToolAnnotations,
     },
     async (request, { mcpReq: { signal } }) => {
       const {
         workspace: root,
+        file: files,
         fold = true,
         startLine,
         endLine,
-        includeDiagnostics = true,
+        includeDiagnostics = "summary",
       } = request;
-      const files = Array.isArray(request.file) ? request.file : [request.file];
+      if (startLine !== undefined && endLine !== undefined && startLine > endLine) {
+        throw new Error("startLine must be less than or equal to endLine.");
+      }
       const workspace = await workspaces.get(root);
       const typeAtlas = createTypeAtlas(workspace);
-      const targets = files.map((entry) => {
-        const target = typeof entry === "string" ? { path: entry } : entry;
-        const targetStartLine = target.startLine ?? startLine;
-        const targetEndLine = target.endLine ?? endLine;
-        if (
-          targetStartLine !== undefined &&
-          targetEndLine !== undefined &&
-          targetStartLine > targetEndLine
-        ) {
-          throw new Error("startLine must be less than or equal to endLine.");
-        }
-        return {
-          file: target.path,
-          startLine: targetStartLine,
-          endLine: targetEndLine,
-          fold: target.fold ?? fold,
-        };
-      });
+      const targets = files.map((file) => ({ file, startLine, endLine, fold }));
       const sizes = await typeAtlas.sourceSizes(
         targets.map(({ file }) => file),
         signal,

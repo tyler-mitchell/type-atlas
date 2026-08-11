@@ -18,6 +18,15 @@ Type Atlas MCP Usage:
 - In Claude Code, attach the source entry as a project MCP server and restart, because MCP servers are loaded once at session start and cannot be hot-reloaded: `claude mcp add --scope project type-atlas-local -- node --conditions=development <repo>/packages/mcp/src/cli.ts`. Source edits also require a restart before the attached tools reflect them. `.mcp.json` is gitignored, so this configuration stays local.
 - Before claiming post-restart readiness, build `@type-atlas/language-server`, `@type-atlas/core`, and `@type-atlas/mcp` whenever the client is configured against built `dist` output; the source entry above runs from `src` and needs no build.
 
+MCP Tool Input Schemas:
+- MCP publishes a tool's input as an object schema: `type: "object"` with `properties` and `required`. That is narrower than JSON Schema, and violating it fails silently — the tool still registers and still validates incoming arguments, but advertises nothing for a client to send, so every call fails complaining about an argument the caller did supply.
+- Never declare a union at the root of a tool input. `a.or(b)` converts to `anyOf`, which has no `properties` to publish. Express a choice as one object with both keys optional and enforce the requirement in the handler, where the error can name what was actually wrong.
+- Keep each published property expressible: a concrete `type`, or `enum`. A property whose value may be an array must publish `type: "array"`, or clients serialize the array to a string.
+- Pass the `"self"` selector when configuring a union or enum — `.configure(meta, "self")`. Without it arktype attaches the metadata to every branch and the enum becomes a list of annotated constants, losing the allowed values.
+- Give `default` a scalar. arktype cannot serialize a function or an array default and publishes an internal marker such as `$ark.default` as the literal default value.
+- Use `.describe()` on a type built with `.pipe()`. `.configure(meta, "self")` after a pipe attaches to the morph, and the published input schema is the pre-morph side, so the description is lost.
+- Describe every property. The description is the only guidance an agent has when choosing arguments, and `test/tool-schemas.test.ts` asserts all of the above against the packaged server's real `tools/list` output.
+
 MCP Output Design:
 - For agent-facing exploratory tools, prefer text as the canonical result view and keep it actually useful for agent decision-making.
 - Do not dump JSON into text, but do format the real page of results in text when that is what the agent is meant to inspect.

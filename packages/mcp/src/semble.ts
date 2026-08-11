@@ -12,12 +12,12 @@ const SearchPage = type({
     score: "number",
     "content?": "string",
   }).array(),
-}).onUndeclaredKey("reject");
+});
 
 const SearchResponse = SearchPage.or(
   type({
     error: "string",
-  }).onUndeclaredKey("reject"),
+  }),
 );
 
 export type SembleSearchPage = typeof SearchPage.infer;

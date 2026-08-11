@@ -18,26 +18,27 @@ import {
 } from "@type-atlas/core/text";
 import { appendDiagnosticContext, textResult } from "./mcp-result.ts";
 import { registerTool } from "./tool.ts";
-import { observedFileInput, positionInput, rangeInput } from "./tool-input.ts";
+import { observedFileInput, paginationInput, positionInput, rangeInput } from "./tool-input.ts";
 import type { VolarWorkspacePool } from "@type-atlas/core";
 
 const input = type.module({
   Position: type({
     ...observedFileInput,
     position: positionInput,
-  }).onUndeclaredKey("reject"),
+  }),
   Completion: type({
     ...observedFileInput,
     position: positionInput,
-    "offset?": "number.integer >= 0",
-    "limit?": "1 <= number.integer <= 100",
-    "resolve?": "boolean",
-    "raw?": "boolean",
-  }).onUndeclaredKey("reject"),
+    ...paginationInput,
+    "resolve?": type("boolean").configure({
+      description:
+        "Resolve documentation and insert details for the returned page. Costs an extra request per candidate.",
+    }),
+  }),
   Range: type({
     ...observedFileInput,
     range: rangeInput,
-  }).onUndeclaredKey("reject"),
+  }),
   ModuleExports: type({
     workspace: observedFileInput.workspace,
     module: type("string >= 1").describe(
@@ -54,11 +55,14 @@ const input = type.module({
       description:
         'Nested member path to inspect, such as ["d"], ["default"], or ["device"] with an exported type.',
     }),
-    "surface?": type("'runtime' | 'all'").configure({
-      default: "runtime",
-      description:
-        "Runtime exports by default; use all to include top-level type exports. Nested paths are runtime surfaces.",
-    }),
+    "surface?": type("'runtime' | 'all'").configure(
+      {
+        default: "runtime",
+        description:
+          "Runtime exports by default; use all to include top-level type exports. Nested paths are runtime surfaces.",
+      },
+      "self",
+    ),
     "query?": type("string").configure({
       default: "",
       description: "Optional case-insensitive text filter over Volar's completion labels.",
@@ -83,7 +87,7 @@ const input = type.module({
       default: true,
       description: "Include declared importable subpaths when inspecting a package root.",
     }),
-  }).onUndeclaredKey("reject"),
+  }),
 });
 
 export const registerAssistanceTools = (

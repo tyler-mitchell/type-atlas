@@ -8,7 +8,7 @@ import {
 import { formatDiagnosticContext, formatDiagnostics } from "@type-atlas/core/text";
 import type { VolarWorkspace } from "@type-atlas/core";
 
-export type DiagnosticMode = boolean | "verbose";
+export type DiagnosticMode = "summary" | "verbose" | "off";
 
 export const formatDiagnosticMode = (
   uri: string,
@@ -29,8 +29,8 @@ export function requestDiagnosticContext(
   signal: AbortSignal,
   focus?: Position | Range,
 ): Promise<string | undefined> {
-  const mode = includeDiagnostics ?? true;
-  if (!mode) {
+  const mode = includeDiagnostics ?? "summary";
+  if (mode === "off") {
     return Promise.resolve(undefined);
   }
 
