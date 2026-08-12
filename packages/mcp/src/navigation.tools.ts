@@ -23,7 +23,7 @@ import {
   formatNavigation,
   formatPositionQuery,
   formatProjectScope,
-  formatWorkspaceSymbolScope,
+  formatLoadedProjectScope,
   formatWorkspaceSymbols,
 } from "@type-atlas/core/text";
 import { appendDiagnosticContext, textResult } from "./mcp-result.ts";
@@ -189,9 +189,7 @@ export const registerNavigationTools = (
             ? page<SymbolInformation | WorkspaceSymbol>(symbols, 0, symbols.length)
             : page<SymbolInformation | WorkspaceSymbol>(symbols, offset, limit);
       return textResult(
-        [formatWorkspaceSymbolScope(project, root), formatWorkspaceSymbols(output, root)].join(
-          "\n",
-        ),
+        [formatLoadedProjectScope(project, root), formatWorkspaceSymbols(output, root)].join("\n"),
       );
     },
   );
@@ -441,7 +439,7 @@ export const registerNavigationTools = (
       return appendDiagnosticContext(
         textResult(
           [
-            formatProjectScope(await project, root),
+            formatLoadedProjectScope(await project, root),
             formatPositionQuery(textDocument.uri, position, await query, root),
             formatLocationPage("references", output, root),
           ].join("\n"),

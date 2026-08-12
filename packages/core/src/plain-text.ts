@@ -749,7 +749,14 @@ export const formatProjectScope = (
     ? `Scope: project only · ${workspacePath(result.uri, workspaceRoot)}`
     : "Scope: inferred project only";
 
-export const formatWorkspaceSymbolScope = (
+/**
+ * Scope line for results gathered from every project the server has loaded.
+ *
+ * Naming the anchor keeps the answer honest in both directions: it says the
+ * search was not confined to one project, and it says which project the request
+ * started from, since projects nothing has opened yet cannot contribute.
+ */
+export const formatLoadedProjectScope = (
   result: { readonly uri: string } | null | undefined,
   workspaceRoot: string,
 ) => {
