@@ -40,7 +40,7 @@ export const formatFoldedSource = (
   const viewLineCount = endLine - startLine + 1;
   const width = String(sourceStartLine + lines.length - 1).length;
   const nonCode = ranges.filter(isNonCodeRange);
-  const folds =
+  const eligible =
     viewLineCount > minimumViewLines
       ? ranges.filter(
           (range) =>
@@ -55,6 +55,24 @@ export const formatFoldedSource = (
             range.endLine - range.startLine <= viewLineCount / 2,
         )
       : [];
+  /**
+   * Drops a range that would hide the view's structure when its own children
+   * can stand in for it.
+   *
+   * The outermost eligible range wins at each line, so one long body can
+   * swallow every declaration beneath it — a factory's whole returned object
+   * collapsed to a single placeholder, hiding the members that are the reason
+   * to read the file. Descending is only better when there is something to
+   * descend into: a long body containing no foldable children keeps its own
+   * placeholder, since discarding it would print every line instead.
+   */
+  const encloses = (outer: FoldingRange, inner: FoldingRange) =>
+    outer !== inner && outer.startLine <= inner.startLine && inner.endLine <= outer.endLine;
+  const folds = eligible.filter(
+    (range) =>
+      range.endLine - range.startLine <= viewLineCount / 3 ||
+      !eligible.some((candidate) => encloses(range, candidate)),
+  );
 
   return lines
     .slice(startIndex, endLine)
