@@ -129,7 +129,11 @@ const sequence = defineCommand({
       const published = await client.listTools();
       for (const { tool, input } of planned) {
         const title = published.tools.find((candidate) => candidate.name === tool)?.title ?? tool;
+        // Latency is a correctness concern for a tool an agent calls constantly,
+        // and it only shows against a server that has already done work.
+        const startedAt = Date.now();
         const result = await client.callTool({ name: tool, arguments: input });
+        process.stderr.write(`[${Date.now() - startedAt}ms] ${tool}\n`);
         const text = (result.content ?? [])
           .filter((item): item is { type: "text"; text: string } => item.type === "text")
           .map((item) => item.text)

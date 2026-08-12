@@ -160,54 +160,6 @@ export const registerLanguageServer = (connection: Connection): void => {
   connection.onInitialized(async () => {
     server.initialized();
 
-    /**
-     * Runs one positional lookup against every loaded project and merges it.
-     *
-     * Volar resolves a positional request to the single language service owning
-     * the document, so in a monorepo whose packages import each other's source
-     * a symbol's usages in sibling packages are missing even though those
-     * projects hold the same file and can answer for it. Each loaded project
-     * costs a warm lookup and they run together, so the added wall-clock is one
-     * project's query rather than their sum. Projects that never loaded stay
-     * unasked, since loading one is seconds and a TypeScript program.
-     *
-     * The owning project is loaded first: only loaded projects can be
-     * enumerated, so the one guaranteed to hold this document may not be among
-     * them, and asking without it returns a sibling's narrower view in its
-     * place. A project that does not hold the document contributes nothing
-     * rather than failing the whole set.
-     *
-     * These handlers are registered after `server.initialize` installs Volar's
-     * own, because the later registration is the one that answers.
-     */
-    connection.onReferences(async ({ textDocument, position, context }, token) => {
-      const uri = URI.parse(textDocument.uri);
-      const owner = await server.project.getLanguageService(uri);
-      const loaded = await server.project.getExistingLanguageServices();
-      const services = loaded.includes(owner) ? loaded : [owner, ...loaded];
-      const found = await Promise.all(
-        services.map((service) =>
-          service
-            .getReferences(
-              uri,
-              position,
-              { includeDeclaration: context?.includeDeclaration ?? true },
-              token,
-            )
-            .catch(() => undefined),
-        ),
-      );
-      const seen = new Set<string>();
-      return found
-        .flatMap((references: Location[] | undefined) => references ?? [])
-        .filter(({ uri: target, range }) => {
-          const at = `${target}#${range.start.line}:${range.start.character}`;
-          if (seen.has(at)) return false;
-          seen.add(at);
-          return true;
-        });
-    });
-
     watchedFiles = await server.fileWatcher.watchFiles(["**/*"]);
   });
   connection.onShutdown(() => {
