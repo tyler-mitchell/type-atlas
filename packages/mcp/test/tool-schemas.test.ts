@@ -86,11 +86,33 @@ test("every tool advertises the arguments it accepts", () => {
   ).toEqual([]);
 });
 
-test("every published property describes its shape", () => {
+test("every published property declares a concrete type or enum", () => {
   expect(
     tools.flatMap(({ name, inputSchema }) =>
       properties(inputSchema)
-        .filter(([, schema]) => !("type" in schema || "enum" in schema || "anyOf" in schema))
+        .filter(([, schema]) => !("type" in schema || "enum" in schema))
+        .map(([property]) => `${name}.${property}`),
+    ),
+  ).toEqual([]);
+});
+
+/**
+ * A choice at the property itself leaves it with no type, and a client then
+ * coerces whatever is sent to a string: an array arrives as its JSON text, a
+ * number as digits. `snippetLines` published as `null | integer` failed exactly
+ * that way, turning 12 into "12".
+ *
+ * Deeper choices are fine, and the assertion above is what enforces the
+ * difference. `read_file.file` publishes `type: "array"` whose items may be a
+ * path or a bounded view: the container names the shape, so elements travel as
+ * the JSON they are, which a mixed call confirms.
+ */
+test("no property replaces its own type with a choice", () => {
+  expect(
+    tools.flatMap(({ name, inputSchema }) =>
+      properties(inputSchema)
+        .filter((entry) => ["anyOf", "oneOf", "allOf", "not"].some((key) => key in entry[1]))
+        .filter(([, schema]) => !("type" in schema || "enum" in schema))
         .map(([property]) => `${name}.${property}`),
     ),
   ).toEqual([]);

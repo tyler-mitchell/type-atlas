@@ -16,10 +16,16 @@ const resultLimit = type("1 <= number.integer <= 20").configure({
   description: "Maximum retrieval matches returned (1-20).",
 });
 
-const snippetLines = type("null | 0 <= number.integer <= 30").configure({
+/**
+ * A nullable bound would publish as a union, which leaves the property without
+ * a type and lets a client send the number as a string. Every match names its
+ * file and line, so reading further is `read_file`'s job rather than a shape
+ * this parameter has to carry.
+ */
+const snippetLines = type("0 <= number.integer <= 30").configure({
   default: 10,
   description:
-    "Source lines included for each retrieval match (0-30); pass null for the complete chunk.",
+    "Source lines included for each retrieval match (0-30). Read the file at a match for more.",
 });
 
 const investigationResultLimit = type("1 <= number.integer <= 20").configure({
@@ -39,10 +45,10 @@ const investigationRelatedLimit = type("0 <= number.integer <= 20").configure({
     "Optional structurally similar results derived from the first inspected candidate (0-20).",
 });
 
-const investigationSnippetLines = type("null | 0 <= number.integer <= 30").configure({
+const investigationSnippetLines = type("0 <= number.integer <= 30").configure({
   default: 6,
   description:
-    "Source lines included for each retrieval match (0-30); pass null for the complete chunk.",
+    "Source lines included for each retrieval match (0-30). Read the file at a match for more.",
 });
 
 const scope = type("string >= 1").configure({

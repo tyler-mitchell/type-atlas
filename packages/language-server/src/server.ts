@@ -4,6 +4,7 @@ import {
   createServer,
   createTypeScriptProject,
 } from "@volar/language-server/node.js";
+import type { Location } from "@volar/language-server/protocol.js";
 import ts from "typescript";
 import { URI } from "vscode-uri";
 import { create as createJsonService } from "volar-service-json";
@@ -160,25 +161,27 @@ export const registerLanguageServer = (connection: Connection): void => {
     server.initialized();
 
     /**
-     * Answers references from every loaded TypeScript project rather than only
-     * the one owning the document.
+     * Runs one positional lookup against every loaded project and merges it.
      *
-     * Volar resolves positional requests to a single language service, so in a
-     * monorepo whose packages import each other's source, a symbol's usages in
-     * sibling packages are missing even though those projects hold the same
-     * file and can answer for it. Each loaded project costs a warm lookup and
-     * they run together, so the added wall-clock is one project's query rather
-     * than their sum. Projects that never loaded stay unasked, since loading
-     * one is seconds and a TypeScript program.
+     * Volar resolves a positional request to the single language service owning
+     * the document, so in a monorepo whose packages import each other's source
+     * a symbol's usages in sibling packages are missing even though those
+     * projects hold the same file and can answer for it. Each loaded project
+     * costs a warm lookup and they run together, so the added wall-clock is one
+     * project's query rather than their sum. Projects that never loaded stay
+     * unasked, since loading one is seconds and a TypeScript program.
      *
-     * Registered here because Volar installs its own handler during
-     * `server.initialize`, and the later registration is the one that answers.
+     * The owning project is loaded first: only loaded projects can be
+     * enumerated, so the one guaranteed to hold this document may not be among
+     * them, and asking without it returns a sibling's narrower view in its
+     * place. A project that does not hold the document contributes nothing
+     * rather than failing the whole set.
+     *
+     * These handlers are registered after `server.initialize` installs Volar's
+     * own, because the later registration is the one that answers.
      */
     connection.onReferences(async ({ textDocument, position, context }, token) => {
       const uri = URI.parse(textDocument.uri);
-      // Load the owning project first. Only loaded projects can be enumerated,
-      // so asking for the existing set alone would omit the one project
-      // guaranteed to hold this document whenever nothing has opened it yet.
       const owner = await server.project.getLanguageService(uri);
       const loaded = await server.project.getExistingLanguageServices();
       const services = loaded.includes(owner) ? loaded : [owner, ...loaded];
@@ -191,14 +194,12 @@ export const registerLanguageServer = (connection: Connection): void => {
               { includeDeclaration: context?.includeDeclaration ?? true },
               token,
             )
-            // A project that does not hold this document contributes nothing
-            // rather than failing the whole set.
             .catch(() => undefined),
         ),
       );
       const seen = new Set<string>();
       return found
-        .flatMap((references) => references ?? [])
+        .flatMap((references: Location[] | undefined) => references ?? [])
         .filter(({ uri: target, range }) => {
           const at = `${target}#${range.start.line}:${range.start.character}`;
           if (seen.has(at)) return false;
