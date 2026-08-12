@@ -75,14 +75,19 @@ const call = defineCommand({
   run: async ({ args }) => {
     if (!args.tool) throw new Error("Name the tool to call.");
     const name = args.tool;
-    const result = await withLocalServer((client) =>
-      client.callTool({ name, arguments: parseArguments(args.arguments) }),
-    );
+    const { title, result } = await withLocalServer(async (client) => {
+      // The published title, so a local row reads like the attached tool's.
+      const published = await client.listTools();
+      return {
+        title: published.tools.find((tool) => tool.name === name)?.title ?? name,
+        result: await client.callTool({ name, arguments: parseArguments(args.arguments) }),
+      };
+    });
     const text = (result.content ?? [])
       .filter((item): item is { type: "text"; text: string } => item.type === "text")
       .map((item) => item.text)
       .join("\n\n");
-    process.stdout.write(`${text}\n`);
+    process.stdout.write(`Local MCP · ${title}\n\n${text}\n`);
     if (result.isError) process.exitCode = 1;
   },
 });
