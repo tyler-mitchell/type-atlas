@@ -636,17 +636,39 @@ export const formatNavigation = (noun: string, result: NavigationResult, workspa
   ].join("\n");
 };
 
+/**
+ * Renders located results grouped under each file.
+ *
+ * One path repeated per hit costs more than the positions it introduces, and a
+ * symbol used ten times in one file reads as ten unrelated results. Grouping
+ * states each path once and collects its positions in source order, matching
+ * how callers and calls are already reported.
+ */
 export const formatLocationPage = (
   noun: string,
   page: Page<Location> | null | undefined,
   workspaceRoot: string,
-) =>
-  !page
-    ? countHeader(noun, 0)
-    : [
-        pageHeader(noun, page),
-        ...page.items.map((item) => workspaceRange(item.uri, item.range, workspaceRoot)),
-      ].join("\n");
+) => {
+  if (!page) return countHeader(noun, 0);
+  const byFile = page.items.reduce((files, { uri, range }) => {
+    const file = workspacePath(uri, workspaceRoot);
+    return files.set(file, [...(files.get(file) ?? []), range]);
+  }, new Map<string, readonly Range[]>());
+  return [
+    pageHeader(noun, page),
+    ...[...byFile].map(([file, ranges]) =>
+      [
+        file,
+        indent(
+          [...ranges]
+            .sort((left, right) => comparePositions(left.start, right.start))
+            .map(rangeText)
+            .join(" · "),
+        ),
+      ].join("\n"),
+    ),
+  ].join("\n");
+};
 
 export const formatDocumentHighlights = (
   uri: string,
