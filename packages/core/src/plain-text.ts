@@ -320,6 +320,15 @@ const documentLinkTarget = (target: string, workspaceRoot: string) => {
   return `${file}${uri.query ? `?${uri.query}` : ""}${uri.fragment ? `#${uri.fragment}` : ""}`;
 };
 
+/**
+ * A tooltip that only restates the interaction an editor offers.
+ *
+ * The Markdown language service attaches "Follow link" to every resolvable
+ * link, which doubled this output while telling an agent nothing the arrow
+ * already says. A tooltip carrying real information is still shown.
+ */
+const isInteractionTooltip = (tooltip: string) => /^follow link/i.test(tooltip.trim());
+
 export const formatDocumentLinks = (
   uri: string,
   links: readonly DocumentLink[],
@@ -327,12 +336,13 @@ export const formatDocumentLinks = (
 ) =>
   [
     `Links (${links.length}) · ${workspacePath(uri, workspaceRoot)}`,
-    ...links.map(
-      (link) =>
-        `${rangeText(link.range)} -> ${
-          link.target ? documentLinkTarget(link.target, workspaceRoot) : "unresolved"
-        }${link.tooltip ? `\n${indent(link.tooltip)}` : ""}`,
-    ),
+    ...links.map((link) => {
+      const tooltip =
+        link.tooltip && !isInteractionTooltip(link.tooltip) ? link.tooltip : undefined;
+      return `${rangeText(link.range)} -> ${
+        link.target ? documentLinkTarget(link.target, workspaceRoot) : "unresolved"
+      }${tooltip ? `\n${indent(tooltip)}` : ""}`;
+    }),
   ].join("\n");
 
 const selectionRangeChain = (selection: SelectionRange | undefined): readonly Range[] =>
@@ -727,6 +737,25 @@ const callItemText = (item: CallHierarchyItem, workspaceRoot: string) =>
       : `; body ${rangeText(item.range)}`
   }${item.detail ? ` — ${item.detail}` : ""}`;
 
+/**
+ * A target outside the workspace, or inside its installed packages.
+ *
+ * `workspacePath` returns a relative path only for files under the root, so an
+ * absolute result already means the target is elsewhere.
+ */
+const isDependencyPath = (file: string) => path.isAbsolute(file) || file.includes("node_modules/");
+
+/**
+ * Renders one direction of a call hierarchy.
+ *
+ * Outgoing calls need more care than incoming ones. A call to a standard
+ * library method resolves to every overload that matched, so one call site
+ * arrives repeated across several declarations in different lib files — a
+ * single `Object.keys` produced sixteen copies of one range across two entries.
+ * Ranges are deduplicated, and dependency targets collapse to their distinct
+ * names on one line, the same treatment `inspect_symbol` gives its calls, which
+ * leaves the workspace targets that actually locate work readable.
+ */
 export const formatCallHierarchy = (
   direction: "incoming" | "outgoing",
   result: CallHierarchyResult,
@@ -738,15 +767,31 @@ export const formatCallHierarchy = (
   if (!items.length) return `${relations[0]?.toUpperCase()}${relations.slice(1)}: none`;
   const groups = items.flatMap((item, index) => {
     const calls =
-      direction === "incoming" ? result.incomingCalls?.[index] : result.outgoingCalls?.[index];
-    const relatedItems =
-      calls?.map((call) => {
-        const target = "from" in call ? call.from : call.to;
-        return `  ${relation} ${callItemText(
-          target,
-          workspaceRoot,
-        )}; call sites ${call.fromRanges.map(rangeText).join(", ")}`;
-      }) ?? [];
+      (direction === "incoming" ? result.incomingCalls?.[index] : result.outgoingCalls?.[index]) ??
+      [];
+    const targets = calls.map((call) => ({
+      target: "from" in call ? call.from : call.to,
+      sites: [...new Set(call.fromRanges.map(rangeText))],
+    }));
+    const workspaceTargets = targets.filter(
+      ({ target }) => !isDependencyPath(workspacePath(target.uri, workspaceRoot)),
+    );
+    const dependencyNames = [
+      ...new Set(
+        targets
+          .filter(({ target }) => isDependencyPath(workspacePath(target.uri, workspaceRoot)))
+          .map(({ target }) => target.name),
+      ),
+    ];
+    const relatedItems = [
+      ...workspaceTargets.map(
+        ({ target, sites }) =>
+          `  ${relation} ${callItemText(target, workspaceRoot)}; call sites ${sites.join(", ")}`,
+      ),
+      ...(dependencyNames.length
+        ? [`  dependency/runtime ${relations}: ${dependencyNames.join(", ")}`]
+        : []),
+    ];
     return [
       callItemText(item, workspaceRoot),
       ...(relatedItems.length ? relatedItems : [`  no ${relations}`]),
