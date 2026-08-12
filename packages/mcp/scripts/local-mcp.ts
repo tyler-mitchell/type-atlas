@@ -92,6 +92,55 @@ const call = defineCommand({
   },
 });
 
+/**
+ * Several calls against one server, for behavior that depends on its state.
+ *
+ * Each `call` starts a server and closes it, so nothing carries between them.
+ * Project loading, freshness after an edit, and concurrency are all properties
+ * of a server that has already done something, and a fresh one cannot show
+ * them: a lookup that widens once a sibling package is loaded looks identical
+ * to one that never widens.
+ */
+const sequence = defineCommand({
+  meta: {
+    name: "sequence",
+    description: "Call several tools against one server, for state-dependent behavior.",
+  },
+  args: {
+    calls: {
+      type: "positional",
+      description: 'JSON array of { "tool", "arguments" }, called in order.',
+    },
+  },
+  run: async ({ args }) => {
+    const parsed: unknown = JSON.parse(args.calls ?? "[]");
+    if (!Array.isArray(parsed) || !parsed.length) {
+      throw new Error('Pass a non-empty JSON array of { "tool", "arguments" }.');
+    }
+    const planned = parsed.map((entry) => {
+      const { tool, arguments: input } = (entry ?? {}) as {
+        tool?: unknown;
+        arguments?: unknown;
+      };
+      if (typeof tool !== "string") throw new Error("Every call needs a tool name.");
+      return { tool, input: (input ?? {}) as Record<string, unknown> };
+    });
+    await withLocalServer(async (client) => {
+      const published = await client.listTools();
+      for (const { tool, input } of planned) {
+        const title = published.tools.find((candidate) => candidate.name === tool)?.title ?? tool;
+        const result = await client.callTool({ name: tool, arguments: input });
+        const text = (result.content ?? [])
+          .filter((item): item is { type: "text"; text: string } => item.type === "text")
+          .map((item) => item.text)
+          .join("\n\n");
+        process.stdout.write(`Local MCP · ${title}\n\n${text}\n\n`);
+        if (result.isError) process.exitCode = 1;
+      }
+    });
+  },
+});
+
 const tools = defineCommand({
   meta: { name: "tools", description: "List the tools the source MCP publishes." },
   args: {
@@ -121,6 +170,6 @@ await runMain(
       name: "local-mcp",
       description: "Exercise the Type Atlas MCP from current source, without a client restart.",
     },
-    subCommands: { call, tools },
+    subCommands: { call, sequence, tools },
   }),
 );
