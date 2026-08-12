@@ -1,4 +1,5 @@
 import { fork } from "node:child_process";
+import { totalmem } from "node:os";
 import { stat } from "node:fs/promises";
 import { watch } from "chokidar";
 import * as path from "pathe";
@@ -63,6 +64,24 @@ const matchesWatcher = (watcher: FileSystemWatcher, relativePath: string, type: 
  */
 const idleWorkspaceTimeout = 45_000;
 
+/**
+ * Heap ceiling for a workspace's language server.
+ *
+ * A forked child inherits none of the parent's exec arguments and takes Node's
+ * default, which is derived from total memory and lands near 4 GB on a 16 GB
+ * machine. One TypeScript program per package is real working set rather than
+ * waste, and a monorepo with several large packages loaded at once reached that
+ * default and aborted, leaving most of the machine unused.
+ *
+ * Half of total memory keeps the ceiling proportional on smaller machines,
+ * where the default is already low and raising it blindly would only trade a
+ * crash for swapping. This defers exhaustion rather than removing it: nothing
+ * bounds how many projects a session loads, and Volar's `project.reload()` is
+ * the affordance for reclaiming them if that becomes the failure again.
+ */
+const languageServerHeapMegabytes = () =>
+  Math.max(2048, Math.min(8192, Math.floor(totalmem() / 1024 / 1024 / 2)));
+
 const startVolarWorkspace = async (
   workspaceRoot: string,
   languageServerEntry: URL,
@@ -76,7 +95,7 @@ const startVolarWorkspace = async (
 
   const languageServer = fork(languageServerEntry, ["--node-ipc"], {
     cwd: workspaceRoot,
-    execArgv: [],
+    execArgv: [`--max-old-space-size=${languageServerHeapMegabytes()}`],
     stdio: ["ignore", "ignore", "inherit", "ipc"],
   });
   const languageServerExit = new Promise<void>((resolve) =>
