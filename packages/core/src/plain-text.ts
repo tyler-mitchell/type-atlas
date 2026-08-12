@@ -464,19 +464,37 @@ export type CompletionPage = Page<CompletionItem> & {
   readonly itemDefaults?: CompletionList["itemDefaults"];
 };
 
-const editText = (item: CompletionItem) => {
+const editRangeText = (item: CompletionItem) =>
+  item.textEdit
+    ? "range" in item.textEdit
+      ? rangeText(item.textEdit.range)
+      : `insert ${rangeText(item.textEdit.insert)}; replace ${rangeText(item.textEdit.replace)}`
+    : undefined;
+
+/**
+ * The edit a candidate applies, minus anything already established.
+ *
+ * Every candidate at one position replaces the same span, and a server that
+ * omits `itemDefaults` repeats that span on each item — a page of ten repeated
+ * one range twenty times. `sharedRange` carries the span the caller already
+ * stated once, and inserted text is dropped when the label implies it, which
+ * leaves only the candidates that genuinely edit something else.
+ */
+const editText = (item: CompletionItem, sharedRange?: string) => {
   if (item.textEdit) {
-    const range =
-      "range" in item.textEdit
-        ? rangeText(item.textEdit.range)
-        : `insert ${rangeText(item.textEdit.insert)}; replace ${rangeText(item.textEdit.replace)}`;
-    return `edit ${range} => ${item.textEdit.newText}`;
+    const range = editRangeText(item);
+    const implied =
+      item.textEdit.newText === item.label || item.textEdit.newText === `.${item.label}`;
+    if (range === sharedRange && implied) return undefined;
+    return range === sharedRange
+      ? `edit => ${item.textEdit.newText}`
+      : `edit ${range} => ${item.textEdit.newText}`;
   }
   const insertion = item.textEditText ?? item.insertText;
   return insertion && insertion !== item.label ? `insert ${insertion}` : undefined;
 };
 
-const completionText = (item: CompletionItem) => {
+const completionText = (item: CompletionItem, sharedRange?: string) => {
   const kind = enumName(CompletionItemKind, item.kind, "completion");
   const label = `${item.label}${item.labelDetails?.detail ?? ""}`;
   const description = item.labelDetails?.description ? ` — ${item.labelDetails.description}` : "";
@@ -485,7 +503,7 @@ const completionText = (item: CompletionItem) => {
       ? " [deprecated]"
       : "";
   const documentation = markupText(item.documentation);
-  const edit = editText(item);
+  const edit = editText(item, sharedRange);
   const additionalEdits =
     item.additionalTextEdits?.map(
       (additional) => `additional edit ${rangeText(additional.range)} => ${additional.newText}`,
@@ -505,19 +523,25 @@ const completionText = (item: CompletionItem) => {
 export const formatCompletions = (page: CompletionPage | null | undefined) => {
   if (!page) return "Completions (0)";
   const state = page.isIncomplete ? " · more available" : "";
-  const defaults = page.itemDefaults?.editRange
-    ? `Default edit: ${
-        "insert" in page.itemDefaults.editRange
-          ? `insert ${rangeText(page.itemDefaults.editRange.insert)}; replace ${rangeText(
-              page.itemDefaults.editRange.replace,
-            )}`
-          : rangeText(page.itemDefaults.editRange)
-      }`
+  const declared = page.itemDefaults?.editRange
+    ? "insert" in page.itemDefaults.editRange
+      ? `insert ${rangeText(page.itemDefaults.editRange.insert)}; replace ${rangeText(
+          page.itemDefaults.editRange.replace,
+        )}`
+      : rangeText(page.itemDefaults.editRange)
     : undefined;
+  // A server that omits `itemDefaults` still edits one span for every
+  // candidate, so derive it when the whole page agrees and state it once.
+  const itemRanges = page.items.map(editRangeText);
+  const shared =
+    declared ??
+    (itemRanges.length &&
+    itemRanges.every((range) => range !== undefined && range === itemRanges[0])
+      ? itemRanges[0]
+      : undefined);
   return [
-    `${pageHeader("completions", page)}${state}`,
-    ...(defaults ? [defaults] : []),
-    ...page.items.map(completionText),
+    `${pageHeader("completions", page)}${state}${shared ? ` · edit ${shared}` : ""}`,
+    ...page.items.map((item) => completionText(item, shared)),
   ].join("\n");
 };
 
