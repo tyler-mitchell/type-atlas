@@ -47,12 +47,21 @@ const matchesWatcher = (watcher: FileSystemWatcher, relativePath: string, type: 
 /**
  * How long an unused workspace keeps its language server.
  *
- * Reloading a disposed workspace rebuilds its TypeScript program, which costs
- * seconds on a monorepo, so this has to outlast the gaps between an agent's
- * calls. Agents pause far longer than a person typing: they reason between
- * tool calls and interleave reads, edits, and shell commands.
+ * Reloading a disposed workspace rebuilds its TypeScript program, measured at
+ * about 5.5 seconds on a mid-sized monorepo against 5 milliseconds warm. That
+ * cost is paid once per idle gap and amortizes over the calls that follow, so
+ * it stays small.
+ *
+ * Holding the process instead is not free: its heap only grows, reaching
+ * 1.8 GB over 75 minutes in one observed session, and exhausting it kills the
+ * workspace and every request in flight. A predictable few seconds beats an
+ * unpredictable crash, so this recycles on a genuine pause rather than trying
+ * to outlast an agent's think time.
+ *
+ * This bounds idle processes only. A workspace called steadily never idles
+ * out, so heap growth during active work needs its own bound.
  */
-const idleWorkspaceTimeout = 30 * 60_000;
+const idleWorkspaceTimeout = 45_000;
 
 const startVolarWorkspace = async (
   workspaceRoot: string,
@@ -82,6 +91,11 @@ const startVolarWorkspace = async (
   const terminateLanguageServer = () => {
     if (isLanguageServerRunning()) languageServer.kill("SIGKILL");
   };
+  const languageServerExitReason = () =>
+    languageServerError?.message ??
+    (languageServer.signalCode
+      ? `killed by ${languageServer.signalCode}, which a memory limit reports as SIGABRT`
+      : `exit code ${languageServer.exitCode}`);
 
   const connection = createProtocolConnection(
     new IPCMessageReader(languageServer),
@@ -240,6 +254,16 @@ const startVolarWorkspace = async (
         throw signal.reason instanceof Error
           ? signal.reason
           : new Error("TypeAtlas request was cancelled.");
+      }
+      // A language server that exits mid-request disposes the connection, and
+      // the rejection every pending request then sees describes the transport
+      // rather than what happened. Name the exit instead, so a caller can tell
+      // a crash from a normal failure and knows whether retrying can help.
+      if (!isLanguageServerRunning()) {
+        throw new Error(
+          `The language server for ${workspaceRoot} exited during this request (${languageServerExitReason()}). It starts again on the next call. If the same request keeps ending this way, it is too large to answer at once — narrow it and retry.`,
+          { cause: languageServerError ?? error },
+        );
       }
       throw error;
     } finally {
