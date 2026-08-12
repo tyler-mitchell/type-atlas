@@ -199,6 +199,15 @@ const startVolarWorkspace = async (
   }
 
   let disposed = false;
+  /** Tail of the in-flight `withTextDocument` chain for each open uri. */
+  const openDocuments = new Map<string, Promise<void>>();
+  /** Monotonic version per uri, so a reused document reads as an edit. */
+  const documentVersions = new Map<string, number>();
+  const documentVersion = (uri: string) => {
+    const version = (documentVersions.get(uri) ?? 0) + 1;
+    documentVersions.set(uri, version);
+    return version;
+  };
   const getWorkspaceUri = (file: string) => {
     const filePath = path.resolve(workspaceRoot, file);
     if (!isFileInDir(filePath, workspaceRoot)) {
@@ -263,6 +272,15 @@ const startVolarWorkspace = async (
     },
     readTextDocumentUri,
     getWorkspaceUri,
+    /**
+     * Opens a document for the duration of one task, then closes it.
+     *
+     * Callers sharing a uri are serialized. A synthetic document is reused
+     * across calls so the language server sees one file being edited rather
+     * than a new source file each time, and overlapping opens of that uri
+     * would otherwise race: one task's close would land while another is still
+     * reading it.
+     */
     async withTextDocument<T>({
       uri,
       languageId,
@@ -275,18 +293,29 @@ const startVolarWorkspace = async (
       readonly source: string;
       readonly signal?: AbortSignal;
       readonly task: (textDocument: { readonly uri: string }) => Promise<T>;
-    }) {
-      signal?.throwIfAborted();
-      await connection.sendNotification(DidOpenTextDocumentNotification.type, {
-        textDocument: { uri, languageId, version: 1, text: source },
-      });
-      try {
-        return await task({ uri });
-      } finally {
-        await connection.sendNotification(DidCloseTextDocumentNotification.type, {
-          textDocument: { uri },
+    }): Promise<T> {
+      const preceding = openDocuments.get(uri) ?? Promise.resolve();
+      const attempt = preceding.then(async () => {
+        signal?.throwIfAborted();
+        await connection.sendNotification(DidOpenTextDocumentNotification.type, {
+          textDocument: { uri, languageId, version: documentVersion(uri), text: source },
         });
-      }
+        try {
+          return await task({ uri });
+        } finally {
+          await connection.sendNotification(DidCloseTextDocumentNotification.type, {
+            textDocument: { uri },
+          });
+        }
+      });
+      openDocuments.set(
+        uri,
+        attempt.then(
+          () => undefined,
+          () => undefined,
+        ),
+      );
+      return attempt;
     },
     dispose,
   };

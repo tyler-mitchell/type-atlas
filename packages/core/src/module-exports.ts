@@ -1,5 +1,4 @@
 import { ResolveDependencySourceRequest } from "@type-atlas/language-server/protocol";
-import { randomUUID } from "node:crypto";
 import {
   type CompletionItem,
   CompletionItemKind,
@@ -123,9 +122,13 @@ export const listModuleExports = async ({
 }): Promise<ModuleExportPage> => {
   const uri = workspace.getWorkspaceUri(fromFile);
   const parsedUri = URI.parse(uri);
-  const probeUri = parsedUri
-    .with({ path: `${parsedUri.path}.type-atlas-${randomUUID()}.ts` })
-    .toString();
+  // The probe sits beside the importing file so module specifiers resolve
+  // against that file's project and package versions. Its name is derived from
+  // that file rather than made unique per call: TypeScript retains what it has
+  // seen, so a fresh name each time leaves another synthetic source file in the
+  // project and the server grows by one per call. A stable name is an ordinary
+  // edit to one file, and `withTextDocument` serializes callers sharing it.
+  const probeUri = parsedUri.with({ path: `${parsedUri.path}.type-atlas-probe.ts` }).toString();
   const effectiveSurface = type || path.length ? "runtime" : surface;
   const { source, position, definitionPosition } = probe({
     moduleName,
