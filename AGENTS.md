@@ -15,7 +15,9 @@ Type Atlas MCP Usage:
 - If the session-attached MCP is unavailable, say so plainly.
 
 - In Codex, use `$local-mcp-development` exactly for local MCP development and verification; do not improvise the client lifecycle. That skill depends on Codex's `code_mod` tool and has no Claude Code equivalent.
-- In Claude Code, attach the source entry as a project MCP server and restart, because MCP servers are loaded once at session start and cannot be hot-reloaded: `claude mcp add --scope project type-atlas-local -- node --conditions=development <repo>/packages/mcp/src/cli.ts`. Source edits also require a restart before the attached tools reflect them. `.mcp.json` is gitignored, so this configuration stays local.
+- In Claude Code, attach the source entry as a project MCP server and restart, because MCP servers are loaded once at session start and cannot be hot-reloaded: `claude mcp add --scope project type-atlas-local -- node --conditions=development <repo>/packages/mcp/src/cli.ts`. `.mcp.json` is gitignored, so this configuration stays local.
+- Only the MCP process is pinned for the session. `@type-atlas/language-server` runs as a child process forked per workspace, and the pool replaces one that has exited, so `pkill -f "language-server/src/node.ts"` makes the next tool call load your edits with no restart and no build under the development condition. Prefer the language server for a change you need to verify against the attached tools mid-session; `@type-atlas/core` and `@type-atlas/mcp` are resolved once at startup and reach the attached tools only after a restart. Do not relocate a concern into the language server merely to make it reloadable.
+- Codex runs `packages/mcp/dist/cli.js` while Claude Code runs `src/cli.ts`, so a Codex agent reads whatever was last built. Build the three packages after source edits, or it is running code that no longer exists.
 - Before claiming post-restart readiness, build `@type-atlas/language-server`, `@type-atlas/core`, and `@type-atlas/mcp` whenever the client is configured against built `dist` output; the source entry above runs from `src` and needs no build.
 
 MCP Tool Input Schemas:
