@@ -48,20 +48,21 @@ const matchesWatcher = (watcher: FileSystemWatcher, relativePath: string, type: 
 /**
  * How long an unused workspace keeps its language server.
  *
- * Reloading rebuilds the TypeScript program, measured at about 5.5 seconds on a
- * mid-sized monorepo against 5 milliseconds warm. An agent pauses far longer
- * than a person typing — it reads a result, writes a patch, runs a command —
- * so a timeout shorter than those gaps charges that reload repeatedly for work
- * the process was about to be asked to do anyway.
+ * Reloading a disposed workspace rebuilds its TypeScript program, measured at
+ * about 5.5 seconds on a mid-sized monorepo against 5 milliseconds warm. That
+ * cost is paid once per idle gap and amortizes over the calls that follow, so
+ * it stays small.
  *
- * Holding it was once the greater risk: the heap grew about 18 MB per module
- * probe with no plateau, reaching 1.8 GB over one session, so a short timeout
- * was the only thing bounding it. That leak is fixed and the fork now has an
- * explicit ceiling, which leaves this free to serve latency, its actual
- * purpose. Minutes cover an agent's gaps while still releasing a workspace it
- * has genuinely finished with, where a session-length timeout would not.
+ * Holding the process instead is not free: its heap only grows, reaching
+ * 1.8 GB over 75 minutes in one observed session, and exhausting it kills the
+ * workspace and every request in flight. A predictable few seconds beats an
+ * unpredictable crash, so this recycles on a genuine pause rather than trying
+ * to outlast an agent's think time.
+ *
+ * This bounds idle processes only. A workspace called steadily never idles
+ * out, so heap growth during active work needs its own bound.
  */
-const idleWorkspaceTimeout = 5 * 60_000;
+const idleWorkspaceTimeout = 45_000;
 
 /**
  * Heap ceiling for a workspace's language server.
