@@ -1,5 +1,7 @@
 import { Client } from "@modelcontextprotocol/client";
 import { getDefaultEnvironment, StdioClientTransport } from "@modelcontextprotocol/client/stdio";
+import { isFileInDir } from "@volar/language-server/node.js";
+import * as path from "pathe";
 import { type } from "arktype";
 import packageJson from "../package.json" with { type: "json" };
 
@@ -36,6 +38,17 @@ const parseSearchPage = (text: string): SembleSearchPage => {
 };
 
 export type Semble = {
+  /**
+   * The directory to index for a requested root.
+   *
+   * Semble keys its cache on the resolved path it is handed, so a package and
+   * the monorepo containing it never share an index: asking about the package
+   * after the monorepo builds a second one over files already indexed. This
+   * answers with a root already indexed in this session that contains the
+   * requested one, and otherwise with the requested one — a session that only
+   * ever names the package still indexes the package, not everything above it.
+   */
+  repo(root: string): string;
   search(input: {
     readonly repo: string;
     readonly query: string;
@@ -145,7 +158,18 @@ export const createSemble = (): Semble => {
   // the message that says how to install uvx.
   void connect().catch(() => undefined);
 
+  const indexed = new Set<string>();
+
   return {
+    repo(root) {
+      const requested = path.resolve(root);
+      const containing = [...indexed].find(
+        (open) => requested === open || isFileInDir(requested, open),
+      );
+      if (containing) return containing;
+      indexed.add(requested);
+      return requested;
+    },
     search: async ({ repo, query, limit, snippetLines, signal }) =>
       await request({
         name: "search",

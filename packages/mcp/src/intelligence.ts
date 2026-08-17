@@ -344,22 +344,24 @@ const scopedSearch = async (input: {
       snippetLines: null,
       signal: input.signal,
     });
-  const workspaceRoot = path.resolve(input.root);
-  if (input.searchRoot === workspaceRoot) return await ask(workspaceRoot, input.limit);
+  // Whichever root is already indexed and contains this one, so a package inside
+  // a monorepo does not build a second index over files the first one holds.
+  const indexRoot = input.semble.repo(input.root);
+  if (input.searchRoot === indexRoot) return await ask(indexRoot, input.limit);
 
-  // The workspace index reports paths against the workspace; every reader below
-  // resolves them against the search root, so they are re-based to it here and
+  // Results come back relative to the root that was indexed, and every reader
+  // below resolves them against the search root, so they are re-based to it and
   // a scoped page reads identically however it was obtained.
   const within = (page: SembleSearchPage) => ({
     ...page,
     results: page.results.flatMap((result) => {
-      const file = path.resolve(workspaceRoot, result.file_path);
+      const file = path.resolve(indexRoot, result.file_path);
       return isFileInDir(file, input.searchRoot)
         ? [{ ...result, file_path: platformRelative(input.searchRoot, file) }]
         : [];
     }),
   });
-  const wide = within(await ask(workspaceRoot, Math.min(input.limit * 12, 300)));
+  const wide = within(await ask(indexRoot, Math.min(input.limit * 12, 300)));
   if (wide.results.length >= input.limit) {
     return { ...wide, results: wide.results.slice(0, input.limit) };
   }

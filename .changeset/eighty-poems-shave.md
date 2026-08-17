@@ -2,21 +2,18 @@
 "@type-atlas/mcp": patch
 ---
 
-Publish `snippetLines` as a plain bounded integer.
+Join a semantic index already built over a containing root.
 
-It was declared `null | 0 <= number.integer <= 30`, and a property whose schema
-is a choice publishes without a type, so a client coerces whatever is sent to a
-string: `search_dependency_code` rejected `snippetLines: 12` because it arrived
-as `"12"`. The bound is now published alone, across `search_code`,
-`related_code`, `investigate_code`, `explore_symbol`, and
-`search_dependency_code`.
+Semble keys its cache on the resolved path it is handed, so a package and the
+monorepo containing it never share an index. Fixing `directory` earlier stopped a
+second index per scope, but the workspace root had the same problem one level up:
+naming the monorepo and then a package inside it built two indexes over
+overlapping files — 13 seconds for the second, measured.
 
-`null` requested the complete chunk. Every match already names its file and
-line, so reading further is `read_file`'s job rather than a shape this parameter
-has to carry.
+A search now uses a root already indexed in this session that contains the
+requested one, and otherwise the requested one, so a session that only ever names
+the package still indexes the package rather than everything above it. Results
+are re-based from whichever root was indexed, so a scoped page reads the same
+either way.
 
-`test/tool-schemas.test.ts` now asserts that every published property declares a
-concrete `type` or `enum` of its own, which is what this violated. A choice
-nested below a typed property stays allowed: `read_file.file` publishes
-`type: "array"` whose items may be a path or a bounded view, and the container
-naming the shape is what lets those elements travel as the JSON they are.
+Measured: the package-scoped search after a monorepo-scoped one answered in 52ms.
