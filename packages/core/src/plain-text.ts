@@ -244,6 +244,7 @@ export const formatDiagnostics = (
  */
 export const formatDiagnose = (input: {
   readonly report: {
+    readonly unchanged?: boolean;
     readonly configFile: string | null;
     readonly projectCount: number;
     readonly fileCount: number;
@@ -255,6 +256,9 @@ export const formatDiagnose = (input: {
   readonly root: string;
 }): string => {
   const { report, scope, root } = input;
+  if (report.unchanged) {
+    return "Nothing has been written since this workspace opened. Pass scope: \"project\" to check it anyway, or name a project.";
+  }
   // Nothing loaded and nothing changed is not a clean report — it is no report.
   if (!report.projectCount) {
     return "No project has been loaded yet, and nothing has changed. Name one with project, or read a file in it first.";

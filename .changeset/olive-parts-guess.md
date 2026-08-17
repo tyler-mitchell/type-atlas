@@ -2,21 +2,13 @@
 "@type-atlas/core": patch
 ---
 
-Stop `callees` from repeating one call site per resolved overload.
+Answer "nothing changed" without checking the project.
 
-A call to a standard library method resolves to every overload that matched, and
-each arrived as a separate callee carrying the same range. One
-`listModuleExports` reported `Object.keys` twice, from `lib.es5.d.ts` and
-`lib.es2015.core.d.ts`, each listing the identical range sixteen times, and the
-four callees that located real work sat under roughly four thousand characters
-of standard library paths.
+`diagnostics` defaults to the files written since the workspace opened. With none
+written, the empty file list fell through to every loaded project, and the filter
+that narrows a report to the changed files cannot narrow an empty list — so the
+whole project came back under a heading that said "changed files". On a
+1,768-file project that was 28.6 seconds to answer a question whose answer was
+already known.
 
-Ranges are now deduplicated, and dependency targets collapse to their distinct
-names on one line — the treatment `inspect_symbol` already gives its calls —
-leaving workspace targets readable. `callers` was unaffected, since callers of a
-workspace symbol are workspace code.
-
-`document_links` no longer prints the "Follow link" tooltip the Markdown
-language service attaches to every resolvable link, which doubled that output
-while saying nothing the arrow does not. A tooltip carrying real information is
-still shown.
+It now says so in 6ms, and names the two ways to ask for the check anyway.

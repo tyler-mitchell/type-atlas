@@ -1,17 +1,28 @@
 ---
-"@type-atlas/core": patch
+"@type-atlas/core": minor
 ---
 
-Descend into a folded body when it would otherwise hide the file's structure.
+Join a workspace already open at an outer root instead of starting a second server.
 
-The outermost eligible range wins at each line, so one long body swallowed every
-declaration beneath it. Reading a 324-line module whole collapsed lines 166-322
-to a single placeholder under `return {`, hiding `capture`, `dispose`, `state$`,
-and `restore` — the module's entire public surface, and the reason to open the
-file. The line above a fold usually names what it hides; an object or return
-body names nothing.
+Volar finds the configuration owning a file by walking up from the file, so a
+server started at a monorepo already answers for every package inside it. Naming
+the monorepo and then a package in it — the ordinary way an agent works — started
+a second language server and rebuilt that package's program, and with it every
+declaration file behind it, since `volar-service-typescript` keys its document
+registry on the root as well. On this repository's engine package that was a
+second copy of a 1,768-file program.
 
-A range that hides more than a third of the view is now dropped in favour of the
-ranges inside it, which surfaces those members with their own bodies folded, for
-five lines. Only when children exist: a long body with no foldable range inside
-keeps its placeholder, since discarding it would print every line instead.
+A nested root now shares the open connection while keeping its own root: paths
+resolve here, files outside it are still refused, and the changed-file view is
+narrowed to this subtree and reported relative to it. Handing back the outer
+workspace itself does not work — it resolves a relative path against the outer
+root — which is why this is a view rather than a reuse.
+
+Measured: a symbol inspection through the nested root answered in 569ms against
+4,923ms for the same inspection that had to build the program.
+
+Two fixes to the request deadline that shipped with it. `Promise.race` abandons
+the loser without stopping it, so every answered request armed a timer that ended
+the server a minute later; the timer is now cleared when the request settles.
+And releasing a nested root now ends the server that answers for it, rather than
+dropping a view whose own disposal is deliberately inert.

@@ -148,6 +148,20 @@ export const createTypeAtlas = (workspace: VolarWorkspace) => {
     readonly signal: AbortSignal;
   }) {
     const uris = input.files.map((file) => workspace.getWorkspaceUri(file));
+    // Asking about changed files when none have changed is a question with an
+    // answer already: nothing. Sending it checks every loaded project — twenty-
+    // eight seconds on a three-thousand-file one — and reports the whole thing
+    // under a heading that says "changed files".
+    if (input.scope === "changed" && !uris.length) {
+      return {
+        configFile: null,
+        projectCount: 0,
+        fileCount: 0,
+        affectedCount: 0,
+        diagnostics: [],
+        unchanged: true,
+      };
+    }
     const projects = await workspace.sendRequest(
       ProjectDiagnosticsRequest.type,
       { textDocuments: uris.map((uri) => ({ uri })) },
@@ -159,6 +173,7 @@ export const createTypeAtlas = (workspace: VolarWorkspace) => {
         : documents,
     );
     return {
+      unchanged: false,
       configFile: projects.length === 1 ? (projects[0]?.configFile ?? null) : null,
       projectCount: projects.length,
       fileCount: projects.reduce((total, { fileCount }) => total + fileCount, 0),

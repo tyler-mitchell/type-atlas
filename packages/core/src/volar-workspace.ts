@@ -316,9 +316,10 @@ const startVolarWorkspace = async (workspaceRoot: string, languageServerEntry: U
    * rather than on a caller giving up, because a caller giving up says nothing
    * about whether the server is stuck.
    */
-  const wedged = (method: string) =>
-    new Promise<never>((_, reject) => {
-      const deadline = setTimeout(() => {
+  const wedged = (method: string) => {
+    const deadline: { timer?: ReturnType<typeof setTimeout> } = {};
+    const reached = new Promise<never>((_, reject) => {
+      deadline.timer = setTimeout(() => {
         terminateLanguageServer();
         reject(
           new Error(
@@ -326,8 +327,12 @@ const startVolarWorkspace = async (workspaceRoot: string, languageServerEntry: U
           ),
         );
       }, requestDeadline);
-      languageServerExit.finally(() => clearTimeout(deadline));
     });
+    // The race abandons the loser but does not stop it. Left running, every
+    // answered request would have armed a timer that killed the server a minute
+    // later — observed as a SIGKILL mid-request after a run of successful ones.
+    return { reached, clear: () => clearTimeout(deadline.timer) };
+  };
 
   const sendRequest = async <Params, Result, Error>(
     request: RequestType<Params, Result, Error>,
@@ -341,10 +346,11 @@ const startVolarWorkspace = async (workspaceRoot: string, languageServerEntry: U
     signal?.addEventListener("abort", cancel, { once: true });
     if (signal?.aborted) cancel();
 
+    const deadline = wedged(request.method);
     try {
       return await Promise.race([
         connection.sendRequest<Result>(request.method, params, cancellation?.token),
-        wedged(request.method),
+        deadline.reached,
       ]);
     } catch (error) {
       if (signal?.aborted) {
@@ -364,6 +370,7 @@ const startVolarWorkspace = async (workspaceRoot: string, languageServerEntry: U
       }
       throw error;
     } finally {
+      deadline.clear();
       signal?.removeEventListener("abort", cancel);
       cancellation?.dispose();
     }
@@ -520,13 +527,88 @@ export type VolarWorkspacePool = ReturnType<typeof createVolarWorkspaces>;
  * an agent's think time rather than being reclaimed between calls. Disposing the
  * pool closes every active process.
  */
+/**
+ * Presents a workspace already open at an outer root as one rooted here.
+ *
+ * Volar finds the configuration owning a file by walking up from the file, so a
+ * server started at a monorepo already answers for every package inside it —
+ * a second server for a package rebuilds that package's program, and with it
+ * every declaration file behind it, since `volar-service-typescript` keys its
+ * document registry on the root too. Naming the monorepo and then a package in
+ * it is the ordinary way an agent reaches that.
+ *
+ * What cannot be shared is the root itself: a workspace resolves relative paths
+ * against its own, and refuses files outside it. Handing back the outer
+ * workspace resolved `src/render/gpu-cull.ts` against the monorepo. So the
+ * connection is shared and the root is not — paths resolve here, and the
+ * changed-file view is narrowed to this subtree and reported relative to it.
+ */
+const nestedWorkspace = (input: {
+  readonly parent: VolarWorkspace;
+  readonly parentRoot: string;
+  readonly workspaceRoot: string;
+}): VolarWorkspace => {
+  const { parent, parentRoot, workspaceRoot } = input;
+  const getWorkspaceUri = (file: string) => {
+    const filePath = path.resolve(workspaceRoot, file);
+    if (!isFileInDir(filePath, workspaceRoot)) {
+      throw new Error(`File is outside the workspace: ${file}`);
+    }
+    return parent.getWorkspaceUri(filePath);
+  };
+  const here = (relativePath: string) => {
+    const filePath = path.resolve(parentRoot, relativePath);
+    return isFileInDir(filePath, workspaceRoot)
+      ? path.relative(workspaceRoot, filePath)
+      : undefined;
+  };
+  return {
+    ...parent,
+    getWorkspaceUri,
+    async getTextDocument(file: string) {
+      return await parent.getTextDocument(path.resolve(workspaceRoot, file));
+    },
+    changedFiles: () => parent.changedFiles().flatMap((file) => here(file) ?? []),
+    observeChanges: (observer) =>
+      parent.observeChanges((relativePath) => {
+        const mine = here(relativePath);
+        if (mine !== undefined) observer(mine);
+      }),
+    // The outer workspace owns the process; this handle is a view of it.
+    dispose: async () => undefined,
+  };
+};
+
 export const createVolarWorkspaces = (languageServer: URL) => {
   const entries = new Map<string, Promise<VolarWorkspace>>();
+
+  /** Forgets an entry, unless it has already been replaced by a later one. */
+  const forget = (workspaceRoot: string, held: Promise<VolarWorkspace>) => () => {
+    if (entries.get(workspaceRoot) === held) entries.delete(workspaceRoot);
+  };
+
+  /** The open root that answers for this one: itself, or the outermost containing it. */
+  const owner = (workspaceRoot: string) =>
+    entries.has(workspaceRoot)
+      ? workspaceRoot
+      : [...entries.keys()].find((openRoot) => isFileInDir(workspaceRoot, openRoot));
 
   const get = (root: string): Promise<VolarWorkspace> => {
     const workspaceRoot = path.resolve(root);
     const existing = entries.get(workspaceRoot);
     if (existing) return existing;
+
+    const parentRoot = owner(workspaceRoot);
+    const parent = parentRoot === undefined ? undefined : entries.get(parentRoot);
+    if (parent && parentRoot !== undefined) {
+      const view = parent.then((active) =>
+        nestedWorkspace({ parent: active, parentRoot, workspaceRoot }),
+      );
+      entries.set(workspaceRoot, view);
+      const drop = forget(workspaceRoot, view);
+      void parent.then(({ closed }) => closed.then(drop, drop), drop);
+      return view;
+    }
 
     const workspace = startVolarWorkspace(workspaceRoot, languageServer);
     entries.set(workspaceRoot, workspace);
@@ -556,10 +638,14 @@ export const createVolarWorkspaces = (languageServer: URL) => {
      * for a queue with no bound but the abandoned work's own duration.
      */
     async release(root: string) {
-      const workspaceRoot = path.resolve(root);
-      const held = entries.get(workspaceRoot);
+      // Ends the server that answers for this root, which may be one opened at
+      // an outer root; a view of it disposes to nothing, so releasing the view
+      // would leave the wedged process running and every later call behind it.
+      const serverRoot = owner(path.resolve(root));
+      if (serverRoot === undefined) return;
+      const held = entries.get(serverRoot);
       if (!held) return;
-      entries.delete(workspaceRoot);
+      entries.delete(serverRoot);
       await held.then(
         (active) => active.dispose(),
         () => undefined,
