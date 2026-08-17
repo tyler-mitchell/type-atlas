@@ -58,9 +58,13 @@ const properties = (schema: { readonly properties?: unknown }): readonly [string
 
 beforeAll(async () => {
   const client = new Client({ name: "type-atlas-schema-test", version: "1.0.0" });
+  // The source entrypoint, because that is what every client attaches. Reading
+  // `bin/type-atlas.cjs` here would assert against whatever was last built, so
+  // a schema defect in the working tree passes and the same defect reaches
+  // every agent the moment they connect.
   const transport = new StdioClientTransport({
     command: process.execPath,
-    args: ["bin/type-atlas.cjs"],
+    args: ["--conditions=development", "src/cli.ts"],
     cwd: packageRoot,
     stderr: "pipe",
   });

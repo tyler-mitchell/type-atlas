@@ -45,9 +45,12 @@ export const fileInput = {
   }),
 } as const;
 
+// No published default: a client that sees one sends it on every call, and the
+// value it sends wins over the handler's. Diagnostics are a type check of the
+// file and everything it imports, so a read that never asked for them was
+// paying for them.
 export const diagnosticModeInput = type("'summary' | 'verbose' | 'off'").configure(
   {
-    default: "summary",
     description:
       "One of: summary (one complete diagnostic plus file totals), verbose (the full report), off (omit diagnostics).",
   },

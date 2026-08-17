@@ -105,11 +105,11 @@ export const registerAssistanceTools = (
     },
     async ({ workspace: root, file, position, includeDiagnostics }, { mcpReq: { signal } }) => {
       const workspace = await workspaces.get(root);
-      const { textDocument, hover } = await createTypeAtlas(workspace).hover(
+      const { textDocument, result: hover } = await createTypeAtlas(workspace).hover({
         file,
-        position,
         signal,
-      );
+        params: { position },
+      });
       const diagnosticContext = requestDiagnosticContext(
         workspace,
         textDocument,

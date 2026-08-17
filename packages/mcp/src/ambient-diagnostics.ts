@@ -30,9 +30,7 @@ export function requestDiagnosticContext(
   focus?: Position | Range,
 ): Promise<string | undefined> {
   const mode = includeDiagnostics ?? "summary";
-  if (mode === "off") {
-    return Promise.resolve(undefined);
-  }
+  if (mode === "off") return Promise.resolve(undefined);
 
   return workspace.sendRequest(DocumentDiagnosticRequest.type, { textDocument }, signal).then(
     (report) => formatDiagnosticMode(textDocument.uri, report, workspaceRoot, mode, focus),

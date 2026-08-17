@@ -1,6 +1,16 @@
 import { type FoldingRange, FoldingRangeKind } from "@volar/language-server/protocol.js";
 
 const minimumViewLines = 20;
+
+/**
+ * Whether folding ranges can change how a view of this many lines renders.
+ *
+ * A short view is printed whole — {@linkcode formatFoldedSource} discards every
+ * range below this size — so asking a language server for ranges it will never
+ * use costs a request that can wait behind a type check for as long as
+ * TypeScript takes, to produce identical output.
+ */
+export const foldingAffectsView = (viewLineCount: number) => viewLineCount > minimumViewLines;
 const minimumFoldedLines = 6;
 const typeDeclaration = /^(?:(?:export|default|declare)\s+)*(?:interface|type)\s+[$_\p{ID_Start}]/u;
 const isNonCodeRange = ({ kind }: FoldingRange) =>
@@ -21,12 +31,14 @@ type SourceView = {
  * remain expanded; eligible implementation bodies are replaced by placeholders
  * that retain their original line range.
  */
+export const sourceLines = (source: string): readonly string[] =>
+  source === "" ? [] : source.replace(/\r?\n$/, "").split(/\r?\n/);
+
 export const formatFoldedSource = (
-  source: string,
+  lines: readonly string[],
   ranges: readonly FoldingRange[],
   view: SourceView = {},
 ): string => {
-  const lines = source === "" ? [] : source.replace(/\r?\n$/, "").split(/\r?\n/);
   const sourceStartLine = view.sourceStartLine ?? 1;
   const startLine = view.startLine ?? sourceStartLine;
   const requestedEndLine = view.endLine ?? sourceStartLine + lines.length - 1;

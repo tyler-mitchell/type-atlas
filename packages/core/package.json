@@ -74,13 +74,15 @@
     "chokidar": "catalog:",
     "pathe": "catalog:",
     "pkg-types": "catalog:",
+    "typescript": "catalog:",
+    "volar-service-typescript": "catalog:",
     "vscode-languageserver-protocol": "catalog:",
+    "vscode-languageserver-textdocument": "catalog:",
     "vscode-uri": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
     "tsdown": "catalog:",
-    "typescript": "catalog:",
     "vitest": "catalog:"
   },
   "engines": {

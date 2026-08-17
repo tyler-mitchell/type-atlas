@@ -1,18 +1,26 @@
-import { FileSizesRequest, ProjectDiagnosticsRequest } from "@type-atlas/language-server/protocol";
+import { ProjectDiagnosticsRequest } from "@type-atlas/language-server/protocol";
 import {
+  CallHierarchyIncomingCallsRequest,
+  type CallHierarchyItem,
+  CallHierarchyOutgoingCallsRequest,
+  CallHierarchyPrepareRequest,
   DefinitionRequest,
   DocumentDiagnosticRequest,
+  DocumentHighlightRequest,
   DocumentLinkRequest,
   DocumentLinkResolveRequest,
   DocumentSymbolRequest,
-  FoldingRangeRequest,
   GetMatchTsConfigRequest,
   HoverRequest,
+  ImplementationRequest,
+  type Position,
   ReferencesRequest,
+  type ReferenceParams,
   SelectionRangeRequest,
+  TypeDefinitionRequest,
   WorkspaceSymbolRequest,
 } from "@volar/language-server/protocol.js";
-import type { Position } from "vscode-languageserver-protocol";
+import type { Location, RequestType } from "vscode-languageserver-protocol";
 import type { VolarWorkspace } from "./volar-workspace.ts";
 
 const sourceCodeUri = /\.(?:[cm]?[jt]s|[jt]sx)$/i;
@@ -63,52 +71,109 @@ const commandTargetResource = (target: string): string | undefined => {
  * observe filesystem changes through the workspace and honor cancellation
  * through the supplied signal. The caller retains ownership of the workspace.
  */
-export const createTypeAtlas = (workspace: VolarWorkspace) => ({
-  sourceSizes(files: readonly string[], signal: AbortSignal) {
-    return workspace.sendRequest(
-      FileSizesRequest.type,
-      { uris: files.map((file) => workspace.getWorkspaceUri(file)) },
-      signal,
-    );
-  },
+export const createTypeAtlas = (workspace: VolarWorkspace) => {
+  /**
+   * Asks the language server one positional request about one file.
+   *
+   * Every such request is the same three steps — resolve the document, send,
+   * return both — so they are declared rather than written out. `shape` says
+   * how the request wants its document: as `{ textDocument, ...rest }`, which
+   * is what LSP defines, or as the identifier alone for the custom requests
+   * this repository adds.
+   */
+  const ask =
+    <Params, Result, Error>(
+      request: RequestType<Params, Result, Error>,
+      shape: "params" | "document" = "params",
+    ) =>
+    async (input: {
+      readonly file: string;
+      readonly signal: AbortSignal;
+      readonly params?: Omit<Params, "textDocument">;
+    }) => {
+      const textDocument = await workspace.getTextDocument(input.file);
+      const result = await workspace.sendRequest(
+        request,
+        (shape === "document" ? textDocument : { textDocument, ...input.params }) as Params,
+        input.signal,
+      );
+      return { textDocument, result };
+    };
 
-  async readSource(file: string, fold: boolean, signal: AbortSignal) {
-    const { textDocument, source } = await workspace.readTextDocument(file, signal);
-    const foldingRanges = fold
-      ? await workspace.sendRequest(FoldingRangeRequest.type, { textDocument }, signal)
-      : [];
-    return { textDocument, source, foldingRanges: foldingRanges ?? [] };
-  },
+  /**
+   * Asks the call hierarchy about one position, in one direction.
+   *
+   * The protocol splits this in two — prepare a callable, then ask about it —
+   * and a position can prepare more than one, so the second step is asked for
+   * each. Both directions differ only in which request answers the second step.
+   */
+  const callHierarchy =
+    <Call>(request: RequestType<{ readonly item: CallHierarchyItem }, Call[] | null, void>) =>
+    async (input: {
+      readonly file: string;
+      readonly position: Position;
+      readonly signal: AbortSignal;
+    }) => {
+      const textDocument = await workspace.getTextDocument(input.file);
+      const items = await workspace.sendRequest(
+        CallHierarchyPrepareRequest.type,
+        { textDocument, position: input.position },
+        input.signal,
+      );
+      return {
+        textDocument,
+        items,
+        calls:
+          items &&
+          (await Promise.all(
+            items.map((item) => workspace.sendRequest(request, { item }, input.signal)),
+          )),
+      };
+    };
 
-  async diagnostics(file: string, signal: AbortSignal) {
-    const textDocument = await workspace.getTextDocument(file);
-    const report = await workspace.sendRequest(
-      DocumentDiagnosticRequest.type,
-      { textDocument },
-      signal,
-    );
-    return { textDocument, report };
-  },
+  return {
+    diagnostics: ask(DocumentDiagnosticRequest.type),
 
-  async projectDiagnostics(file: string, signal: AbortSignal) {
-    const textDocument = await workspace.getTextDocument(file);
-    const project = await workspace.sendRequest(
+  /**
+   * Whole-program diagnostics for the projects owning a set of files.
+   *
+   * One request: the server resolves each file to the service owning it, so
+   * files sharing a project are checked once. `changed` reports the part of
+   * that check covering the files named; `project` reports the rest of what the
+   * same check already found, at no additional cost.
+   */
+  async diagnose(input: {
+    readonly files: readonly string[];
+    readonly scope: "changed" | "project";
+    readonly signal: AbortSignal;
+  }) {
+    const uris = input.files.map((file) => workspace.getWorkspaceUri(file));
+    const projects = await workspace.sendRequest(
       ProjectDiagnosticsRequest.type,
-      textDocument,
-      signal,
+      { textDocuments: uris.map((uri) => ({ uri })) },
+      input.signal,
     );
-    return { textDocument, project };
+    const documents = projects.flatMap(({ documents }) =>
+      input.scope === "changed" && uris.length
+        ? documents.filter(({ uri }) => uris.includes(uri))
+        : documents,
+    );
+    return {
+      configFile: projects.length === 1 ? (projects[0]?.configFile ?? null) : null,
+      projectCount: projects.length,
+      fileCount: projects.reduce((total, { fileCount }) => total + fileCount, 0),
+      affectedCount: documents.length,
+      diagnostics: documents
+        .flatMap(({ uri, diagnostics }) => diagnostics.map((diagnostic) => ({ uri, diagnostic })))
+        .sort(
+          (left, right) =>
+            (left.diagnostic.severity ?? Number.POSITIVE_INFINITY) -
+            (right.diagnostic.severity ?? Number.POSITIVE_INFINITY),
+        ),
+    };
   },
 
-  async documentSymbols(file: string, signal: AbortSignal) {
-    const textDocument = await workspace.getTextDocument(file);
-    const symbols = await workspace.sendRequest(
-      DocumentSymbolRequest.type,
-      { textDocument },
-      signal,
-    );
-    return { textDocument, symbols };
-  },
+  documentSymbols: ask(DocumentSymbolRequest.type),
 
   async documentLinks(file: string, signal: AbortSignal) {
     const textDocument = await workspace.getTextDocument(file);
@@ -128,69 +193,57 @@ export const createTypeAtlas = (workspace: VolarWorkspace) => ({
     };
   },
 
-  async selectionRanges(file: string, positions: readonly Position[], signal: AbortSignal) {
-    const textDocument = await workspace.getTextDocument(file);
-    const ranges = await workspace.sendRequest(
-      SelectionRangeRequest.type,
-      { textDocument, positions: [...positions] },
-      signal,
-    );
-    return { textDocument, ranges };
-  },
+  selectionRanges: ask(SelectionRangeRequest.type),
 
-  async hover(file: string, position: Position, signal: AbortSignal) {
-    const textDocument = await workspace.getTextDocument(file);
-    const hover = await workspace.sendRequest(
-      HoverRequest.type,
-      { textDocument, position },
-      signal,
-    );
-    return { textDocument, hover };
-  },
+  hover: ask(HoverRequest.type),
 
-  async definitions(file: string, position: Position, signal: AbortSignal) {
-    const textDocument = await workspace.getTextDocument(file);
-    const definitions = await workspace.sendRequest(
-      DefinitionRequest.type,
-      { textDocument, position },
-      signal,
-    );
-    return { textDocument, definitions };
-  },
+  definitions: ask(DefinitionRequest.type),
 
-  async references(
-    file: string,
-    position: Position,
-    includeDeclaration: boolean,
-    signal: AbortSignal,
-  ) {
-    const textDocument = await workspace.getTextDocument(file);
-    const references = await workspace.sendRequest(
-      ReferencesRequest.type,
-      {
+  typeDefinitions: ask(TypeDefinitionRequest.type),
+
+  implementations: ask(ImplementationRequest.type),
+
+  documentHighlights: ask(DocumentHighlightRequest.type),
+
+  callers: callHierarchy(CallHierarchyIncomingCallsRequest.type),
+
+  callees: callHierarchy(CallHierarchyOutgoingCallsRequest.type),
+
+    // `crossProject` is ours, not LSP's: the server reads it off the same
+    // params to decide whether to fan out across loaded projects.
+    references: ask<
+      ReferenceParams & { readonly crossProject: boolean },
+      Location[] | null,
+      never
+    >(ReferencesRequest.type as never),
+
+    async workspaceSymbols(input: {
+      readonly file: string;
+      readonly query: string;
+      readonly signal: AbortSignal;
+    }) {
+      const textDocument = await workspace.getTextDocument(input.file);
+      const project = await workspace.sendRequest(
+        GetMatchTsConfigRequest.type,
         textDocument,
-        position,
-        context: { includeDeclaration },
-      },
-      signal,
-    );
-    return { textDocument, references };
-  },
-
-  async workspaceSymbols(file: string, query: string, signal: AbortSignal) {
-    const textDocument = await workspace.getTextDocument(file);
-    const project = await workspace.sendRequest(GetMatchTsConfigRequest.type, textDocument, signal);
-    const symbols = await workspace.sendRequest(WorkspaceSymbolRequest.type, { query }, signal);
-    return {
-      textDocument,
-      project,
-      symbols:
-        symbols?.filter(
-          (symbol) =>
-            sourceCodeUri.test(symbol.location.uri) && !declarationUri.test(symbol.location.uri),
-        ) ?? symbols,
-    };
-  },
-});
+        input.signal,
+      );
+      const symbols = await workspace.sendRequest(
+        WorkspaceSymbolRequest.type,
+        { query: input.query },
+        input.signal,
+      );
+      return {
+        textDocument,
+        project,
+        symbols:
+          symbols?.filter(
+            (symbol) =>
+              sourceCodeUri.test(symbol.location.uri) && !declarationUri.test(symbol.location.uri),
+          ) ?? symbols,
+      };
+    },
+  };
+};
 
 export type TypeAtlas = ReturnType<typeof createTypeAtlas>;

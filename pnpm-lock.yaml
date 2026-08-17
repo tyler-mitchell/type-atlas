@@ -78,6 +78,9 @@ catalogs:
     typescript:
       specifier: 5.9.3
       version: 5.9.3
+    typescript-native-bridge:
+      specifier: 6.0.3-bridge.13.tsgo.7.0.2
+      version: 6.0.3-bridge.13.tsgo.7.0.2
     vitest:
       specifier: ^4.1.10
       version: 4.1.10
@@ -148,9 +151,18 @@ importers:
       pkg-types:
         specifier: 'catalog:'
         version: 2.3.1
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      volar-service-typescript:
+        specifier: 'catalog:'
+        version: 0.0.71(@volar/language-service@2.4.28)
       vscode-languageserver-protocol:
         specifier: 'catalog:'
         version: 3.17.5
+      vscode-languageserver-textdocument:
+        specifier: 'catalog:'
+        version: 1.0.12
       vscode-uri:
         specifier: 'catalog:'
         version: 3.1.0
@@ -161,9 +173,6 @@ importers:
       tsdown:
         specifier: 'catalog:'
         version: 0.22.14(@arethetypeswrong/core@0.18.5)(@volar/typescript@2.4.28)(publint@0.3.22)(typescript@5.9.3)
-      typescript:
-        specifier: 'catalog:'
-        version: 5.9.3
       vitest:
         specifier: 'catalog:'
         version: 4.1.10(@types/node@22.20.1)(vite@8.1.5(@types/node@22.20.1)(jiti@2.7.0)(yaml@2.9.0))
@@ -176,6 +185,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
+      typescript-native-bridge:
+        specifier: 'catalog:'
+        version: 6.0.3-bridge.13.tsgo.7.0.2
       volar-service-json:
         specifier: 'catalog:'
         version: 0.0.71(@volar/language-service@2.4.28)
@@ -896,6 +908,41 @@ packages:
 
   '@types/node@22.20.1':
     resolution: {integrity: sha512-EANqOCF9QFyra+4pfxUcX9STKJpCLjMbObVzljIJomAWSnuSIEAvyzEU53GaajbXJEgdh0iEcPL+DGvpUd4k1Q==}
+
+  '@typescript-native-bridge/darwin-arm64@6.0.3-bridge.13.tsgo.7.0.2':
+    resolution: {integrity: sha512-/0jVVfwRRyppYXM8ktcOe7G+lsuw/y0Xvun++hutePiX/SWdtly6iuQzodwz+Opwcm1Bxdhefhi//nBvEm7cQQ==}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@typescript-native-bridge/darwin-x64@6.0.3-bridge.13.tsgo.7.0.2':
+    resolution: {integrity: sha512-VUEyuE4qBbekMRJCW3/ZIfDVkyhtIP9SC1BlN50MqlHIEfoPEK/VMAjTjH1P1nkJAwXV9+3qBtJGeCU7nTHQSA==}
+    cpu: [x64]
+    os: [darwin]
+
+  '@typescript-native-bridge/linux-arm64@6.0.3-bridge.13.tsgo.7.0.2':
+    resolution: {integrity: sha512-HDPzYrf0/P6clyDsxHb1ZvjYg3PEHF5IGk9Ot3x1Td1d70FLl/fgwuOCf5dpFRYbNjORwHDQj9CJJ/SsJbr5OQ==}
+    cpu: [arm64]
+    os: [linux]
+
+  '@typescript-native-bridge/linux-arm@6.0.3-bridge.13.tsgo.7.0.2':
+    resolution: {integrity: sha512-TzycgBwIT3fKdceLMDRDtc8OfeJUKuYpc86CH0SS3ERocs+5nRf/w9yig2f4j1Klk1NCkzKrVJ7z9Gve2LBLUg==}
+    cpu: [arm]
+    os: [linux]
+
+  '@typescript-native-bridge/linux-x64@6.0.3-bridge.13.tsgo.7.0.2':
+    resolution: {integrity: sha512-S2RY3r4ktbI4U0vrfB/1E5/xwmkNzq1zTwTGwRnJHaOebgzZwdzbuYD72Z7QaoA8Quju5Vtlgsa5rvOp5n81xw==}
+    cpu: [x64]
+    os: [linux]
+
+  '@typescript-native-bridge/win32-arm64@6.0.3-bridge.13.tsgo.7.0.2':
+    resolution: {integrity: sha512-7b4Y1qCC3CCAsL5o/zvNWVhWTrQ29ThwsfpzKMcySPK32L3pR0+cZEtMW2lMDRGOnC53saqTA5IJNanXsnfZxQ==}
+    cpu: [arm64]
+    os: [win32]
+
+  '@typescript-native-bridge/win32-x64@6.0.3-bridge.13.tsgo.7.0.2':
+    resolution: {integrity: sha512-isjkrzp/4vck8VmhTNZLRu6iIabmczmnIaQIe4UQBlnAv821DFJy9zN2rl87GHylUFZIMbVwEmKxYELEJN1BXg==}
+    cpu: [x64]
+    os: [win32]
 
   '@vitest/expect@4.1.10':
     resolution: {integrity: sha512-YsCn+qAk1GWjQOWFEsEcL2gNQ0zmVmQu3T03qP6UyjhtmdtwtbuI+DASn/7iQB3HGTXkdBwGddzxPlmiql5vlA==}
@@ -1874,6 +1921,11 @@ packages:
   typescript-auto-import-cache@0.3.6:
     resolution: {integrity: sha512-RpuHXrknHdVdK7wv/8ug3Fr0WNsNi5l5aB8MYYuXhq2UH5lnEB1htJ1smhtD5VeCsGr2p8mUDtd83LCQDFVgjQ==}
 
+  typescript-native-bridge@6.0.3-bridge.13.tsgo.7.0.2:
+    resolution: {integrity: sha512-IPTxG5aruadUIHSx+GUY+v409wGtL8UBgdIV1Rik8ZESo1q/MwCRvwrAgB43yKyd81Dm+qugQ5w+qhlV7y2GgQ==}
+    engines: {node: '>=20.19'}
+    hasBin: true
+
   typescript@5.6.1-rc:
     resolution: {integrity: sha512-E3b2+1zEFu84jB0YQi9BORDjz9+jGbwwy1Zi3G0LUNw7a7cePUrHMRNy8aPh53nXpkFGVHSxIZo5vKTfYaFiBQ==}
     engines: {node: '>=14.17'}
@@ -2615,6 +2667,27 @@ snapshots:
   '@types/node@22.20.1':
     dependencies:
       undici-types: 6.21.0
+
+  '@typescript-native-bridge/darwin-arm64@6.0.3-bridge.13.tsgo.7.0.2':
+    optional: true
+
+  '@typescript-native-bridge/darwin-x64@6.0.3-bridge.13.tsgo.7.0.2':
+    optional: true
+
+  '@typescript-native-bridge/linux-arm64@6.0.3-bridge.13.tsgo.7.0.2':
+    optional: true
+
+  '@typescript-native-bridge/linux-arm@6.0.3-bridge.13.tsgo.7.0.2':
+    optional: true
+
+  '@typescript-native-bridge/linux-x64@6.0.3-bridge.13.tsgo.7.0.2':
+    optional: true
+
+  '@typescript-native-bridge/win32-arm64@6.0.3-bridge.13.tsgo.7.0.2':
+    optional: true
+
+  '@typescript-native-bridge/win32-x64@6.0.3-bridge.13.tsgo.7.0.2':
+    optional: true
 
   '@vitest/expect@4.1.10':
     dependencies:
@@ -3491,6 +3564,16 @@ snapshots:
   typescript-auto-import-cache@0.3.6:
     dependencies:
       semver: 7.8.5
+
+  typescript-native-bridge@6.0.3-bridge.13.tsgo.7.0.2:
+    optionalDependencies:
+      '@typescript-native-bridge/darwin-arm64': 6.0.3-bridge.13.tsgo.7.0.2
+      '@typescript-native-bridge/darwin-x64': 6.0.3-bridge.13.tsgo.7.0.2
+      '@typescript-native-bridge/linux-arm': 6.0.3-bridge.13.tsgo.7.0.2
+      '@typescript-native-bridge/linux-arm64': 6.0.3-bridge.13.tsgo.7.0.2
+      '@typescript-native-bridge/linux-x64': 6.0.3-bridge.13.tsgo.7.0.2
+      '@typescript-native-bridge/win32-arm64': 6.0.3-bridge.13.tsgo.7.0.2
+      '@typescript-native-bridge/win32-x64': 6.0.3-bridge.13.tsgo.7.0.2
 
   typescript@5.6.1-rc: {}
 

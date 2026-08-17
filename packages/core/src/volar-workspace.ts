@@ -1,6 +1,7 @@
 import { fork } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { totalmem } from "node:os";
-import { stat } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { watch } from "chokidar";
 import * as path from "pathe";
 import {
@@ -27,7 +28,7 @@ import {
   WatchKind,
 } from "vscode-languageserver-protocol/node.js";
 import { isFileInDir } from "@volar/language-server/node.js";
-import { ReadFileRequest } from "@type-atlas/language-server/protocol";
+import { GetMatchTsConfigRequest } from "@volar/language-server/protocol.js";
 import { URI } from "vscode-uri";
 import { clientCapabilities, getClientConfiguration } from "./language-client.ts";
 import { containingGitSubmodule, findGitSubmoduleRoots } from "./git-submodules.ts";
@@ -44,25 +45,6 @@ const matchesWatcher = (watcher: FileSystemWatcher, relativePath: string, type: 
   ((watcher.kind ?? WatchKind.Create | WatchKind.Change | WatchKind.Delete) & watchKind(type)) !==
     0 &&
   path.matchesGlob(relativePath, watcher.globPattern);
-
-/**
- * How long an unused workspace keeps its language server.
- *
- * Reloading a disposed workspace rebuilds its TypeScript program, measured at
- * about 5.5 seconds on a mid-sized monorepo against 5 milliseconds warm. That
- * cost is paid once per idle gap and amortizes over the calls that follow, so
- * it stays small.
- *
- * Holding the process instead is not free: its heap only grows, reaching
- * 1.8 GB over 75 minutes in one observed session, and exhausting it kills the
- * workspace and every request in flight. A predictable few seconds beats an
- * unpredictable crash, so this recycles on a genuine pause rather than trying
- * to outlast an agent's think time.
- *
- * This bounds idle processes only. A workspace called steadily never idles
- * out, so heap growth during active work needs its own bound.
- */
-const idleWorkspaceTimeout = 45_000;
 
 /**
  * Heap ceiling for a workspace's language server.
@@ -82,16 +64,49 @@ const idleWorkspaceTimeout = 45_000;
 const languageServerHeapMegabytes = () =>
   Math.max(2048, Math.min(8192, Math.floor(totalmem() / 1024 / 1024 / 2)));
 
-const startVolarWorkspace = async (
-  workspaceRoot: string,
-  languageServerEntry: URL,
-  release: () => void,
-) => {
+/** Files a TypeScript project can report diagnostics for. */
+const sourceFile = /\.(?:[cm]?[jt]s|[jt]sx)$/i;
+
+const startVolarWorkspace = async (workspaceRoot: string, languageServerEntry: URL) => {
   const workspaceStat = await stat(workspaceRoot).catch(() => undefined);
   if (!workspaceStat?.isDirectory()) {
     throw new Error(`Workspace is not a directory: ${workspaceRoot}`);
   }
   const submoduleRoots = await findGitSubmoduleRoots(workspaceRoot);
+
+  let watcherError: Error | undefined;
+  /**
+   * Notified for every workspace change, so callers need no watcher of their own.
+   */
+  const changeObservers = new Set<(relativePath: string) => void>();
+
+  /**
+   * Source files written since this workspace opened.
+   *
+   * Checking a whole project is build-scale work — `tsc` needs twenty-five
+   * seconds on a large one — and almost none of it concerns what an agent just
+   * did. The files it wrote are the ones whose diagnostics it cannot predict,
+   * and the watcher this workspace already runs for the language server names
+   * them as they change.
+   */
+  const changedFiles = new Set<string>();
+
+  const watcher = watch(workspaceRoot, {
+    // Establishing watches walks the tree, and that walk is what the first call
+    // to a workspace waits for. Git's object store is never source, and an
+    // installed package changes when something else installs it — a restart-
+    // level event, not one TypeScript needs told about, since it resolves
+    // modules when it needs them. Descending into either costs the whole walk
+    // to learn nothing.
+    ignored: (file) => {
+      const relativePath = path.relative(workspaceRoot, file);
+      const first = relativePath.split(path.sep)[0];
+      if (first === ".git" || relativePath.includes("node_modules")) return true;
+      return containingGitSubmodule(path.resolve(workspaceRoot, file), submoduleRoots) !== undefined;
+    },
+    ignoreInitial: true,
+    followSymlinks: false,
+  });
 
   const languageServer = fork(languageServerEntry, ["--node-ipc"], {
     cwd: workspaceRoot,
@@ -120,11 +135,7 @@ const startVolarWorkspace = async (
     new IPCMessageReader(languageServer),
     new IPCMessageWriter(languageServer),
   );
-  let idleTimer: ReturnType<typeof setTimeout> | undefined;
-  languageServer.once("close", () => {
-    clearTimeout(idleTimer);
-    connection.dispose();
-  });
+  languageServer.once("close", () => connection.dispose());
   connection.listen();
   connection.onRequest(ConfigurationRequest.type, ({ items }) =>
     items.map(({ section }) => getClientConfiguration(section)),
@@ -133,10 +144,7 @@ const startVolarWorkspace = async (
   connection.onRequest(SemanticTokensRefreshRequest.type, () => undefined);
 
   const registrations = new Map<string, DidChangeWatchedFilesRegistrationOptions>();
-  let resolveRegistration: () => void = () => undefined;
-  const registered = new Promise<void>((resolve) => {
-    resolveRegistration = resolve;
-  });
+  const { promise: registered, resolve: resolveRegistration } = Promise.withResolvers<void>();
   connection.onRequest(RegistrationRequest.type, ({ registrations: items }) => {
     for (const registration of items) {
       if (registration.method !== DidChangeWatchedFilesNotification.method) {
@@ -157,15 +165,17 @@ const startVolarWorkspace = async (
     }
   });
 
-  let watcherError: Error | undefined;
-  const watcher = watch(workspaceRoot, {
-    ignored: (file) =>
-      containingGitSubmodule(path.resolve(workspaceRoot, file), submoduleRoots) !== undefined,
-    ignoreInitial: true,
-    followSymlinks: false,
-  });
   languageServer.once("close", () => void watcher.close());
-  try {
+
+  /**
+   * Completes the LSP handshake, once, on the first request that needs it.
+   *
+   * Reading a file, sizing it, and resolving its uri are filesystem work that
+   * this process can do alone, and they are the most common thing asked of a
+   * workspace. Initializing first made them wait a second for a TypeScript
+   * server they never spoke to.
+   */
+  const initialized = (async () => {
     const workspaceUri = URI.file(workspaceRoot).toString();
     await connection.sendRequest(InitializeRequest.type, {
       processId: process.pid,
@@ -210,6 +220,12 @@ const startVolarWorkspace = async (
           : event === "add" || event === "addDir"
             ? [FileChangeType.Created]
             : [FileChangeType.Deleted];
+      // Observers see every workspace change, not only the ones a registered
+      // language-server watcher matched: a file this server ignores can still
+      // be the reason another file's diagnostics changed.
+      for (const observe of changeObservers) observe(relativePath);
+      if (event === "unlink" || event === "unlinkDir") changedFiles.delete(relativePath);
+      else if (sourceFile.test(relativePath)) changedFiles.add(relativePath);
       void sendFileChanges(relativePath, types)
         .then(() =>
           path.matchesGlob(relativePath, "**/node_modules/{*,@*/*}")
@@ -223,24 +239,29 @@ const startVolarWorkspace = async (
     watcher.on("error", (error) => {
       watcherError = error;
     });
-  } catch (error) {
-    await watcher.close();
-    connection.dispose();
-    terminateLanguageServer();
-    await languageServerExit;
-    throw languageServerError ?? error;
-  }
+  })()
+    .catch(async (error) => {
+      await watcher.close();
+      connection.dispose();
+      terminateLanguageServer();
+      await languageServerExit;
+      throw languageServerError ?? error;
+    });
+  // Nothing awaits this until a language-server request does, so an unhandled
+  // rejection here would crash the process before that.
+  void initialized.catch(() => undefined);
 
   let disposed = false;
   /** Tail of the in-flight `withTextDocument` chain for each open uri. */
   const openDocuments = new Map<string, Promise<void>>();
-  /** Monotonic version per uri, so a reused document reads as an edit. */
-  const documentVersions = new Map<string, number>();
-  const documentVersion = (uri: string) => {
-    const version = (documentVersions.get(uri) ?? 0) + 1;
-    documentVersions.set(uri, version);
-    return version;
-  };
+  /**
+   * Increments on every open, so a reused document reads as an edit.
+   *
+   * One counter rather than one per uri: the protocol requires a document's
+   * versions to increase, not to start at one, and a map keyed by uri would
+   * hold an entry for every file the session ever touched.
+   */
+  let documentVersion = 0;
   const getWorkspaceUri = (file: string) => {
     const filePath = path.resolve(workspaceRoot, file);
     if (!isFileInDir(filePath, workspaceRoot)) {
@@ -254,13 +275,28 @@ const startVolarWorkspace = async (
     }
     return URI.file(filePath).toString();
   };
+  /**
+   * Starts the project owning a file, without waiting for it.
+   *
+   * A session opens by reading, and reading deliberately never reaches the
+   * language server — so the program for the project is not begun until the
+   * first question that needs types, and that question wears the whole build:
+   * seven seconds on a three-thousand-file project. Asking which project owns
+   * the file is the cheapest request that makes Volar resolve and build it, so
+   * it is asked when a file is first read and its answer thrown away. The build
+   * then runs while the agent reads, and the semantic question that follows
+   * meets a program that is ready or nearly so.
+   */
+  const warmProject = (uri: string) => {
+    void sendRequest(GetMatchTsConfigRequest.type, { uri }).catch(() => undefined);
+  };
   const sendRequest = async <Params, Result, Error>(
     request: RequestType<Params, Result, Error>,
     params: Params,
     signal?: AbortSignal,
   ): Promise<Result> => {
+    await initialized;
     if (watcherError) throw watcherError;
-    clearTimeout(idleTimer);
     const cancellation = signal ? new CancellationTokenSource() : undefined;
     const cancel = () => cancellation?.cancel();
     signal?.addEventListener("abort", cancel, { once: true });
@@ -288,18 +324,25 @@ const startVolarWorkspace = async (
     } finally {
       signal?.removeEventListener("abort", cancel);
       cancellation?.dispose();
-      if (!connection.hasPendingResponse() && !disposed && isLanguageServerRunning()) {
-        idleTimer = setTimeout(() => {
-          release();
-          void dispose().catch(() => undefined);
-        }, idleWorkspaceTimeout);
-        idleTimer.unref();
-      }
     }
   };
+  /**
+   * Reads a file's text from disk, without involving the language server.
+   *
+   * The language server is one process running one thread, and a semantic
+   * request holds that thread until TypeScript is finished, so anything asked
+   * of it while a check runs waits for the check. Reading a file needs none of
+   * that: measured against a busy workspace, the same read took 7.5 seconds
+   * through the server and is immediate from disk.
+   *
+   * Volar's own file system would only matter for language plugins that
+   * generate virtual code; this server registers none, so a `file:` read there
+   * resolves to exactly this.
+   */
   const readTextDocumentUri = async (uri: string, signal?: AbortSignal) => {
-    const source = await sendRequest(ReadFileRequest.type, { uri }, signal);
-    if (source === null) {
+    signal?.throwIfAborted();
+    const source = await readFile(fileURLToPath(uri), "utf8").catch(() => undefined);
+    if (source === undefined) {
       throw new Error(`Source document is unavailable: ${uri}`);
     }
     return { textDocument: { uri }, source };
@@ -308,13 +351,21 @@ const startVolarWorkspace = async (
     closed: languageServerExit,
     sendRequest,
     async getTextDocument(file: string) {
-      return (await readTextDocumentUri(getWorkspaceUri(file))).textDocument;
-    },
-    readTextDocument(file: string, signal?: AbortSignal) {
-      return readTextDocumentUri(getWorkspaceUri(file), signal);
+      const uri = getWorkspaceUri(file);
+      // A positional request needs the identifier and the assurance that the
+      // file is there. Reading the file to learn that costs its whole size on
+      // every hover, definition, and reference; the language server reads it
+      // itself either way.
+      const present = await stat(fileURLToPath(uri)).then(
+        (entry) => entry.isFile(),
+        () => false,
+      );
+      if (!present) throw new Error(`Source document is unavailable: ${uri}`);
+      return { uri };
     },
     readTextDocumentUri,
     getWorkspaceUri,
+    warmProject,
     /**
      * Opens a document for the duration of one task, then closes it.
      *
@@ -337,11 +388,12 @@ const startVolarWorkspace = async (
       readonly signal?: AbortSignal;
       readonly task: (textDocument: { readonly uri: string }) => Promise<T>;
     }): Promise<T> {
+      await initialized;
       const preceding = openDocuments.get(uri) ?? Promise.resolve();
       const attempt = preceding.then(async () => {
         signal?.throwIfAborted();
         await connection.sendNotification(DidOpenTextDocumentNotification.type, {
-          textDocument: { uri, languageId, version: documentVersion(uri), text: source },
+          textDocument: { uri, languageId, version: ++documentVersion, text: source },
         });
         try {
           return await task({ uri });
@@ -360,13 +412,30 @@ const startVolarWorkspace = async (
       );
       return attempt;
     },
+
+    /**
+     * Observes every file change in this workspace, until the returned function
+     * is called.
+     *
+     * This workspace already watches its root to keep the language server's
+     * file view current, so an observer costs nothing beyond a callback, and a
+     * caller that watched a path itself would both duplicate that work and see
+     * less: diagnostics for one file change when a different file is edited,
+     * and only a workspace-wide view catches that.
+     */
+    /** Source files written since this workspace opened. */
+    changedFiles: (): readonly string[] => [...changedFiles],
+
+    observeChanges(observer: (relativePath: string) => void): () => void {
+      changeObservers.add(observer);
+      return () => void changeObservers.delete(observer);
+    },
     dispose,
   };
 
   async function dispose() {
     if (disposed) return;
     disposed = true;
-    clearTimeout(idleTimer);
     await watcher.close();
     const shutdownTimer = setTimeout(terminateLanguageServer, 2_000);
     shutdownTimer.unref();
@@ -388,9 +457,10 @@ const startVolarWorkspace = async (
 /**
  * An active language-server process scoped to one normalized workspace root.
  *
- * Requests observe watched filesystem changes, may be cancelled, and keep the
- * process alive while work is pending. Call `dispose` when the owning process
- * shuts down; otherwise an idle workspace releases itself automatically.
+ * Requests observe watched filesystem changes and may be cancelled. The process
+ * lives until `dispose` is called, keeping its TypeScript program warm across an
+ * agent's think time, and a cancelled request disposes it because the work it
+ * abandoned cannot be stopped any other way.
  */
 export type VolarWorkspace = Awaited<ReturnType<typeof startVolarWorkspace>>;
 
@@ -401,9 +471,12 @@ export type VolarWorkspacePool = ReturnType<typeof createVolarWorkspaces>;
  * Creates a pool that owns at most one active language-server process per
  * normalized workspace root.
  *
- * Concurrent calls to `get` for the same root share initialization. Failed,
- * exited, and idle processes are removed so a later request starts a fresh
- * workspace. Disposing the pool closes every active process.
+ * Concurrent calls to `get` for the same root share initialization. A failed or
+ * exited process is removed so a later request starts a fresh workspace, and a
+ * live one is kept for the session: its TypeScript program is the expensive
+ * thing here, worth seconds to rebuild and milliseconds to reuse, so it outlasts
+ * an agent's think time rather than being reclaimed between calls. Disposing the
+ * pool closes every active process.
  */
 export const createVolarWorkspaces = (languageServer: URL) => {
   const entries = new Map<string, Promise<VolarWorkspace>>();
@@ -413,7 +486,7 @@ export const createVolarWorkspaces = (languageServer: URL) => {
     const existing = entries.get(workspaceRoot);
     if (existing) return existing;
 
-    const workspace = startVolarWorkspace(workspaceRoot, languageServer, remove);
+    const workspace = startVolarWorkspace(workspaceRoot, languageServer);
     entries.set(workspaceRoot, workspace);
     void workspace.then(({ closed }) => closed.then(remove), remove);
     return workspace;

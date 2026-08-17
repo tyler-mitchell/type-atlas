@@ -5,30 +5,29 @@ import {
 } from "@volar/language-server/protocol.js";
 import type ts from "typescript";
 
-/** Reads the current server-side text for a document URI. */
-export const ReadFileRequest = {
-  type: new RequestType<TextDocumentIdentifier, string | null, never>("type-atlas/readFile"),
-} as const;
+/** One project's whole-program diagnostics. */
+export type ProjectDiagnostics = {
+  readonly configFile: string | null;
+  readonly fileCount: number;
+  readonly documents: readonly {
+    readonly uri: string;
+    readonly diagnostics: readonly Diagnostic[];
+  }[];
+};
 
-/** Returns the current server-side byte sizes for document URIs. */
-export const FileSizesRequest = {
-  type: new RequestType<{ readonly uris: readonly string[] }, readonly (number | null)[], never>(
-    "type-atlas/fileSizes",
-  ),
-} as const;
-
-/** Returns diagnostics for the TypeScript project selected by a document. */
+/**
+ * Checks whole TypeScript projects.
+ *
+ * Documents select the projects owning them, and Volar resolves each to the
+ * service that owns it — so several files in one project resolve to one
+ * service and it is checked once. Without documents, every project the server
+ * has already loaded answers. Either way a caller asking "what is broken in
+ * what I touched" sends one request, not one per file.
+ */
 export const ProjectDiagnosticsRequest = {
   type: new RequestType<
-    TextDocumentIdentifier,
-    {
-      readonly configFile: string | null;
-      readonly fileCount: number;
-      readonly documents: readonly {
-        readonly uri: string;
-        readonly diagnostics: readonly Diagnostic[];
-      }[];
-    } | null,
+    { readonly textDocuments?: readonly TextDocumentIdentifier[] },
+    readonly ProjectDiagnostics[],
     never
   >("type-atlas/projectDiagnostics"),
 } as const;

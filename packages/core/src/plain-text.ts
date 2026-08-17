@@ -30,12 +30,8 @@ import {
 import { URI } from "vscode-uri";
 import type { ModuleExportPage } from "./module-exports.ts";
 
-export type Page<Item> = {
-  readonly total: number;
-  readonly offset: number;
-  readonly items: readonly Item[];
-  readonly nextOffset?: number;
-};
+import { page, type Page } from "./projection.ts";
+export type { Page };
 
 const enumName = (
   values: Record<string, number | ((value: number) => boolean)>,
@@ -239,12 +235,56 @@ export const formatDiagnostics = (
   return [`${countHeader("diagnostics", report.items.length)} · ${file}`, ...items].join("\n\n");
 };
 
+/**
+ * Renders a whole-project diagnostic report, or says it came back clean.
+ *
+ * Silence reads as a failed call, so a clean report still names what was
+ * checked. What it checked is the report's own account of itself: the projects
+ * that answered and the files they hold.
+ */
+export const formatDiagnose = (input: {
+  readonly report: {
+    readonly configFile: string | null;
+    readonly projectCount: number;
+    readonly fileCount: number;
+    readonly affectedCount: number;
+    readonly diagnostics: readonly { readonly uri: string; readonly diagnostic: Diagnostic }[];
+  };
+  readonly scope: "changed" | "project";
+  readonly page: { readonly offset: number; readonly limit: number };
+  readonly root: string;
+}): string => {
+  const { report, scope, root } = input;
+  // Nothing loaded and nothing changed is not a clean report — it is no report.
+  if (!report.projectCount) {
+    return "No project has been loaded yet, and nothing has changed. Name one with project, or read a file in it first.";
+  }
+  const where =
+    report.projectCount > 1
+      ? `${report.projectCount} projects`
+      : report.configFile
+        ? workspacePath(report.configFile, root)
+        : "inferred project";
+  return (
+    formatProjectDiagnostics(
+      report.configFile,
+      report.fileCount,
+      report.affectedCount,
+      page(report.diagnostics, input.page.offset, input.page.limit),
+      root,
+      scope,
+    ) ||
+    `No diagnostics · ${scope === "changed" ? "changed files" : "whole project"} · ${report.fileCount} files checked · ${where}`
+  );
+};
+
 export const formatProjectDiagnostics = (
   project: string | null,
   fileCount: number,
   affectedFileCount: number,
   diagnostics: Page<{ readonly uri: string; readonly diagnostic: Diagnostic }>,
   workspaceRoot: string,
+  scope: "changed" | "project" = "project",
 ): string => {
   if (!diagnostics.total) return "";
   const grouped = new Map<string, { readonly uri: string; readonly diagnostic: Diagnostic }[]>();
@@ -259,7 +299,7 @@ export const formatProjectDiagnostics = (
     return formatDiagnostics(uri, report, workspaceRoot);
   });
   return [
-    `Project diagnostics (${diagnostics.total}) · ${grouped.size} shown · ${affectedFileCount} affected · ${fileCount} files · ${
+    `${scope === "changed" ? "Changed files" : "Whole project"} (${diagnostics.total}) · ${grouped.size} shown · ${affectedFileCount} affected · ${fileCount} files checked · ${
       project ? workspacePath(project, workspaceRoot) : "inferred project"
     }`,
     diagnostics.offset || diagnostics.nextOffset !== undefined
@@ -406,22 +446,6 @@ export const formatHover = (
   if (!hover) return `Hover: none · ${file}`;
   const location = hover.range ? workspaceRange(uri, hover.range, workspaceRoot) : file;
   return [location, hoverContentsText(hover.contents) ?? "No hover content."].join("\n\n");
-};
-
-export const formatPositionQuery = (
-  uri: string,
-  position: Position,
-  hover: Hover | null | undefined,
-  workspaceRoot: string,
-) => {
-  const location = hover?.range
-    ? workspaceRange(uri, hover.range, workspaceRoot)
-    : `${workspacePath(uri, workspaceRoot)}:${positionText(position)}`;
-  const identity = hoverContentsText(hover?.contents ?? [])
-    ?.split("\n", 1)[0]
-    ?.trim()
-    .replace(/\{\s*$/, "…");
-  return identity ? `Query: ${identity} · ${location}` : `Query: no symbol · ${location}`;
 };
 
 const parameterLabel = (signature: string, label: string | [number, number]) =>
@@ -832,25 +856,24 @@ export const formatProjectConfig = (
     ? `TypeScript project: ${workspacePath(result.uri, workspaceRoot)}`
     : "TypeScript project: inferred";
 
-export const formatProjectScope = (
-  result: { readonly uri: string } | null | undefined,
-  workspaceRoot: string,
-) =>
-  result
-    ? `Scope: project only · ${workspacePath(result.uri, workspaceRoot)}`
-    : "Scope: inferred project only";
-
 /**
- * Scope line for results gathered from every project the server has loaded.
+ * The scope line that says which projects could have answered.
  *
- * Naming the anchor keeps the answer honest in both directions: it says the
- * search was not confined to one project, and it says which project the request
- * started from, since projects nothing has opened yet cannot contribute.
+ * `project` is the one owning the file, which is all a positional request
+ * consults. `loaded` names the anchor instead, because the answer spans every
+ * project the server has opened and a project nothing has touched cannot
+ * contribute — so the anchor is what makes the result reproducible.
  */
-export const formatLoadedProjectScope = (
+export const formatScope = (
+  scope: "project" | "loaded",
   result: { readonly uri: string } | null | undefined,
   workspaceRoot: string,
 ) => {
-  const anchor = result ? workspacePath(result.uri, workspaceRoot) : "inferred project";
-  return `Scope: loaded projects · anchor ${anchor}`;
+  const project = result ? workspacePath(result.uri, workspaceRoot) : undefined;
+  return scope === "loaded"
+    ? `Scope: loaded projects · anchor ${project ?? "inferred project"}`
+    : project
+      ? `Scope: project only · ${project}`
+      : "Scope: inferred project only";
 };
+

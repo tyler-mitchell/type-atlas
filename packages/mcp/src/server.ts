@@ -11,9 +11,17 @@ const createServer = (
 ): McpServer => {
   const server = new McpServer(serverInfo, {
     instructions: serverInstructions,
-    capabilities: { tools: { listChanged: false } },
-    cacheHints: {
-      "tools/list": { ttlMs: 60_000, cacheScope: "public" },
+    capabilities: {
+      tools: { listChanged: false },
+      // `watch_diagnostics` keeps a resource per watched file and invalidates it
+      // when the diagnostics change, for a client that reads back.
+      //
+      // A 2026-07-28 client uses `subscribe` to decide which events to request
+      // on its `subscriptions/listen` filter, which the serving entry answers.
+      // A 2025 client cannot call `resources/subscribe` — the SDK defines the
+      // request but serves no handler, that era being superseded — and does not
+      // need to: the invalidation reaches it unsolicited either way.
+      resources: { subscribe: true },
     },
   });
   registerTools(server, workspaces, semble);

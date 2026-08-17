@@ -4,7 +4,6 @@ import {
   CallHierarchyOutgoingCallsRequest,
   CallHierarchyPrepareRequest,
   DefinitionRequest,
-  DocumentSymbolRequest,
   GetMatchTsConfigRequest,
   HoverRequest,
   ImplementationRequest,
@@ -13,12 +12,14 @@ import {
   type Position,
   type Range,
   ReferencesRequest,
+  type ReferenceParams,
   SymbolKind,
-  type SymbolInformation,
   type DocumentSymbol,
   TypeDefinitionRequest,
 } from "@volar/language-server/protocol.js";
 import { isFileInDir } from "@volar/language-server/node.js";
+import { sourceLines } from "./folded-source.ts";
+import { documentSymbols } from "./syntactic-features.ts";
 import { URI } from "vscode-uri";
 import { hoverContentsText, rangeText, symbolKind, workspacePath } from "./plain-text.ts";
 import type { VolarWorkspace } from "./volar-workspace.ts";
@@ -29,6 +30,7 @@ export type InspectSymbolTarget = { readonly position: Position } | { readonly s
 /** Controls expensive source and type sections and bounds repeated relationships. */
 export type InspectSymbolOptions = {
   readonly compactExternalCalls?: boolean;
+  readonly crossProject?: boolean;
   readonly includeSource: boolean;
   readonly includeTypeDefinitions: boolean;
   readonly limit: number;
@@ -50,46 +52,104 @@ type RelatedCall = {
   readonly sites: readonly Range[];
 };
 
+/** A call and the exact places it happens, as the call hierarchy reports them. */
+export type CallSite = {
+  readonly item: Located & { readonly name: string; readonly kind: SymbolKind };
+  readonly siteUri: string;
+  readonly sites: readonly Range[];
+};
+
 /**
- * The canonical agent-facing inspection and the resolved position used to produce it.
+ * What the language server was asked and answered about one symbol.
  *
- * `position` is absent when a name is ambiguous or cannot be resolved; `text`
- * then contains bounded candidates with exact source ranges.
+ * Composing the answer is the operation's product; rendering it is the
+ * caller's, so a consumer that is not this MCP presents the same inspection
+ * its own way. `choice` stands in for the rest when a name is ambiguous or
+ * unresolved, carrying the bounded candidates instead of an answer.
  */
 export type InspectSymbolResult = {
   readonly textDocument: { readonly uri: string };
   readonly position?: Position;
-  readonly text: string;
+  readonly choice?: {
+    readonly reason: "ambiguous" | "not found";
+    readonly name: string;
+    readonly candidates: readonly Located[];
+    readonly total: number;
+  };
+  readonly primary?: Located;
+  readonly name?: string;
+  readonly project?: string | undefined;
+  readonly hover?: string | undefined;
+  readonly additionalDefinitions?: readonly Located[];
+  readonly implementations?: readonly Located[];
+  readonly typeDefinitions?: readonly Located[];
+  readonly callers?: readonly CallSite[];
+  readonly callees?: readonly CallSite[];
+  readonly sharedCalleeUri?: string | undefined;
+  readonly compactExternalCalls?: boolean;
+  readonly limit?: number;
+  readonly references?: {
+    readonly shown: readonly Located[];
+    readonly other: number;
+    readonly total: number;
+  };
+  readonly source?: readonly string[] | undefined;
 };
 
-const flattenSymbols = (
-  symbols: readonly (DocumentSymbol | SymbolInformation)[] | null,
-  documentUri: string,
-): readonly Located[] =>
-  symbols?.flatMap((symbol): readonly Located[] =>
-    "range" in symbol
-      ? [
-          {
-            uri: documentUri,
-            name: symbol.name,
-            kind: symbol.kind,
-            range: symbol.range,
-            selectionRange: symbol.selectionRange,
-            ...(symbol.detail ? { detail: symbol.detail } : {}),
-          },
-          ...flattenSymbols(symbol.children ?? null, documentUri),
-        ]
-      : [
-          {
-            uri: symbol.location.uri,
-            name: symbol.name,
-            kind: symbol.kind,
-            range: symbol.location.range,
-            selectionRange: symbol.location.range,
-            ...(symbol.containerName ? { detail: symbol.containerName } : {}),
-          },
-        ],
-  ) ?? [];
+const located = (symbol: DocumentSymbol, uri: string): Located => ({
+  uri,
+  name: symbol.name,
+  kind: symbol.kind,
+  range: symbol.range,
+  selectionRange: symbol.selectionRange,
+  ...(symbol.detail ? { detail: symbol.detail } : {}),
+});
+
+/**
+ * Every declaration in an outline, outermost first.
+ *
+ * Yielded rather than returned as an array. An outline of a large file nests
+ * deeply — an object literal of generic factories reaches a dozen levels — and
+ * building the flat list by spreading each subtree's array into its parent's
+ * copies the tail of the file once per level it sits under. On this repository's
+ * 1,225-line resource module that cost 1.3 seconds, more than the whole
+ * inspection around it; the callers below want a search or a first match, so
+ * none of them need the array at all.
+ */
+function* declarations(
+  symbols: readonly DocumentSymbol[],
+  uri: string,
+): Generator<Located, void, undefined> {
+  for (const symbol of symbols) {
+    yield located(symbol, uri);
+    yield* declarations(symbol.children ?? [], uri);
+  }
+}
+
+/**
+ * The innermost declaration containing a position.
+ *
+ * An outline is a tree, so the answer is one descent through the branch that
+ * contains the position — not a search over every declaration in the file.
+ */
+const enclosing = (input: {
+  readonly symbols: readonly DocumentSymbol[];
+  readonly position: Position;
+  readonly uri: string;
+}): Located | undefined => {
+  const branch = input.symbols.find(({ range }) => contains(range, input.position));
+  if (!branch) return undefined;
+  return (
+    enclosing({ symbols: branch.children ?? [], position: input.position, uri: input.uri }) ??
+    located(branch, input.uri)
+  );
+};
+
+const contains = (range: Range, position: Position) =>
+  (range.start.line < position.line ||
+    (range.start.line === position.line && range.start.character <= position.character)) &&
+  (position.line < range.end.line ||
+    (position.line === range.end.line && position.character < range.end.character));
 
 const navigationItems = (
   value: Location | readonly Location[] | readonly LocationLink[] | null,
@@ -107,16 +167,14 @@ const locate = (item: Location | LocationLink): Located =>
 
 const key = ({ uri, selectionRange }: Located) => `${uri}\0${rangeText(selectionRange)}`;
 
-const unique = <Item>(items: readonly Item[], itemKey: (item: Item) => string) =>
-  items.filter(
-    (item, index) => items.findIndex((candidate) => itemKey(candidate) === itemKey(item)) === index,
-  );
+/** First occurrence of each key, in order, computing every key once. */
+const unique = <Item>(items: readonly Item[], itemKey: (item: Item) => string) => [
+  ...new Map(items.map((item) => [itemKey(item), item] as const).reverse()).values(),
+].reverse();
 
+/** Grouped by file in first-seen order, in one pass rather than a filter per uri. */
 const groups = <Item extends { readonly uri: string }>(items: readonly Item[]) =>
-  [...new Set(items.map(({ uri }) => uri))].map((uri) => ({
-    uri,
-    items: items.filter((item) => item.uri === uri),
-  }));
+  [...Map.groupBy(items, ({ uri }) => uri)].map(([uri, grouped]) => ({ uri, items: grouped }));
 
 const locationText = ({ range, selectionRange }: Located) => {
   const selection = rangeText(selectionRange);
@@ -226,11 +284,11 @@ const symbolChoice = (
   ].join("\n");
 };
 
-const sourceLines = async (workspace: VolarWorkspace, uri: string) =>
-  (await workspace.readTextDocumentUri(uri)).source.split(/\r?\n/);
+const documentLines = async (workspace: VolarWorkspace, uri: string) =>
+  sourceLines((await workspace.readTextDocumentUri(uri)).source);
 
 const excerpt = async (workspace: VolarWorkspace, target: Located) => {
-  const lines = await sourceLines(workspace, target.uri);
+  const lines = await documentLines(workspace, target.uri);
   const end = target.range.end.line + (target.range.end.character > 0 ? 1 : 0);
   return lines
     .slice(target.range.start.line, end)
@@ -241,7 +299,7 @@ const withSourceLines = async (workspace: VolarWorkspace, items: readonly Locate
   (
     await Promise.all(
       groups(items).map(async ({ uri, items: related }) => {
-        const lines = await sourceLines(workspace, uri);
+        const lines = await documentLines(workspace, uri);
         return related.map((item) => ({
           ...item,
           sourceLine: lines[item.selectionRange.start.line] ?? "",
@@ -250,44 +308,43 @@ const withSourceLines = async (workspace: VolarWorkspace, items: readonly Locate
     )
   ).flat();
 
-const symbolAtDefinition = async (
-  workspace: VolarWorkspace,
-  root: string,
-  definition: Located | undefined,
-  signal: AbortSignal,
-) => {
-  if (!definition) return undefined;
-  const file = URI.parse(definition.uri).fsPath;
-  if (!isFileInDir(file, root)) return undefined;
-  const textDocument = await workspace.getTextDocument(file);
-  const symbols = await workspace.sendRequest(DocumentSymbolRequest.type, { textDocument }, signal);
-  return flattenSymbols(symbols, definition.uri).find((symbol) => key(symbol) === key(definition));
-};
+/**
+ * One document's declarations, from its text.
+ *
+ * An outline is syntactic — the language server answers it from a parse of this
+ * one file — but a request for it resolves to the project owning the file first
+ * and builds that project's program. This inspection wants an outline three
+ * times over: to resolve a name, to find what a position sits inside, and to
+ * name a definition in another file. None of them are worth a program.
+ */
+const outline = async (workspace: VolarWorkspace, uri: string) =>
+  documentSymbols({ uri, source: (await workspace.readTextDocumentUri(uri)).source });
 
-const enclosingSymbolAt = async (
-  workspace: VolarWorkspace,
-  textDocument: { readonly uri: string },
-  position: Position,
-  signal: AbortSignal,
-) =>
-  flattenSymbols(
-    await workspace.sendRequest(DocumentSymbolRequest.type, { textDocument }, signal),
-    textDocument.uri,
-  )
-    .filter(
-      ({ range }) =>
-        (range.start.line < position.line ||
-          (range.start.line === position.line && range.start.character <= position.character)) &&
-        (position.line < range.end.line ||
-          (position.line === range.end.line && position.character < range.end.character)),
-    )
-    .sort(
-      (left, right) =>
-        right.range.start.line - left.range.start.line ||
-        right.range.start.character - left.range.start.character ||
-        left.range.end.line - right.range.end.line ||
-        left.range.end.character - right.range.end.character,
-    )[0];
+/**
+ * The declaration a definition points at, in whichever file that is.
+ *
+ * A definition and the outline entry for it agree on their selection range, so
+ * the two are matched. The document under inspection is already outlined; only
+ * a definition in another file is read, and only inside the workspace.
+ */
+const declarationAt = async (input: {
+  readonly workspace: VolarWorkspace;
+  readonly root: string;
+  readonly document: { readonly uri: string };
+  readonly symbols: readonly DocumentSymbol[];
+  readonly definition: Located | undefined;
+}) => {
+  const { definition } = input;
+  if (!definition) return undefined;
+  const local = definition.uri === input.document.uri;
+  if (!local && !isFileInDir(URI.parse(definition.uri).fsPath, input.root)) return undefined;
+  const symbols = local ? input.symbols : await outline(input.workspace, definition.uri);
+  const wanted = key(definition);
+  for (const symbol of declarations(symbols, definition.uri)) {
+    if (key(symbol) === wanted) return symbol;
+  }
+  return undefined;
+};
 
 /**
  * Composes the language server's symbol, hover, navigation, reference, and call
@@ -297,38 +354,44 @@ const enclosingSymbolAt = async (
  * rather than choosing a declaration. Position selection follows the language
  * server's normal resolution rules.
  */
-export const inspectSymbol = async (
-  workspace: VolarWorkspace,
-  root: string,
-  file: string,
-  target: InspectSymbolTarget,
-  options: InspectSymbolOptions,
-  signal: AbortSignal,
-): Promise<InspectSymbolResult> => {
+export const inspectSymbol = async (input: {
+  readonly workspace: VolarWorkspace;
+  readonly root: string;
+  readonly file: string;
+  readonly target: InspectSymbolTarget;
+  readonly options: InspectSymbolOptions;
+  readonly signal: AbortSignal;
+}): Promise<InspectSymbolResult> => {
+  const { workspace, root, file, target, options, signal } = input;
   const textDocument = await workspace.getTextDocument(file);
-  const symbols =
+  // Read and parsed here rather than asked of the language server, so resolving
+  // a name never waits on a project. It answers two questions — which
+  // declaration a name means, and what declaration a position falls in — from
+  // one parse.
+  const fileSymbols = await outline(workspace, textDocument.uri);
+  // Walked once, keeping only what a name asked for. A position needs no walk.
+  const matches =
     "symbol" in target
-      ? flattenSymbols(
-          await workspace.sendRequest(DocumentSymbolRequest.type, { textDocument }, signal),
-          textDocument.uri,
+      ? [...declarations(fileSymbols, textDocument.uri)].filter(
+          ({ name }) => name === target.symbol,
         )
       : [];
-  const matches = "symbol" in target ? symbols.filter(({ name }) => name === target.symbol) : [];
   if ("symbol" in target && matches.length !== 1) {
+    const wanted = target.symbol.toLowerCase();
     const candidates = matches.length
       ? matches
-      : symbols.filter(({ name }) => name?.toLowerCase().includes(target.symbol.toLowerCase()));
+      : [...declarations(fileSymbols, textDocument.uri)].filter(({ name }) =>
+          name?.toLowerCase().includes(wanted),
+        );
     const shownCandidates = await withSourceLines(workspace, candidates.slice(0, options.limit));
     return {
       textDocument,
-      text: symbolChoice(
-        matches.length ? "ambiguous" : "not found",
-        target.symbol,
-        textDocument.uri,
-        shownCandidates,
-        candidates.length,
-        root,
-      ),
+      choice: {
+        reason: matches.length ? "ambiguous" : "not found",
+        name: target.symbol,
+        candidates: shownCandidates,
+        total: candidates.length,
+      },
     };
   }
 
@@ -342,7 +405,12 @@ export const inspectSymbol = async (
       workspace.sendRequest(ImplementationRequest.type, { textDocument, position }, signal),
       workspace.sendRequest(
         ReferencesRequest.type,
-        { textDocument, position, context: { includeDeclaration: true } },
+        {
+          textDocument,
+          position,
+          context: { includeDeclaration: true },
+          crossProject: options.crossProject,
+        } as ReferenceParams & { readonly crossProject?: boolean },
         signal,
       ),
       workspace.sendRequest(CallHierarchyPrepareRequest.type, { textDocument, position }, signal),
@@ -366,18 +434,24 @@ export const inspectSymbol = async (
   const definitions = navigationItems(definitionResult).map(locate);
   const implementations = navigationItems(implementationResult).map(locate);
   const callable = items?.[0];
-  const definedSymbol =
-    !selected && !callable
-      ? await symbolAtDefinition(workspace, root, definitions[0], signal)
-      : undefined;
-  const enclosingSymbol =
-    !selected && !callable && !definedSymbol
-      ? await enclosingSymbolAt(workspace, textDocument, position, signal)
-      : undefined;
+  // A name target already chose its declaration, and a callable carries its own
+  // identity from the call hierarchy. Everything else is a position in a file:
+  // the declaration its definition points at, or failing that the one it sits
+  // inside.
+  const unnamed =
+    selected || callable
+      ? undefined
+      : ((await declarationAt({
+          workspace,
+          root,
+          document: textDocument,
+          symbols: fileSymbols,
+          definition: definitions[0],
+        })) ??
+        enclosing({ symbols: fileSymbols, position, uri: textDocument.uri }));
   const base: Located =
     selected ??
-    definedSymbol ??
-    enclosingSymbol ??
+    unnamed ??
     (callable
       ? {
           uri: callable.uri,
@@ -408,7 +482,7 @@ export const inspectSymbol = async (
   };
   const [source, typeResult] = await Promise.all([
     options.includeSource ? excerpt(workspace, primary) : undefined,
-    options.includeTypeDefinitions || !items?.length
+    options.includeTypeDefinitions
       ? workspace.sendRequest(TypeDefinitionRequest.type, { textDocument, position }, signal)
       : null,
   ]);
@@ -465,12 +539,60 @@ export const inspectSymbol = async (
   return {
     textDocument,
     position,
-    text: [
-      `${name}${primary.kind === undefined ? "" : ` [${symbolKind(primary.kind)}]`}`,
+    primary,
+    name,
+    project: project ? project.uri : undefined,
+    hover: hoverText,
+    additionalDefinitions,
+    implementations: distinctImplementations,
+    typeDefinitions: distinctTypes,
+    callers: items?.length ? callers : [],
+    callees: items?.length ? callees : [],
+    sharedCalleeUri: sharedSiteUri,
+    compactExternalCalls: options.compactExternalCalls,
+    limit: options.limit,
+    references: {
+      shown: shownReferences,
+      other: otherReferences.length,
+      total: allReferences.length,
+    },
+    source,
+  };
+};
+
+/** Renders an inspection as the agent-facing text the MCP returns. */
+export const formatSymbolInspection = (input: {
+  readonly result: InspectSymbolResult;
+  readonly root: string;
+}): string => {
+  const { result, root } = input;
+  if (result.choice) {
+    return symbolChoice(
+      result.choice.reason,
+      result.choice.name,
+      result.textDocument.uri,
+      result.choice.candidates,
+      result.choice.total,
+      root,
+    );
+  }
+  const primary = result.primary;
+  if (!primary) return "";
+  const additionalDefinitions = result.additionalDefinitions ?? [];
+  const distinctImplementations = result.implementations ?? [];
+  const distinctTypes = result.typeDefinitions ?? [];
+  const callers = result.callers ?? [];
+  const callees = result.callees ?? [];
+  const shownReferences = result.references?.shown ?? [];
+  const otherReferences = result.references?.other ?? 0;
+  const allReferences = result.references?.total ?? 0;
+  const limit = result.limit ?? shownReferences.length;
+  return [
+      `${result.name}${primary.kind === undefined ? "" : ` [${symbolKind(primary.kind)}]`}`,
       workspacePath(primary.uri, root),
       `  ${locationText(primary)}`,
-      `  project ${project ? workspacePath(project.uri, root) : "inferred"}`,
-      ...(hoverText ? ["", hoverText] : []),
+      `  project ${result.project ? workspacePath(result.project, root) : "inferred"}`,
+      ...(result.hover ? ["", result.hover] : []),
       ...(additionalDefinitions.length
         ? [
             "",
@@ -485,55 +607,54 @@ export const inspectSymbol = async (
             ...locationGroups(distinctImplementations, root),
           ]
         : []),
-      ...((options.includeTypeDefinitions || !items?.length) && distinctTypes.length
+      ...(distinctTypes.length
         ? ["", `Type definitions (${distinctTypes.length})`, ...locationGroups(distinctTypes, root)]
         : []),
-      ...(items?.length && callers.length
+      ...(callers.length
         ? [
             "",
             ...callSection({
               name: "Callers",
               calls: callers,
-              limit: options.limit,
+              limit,
               root,
               includeExternalDetails: true,
             }),
           ]
         : []),
-      ...(items?.length && callees.length
+      ...(callees.length
         ? [
             "",
             ...callSection({
               name: "Calls",
               calls: callees,
-              limit: options.limit,
+              limit,
               root,
-              sharedSiteUri,
-              includeExternalDetails: options.compactExternalCalls === false,
+              sharedSiteUri: result.sharedCalleeUri,
+              includeExternalDetails: result.compactExternalCalls === false,
             }),
           ]
         : []),
-      ...(otherReferences.length
+      ...(otherReferences
         ? [
             "",
             `Other references (${
-              shownReferences.length === otherReferences.length
-                ? `${otherReferences.length} of ${allReferences.length} total`
-                : `${shownReferences.length}/${otherReferences.length} other · ${allReferences.length} total`
+              shownReferences.length === otherReferences
+                ? `${otherReferences} of ${allReferences} total`
+                : `${shownReferences.length}/${otherReferences} other · ${allReferences} total`
             })`,
             ...locationGroups(shownReferences, root),
-            ...(shownReferences.length < otherReferences.length
-              ? [`${otherReferences.length - shownReferences.length} more`]
+            ...(shownReferences.length < otherReferences
+              ? [`${otherReferences - shownReferences.length} more`]
               : []),
           ]
         : []),
-      ...(source
+      ...(result.source
         ? [
             "",
             `Source · ${workspacePath(primary.uri, root)}:${rangeText(primary.range)}`,
-            ...source,
+            ...result.source,
           ]
         : []),
-    ].join("\n"),
-  };
+  ].join("\n");
 };

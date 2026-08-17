@@ -51,9 +51,14 @@ const investigationSnippetLines = type("0 <= number.integer <= 30").configure({
     "Source lines included for each retrieval match (0-30). Read the file at a match for more.",
 });
 
-const scope = type("string >= 1").configure({
+/**
+ * Named `directory` rather than `scope` because `diagnostics.scope` is an enum
+ * whose values include `file`, and an agent that has learned that passes a file
+ * path here. The suite already names this concept on `list_files`.
+ */
+const directory = type("string >= 1").configure({
   description:
-    "Optional workspace-relative directory to search. Each distinct scope has a separate Semble index; prefer a stable package or app boundary.",
+    "Workspace-relative directory to search, not a file. Narrows results to that subtree; the workspace is indexed either way, so scoping costs nothing.",
 });
 
 const includeTypes = type("boolean").configure({
@@ -63,7 +68,7 @@ const includeTypes = type("boolean").configure({
 
 const exploreOptions = {
   ...fileInput,
-  "scope?": scope,
+  "directory?": directory,
   "includeSource?": type("boolean").configure({
     default: false,
     description: "Include the complete selected symbol body.",
@@ -114,7 +119,7 @@ const input = type.module({
   }),
   Search: type({
     workspace: fileInput.workspace,
-    "scope?": scope,
+    "directory?": directory,
     "includeTypes?": includeTypes,
     query: type("string >= 1").configure({
       description: "Natural-language behavior, concept, or code to find.",
@@ -124,7 +129,7 @@ const input = type.module({
   }),
   Related: type({
     ...fileInput,
-    "scope?": scope,
+    "directory?": directory,
     "includeTypes?": includeTypes,
     line: type("number.integer >= 1")
       .pipe((line) => line - 1)
@@ -145,7 +150,7 @@ const input = type.module({
   }),
   Investigate: type({
     workspace: fileInput.workspace,
-    "scope?": scope,
+    "directory?": directory,
     question: type("string >= 1").configure({
       description: "Implementation question or behavior to investigate.",
     }),
@@ -218,18 +223,18 @@ export const registerIntelligenceTools = (
     {
       title: "Search code",
       description:
-        "Find code by behavior or concept and anchor each match to an exact language-server symbol. Matching is semantic, not textual: this will not reliably locate an exact string literal, error message, or comment. Use workspace_symbols for an exact known name. Relevance is relative to the top result shown, so the first match is always 100%.",
+        "Find code by behavior or concept and anchor each match to an exact language-server symbol. The first search of a repository builds its index and takes seconds; later searches answer in milliseconds.",
       inputSchema: input.Search,
       annotations: readOnlyToolAnnotations,
     },
     async (
-      { workspace, scope, includeTypes = false, query, limit = 5, snippetLines = 10 },
+      { workspace, directory, includeTypes = false, query, limit = 5, snippetLines = 10 },
       { mcpReq: { signal } },
     ) =>
       textResult(
         await intelligence.search({
           root: workspace,
-          scope,
+          directory,
           includeTypes,
           query,
           limit,
@@ -250,13 +255,13 @@ export const registerIntelligenceTools = (
       annotations: readOnlyToolAnnotations,
     },
     async (
-      { workspace, scope, includeTypes = false, file, line, limit = 5, snippetLines = 10 },
+      { workspace, directory, includeTypes = false, file, line, limit = 5, snippetLines = 10 },
       { mcpReq: { signal } },
     ) =>
       textResult(
         await intelligence.findRelated({
           root: workspace,
-          scope,
+          directory,
           includeTypes,
           file,
           line,
@@ -281,7 +286,7 @@ export const registerIntelligenceTools = (
       {
         workspace,
         file,
-        scope,
+        directory,
         includeSource = false,
         includeTypeDefinitions = false,
         limit = 12,
@@ -294,7 +299,7 @@ export const registerIntelligenceTools = (
       textResult(
         await intelligence.exploreSymbol({
           root: workspace,
-          scope,
+          directory,
           file,
           target: symbolTarget(target),
           includeSource,
@@ -320,7 +325,7 @@ export const registerIntelligenceTools = (
     async (
       {
         workspace,
-        scope,
+        directory,
         question,
         candidateLimit = 3,
         inspectionLimit = 2,
@@ -334,7 +339,7 @@ export const registerIntelligenceTools = (
       textResult(
         await intelligence.investigate({
           root: workspace,
-          scope,
+          directory,
           question,
           candidateLimit,
           inspectionLimit,

@@ -1,16 +1,21 @@
 ---
-"@type-atlas/core": patch
+"@type-atlas/language-server": patch
 ---
 
-State a completion page's shared edit span once instead of on every candidate.
+Keep configured language-service plugins in a project diagnostic scan.
 
-Every candidate at one position replaces the same span, and TypeScript sends no
-`itemDefaults`, so each item repeated it: a page of ten carried one range twenty
-times and spent two lines per candidate, roughly 48 of every 52 characters on
-text identical to the line above. The inserted text was repeated too, though it
-is the label for a plain member and `.label` for a member access.
+A project check asked the program for every file's diagnostics at once. That
+reads as the cheap way to do it, and it silently dropped every diagnostic a
+project's configured TypeScript language-service plugin contributes: the Effect
+adapter this repository ships routes through the decorated language service only
+when `getSemanticDiagnostics` is called *with* a source file, and falls back to
+the raw program when called with none. A project configuring
+`@effect/language-service` therefore saw its own diagnostics in `tsc` and not
+here.
 
-The span is now derived when the whole page agrees and stated once in the
-header, and a candidate shows an edit only where it differs or inserts something
-the label does not imply. Scanning candidates by name and kind is what the tool
-is for, and that is now what the output is.
+The scan now runs file by file over the same program, which is how the plugin
+contract is entered, and the comment on it records what it is: a knowing
+deviation from the evidence ledger's prescription of Volar's own per-file
+`getDiagnostics`, taken because that path re-enters the semantic provider for
+every document with no short-circuit, and bounded by this server registering no
+virtual-code language plugin.

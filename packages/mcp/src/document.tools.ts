@@ -1,15 +1,14 @@
 import { GetMatchTsConfigRequest } from "@volar/language-server/protocol.js";
-import { createTypeAtlas, page, projectDocumentSymbols } from "@type-atlas/core";
+import { createTypeAtlas, projectDocumentSymbols } from "@type-atlas/core";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { type } from "arktype";
 import { requestDiagnosticContext } from "./ambient-diagnostics.ts";
 import { readOnlyToolAnnotations } from "./metadata.ts";
 import {
-  formatDiagnostics,
+  formatDiagnose,
   formatDocumentLinks,
   formatDocumentSymbols,
   formatProjectConfig,
-  formatProjectDiagnostics,
   formatSelectionRanges,
 } from "@type-atlas/core/text";
 import { appendDiagnosticContext, textResult } from "./mcp-result.ts";
@@ -19,21 +18,25 @@ import type { VolarWorkspacePool } from "@type-atlas/core";
 
 const input = type.module({
   Diagnostics: type({
-    ...fileInput,
-    "scope?": type.enumerated("file", "project").configure(
+    workspace: fileInput.workspace,
+    "project?": type("string >= 1").configure({
+      description:
+        "Which TypeScript project to check, named by its directory or by any path inside it — this never reports on one file. Only needed when nothing has changed yet; the changed files choose the project otherwise.",
+    }),
+    "scope?": type.enumerated("changed", "project").configure(
       {
-        default: "project",
+        default: "changed",
         description:
-          "One of: project (the TypeScript project selected by this file, the default), file (that file alone).",
+          "changed (files written since this workspace opened, the default) or project (every file in the projects owning them).",
       },
       "self",
     ),
     "offset?": type("number.integer >= 0").configure({
-      description: "First project diagnostic returned; applies only to project scope.",
+      description: "First diagnostic returned.",
     }),
     "limit?": type("1 <= number.integer <= 1000").configure({
       default: 100,
-      description: "Maximum project diagnostics returned; applies only to project scope.",
+      description: "Maximum diagnostics returned.",
     }),
   }),
   File: type(fileInput),
@@ -65,39 +68,26 @@ export const registerDocumentTools = (server: McpServer, workspaces: VolarWorksp
     {
       title: "Diagnostics",
       description:
-        "Return a bounded diagnostic page for the exact TypeScript project selected by file. Normal file tools already surface complete ambient errors and warnings; use file scope only when deliberately requesting every diagnostic for one file. A clean report returns no content.",
+        "Report diagnostics for the TypeScript projects you have touched — the compiler's own whole-program check, run once per project.",
       inputSchema: input.Diagnostics,
       annotations: readOnlyToolAnnotations,
     },
     async (
-      { workspace: root, file, scope = "project", offset = 0, limit = 100 },
+      { workspace: root, project: named, scope = "changed", offset = 0, limit = 100 },
       { mcpReq: { signal } },
     ) => {
       const workspace = await workspaces.get(root);
-      const intelligence = createTypeAtlas(workspace);
-      if (scope === "file") {
-        const { textDocument, report } = await intelligence.diagnostics(file, signal);
-        return textResult(formatDiagnostics(textDocument.uri, report, root));
-      }
-
-      const { project } = await intelligence.projectDiagnostics(file, signal);
-      const diagnostics =
-        project?.documents.flatMap(({ uri, diagnostics }) =>
-          diagnostics.map((diagnostic) => ({ uri, diagnostic })),
-        ) ?? [];
-      const prioritized = [...diagnostics].sort(
-        (left, right) =>
-          (left.diagnostic.severity ?? Number.POSITIVE_INFINITY) -
-          (right.diagnostic.severity ?? Number.POSITIVE_INFINITY),
-      );
       return textResult(
-        formatProjectDiagnostics(
-          project?.configFile ?? null,
-          project?.fileCount ?? 0,
-          project?.documents.length ?? 0,
-          page(prioritized, offset, limit),
+        formatDiagnose({
+          report: await createTypeAtlas(workspace).diagnose({
+            files: named ? [named] : workspace.changedFiles(),
+            scope,
+            signal,
+          }),
+          scope,
+          page: { offset, limit },
           root,
-        ),
+        }),
       );
     },
   );
@@ -146,7 +136,7 @@ export const registerDocumentTools = (server: McpServer, workspaces: VolarWorksp
     ) => {
       const workspace = await workspaces.get(root);
       const intelligence = createTypeAtlas(workspace);
-      const { textDocument, symbols } = await intelligence.documentSymbols(file, signal);
+      const { textDocument, result: symbols } = await intelligence.documentSymbols({ file, signal });
       const diagnosticContext = requestDiagnosticContext(
         workspace,
         textDocument,
@@ -176,7 +166,11 @@ export const registerDocumentTools = (server: McpServer, workspaces: VolarWorksp
       const workspace = await workspaces.get(root);
       const positions = Array.isArray(position) ? position : [position];
       const intelligence = createTypeAtlas(workspace);
-      const { textDocument, ranges } = await intelligence.selectionRanges(file, positions, signal);
+      const { textDocument, result: ranges } = await intelligence.selectionRanges({
+        file,
+        signal,
+        params: { positions: [...positions] },
+      });
       const diagnosticContext = requestDiagnosticContext(
         workspace,
         textDocument,

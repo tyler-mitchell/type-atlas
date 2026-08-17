@@ -81,6 +81,7 @@
   "dependencies": {
     "@volar/language-server": "catalog:",
     "typescript": "catalog:",
+    "typescript-native-bridge": "catalog:",
     "volar-service-json": "catalog:",
     "volar-service-markdown": "catalog:",
     "volar-service-typescript": "catalog:",

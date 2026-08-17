@@ -53,7 +53,7 @@ export const registerWorkspaceTools = (server: McpServer): void => {
     {
       title: "List files",
       description:
-        "Show a bounded workspace-relative project structure. The default file view groups edit targets by directory; use the directory view for compact architecture orientation. Results honor .gitignore, omit dependency and VCS internals, and treat Git submodules as separate workspaces by default.",
+        'Show a bounded workspace-relative project structure. `view: "files"` (the default) groups edit targets by directory; `view: "directories"` is compact architecture orientation. Results honor .gitignore, omit dependency and VCS internals, and treat Git submodules as separate workspaces by default.',
       inputSchema: input,
       annotations: readOnlyToolAnnotations,
     },

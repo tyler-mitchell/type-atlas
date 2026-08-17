@@ -29,14 +29,21 @@ test("ends tool calls at the server deadline without closing the session", async
     const result = await client.callTool({ name: "wait", arguments: {} });
     timeout.mockRestore();
 
+    // Naming the tool and saying the work continues is the whole value here: an
+    // agent told only that something timed out repeats the call, which is the
+    // one response that makes a busy language server worse.
     expect(result).toMatchObject({
       isError: true,
-      content: [{ type: "text", text: expect.stringMatching(/timeout/i) }],
+      content: [
+        { type: "text", text: expect.stringMatching(/^wait did not answer within .*still working/s) },
+      ],
     });
+    // Every answer carries what the call cost on its last line, so the text is
+    // matched by what the tool said rather than by equality.
     await expect(
       client.callTool({ name: "echo", arguments: { text: "ready" } }),
     ).resolves.toMatchObject({
-      content: [{ type: "text", text: "ready" }],
+      content: [{ type: "text", text: expect.stringMatching(/^ready\n\n· \d+ms$/) }],
     });
   } finally {
     vi.restoreAllMocks();

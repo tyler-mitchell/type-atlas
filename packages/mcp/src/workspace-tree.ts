@@ -1,4 +1,4 @@
-import { realpath } from "node:fs/promises";
+import { realpath, stat } from "node:fs/promises";
 import { containingGitSubmodule, findGitSubmoduleRoots } from "@type-atlas/core";
 import { isFileInDir } from "@volar/language-server/node.js";
 import { fdir } from "fdir";
@@ -24,12 +24,31 @@ export const workspaceTree = async (input: {
   if (directory !== root && !isFileInDir(directory, root)) {
     throw new Error(`Directory is outside the workspace: ${input.directory}`);
   }
+  // `realpath` reports a missing or non-directory path as a raw errno naming an
+  // absolute path the caller never wrote. Say which argument was wrong instead.
   const [realRoot, realDirectory] = await Promise.all([
-    realpath(root).then(path.normalize),
-    realpath(directory).then(path.normalize),
+    realpath(root)
+      .then(path.normalize)
+      .catch(() => {
+        throw new Error(`Workspace is not a directory: ${input.workspace}`);
+      }),
+    realpath(directory)
+      .then(path.normalize)
+      .catch(() => {
+        throw new Error(
+          `No directory at ${input.directory} in this workspace. Pass a directory, not a file, and check the path.`,
+        );
+      }),
   ]);
   if (realDirectory !== realRoot && !isFileInDir(realDirectory, realRoot)) {
     throw new Error(`Directory resolves outside the workspace: ${input.directory}`);
+  }
+  // A path that exists but is a file crawls into an errno naming `lstat`, which
+  // reads as a bug in the tool rather than a wrong argument.
+  if (!(await stat(realDirectory)).isDirectory()) {
+    throw new Error(
+      `${input.directory} is a file. Pass the directory containing it: ${path.relative(root, path.dirname(directory)) || "."}`,
+    );
   }
   const submoduleRoots = input.includeSubmodules ? [] : await findGitSubmoduleRoots(root);
   const submodule = containingGitSubmodule(directory, submoduleRoots);

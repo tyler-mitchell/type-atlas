@@ -8,8 +8,8 @@ test("prefers authored package source with one search and two completion pages",
   const calls = { completion: 0, resolve: 0, search: 0 };
   const workspace = {
     getTextDocument: vi.fn(async (file: string) => ({ uri: `file://${file}` })),
-    readTextDocument: vi.fn(async (file: string) => ({
-      textDocument: { uri: `file://${file}` },
+    readTextDocumentUri: vi.fn(async (uri: string) => ({
+      textDocument: { uri },
       source:
         "/** Creates an actor from the supplied logic. */\nexport function createActor() {}\nexport function createMachine() {}\nexport class ActorError {}\nexport function unrelated() {}",
     })),
@@ -152,8 +152,8 @@ test.each([
   const calls = { completion: 0, resolve: 0, search: 0 };
   const workspace = {
     getTextDocument: vi.fn(async (file: string) => ({ uri: `file://${file}` })),
-    readTextDocument: vi.fn(async (file: string) => ({
-      textDocument: { uri: `file://${file}` },
+    readTextDocumentUri: vi.fn(async (uri: string) => ({
+      textDocument: { uri },
       source: `${surface.label}\nunrelated`,
     })),
     getWorkspaceUri: () => "file:///workspace/source.ts",

@@ -75,6 +75,32 @@ export const createSemble = (): Semble => {
   });
   const state: { connection?: Promise<void> } = {};
 
+  /**
+   * Connects, reusing a connection already under way.
+   *
+   * Semble runs as its own process, and starting it is `uvx` resolving the
+   * package, Python booting, and an MCP handshake — most of two seconds. Doing
+   * that on the first search made the first search wear it. It is started when
+   * this server starts instead, so it happens while the agent is reading files,
+   * and a search that arrives later joins a connection that is already open.
+   */
+  const connect = () =>
+    (state.connection ??= client.connect(transport).catch((error: unknown) => {
+      state.connection = undefined;
+      if (
+        error !== null &&
+        typeof error === "object" &&
+        "code" in error &&
+        error.code === "ENOENT"
+      ) {
+        throw new Error(
+          "Semantic search requires uvx. Install uv from https://docs.astral.sh/uv/getting-started/installation/.",
+          { cause: error },
+        );
+      }
+      throw error;
+    }));
+
   const request = async (
     input:
       | {
@@ -99,21 +125,7 @@ export const createSemble = (): Semble => {
           readonly signal: AbortSignal;
         },
   ): Promise<SembleSearchPage> => {
-    await (state.connection ??= client.connect(transport).catch((error: unknown) => {
-      state.connection = undefined;
-      if (
-        error !== null &&
-        typeof error === "object" &&
-        "code" in error &&
-        error.code === "ENOENT"
-      ) {
-        throw new Error(
-          "Semantic search requires uvx. Install uv from https://docs.astral.sh/uv/getting-started/installation/.",
-          { cause: error },
-        );
-      }
-      throw error;
-    }));
+    await connect();
     const result = await client.callTool(
       { name: input.name, arguments: input.arguments },
       { signal: input.signal },
@@ -128,6 +140,10 @@ export const createSemble = (): Semble => {
 
     return parseSearchPage(content.text);
   };
+
+  // Nothing awaits this until a search does; a failure is reported there, with
+  // the message that says how to install uvx.
+  void connect().catch(() => undefined);
 
   return {
     search: async ({ repo, query, limit, snippetLines, signal }) =>

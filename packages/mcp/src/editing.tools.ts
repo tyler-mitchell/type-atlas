@@ -8,7 +8,7 @@ import {
 } from "@volar/language-server/protocol.js";
 import { type } from "arktype";
 import { readOnlyToolAnnotations } from "./metadata.ts";
-import { formatProjectScope } from "@type-atlas/core/text";
+import { formatScope } from "@type-atlas/core/text";
 import { textResult } from "./mcp-result.ts";
 import { fileInput, positionInput } from "./tool-input.ts";
 import type { VolarWorkspacePool } from "@type-atlas/core";
@@ -81,7 +81,7 @@ export const registerEditingTools = (server: McpServer, workspaces: VolarWorkspa
       if (!edit) return textResult("");
       const rendered = await renderWorkspaceEdit(workspace, root, edit);
       return formatPatchResult(
-        `Rename to ${newName} · ${formatProjectScope(project, root)}`,
+        `Rename to ${newName} · ${formatScope("project", project, root)}`,
         rendered,
       );
     },

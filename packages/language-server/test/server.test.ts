@@ -8,7 +8,6 @@ import ts from "typescript";
 import { afterEach, describe, expect, it } from "vitest";
 import { URI } from "vscode-uri";
 import { withEffectLanguageService } from "../src/effect-language-service.ts";
-import { ReadFileRequest } from "../src/protocol.ts";
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const temporaryRoots = new Set<string>();
@@ -120,16 +119,7 @@ describe("language server", () => {
         }),
       });
 
-      const source = await handle.connection.sendRequest(ReadFileRequest.type, {
-        uri: document.uri,
-      });
       await rm(file);
-      expect(source).toBe("export const value = 1;\n");
-      expect(
-        await handle.connection.sendRequest(ReadFileRequest.type, {
-          uri: document.uri,
-        }),
-      ).toBe(source);
     } finally {
       await handle.shutdown();
       const exited = once(handle.process, "exit");

@@ -1,5 +1,12 @@
 import type { DocumentSymbol, SymbolInformation } from "@volar/language-server/protocol.js";
-import type { Page } from "./plain-text.ts";
+
+/** One bounded slice of a larger result set, and where the next one starts. */
+export type Page<Item> = {
+  readonly total: number;
+  readonly offset: number;
+  readonly items: readonly Item[];
+  readonly nextOffset?: number;
+};
 
 const projectDocumentSymbol = (symbol: DocumentSymbol, depth: number): DocumentSymbol => {
   const { children, ...item } = symbol;

@@ -1,17 +1,10 @@
 import {
-  CallHierarchyIncomingCallsRequest,
-  CallHierarchyOutgoingCallsRequest,
-  CallHierarchyPrepareRequest,
-  DocumentHighlightRequest,
   FindFileReferenceRequest,
   GetMatchTsConfigRequest,
-  HoverRequest,
-  ImplementationRequest,
   type SymbolInformation,
-  TypeDefinitionRequest,
   type WorkspaceSymbol,
 } from "@volar/language-server/protocol.js";
-import { createTypeAtlas, inspectSymbol, page } from "@type-atlas/core";
+import { createTypeAtlas, formatSymbolInspection, inspectSymbol, page } from "@type-atlas/core";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { type } from "arktype";
 import { requestDiagnosticContext } from "./ambient-diagnostics.ts";
@@ -21,9 +14,7 @@ import {
   formatDocumentHighlights,
   formatLocationPage,
   formatNavigation,
-  formatPositionQuery,
-  formatProjectScope,
-  formatLoadedProjectScope,
+  formatScope,
   formatWorkspaceSymbols,
 } from "@type-atlas/core/text";
 import { appendDiagnosticContext, textResult } from "./mcp-result.ts";
@@ -33,6 +24,10 @@ import type { VolarWorkspacePool } from "@type-atlas/core";
 
 const inspectOptions = {
   ...observedFileInput,
+  "crossProject?": type("boolean").configure({
+    default: false,
+    description: "Include references from every TypeScript project loaded in this workspace session.",
+  }),
   "compactExternalCalls?": type("boolean").configure({
     default: true,
     description:
@@ -61,6 +56,10 @@ const input = type.module({
   References: type({
     ...observedFileInput,
     position: positionInput,
+    "crossProject?": type("boolean").configure({
+      default: false,
+      description: "Include references from every TypeScript project loaded in this workspace session.",
+    }),
     "includeDeclaration?": type("boolean").configure({
       description: "Include the symbol's own declaration among the results.",
     }),
@@ -124,7 +123,7 @@ export const registerNavigationTools = (
     {
       title: "Inspect symbol",
       description:
-        "Return a bounded working view of a symbol: type and documentation, exact definition/body ranges, distinct implementations and types, callers, direct calls, remaining references, project scope, and optional source. Select by exact file-local symbol name or source position.",
+        "Return a bounded working view of a symbol: type and documentation, exact definition/body ranges, distinct implementations and types, callers, direct calls, remaining references, project scope, and optional source. Select by exact file-local symbol name or source position. Set crossProject to include references from every project already loaded in this workspace session.",
       inputSchema: input.InspectSymbol,
       annotations: readOnlyToolAnnotations,
     },
@@ -133,6 +132,7 @@ export const registerNavigationTools = (
         workspace: root,
         file,
         includeDiagnostics,
+        crossProject = false,
         compactExternalCalls = true,
         includeSource = false,
         includeTypeDefinitions = false,
@@ -142,14 +142,14 @@ export const registerNavigationTools = (
       { mcpReq: { signal } },
     ) => {
       const workspace = await workspaces.get(root);
-      const result = await inspectSymbol(
+      const result = await inspectSymbol({
         workspace,
         root,
         file,
-        symbolTarget(target),
-        { compactExternalCalls, includeSource, includeTypeDefinitions, limit },
+        target: symbolTarget(target),
+        options: { compactExternalCalls, crossProject, includeSource, includeTypeDefinitions, limit },
         signal,
-      );
+      });
       const diagnosticContext = requestDiagnosticContext(
         workspace,
         result.textDocument,
@@ -158,7 +158,10 @@ export const registerNavigationTools = (
         signal,
         result.position,
       );
-      return appendDiagnosticContext(textResult(result.text), await diagnosticContext);
+      return appendDiagnosticContext(
+        textResult(formatSymbolInspection({ result, root })),
+        await diagnosticContext,
+      );
     },
   );
 
@@ -177,11 +180,11 @@ export const registerNavigationTools = (
       { mcpReq: { signal } },
     ) => {
       const workspace = await workspaces.get(root);
-      const { project, symbols } = await createTypeAtlas(workspace).workspaceSymbols(
+      const { project, symbols } = await createTypeAtlas(workspace).workspaceSymbols({
         file,
         query,
         signal,
-      );
+      });
       const output =
         symbols === null
           ? null
@@ -189,7 +192,7 @@ export const registerNavigationTools = (
             ? page<SymbolInformation | WorkspaceSymbol>(symbols, 0, symbols.length)
             : page<SymbolInformation | WorkspaceSymbol>(symbols, offset, limit);
       return textResult(
-        [formatLoadedProjectScope(project, root), formatWorkspaceSymbols(output, root)].join("\n"),
+        [formatScope("loaded", project, root), formatWorkspaceSymbols(output, root)].join("\n"),
       );
     },
   );
@@ -205,11 +208,11 @@ export const registerNavigationTools = (
     },
     async ({ workspace: root, file, position, includeDiagnostics }, { mcpReq: { signal } }) => {
       const workspace = await workspaces.get(root);
-      const { textDocument, definitions } = await createTypeAtlas(workspace).definitions(
+      const { textDocument, result: definitions } = await createTypeAtlas(workspace).definitions({
         file,
-        position,
         signal,
-      );
+        params: { position },
+      });
       const diagnosticContext = requestDiagnosticContext(
         workspace,
         textDocument,
@@ -236,23 +239,21 @@ export const registerNavigationTools = (
     },
     async ({ workspace: root, file, position, includeDiagnostics }, { mcpReq: { signal } }) => {
       const workspace = await workspaces.get(root);
-      const textDocument = await workspace.getTextDocument(file);
-      const diagnosticContext = requestDiagnosticContext(
-        workspace,
-        textDocument,
-        root,
-        includeDiagnostics,
+      const { textDocument, result } = await createTypeAtlas(workspace).typeDefinitions({
+        file,
         signal,
-        position,
-      );
-      const result = await workspace.sendRequest(
-        TypeDefinitionRequest.type,
-        { textDocument, position },
-        signal,
-      );
+        params: { position },
+      });
       return appendDiagnosticContext(
         textResult(formatNavigation("type definitions", result, root)),
-        await diagnosticContext,
+        await requestDiagnosticContext(
+          workspace,
+          textDocument,
+          root,
+          includeDiagnostics,
+          signal,
+          position,
+        ),
       );
     },
   );
@@ -268,23 +269,21 @@ export const registerNavigationTools = (
     },
     async ({ workspace: root, file, position, includeDiagnostics }, { mcpReq: { signal } }) => {
       const workspace = await workspaces.get(root);
-      const textDocument = await workspace.getTextDocument(file);
-      const diagnosticContext = requestDiagnosticContext(
-        workspace,
-        textDocument,
-        root,
-        includeDiagnostics,
+      const { textDocument, result } = await createTypeAtlas(workspace).implementations({
+        file,
         signal,
-        position,
-      );
-      const result = await workspace.sendRequest(
-        ImplementationRequest.type,
-        { textDocument, position },
-        signal,
-      );
+        params: { position },
+      });
       return appendDiagnosticContext(
         textResult(formatNavigation("implementations", result, root)),
-        await diagnosticContext,
+        await requestDiagnosticContext(
+          workspace,
+          textDocument,
+          root,
+          includeDiagnostics,
+          signal,
+          position,
+        ),
       );
     },
   );
@@ -301,40 +300,23 @@ export const registerNavigationTools = (
     },
     async ({ workspace: root, file, position, includeDiagnostics }, { mcpReq: { signal } }) => {
       const workspace = await workspaces.get(root);
-      const textDocument = await workspace.getTextDocument(file);
-      const diagnosticContext = requestDiagnosticContext(
-        workspace,
-        textDocument,
-        root,
-        includeDiagnostics,
-        signal,
+      const { textDocument, items, calls } = await createTypeAtlas(workspace).callers({
+        file,
         position,
-      );
-      const items = await workspace.sendRequest(
-        CallHierarchyPrepareRequest.type,
-        { textDocument, position },
         signal,
-      );
-      const incomingCalls =
-        items === null
-          ? null
-          : await Promise.all(
-              items.map((item) =>
-                workspace.sendRequest(CallHierarchyIncomingCallsRequest.type, { item }, signal),
-              ),
-            );
+      });
       return appendDiagnosticContext(
         textResult(
-          formatCallHierarchy(
-            "incoming",
-            {
-              prepareCallHierarchy: items,
-              incomingCalls,
-            },
-            root,
-          ),
+          formatCallHierarchy("incoming", { prepareCallHierarchy: items, incomingCalls: calls }, root),
         ),
-        await diagnosticContext,
+        await requestDiagnosticContext(
+          workspace,
+          textDocument,
+          root,
+          includeDiagnostics,
+          signal,
+          position,
+        ),
       );
     },
   );
@@ -351,40 +333,23 @@ export const registerNavigationTools = (
     },
     async ({ workspace: root, file, position, includeDiagnostics }, { mcpReq: { signal } }) => {
       const workspace = await workspaces.get(root);
-      const textDocument = await workspace.getTextDocument(file);
-      const diagnosticContext = requestDiagnosticContext(
-        workspace,
-        textDocument,
-        root,
-        includeDiagnostics,
-        signal,
+      const { textDocument, items, calls } = await createTypeAtlas(workspace).callees({
+        file,
         position,
-      );
-      const items = await workspace.sendRequest(
-        CallHierarchyPrepareRequest.type,
-        { textDocument, position },
         signal,
-      );
-      const outgoingCalls =
-        items === null
-          ? null
-          : await Promise.all(
-              items.map((item) =>
-                workspace.sendRequest(CallHierarchyOutgoingCallsRequest.type, { item }, signal),
-              ),
-            );
+      });
       return appendDiagnosticContext(
         textResult(
-          formatCallHierarchy(
-            "outgoing",
-            {
-              prepareCallHierarchy: items,
-              outgoingCalls,
-            },
-            root,
-          ),
+          formatCallHierarchy("outgoing", { prepareCallHierarchy: items, outgoingCalls: calls }, root),
         ),
-        await diagnosticContext,
+        await requestDiagnosticContext(
+          workspace,
+          textDocument,
+          root,
+          includeDiagnostics,
+          signal,
+          position,
+        ),
       );
     },
   );
@@ -395,7 +360,7 @@ export const registerNavigationTools = (
     {
       title: "References",
       description:
-        "Return a bounded page of reference locations from the TypeScript project selected by file. Set raw to return every project-scoped reference. Results stop at that project boundary, so in a multi-project workspace this is a scoped answer rather than a complete usage audit.",
+        "Return a bounded page of reference locations from the TypeScript project selected by file. Set crossProject to include every project already loaded in this workspace session, and raw to return the complete selected scope.",
       inputSchema: input.References,
       annotations: readOnlyToolAnnotations,
     },
@@ -405,6 +370,7 @@ export const registerNavigationTools = (
         file,
         position,
         includeDeclaration = true,
+        crossProject = false,
         offset = 0,
         limit = 20,
         raw = false,
@@ -414,12 +380,11 @@ export const registerNavigationTools = (
     ) => {
       const workspace = await workspaces.get(root);
       const intelligence = createTypeAtlas(workspace);
-      const { textDocument, references } = await intelligence.references(
+      const { textDocument, result: references } = await intelligence.references({
         file,
-        position,
-        includeDeclaration,
         signal,
-      );
+        params: { position, context: { includeDeclaration }, crossProject },
+      });
       const diagnosticContext = requestDiagnosticContext(
         workspace,
         textDocument,
@@ -429,7 +394,6 @@ export const registerNavigationTools = (
         position,
       );
       const project = workspace.sendRequest(GetMatchTsConfigRequest.type, textDocument, signal);
-      const query = workspace.sendRequest(HoverRequest.type, { textDocument, position }, signal);
       const output =
         references === null
           ? null
@@ -439,8 +403,7 @@ export const registerNavigationTools = (
       return appendDiagnosticContext(
         textResult(
           [
-            formatLoadedProjectScope(await project, root),
-            formatPositionQuery(textDocument.uri, position, await query, root),
+            formatScope("loaded", await project, root),
             formatLocationPage("references", output, root),
           ].join("\n"),
         ),
@@ -487,7 +450,7 @@ export const registerNavigationTools = (
       return appendDiagnosticContext(
         textResult(
           [
-            formatProjectScope(await project, root),
+            formatScope("project", await project, root),
             formatLocationPage("file references", output, root),
           ].join("\n"),
         ),
@@ -507,23 +470,21 @@ export const registerNavigationTools = (
     },
     async ({ workspace: root, file, position, includeDiagnostics }, { mcpReq: { signal } }) => {
       const workspace = await workspaces.get(root);
-      const textDocument = await workspace.getTextDocument(file);
-      const diagnosticContext = requestDiagnosticContext(
-        workspace,
-        textDocument,
-        root,
-        includeDiagnostics,
+      const { textDocument, result } = await createTypeAtlas(workspace).documentHighlights({
+        file,
         signal,
-        position,
-      );
-      const result = await workspace.sendRequest(
-        DocumentHighlightRequest.type,
-        { textDocument, position },
-        signal,
-      );
+        params: { position },
+      });
       return appendDiagnosticContext(
         textResult(formatDocumentHighlights(textDocument.uri, result, root)),
-        await diagnosticContext,
+        await requestDiagnosticContext(
+          workspace,
+          textDocument,
+          root,
+          includeDiagnostics,
+          signal,
+          position,
+        ),
       );
     },
   );

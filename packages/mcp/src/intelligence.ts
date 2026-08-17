@@ -1,13 +1,16 @@
 import {
   createTypeAtlas,
   containingGitSubmodule,
+  documentSymbols,
   findGitSubmoduleRoots,
+  formatSymbolInspection,
   inspectSymbol,
   type InspectSymbolTarget,
   type VolarWorkspacePool,
 } from "@type-atlas/core";
 import { hoverContentsText, symbolKind, workspacePath } from "@type-atlas/core/text";
 import { isFileInDir } from "@volar/language-server/node.js";
+import { stat } from "node:fs/promises";
 import { relative as platformRelative } from "node:path";
 import * as path from "pathe";
 import type {
@@ -76,11 +79,21 @@ const overlappingSymbolPaths = (
 const overlapLength = (range: Range, startLine: number, endLine: number): number =>
   Math.max(0, Math.min(range.end.line, endLine) - Math.max(range.start.line, startLine) + 1);
 
-const resolveSearchRoot = async (root: string, scope: string | undefined): Promise<string> => {
+const resolveSearchRoot = async (root: string, directory: string | undefined): Promise<string> => {
   const workspaceRoot = path.resolve(root);
-  const searchRoot = path.resolve(workspaceRoot, scope ?? ".");
+  const searchRoot = path.resolve(workspaceRoot, directory ?? ".");
   if (searchRoot !== workspaceRoot && !isFileInDir(searchRoot, workspaceRoot)) {
-    throw new Error(`Search scope is outside the workspace: ${scope}`);
+    throw new Error(`Search directory is outside the workspace: ${directory}`);
+  }
+  // A file reaches the indexer as a root it cannot walk, which fails deep in
+  // indexing as an unreadable directory rather than at the argument that was
+  // wrong. Name the directory that file lives in, since that is what the
+  // caller meant.
+  const searchRootStat = await stat(searchRoot).catch(() => undefined);
+  if (searchRootStat && !searchRootStat.isDirectory()) {
+    throw new Error(
+      `Search directory is a file: ${directory}. Pass the directory containing it: ${path.relative(workspaceRoot, path.dirname(searchRoot)) || "."}`,
+    );
   }
   const submoduleRoots = await findGitSubmoduleRoots(workspaceRoot);
   const submoduleRoot =
@@ -88,7 +101,7 @@ const resolveSearchRoot = async (root: string, scope: string | undefined): Promi
     submoduleRoots.find((candidate) => isFileInDir(candidate, searchRoot));
   if (submoduleRoot) {
     throw new Error(
-      `Search scope contains nested workspace ${path.relative(workspaceRoot, submoduleRoot)}. Use that path as workspace or choose a narrower parent-workspace scope.`,
+      `Search directory contains nested workspace ${path.relative(workspaceRoot, submoduleRoot)}. Use that path as workspace or choose a narrower parent-workspace directory.`,
     );
   }
   return searchRoot;
@@ -123,7 +136,17 @@ export const enrichRetrievalPage = async (input: {
     matches: await Promise.all(
       input.page.results.map(async (result) => {
         const file = path.resolve(input.searchRoot, result.file_path);
-        const { symbols } = await intelligence.documentSymbols(file, input.signal);
+        // Semantic search answers from the whole search root, so results land in
+        // packages this session has never opened. Labelling one with the symbol
+        // containing it is a question about that file's own syntax; asking the
+        // language server would resolve each result to its project and build
+        // that project's program, so a three-result page could build three.
+        const read = await workspace.readTextDocumentUri(
+          workspace.getWorkspaceUri(file),
+          input.signal,
+        );
+        const source = read.source;
+        const symbols = documentSymbols({ uri: read.textDocument.uri, source });
         const resultStartLine = result.start_line - 1;
         const resultEndLine = result.end_line - 1;
         const symbolPaths = [
@@ -138,11 +161,10 @@ export const enrichRetrievalPage = async (input: {
           symbolPaths.find((path) => queryIdentifiers.has(path.at(-1)!.symbol.name)) ??
           symbolPaths[0];
         const selected = symbolPath?.at(-1);
-        const exactSource = anchorIdentifiers.size
-          ? await workspace.readTextDocument(file, input.signal)
-          : undefined;
-        const contentLines = exactSource?.source.split("\n") ?? result.content?.split("\n") ?? [];
-        const contentStartLine = exactSource ? 0 : resultStartLine;
+        const contentLines = anchorIdentifiers.size
+          ? source.split("\n")
+          : (result.content?.split("\n") ?? []);
+        const contentStartLine = anchorIdentifiers.size ? 0 : resultStartLine;
         const anchorLine = contentLines.findIndex(
           (line) =>
             !/^\s*(?:\/\/|\/\*|\*)/u.test(line) &&
@@ -165,7 +187,13 @@ export const enrichRetrievalPage = async (input: {
               );
         const hover =
           selected && input.includeTypes
-            ? (await intelligence.hover(file, selected.selection.start, input.signal)).hover
+            ? (
+                await intelligence.hover({
+                  file,
+                  signal: input.signal,
+                  params: { position: selected.selection.start },
+                })
+              ).result
             : undefined;
         return {
           result,
@@ -286,26 +314,79 @@ const relatedCodeSection = async (
   }
 };
 
+/**
+ * Searches a directory without giving it an index of its own.
+ *
+ * Semble keys its cache on the resolved path it is handed, so a directory and
+ * the workspace containing it never share an index: naming the directory as the
+ * repo builds a second one from scratch, which on this repository's traffic
+ * example cost thirteen seconds — for a narrowing that was asked for to make the
+ * search cheaper. The workspace is the index instead, and the directory selects
+ * from its results. Semble offers no path filter, so a scoped page is filled by
+ * asking for a wider one; a warm search costs tens of milliseconds, so asking
+ * twice is far cheaper than a second index. Should the workspace index genuinely
+ * not hold enough under that directory, the directory is indexed after all, and
+ * the answer is the same one it would have given before.
+ */
+const scopedSearch = async (input: {
+  readonly semble: Semble;
+  readonly root: string;
+  readonly searchRoot: string;
+  readonly query: string;
+  readonly limit: number;
+  readonly signal: AbortSignal;
+}): Promise<SembleSearchPage> => {
+  const ask = (repo: string, limit: number) =>
+    input.semble.search({
+      repo,
+      query: input.query,
+      limit,
+      snippetLines: null,
+      signal: input.signal,
+    });
+  const workspaceRoot = path.resolve(input.root);
+  if (input.searchRoot === workspaceRoot) return await ask(workspaceRoot, input.limit);
+
+  // The workspace index reports paths against the workspace; every reader below
+  // resolves them against the search root, so they are re-based to it here and
+  // a scoped page reads identically however it was obtained.
+  const within = (page: SembleSearchPage) => ({
+    ...page,
+    results: page.results.flatMap((result) => {
+      const file = path.resolve(workspaceRoot, result.file_path);
+      return isFileInDir(file, input.searchRoot)
+        ? [{ ...result, file_path: platformRelative(input.searchRoot, file) }]
+        : [];
+    }),
+  });
+  const wide = within(await ask(workspaceRoot, Math.min(input.limit * 12, 300)));
+  if (wide.results.length >= input.limit) {
+    return { ...wide, results: wide.results.slice(0, input.limit) };
+  }
+  return await ask(input.searchRoot, input.limit);
+};
+
 export const createRetrievalIntelligence = (dependencies: {
   readonly semble: Semble;
   readonly workspaces: VolarWorkspacePool;
 }) => {
   const search = async (request: {
     readonly root: string;
-    readonly scope?: string;
+    readonly directory?: string;
     readonly query: string;
     readonly includeTypes: boolean;
     readonly limit: number;
     readonly snippetLines: number | null;
     readonly signal: AbortSignal;
   }): Promise<RetrievalPage> => {
-    const searchRoot = await resolveSearchRoot(request.root, request.scope);
+    const searchRoot = await resolveSearchRoot(request.root, request.directory);
     return await enrichRetrievalPage({
-      page: await dependencies.semble.search({
-        repo: searchRoot,
+      page: await scopedSearch({
+        semble: dependencies.semble,
+        root: request.root,
+        searchRoot,
         query: request.query,
         limit: request.limit,
-        snippetLines: null,
         signal: request.signal,
       }),
       root: request.root,
@@ -319,7 +400,7 @@ export const createRetrievalIntelligence = (dependencies: {
 
   const findRelated = async (request: {
     readonly root: string;
-    readonly scope?: string;
+    readonly directory?: string;
     readonly file: string;
     readonly line: number;
     readonly includeTypes: boolean;
@@ -328,10 +409,10 @@ export const createRetrievalIntelligence = (dependencies: {
     readonly snippetLines: number | null;
     readonly signal: AbortSignal;
   }): Promise<RetrievalPage> => {
-    const searchRoot = await resolveSearchRoot(request.root, request.scope);
+    const searchRoot = await resolveSearchRoot(request.root, request.directory);
     const file = path.resolve(request.root, request.file);
     if (!isFileInDir(file, searchRoot)) {
-      throw new Error(`Related-code seed is outside the search scope: ${request.file}`);
+      throw new Error(`Related-code seed is outside the search directory: ${request.file}`);
     }
     const page = await dependencies.semble.findRelated({
       repo: searchRoot,
@@ -365,7 +446,7 @@ export const createRetrievalIntelligence = (dependencies: {
       formatPage({ retrieval: await findRelated(request) }),
     exploreSymbol: async (request: {
       readonly root: string;
-      readonly scope?: string;
+      readonly directory?: string;
       readonly file: string;
       readonly target: InspectSymbolTarget;
       readonly includeSource: boolean;
@@ -376,33 +457,34 @@ export const createRetrievalIntelligence = (dependencies: {
       readonly signal: AbortSignal;
     }) => {
       const workspace = await dependencies.workspaces.get(request.root);
-      const inspection = await inspectSymbol(
+      const inspection = await inspectSymbol({
         workspace,
-        request.root,
-        request.file,
-        request.target,
-        {
+        root: request.root,
+        file: request.file,
+        target: request.target,
+        options: {
           includeSource: request.includeSource,
           includeTypeDefinitions: request.includeTypeDefinitions,
           limit: request.limit,
         },
-        request.signal,
-      );
+        signal: request.signal,
+      });
       const { position } = inspection;
-      if (!position) return inspection.text;
+      const inspectionText = formatSymbolInspection({ result: inspection, root: request.root });
+      if (!position) return inspectionText;
       const anchor = {
         file: path.resolve(request.root, request.file),
         position,
       };
       return [
-        inspection.text,
+        inspectionText,
         "",
         ...(await relatedCodeSection(
           async () =>
             formatPage({
               retrieval: await findRelated({
                 root: request.root,
-                scope: request.scope,
+                directory: request.directory,
                 file: request.file,
                 line: position.line,
                 includeTypes: false,
@@ -420,7 +502,7 @@ export const createRetrievalIntelligence = (dependencies: {
     },
     investigate: async (request: {
       readonly root: string;
-      readonly scope?: string;
+      readonly directory?: string;
       readonly question: string;
       readonly candidateLimit: number;
       readonly inspectionLimit: number;
@@ -432,7 +514,7 @@ export const createRetrievalIntelligence = (dependencies: {
     }) => {
       const retrieval = await search({
         root: request.root,
-        scope: request.scope,
+        directory: request.directory,
         query: request.question,
         includeTypes: false,
         limit: Math.min(request.candidateLimit * 3, 20),
@@ -494,24 +576,24 @@ export const createRetrievalIntelligence = (dependencies: {
       const workspace = await dependencies.workspaces.get(request.root);
       const inspections = await Promise.all(
         candidates.map((candidate) =>
-          inspectSymbol(
+          inspectSymbol({
             workspace,
-            request.root,
-            candidate.file,
-            { position: candidate.selected.selection.start },
-            {
+            root: request.root,
+            file: candidate.file,
+            target: { position: candidate.selected.selection.start },
+            options: {
               includeSource: request.includeSource,
               includeTypeDefinitions: false,
               limit: request.relationshipLimit,
             },
-            request.signal,
-          ),
+            signal: request.signal,
+          }),
         ),
       );
       const related = request.relatedLimit
         ? await findRelated({
             root: request.root,
-            scope: request.scope,
+            directory: request.directory,
             file: candidates[0]!.file,
             line: candidates[0]!.selected.selection.start.line,
             includeTypes: false,
@@ -538,7 +620,7 @@ export const createRetrievalIntelligence = (dependencies: {
           ...(inspections.length > 1
             ? ["", `### Retrieved candidate ${candidateRanks[index]}`]
             : []),
-          inspection.text,
+          formatSymbolInspection({ result: inspection, root: request.root }),
         ]),
         ...(related
           ? [

@@ -1,8 +1,16 @@
 {
   "compilerOptions": {
-    "target": "ES2022",
+    // Matches the `node: ">=22.20"` every package declares. Understating it left
+    // `Promise.withResolvers` and `Map.groupBy` unavailable and hand-rolled.
+    "target": "ES2024",
     "module": "ESNext",
     "moduleResolution": "bundler",
+    // Every client runs the source entrypoint under `--conditions=development`,
+    // so a workspace package resolves to `src`. Without the same condition here
+    // `tsc` follows `types` to `dist`, and the compiler then checks the last
+    // build while the process runs the working tree — the two disagree exactly
+    // when source has changed, which is always, during development.
+    "customConditions": ["development"],
     "resolveJsonModule": true,
     "strict": true,
     "declaration": true,

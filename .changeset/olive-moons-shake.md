@@ -1,20 +1,16 @@
 ---
-"@type-atlas/core": patch
+"@type-atlas/mcp": patch
 ---
 
-Stop `list_module_exports` and `search_dependency_code` from leaking a source
-file per call.
+Say each thing once in the tool surface.
 
-Both answer by opening a synthetic probe document beside the importing file and
-reading completions from it. The probe carried a fresh random name on every
-call, so TypeScript saw a source file it had never seen each time and retained
-it: eight identical calls against one small package grew the language server
-from 503 MB to 631 MB, about 18 MB apiece, with no plateau. Enough calls
-exhausted its heap, which killed the workspace and failed every request in
-flight with only a note that the connection was disposed.
+Tool descriptions and schemas are serialized into every model request, so text
+repeated between the server instructions and a tool's own description is paid for
+on every call an agent makes, whichever tool it calls. The `diagnostics`
+description and its `scope` field restated the changed-versus-project semantics
+the server instructions already give; both are now the short form.
 
-The probe now derives its name from the importing file, so the language server
-sees one file being edited rather than an unbounded set of new ones, and the
-same eight calls hold flat. `withTextDocument` serializes callers sharing a uri
-and versions each open, which is what the random name was avoiding: two
-overlapping probes would otherwise close the document out from under each other.
+The `directory` description was also stale as well as long. It told agents that
+each distinct directory has its own Semble index and that scoping therefore
+answers faster — true before the workspace became the index, and misleading now
+that scoping costs nothing. It says what it does instead.

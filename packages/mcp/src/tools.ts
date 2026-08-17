@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { registerAssistanceTools } from "./assistance.tools.ts";
 import { registerCodeActionTools } from "./code-actions.tools.ts";
+import { registerDiagnosticWatchTool } from "./diagnostic-watch.tool.ts";
 import { registerDocumentTools } from "./document.tools.ts";
 import { registerEditingTools } from "./editing.tools.ts";
 import { registerIntelligenceTools } from "./intelligence.tools.ts";
@@ -23,4 +24,5 @@ export const registerTools = (
   registerEditingTools(server, workspaces);
   registerCodeActionTools(server, workspaces);
   registerIntelligenceTools(server, workspaces, semble);
+  registerDiagnosticWatchTool(server, workspaces);
 };
