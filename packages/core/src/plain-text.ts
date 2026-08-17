@@ -673,6 +673,12 @@ export const formatModuleExports = (page: ModuleExportPage) => {
 
 type NavigationResult = Location | readonly Location[] | readonly LocationLink[] | null | undefined;
 
+const containsPosition = (range: Range, position: Position) =>
+  (range.start.line < position.line ||
+    (range.start.line === position.line && range.start.character <= position.character)) &&
+  (position.line < range.end.line ||
+    (position.line === range.end.line && position.character <= range.end.character));
+
 const navigationText = (item: Location | LocationLink, workspaceRoot: string) => {
   if ("targetUri" in item) {
     const target = workspaceRange(item.targetUri, item.targetSelectionRange, workspaceRoot);
@@ -685,9 +691,36 @@ const navigationText = (item: Location | LocationLink, workspaceRoot: string) =>
   return workspaceRange(item.uri, item.range, workspaceRoot);
 };
 
-export const formatNavigation = (noun: string, result: NavigationResult, workspaceRoot: string) => {
+/**
+ * Renders navigation targets, and refuses to call a declaration its own answer.
+ *
+ * The implementation request returns the declaration itself for anything that is
+ * not overridden — which is most TypeScript — and printing that as
+ * "Implementations (1)" asserts the opposite of what it means. `origin` is the
+ * position that was asked about; a lone target spanning it is the declaration
+ * the caller is already standing on, and the answer is that there are none.
+ * Definitions are left alone: there, returning the declaration is the answer.
+ */
+export const formatNavigation = (
+  noun: string,
+  result: NavigationResult,
+  workspaceRoot: string,
+  origin?: { readonly uri: string; readonly position: Position },
+) => {
   const items = !result ? [] : Array.isArray(result) ? result : [result];
-  if (!items.length) return countHeader(noun, 0);
+  const declaresOrigin =
+    origin !== undefined &&
+    items.length === 1 &&
+    items.every((item) => {
+      const uri = "targetUri" in item ? item.targetUri : item.uri;
+      const range = "targetUri" in item ? item.targetRange : item.range;
+      return uri === origin.uri && containsPosition(range, origin.position);
+    });
+  if (!items.length || declaresOrigin) {
+    return declaresOrigin
+      ? `${countHeader(noun, 0)} · the declaration here is not overridden`
+      : countHeader(noun, 0);
+  }
   return [
     countHeader(noun, items.length),
     ...items.map((item) => navigationText(item, workspaceRoot)),

@@ -1,13 +1,13 @@
 ---
 "@type-atlas/core": patch
+"@type-atlas/mcp": patch
 ---
 
-Group located results under each file rather than repeating its path per hit.
+Stop reporting a declaration as its own implementation.
 
-`references` and `file_references` printed one fully qualified path per result,
-so ten uses in one file cost ten copies of a path to introduce ten line numbers,
-and read as ten unrelated results. Ten hits in a single file dropped from about
-570 characters to 200.
+The implementation request returns the declaration itself for anything that is
+not overridden, which is most TypeScript. `implementations` printed that as
+"Implementations (1)" pointing back at the position asked about — the opposite of
+what it means. It now reports none, and says the declaration is not overridden.
 
-Each file is now named once, followed by its positions in source order, matching
-how callers and calls are already reported.
+Definitions are unchanged: there, returning the declaration is the answer.

@@ -275,7 +275,9 @@ export const registerNavigationTools = (
         params: { position },
       });
       return appendDiagnosticContext(
-        textResult(formatNavigation("implementations", result, root)),
+        textResult(
+          formatNavigation("implementations", result, root, { uri: textDocument.uri, position }),
+        ),
         await requestDiagnosticContext(
           workspace,
           textDocument,
