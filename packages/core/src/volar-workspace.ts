@@ -67,6 +67,15 @@ const languageServerHeapMegabytes = () =>
 /** Files a TypeScript project can report diagnostics for. */
 const sourceFile = /\.(?:[cm]?[jt]s|[jt]sx)$/i;
 
+/**
+ * How long one request may hold the language server before it is ended.
+ *
+ * Longer than the slowest legitimate answer measured here — a cold whole-project
+ * check of a three-thousand-file program — so a slow project is not mistaken for
+ * a stuck one.
+ */
+const requestDeadline = 60_000;
+
 const startVolarWorkspace = async (workspaceRoot: string, languageServerEntry: URL) => {
   const workspaceStat = await stat(workspaceRoot).catch(() => undefined);
   if (!workspaceStat?.isDirectory()) {
@@ -290,6 +299,36 @@ const startVolarWorkspace = async (workspaceRoot: string, languageServerEntry: U
   const warmProject = (uri: string) => {
     void sendRequest(GetMatchTsConfigRequest.type, { uri }).catch(() => undefined);
   };
+  /**
+   * Ends the language server when a request has plainly stopped answering.
+   *
+   * A semantic request cannot be cancelled — see
+   * `docs/volar-affordance-evidence.md` § "Semantic requests cannot be
+   * cancelled": the token Volar hands TypeScript raises nothing, and a request
+   * abandoned at five seconds ran to completion at nearly ten. While it runs the
+   * server holds its only thread and stops reading its socket, so every later
+   * call for this workspace waits behind it — a folded five-line read needing no
+   * type checking has timed out at thirty seconds that way. Ending the process
+   * is the only bound a client has.
+   *
+   * The cost is one project rebuild on the next call, against a queue bounded
+   * only by however long the abandoned work runs. This fires on the deadline
+   * rather than on a caller giving up, because a caller giving up says nothing
+   * about whether the server is stuck.
+   */
+  const wedged = (method: string) =>
+    new Promise<never>((_, reject) => {
+      const deadline = setTimeout(() => {
+        terminateLanguageServer();
+        reject(
+          new Error(
+            `The language server for ${workspaceRoot} stopped answering (${method} ran past ${requestDeadline / 1000} seconds) and was ended, because nothing can interrupt a check already under way and every later call would have waited behind it. The next call starts a new one and pays the project load again.`,
+          ),
+        );
+      }, requestDeadline);
+      languageServerExit.finally(() => clearTimeout(deadline));
+    });
+
   const sendRequest = async <Params, Result, Error>(
     request: RequestType<Params, Result, Error>,
     params: Params,
@@ -303,7 +342,10 @@ const startVolarWorkspace = async (workspaceRoot: string, languageServerEntry: U
     if (signal?.aborted) cancel();
 
     try {
-      return await connection.sendRequest(request.method, params, cancellation?.token);
+      return await Promise.race([
+        connection.sendRequest<Result>(request.method, params, cancellation?.token),
+        wedged(request.method),
+      ]);
     } catch (error) {
       if (signal?.aborted) {
         throw signal.reason instanceof Error
@@ -500,6 +542,29 @@ export const createVolarWorkspaces = (languageServer: URL) => {
 
   return {
     get,
+    /**
+     * Ends a workspace's language server, if it has one.
+     *
+     * A semantic request cannot be cancelled — see
+     * `docs/volar-affordance-evidence.md` § "Semantic requests cannot be
+     * cancelled" — and while one runs the server holds its only thread and stops
+     * reading IPC, so every later call for that workspace waits behind it. A
+     * request abandoned at five seconds ran to completion at nearly ten, and a
+     * folded five-line read needing no type checking timed out at thirty against
+     * a workspace in that state. Ending the process is the only bound a client
+     * has. The next call starts a fresh workspace, trading one program rebuild
+     * for a queue with no bound but the abandoned work's own duration.
+     */
+    async release(root: string) {
+      const workspaceRoot = path.resolve(root);
+      const held = entries.get(workspaceRoot);
+      if (!held) return;
+      entries.delete(workspaceRoot);
+      await held.then(
+        (active) => active.dispose(),
+        () => undefined,
+      );
+    },
     async dispose() {
       const current = [...entries.values()];
       entries.clear();

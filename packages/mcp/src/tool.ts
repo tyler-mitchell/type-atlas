@@ -32,7 +32,11 @@ const withElapsed = <Result extends object>(result: Result, started: number): Re
   };
 };
 
-/** Timing out does not stop the language server, so repeating the call only queues behind it. */
+/**
+ * Timing out does not stop the language server, so repeating the call only
+ * queues behind it. The workspace ends a server that runs past its own, longer
+ * deadline; until then the work continues.
+ */
 const timeoutReason = (tool: string, expiry: AbortSignal, signal: AbortSignal): Error =>
   expiry.aborted
     ? new Error(
