@@ -2,6 +2,7 @@ import { readdir, stat } from "node:fs/promises";
 import * as path from "pathe";
 import {
   ProjectDiagnosticsRequest,
+  WorkspaceDeclarationsRequest,
   WorkspaceReferencesRequest,
 } from "@type-atlas/language-server/protocol";
 import {
@@ -432,9 +433,13 @@ export const createTypeAtlas = (workspace: VolarWorkspace) => {
         textDocument,
         input.signal,
       );
+      // Not `workspace/symbol`: it carries no document, so Volar cannot resolve
+      // a project from it and searches one holding no files. It answered an
+      // empty array for every query, including names declared in a project the
+      // same session had already checked.
       const symbols = await workspace.sendRequest(
-        WorkspaceSymbolRequest.type,
-        { query: input.query },
+        WorkspaceDeclarationsRequest.type,
+        { textDocument, query: input.query },
         input.signal,
       );
       return {

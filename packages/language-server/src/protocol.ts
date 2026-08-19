@@ -6,6 +6,9 @@ import {
   type TextDocumentIdentifier,
 } from "@volar/language-server/protocol.js";
 import type ts from "typescript";
+import type { Declaration } from "./workspace-declarations.ts";
+
+export type { Declaration } from "./workspace-declarations.ts";
 
 /** One project's whole-program diagnostics. */
 export type ProjectDiagnostics = {
@@ -54,6 +57,30 @@ export const WorkspaceReferencesRequest = {
     readonly Location[],
     never
   >("type-atlas/workspaceReferences"),
+} as const;
+
+/**
+ * Declarations matching a name, from every TypeScript project loaded here.
+ *
+ * `workspace/symbol` carries no document, so Volar has nothing to resolve a
+ * project from and runs the search against one holding no files — it answered
+ * an empty array for every query, for a name declared in a project the same
+ * session had already checked. The projects that could hold the answer are the
+ * ones this server has built, so this asks each of them, exactly as
+ * `type-atlas/workspaceReferences` does for a symbol's uses.
+ *
+ * A document comes with the request only to name the project to start from; the
+ * search itself is by name across all of them.
+ */
+export const WorkspaceDeclarationsRequest = {
+  type: new RequestType<
+    {
+      readonly textDocument: TextDocumentIdentifier;
+      readonly query: string;
+    },
+    readonly Declaration[],
+    never
+  >("type-atlas/workspaceDeclarations"),
 } as const;
 
 /** Resolves an installed module from the TypeScript project containing a document. */

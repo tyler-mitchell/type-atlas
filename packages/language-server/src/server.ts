@@ -25,8 +25,10 @@ import {
   type ProjectDiagnostics,
   ProjectDiagnosticsRequest,
   ResolveDependencySourceRequest,
+  WorkspaceDeclarationsRequest,
   WorkspaceReferencesRequest,
 } from "./protocol.ts";
+import { workspaceDeclarations } from "./workspace-declarations.ts";
 
 const markdownFileExtensions = [
   "md",
@@ -215,6 +217,35 @@ export const registerLanguageServer = (connection: Connection): void => {
           );
       },
     );
+    connection.onRequest(WorkspaceDeclarationsRequest.type, async ({ textDocument, query }) => {
+      const uri = URI.parse(textDocument.uri);
+      const owner = await server.project.getLanguageService(uri);
+      const loaded =
+        (await Promise.resolve(server.project.getExistingLanguageServices()).catch(
+          () => undefined,
+        )) ?? [];
+      // One project that cannot answer must not delete what the others found,
+      // the same reason `workspaceReferences` catches per service.
+      const found = [owner, ...loaded.filter((service) => service !== owner)].flatMap((service) => {
+        try {
+          return workspaceDeclarations(service, query);
+        } catch {
+          return [];
+        }
+      });
+      // A declaration reached through two projects is one declaration: the same
+      // name at the same place.
+      return found.filter(
+        (symbol, index, all) =>
+          all.findIndex(
+            (other) =>
+              other.name === symbol.name &&
+              other.location.uri === symbol.location.uri &&
+              other.location.range.start.line === symbol.location.range.start.line &&
+              other.location.range.start.character === symbol.location.range.start.character,
+          ) === index,
+      );
+    });
     connection.onRequest(ProjectDiagnosticsRequest.type, async ({ textDocuments }, token) => {
       // Volar resolves a document to the service owning it, so files sharing a
       // project resolve to one service and it is checked once. Deduplicating

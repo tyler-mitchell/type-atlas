@@ -1,9 +1,9 @@
+import { WorkspaceDeclarationsRequest } from "@type-atlas/language-server/protocol";
 import {
   DocumentLinkRequest,
   DocumentLinkResolveRequest,
   GetMatchTsConfigRequest,
   SymbolKind,
-  WorkspaceSymbolRequest,
 } from "@volar/language-server/protocol.js";
 import { expect, test, vi } from "vitest";
 import { createTypeAtlas } from "../src/operations.ts";
@@ -14,7 +14,9 @@ const RANGE = { start: { line: 0, character: 0 }, end: { line: 0, character: 1 }
 test("keeps workspace symbol results within source-code files", async () => {
   const sendRequest = vi.fn(async (request) => {
     if (request === GetMatchTsConfigRequest.type) return null;
-    if (request === WorkspaceSymbolRequest.type) {
+    // Not `workspace/symbol`: that request carries no document, so Volar
+    // resolves no project for it and searches one holding no files.
+    if (request === WorkspaceDeclarationsRequest.type) {
       return [
         {
           name: "TimelineCompositionAtInput",
@@ -35,11 +37,11 @@ test("keeps workspace symbol results within source-code files", async () => {
     sendRequest,
   } as unknown as VolarWorkspace;
 
-  const result = await createTypeAtlas(workspace).workspaceSymbols(
-    "source.ts",
-    "TimelineCompositionAtInput",
-    new AbortController().signal,
-  );
+  const result = await createTypeAtlas(workspace).workspaceSymbols({
+    file: "source.ts",
+    query: "TimelineCompositionAtInput",
+    signal: new AbortController().signal,
+  });
 
   expect(result.symbols?.map(({ name }) => name)).toEqual(["TimelineCompositionAtInput"]);
 });

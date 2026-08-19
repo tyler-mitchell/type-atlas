@@ -6,6 +6,5 @@
     "allowImportingTsExtensions": true,
     "outDir": "dist"
   },
-  "include": ["src"],
-  "exclude": ["src/markdoc/format/vitest-reference"]
+  "include": ["src", "test"]
 }

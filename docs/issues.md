@@ -1,4 +1,4 @@
-# Known defects
+# Issues
 
 Things the MCP surface does that it should not, or does not that it should,
 found by using it. Written at the moment of discovery, because a finding
@@ -9,6 +9,15 @@ reproduction is a rumour, and the next reader needs to confirm it still holds
 before acting on it.
 
 An entry leaves this file when it is fixed, not when it is explained.
+
+**〈raised〉** marks an issue Tyler raised rather than one found while working.
+Those are deferred on arrival — captured here and left alone — unless they
+happen to land on whatever is already open at that moment. The mark exists so
+the distinction survives the session that recorded it.
+
+One raised message often carries more than one issue. They are split here
+rather than filed as one, because they are fixed separately and one of them
+being done should not make the other look done with it.
 
 ---
 
@@ -40,6 +49,32 @@ states a range and names the parameter that continues it.
 ---
 
 ## Correctness
+
+### `getNavigateToItems` answers nothing on the hosted language service
+
+The cause behind `workspace_symbols`, diagnosed but not fixed.
+
+Volar's own workspace symbol search was ruled out first: its TypeScript plugin
+converts each match through `ctx.getTextDocument(...)`, which resolves only
+files Volar holds open, so a workspace-wide query — almost entirely unopened
+files — loses every result. `type-atlas/workspaceDeclarations` now bypasses
+that and asks TypeScript directly, and the answer is still empty.
+
+Instrumented from inside the request, against a two-file project:
+
+```
+items=0 files=[…/src/example.ts|…/src/other.ts] names=
+```
+
+The program holds the file declaring `computeTotal`, and
+`getNavigateToItems("computeTotal")` returns nothing. The identical call on a
+plain `ts.createLanguageService` over the same file returns the declaration, so
+the query is right and the loss is in the hosted service — either the tsgo
+bridge under Volar's host, or the `withEffectLanguageService` proxy in front of
+it. Passing an explicit `maxResultCount` changed nothing.
+
+`packages/language-server/test/server.test.ts` holds this as an `it.fails`, so
+it reports when the behaviour returns rather than sitting silent.
 
 ### `workspace_symbols` answers empty for a project that is loaded
 
@@ -93,6 +128,36 @@ when the index is empty.
 Both this and `find_successor` above break the same rule: **a tool may report
 what it observed, and may not report what that observation implies about the
 world.** Ranking is an observation; "this is relevant" is a conclusion.
+
+### 〈raised〉 An absolute path appears where the default is workspace-relative
+
+```
+file_references { file: packages/mcp/src/experimental.tools.ts }
+→ … anchored at packages/mcp/tsconfig.json in /Users/tylermitchell/Projects/featuretype.
+```
+
+Paths default to workspace-relative and `displayPath` renders them that way
+everywhere. The root itself is the exception: preambles print it absolutely, on
+the reasoning that a reader needs to know what the relative paths are read
+against. That reasoning was never checked against the ask, and the ask was that
+absolute paths are opt-in.
+
+To settle broadly rather than per tool, because the root is stated in nearly
+every preamble — and because there are other places an absolute path can still
+surface: `project_config` asks for one deliberately, and `displayPath` falls
+back to one for any file outside the root it was measured from.
+
+### 〈raised〉 The `file_references` preamble needs rethinking
+
+```
+packages/mcp/src/experimental.tools.ts is referenced from 2 places, across every
+project loaded this session, anchored at packages/mcp/tsconfig.json in
+/Users/tylermitchell/Projects/featuretype.
+```
+
+One sentence carrying five facts — subject, count, scope, anchor, root — read
+as a single run-on clause. Raised as needing rethinking; the shape it should
+take is not decided here.
 
 ### A probe document is reported as a problem in the user's project
 

@@ -76,6 +76,60 @@ describe("language server", () => {
     }
   });
 
+  /**
+   * Known failing, deliberately, so it says so when it stops.
+   *
+   * The program demonstrably holds the file — this test prints both source
+   * files when it fails — and `getNavigateToItems` still answers nothing for a
+   * name declared in one of them. The same call against a plain TypeScript
+   * language service over the same file returns the declaration, so the loss is
+   * somewhere in the hosted service rather than in the query.
+   *
+   * Written as a failing expectation rather than deleted, because the fix is
+   * upstream and this is what will notice it arriving.
+   */
+  it.fails("finds a declaration in a file no document has opened", async () => {
+    const root = await mkdtemp(path.join(packageRoot, ".language-server-test-"));
+    temporaryRoots.add(root);
+    await mkdir(path.join(root, "src"));
+    await writeFile(
+      path.join(root, "tsconfig.json"),
+      JSON.stringify({
+        compilerOptions: { strict: true, target: "ES2022" },
+        include: ["src/**/*.ts"],
+      }),
+    );
+    const opened = path.join(root, "src", "example.ts");
+    const unopened = path.join(root, "src", "other.ts");
+    await writeFile(opened, "export const value = 1;\n");
+    await writeFile(unopened, "export function computeTotal() {\n  return 1;\n}\n");
+
+    const handle = startLanguageServer(
+      path.join(packageRoot, "bin", "type-atlas-language-server.cjs"),
+      packageRoot,
+    );
+    try {
+      await handle.initialize(URI.file(root).toString(), undefined, { textDocument: {} });
+      const document = await handle.openTextDocument(opened, "typescript");
+      const declarations = await handle.connection.sendRequest(
+        "type-atlas/workspaceDeclarations",
+        { textDocument: { uri: document.uri }, query: "computeTotal" },
+      );
+      expect(declarations).toEqual([
+        expect.objectContaining({
+          name: "computeTotal",
+          location: expect.objectContaining({ uri: URI.file(unopened).toString() }),
+        }),
+      ]);
+    } finally {
+      await handle.shutdown();
+      const exited = once(handle.process, "exit");
+      await handle.connection.sendNotification(ExitNotification.type);
+      await exited;
+      handle.connection.dispose();
+    }
+  }, 30_000);
+
   it("serves TypeScript and source documents through the Volar process entrypoint", async () => {
     const root = await mkdtemp(path.join(packageRoot, ".language-server-test-"));
     temporaryRoots.add(root);

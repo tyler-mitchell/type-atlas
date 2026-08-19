@@ -471,6 +471,11 @@ export const registerNavigationTools = (
           query,
           anchor: project ? displayPath(project.uri, root) : "an inferred project",
           root,
+          // Null is a provider that did not answer; an empty array is one that
+          // searched and found nothing. They read identically and mean opposite
+          // things — the second says the name is absent, the first says nothing
+          // at all — so the document is told which it has.
+          answered: symbols !== null,
           total: output?.total ?? 0,
           items: named,
         },
