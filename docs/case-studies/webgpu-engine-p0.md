@@ -106,8 +106,17 @@ webgpu-engine's own project answers are the visible symptom that closes.
 
 The handoff's principal architecture, dependent on tasks 1–2. Per-resource
 `ContinuationPolicy` (restore/preserve/invalidate) as a declaration fact;
-`resetOwned` obeys it. **Unverified anchors**: `makePipelineResourceRuntime`'s
-readback and reset internals — navigate before design. Then in-memory
+`resetOwned` obeys it. Anchors now navigated: the conflation the handoff
+describes is exactly one predicate — `originResources` selects every
+`lifetime === "persistent"` backing (resource-runtime.ts:339–352) — so the
+policy inserts at that filter and the per-kind walk below it. `resetOwned`
+(353–428) already carries the disciplines a restore path needs: refuse
+before the first queue mutation, clear the whole allocation before
+rewriting authored initial data, async products to pending at revision 0.
+Capture's raw material is present: `physicalBackings` enumerates front and
+back (431–433), `products.commit` shows the front/back swap and revision
+bump a checkpoint must record (443–464), and `read` is the readback
+(317). Then in-memory
 capture/restore with the manifest refusing incompatibility before the first
 write; then the generalized continuation request on the frame-loop boundary,
 whose CoreTime half (`snapshotPlan`, digest records, replay suffix) is
