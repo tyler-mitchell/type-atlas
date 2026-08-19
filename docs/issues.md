@@ -382,6 +382,24 @@ about where file grouping applies inside a structural tree — possibly a shared
 mechanism other structural answers reuse. Observed 2026-08-19, kek-monorepo,
 `quorl` on `exactCoordinateOnClock`.
 
+### Documentation mangles a `{@link}` nested in another JSDoc tag
+
+```
+*@throws* — {  
+
+*@link*  
+PolicyViolation} when clocks differ, the grid is invalid, …
+```
+
+Upstream wrote `@throws {@link PolicyViolation} when …`; the rendering splits
+the inline link out of its enclosing tag, leaving a dangling `{`, a detached
+`*@link*` heading, and the class name wearing a stray `}`. The sentence a
+maintainer wrote is unreadable in exactly the answer meant to carry it.
+Whatever converts hover/documentation markup treats inline JSDoc tags as
+top-level ones. Observed 2026-08-19, kek-monorepo, `explore_symbol` on
+`quantizeTimelineCoordinate`; the same rendering path serves `hover` and
+`inspect_symbol`.
+
 ### `explore_symbol`'s related section declares "Related" a name nobody asked for
 
 ```
@@ -395,6 +413,25 @@ literal word "Related" as the searched identifier and reports its absence — a
 sentence about nothing a caller said. The label grammar exists for queries a
 caller typed; a similarity seed is not one. Observed 2026-08-19, kek-monorepo,
 `explore_symbol` on `exactCoordinateOnClock`.
+
+### `investigate_code` ranks an import block as its best answer
+
+```
+investigate_code { question: "how does the transport advance the timeline position each frame" }
+→ === 1 · packages/core-time/src/framework.ts:210-240 · relevance 100% ===
+  210 |   TimelineLatestEventInput,
+  211 |   TimelinePosition,   …
+```
+
+The top-ranked snippet is thirty lines of import/export names — it names every
+timeline concept, so it outranks the code implementing them, and it answers a
+behavioral question with nothing a reader can act on; the real answer (the
+frame loop) ranked third. `dependency-search.ts` already holds the affordance
+for exactly this class (`modulePreamble`, written because a CommonJS export
+banner outranked implementations); the retrieval side of `investigate_code`
+and `search_code` never adopted the judgment. The missing structure line on
+such a match is the tell: a snippet anchored to no declaration is usually a
+module's plumbing, not its behavior. Observed 2026-08-19, kek-monorepo.
 
 ### `investigate_code` titles its sections `###`
 
