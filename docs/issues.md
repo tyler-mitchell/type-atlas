@@ -201,6 +201,22 @@ Observed 2026-08-19. Same split on kek-monorepo: `planTensorStorage`, a
 `const` arrow function, is `[constant]` in `workspace_symbols` and
 `[function]` in `inspect_symbol`.
 
+### The outline names a member `<unknown>`
+
+```
+page [variable] 28:14-28:18 · range 28:14-36:2
+├  <unknown> [property] 34:5-34:55
+```
+
+The syntactic outline of `packages/core/src/projection.ts` renders a row whose
+name slot is the literal `<unknown>` — the conditional-spread member on line 34
+has no name the parser will state, and the placeholder flows straight into the
+location grammar (`name [kind] · pos`) as though it were one. A row that
+cannot be named should say what it is (the source text, or a sentence), not
+wear a bracketed token from the parser's vocabulary. Reaches `document_symbols`
+and anything else rendering the outline. Observed 2026-08-19 in the `compose`
+POC's pinned snapshot (`packages/mcp/test/compose.test.ts`).
+
 ### `list_module_exports` shows TypeScript's `detail` verbatim
 
 A re-exported alias renders as two lines — `(alias) const x: T` followed by

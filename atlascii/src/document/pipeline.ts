@@ -41,6 +41,31 @@ const present = (value: unknown): unknown =>
           .map(([name, held]) => [name, present(held)]),
       );
 
+/** One `ask` a composed document declares: an operation and the name it binds. */
+export type DocumentAsk = {
+  readonly operation: string;
+  readonly bind: string;
+  readonly attributes: Readonly<Record<string, unknown>>;
+};
+
+/**
+ * The intelligence a composed document declares it wants, in document order.
+ *
+ * `ask` tags are declarations, so they are read from the parse rather than
+ * discovered during rendering — a fulfiller runs every operation first, then
+ * renders once with the answers bound. Reading them here keeps the engine
+ * behind this entry point: a fulfiller learns what was asked without ever
+ * holding a Markdoc node.
+ */
+export const documentAsks = (source: string): readonly DocumentAsk[] =>
+  [...Markdoc.parse(source).walk()]
+    .filter((node) => node.type === "tag" && node.tag === "ask")
+    .map((node) => ({
+      operation: String(node.attributes.primary ?? ""),
+      bind: String(node.attributes.as ?? ""),
+      attributes: node.attributes as Record<string, unknown>,
+    }));
+
 /**
  * Renders one authored document to text.
  *

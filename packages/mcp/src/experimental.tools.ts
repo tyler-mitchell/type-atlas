@@ -1,20 +1,27 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import {
   type Diagnostic,
+  type DocumentSymbol,
   DocumentDiagnosticRequest,
   GetMatchTsConfigRequest,
+  type SymbolInformation,
 } from "@volar/language-server/protocol.js";
 import {
   createTypeAtlas,
   declarationAtPosition,
+  declarationChainAtPosition,
+  documentSymbols,
+  renderComposition,
   renderDocument,
   type VolarWorkspacePool,
 } from "@type-atlas/core";
 import { type } from "arktype";
-import { displayPath } from "atlascii";
+import { displayPath, sameRange } from "atlascii";
+import { type DocumentAsk, documentAsks } from "atlascii/document";
 import { textResult } from "./mcp-result.ts";
 import { readOnlyToolAnnotations } from "./metadata.ts";
 import { createQuorl } from "./quorl.ts";
+import { enclosingDeclaration, referenceGroups } from "./reference-groups.ts";
 import type { Semble } from "./semble.ts";
 import { registerTool } from "./tool.ts";
 import { fileInput, positionInput } from "./tool-input.ts";
@@ -55,6 +62,13 @@ const input = type.module({
         { description: "Proposed contents to check, before anything is written." },
         "self",
       ),
+  }),
+  Compose: type({
+    workspace: fileInput.workspace,
+    document: type("string >= 1").configure({
+      description:
+        "Markdoc source: ask declarations followed by a body composing what they bind.",
+    }),
   }),
 });
 
@@ -157,6 +171,143 @@ export const registerExperimentalTools = (
         },
       });
       return textResult(rendered.text);
+    },
+  );
+
+  registerTool(
+    server,
+    "compose",
+    {
+      title: "Compose",
+      description:
+        'Experimental: compose one code-intelligence answer by authoring a Markdoc document in the atlascii design language. Declare data with self-closing ask tags, then compose what they bind with the shipped tags and partials — headings via ##, counts read directly ({% $uses.total %}).\n\nOperations and what each binds:\n- {% ask "references" as="uses" file="src/x.ts" line=5 character=10 /%} (one-based, on the symbol\'s name) → {total, files, projects, groups}; render sites with {% tree entries=$uses.groups partial="reference-node.mdoc" /%}\n- {% ask "outline" as="shape" file="src/x.ts" /%} → {total, tree}; render with {% tree entries=$shape.tree partial="symbol-node.mdoc" /%}\n- {% ask "diagnostics" as="problems" file="src/x.ts" /%} → {total, groups}; render with {% each items=$problems.groups as="group" partial="diagnostic-group.mdoc" /%}\n- {% ask "source" as="body" file="src/x.ts" from=10 to=40 /%} → {lines, startLine}; render with {% source lines=$body.lines startLine=$body.startLine /%}',
+      inputSchema: input.Compose,
+      annotations: readOnlyToolAnnotations,
+    },
+    async ({ workspace: root, document }, { mcpReq: { signal } }) => {
+      const workspace = await workspaces.get(root);
+      const intelligence = createTypeAtlas(workspace);
+      const askedFile = (ask: DocumentAsk) => String(ask.attributes.file ?? "");
+      // The operations a composition can ask for, each binding the shape its
+      // partial reads — the same shapes the dedicated tools compose from.
+      const operations: Record<string, (ask: DocumentAsk) => Promise<unknown>> = {
+        references: async (ask) => {
+          const position = {
+            line: Number(ask.attributes.line ?? 1) - 1,
+            character: Number(ask.attributes.character ?? 1) - 1,
+          };
+          const { result, projects } = await intelligence.references({
+            file: askedFile(ask),
+            signal,
+            params: { position, context: { includeDeclaration: false }, scope: "workspace" },
+          });
+          const sites = [];
+          for (const { uri, range } of result ?? []) {
+            const chain = await declarationChainAtPosition({
+              workspace,
+              uri,
+              position: range.start,
+            }).catch(() => []);
+            sites.push({
+              file: displayPath(uri, root),
+              line: range.start.line + 1,
+              character: range.start.character + 1,
+              within: enclosingDeclaration(chain, range)?.name,
+            });
+          }
+          const ordered = [...sites].sort(
+            (left, right) =>
+              left.file.localeCompare(right.file) ||
+              left.line - right.line ||
+              left.character - right.character,
+          );
+          return {
+            total: ordered.length,
+            files: new Set(ordered.map(({ file }) => file)).size,
+            projects,
+            groups: referenceGroups(ordered),
+          };
+        },
+        outline: async (ask) => {
+          const uri = workspace.getWorkspaceUri(askedFile(ask));
+          const { source } = await workspace.readTextDocumentUri(uri, signal);
+          const parsed = documentSymbols({ uri, source }) ?? [];
+          const nest = (
+            entries: readonly (DocumentSymbol | SymbolInformation)[],
+          ): readonly Record<string, unknown>[] =>
+            entries.map((entry) => {
+              const selection = "range" in entry ? entry.selectionRange : entry.location.range;
+              const extent = "range" in entry ? entry.range : entry.location.range;
+              return {
+                name: entry.name,
+                kind: entry.kind,
+                selection,
+                extent: sameRange(extent, selection) ? undefined : extent,
+                detail: "detail" in entry ? entry.detail : undefined,
+                children: "range" in entry ? nest(entry.children ?? []) : [],
+              };
+            });
+          return { total: parsed.length, tree: nest(parsed) };
+        },
+        diagnostics: async (ask) => {
+          const { uri } = await workspace.getTextDocument(askedFile(ask));
+          const report = await workspace.sendRequest(
+            DocumentDiagnosticRequest.type,
+            { textDocument: { uri } },
+            signal,
+          );
+          const problems = (
+            report && typeof report === "object" && "items" in report
+              ? ((report as { items: readonly Diagnostic[] }).items ?? [])
+              : []
+          ).map((entry) => ({
+            severity: entry.severity,
+            source: entry.source,
+            code: entry.code,
+            range: entry.range,
+            message: entry.message,
+          }));
+          return {
+            total: problems.length,
+            groups:
+              problems.length > 0 ? [{ file: displayPath(uri, root), problems }] : [],
+          };
+        },
+        source: async (ask) => {
+          const uri = workspace.getWorkspaceUri(askedFile(ask));
+          const { source } = await workspace.readTextDocumentUri(uri, signal);
+          const lines = source.split("\n");
+          const from = Number(ask.attributes.from ?? 1);
+          return {
+            lines: lines.slice(from - 1, Number(ask.attributes.to ?? lines.length)),
+            startLine: from,
+          };
+        },
+      };
+      const asks = documentAsks(document);
+      const unfulfillable = asks.filter(({ operation }) => !(operation in operations));
+      if (unfulfillable.length > 0) {
+        throw new Error(
+          `This composition asks for ${unfulfillable
+            .map(({ operation }) => `"${operation}"`)
+            .join(", ")}; the operations are ${Object.keys(operations).join(", ")}.`,
+        );
+      }
+      const bound = Object.fromEntries(
+        await Promise.all(
+          asks.map(async (ask) => [ask.bind, await operations[ask.operation]!(ask)] as const),
+        ),
+      );
+      const rendered = await renderComposition({ source: document, variables: bound });
+      // A name the body reads that no ask bound renders as a hole; naming it is
+      // the feedback a composer can act on.
+      return textResult(
+        rendered.undefinedVariables.length > 0
+          ? `${rendered.text}\n\nUndefined in this composition: ${[
+              ...new Set(rendered.undefinedVariables),
+            ].join(", ")} — the asks bind ${asks.map(({ bind }) => bind).join(", ") || "nothing"}.`
+          : rendered.text,
+      );
     },
   );
 

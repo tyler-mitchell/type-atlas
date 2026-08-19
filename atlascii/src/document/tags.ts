@@ -81,6 +81,29 @@ const nested = (
 };
 
 export const tags: Config["tags"] = {
+  /**
+   * A declaration of code intelligence a composed document wants — not a
+   * component, and it renders nothing. The composer names an operation and
+   * the variable to bind its answer to; whoever renders the document
+   * fulfills every ask before rendering, so the body composes the answers
+   * with the same tags and partials every authored document uses. Which
+   * operations exist, and the shape each binds, belongs to the fulfiller.
+   */
+  ask: {
+    selfClosing: true,
+    attributes: {
+      primary: { type: String, required: true },
+      as: { type: String, required: true },
+      file: { type: String },
+      line: { type: Number },
+      character: { type: Number },
+      query: { type: String },
+      from: { type: Number },
+      to: { type: Number },
+    },
+    transform: () => "",
+  },
+
   /** A titled section: a heading and whatever a document puts under it. */
   section: {
     attributes: { title: { type: String, required: true }, level: { type: Number } },

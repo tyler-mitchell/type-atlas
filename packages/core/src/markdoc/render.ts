@@ -76,3 +76,22 @@ export const renderDocument = async (input: {
   ]);
   return renderSource({ source, file: input.document, variables: input.variables, partials });
 };
+
+/**
+ * Renders a caller-authored document through the same engine and partials.
+ *
+ * A composition is source the caller wrote rather than a name from the
+ * catalogue, and it reaches everything an authored document reaches — the
+ * tags, the functions, and every shipped partial — because the point of
+ * composing is to reuse the design language, not a subset of it.
+ */
+export const renderComposition = async (input: {
+  readonly source: string;
+  readonly variables: Record<string, unknown>;
+}) =>
+  renderSource({
+    source: input.source,
+    file: "composition.mdoc",
+    variables: input.variables,
+    partials: await partialSources(),
+  });
