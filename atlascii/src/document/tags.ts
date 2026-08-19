@@ -547,19 +547,6 @@ export const tags: Config["tags"] = {
       ),
   },
 
-  /**
-   * One glyph per item, for a progress line that stays on one row.
-   *
-   * Vitest's dot reporter emits runs of the same glyph together rather than one
-   * at a time, which is what lets a renderer colour a run once; `runs` exposes
-   * that grouping for a consumer that needs it.
-   */
-  dots: {
-    selfClosing: true,
-    attributes: { marks: { type: Array, required: true } },
-    transform: (node) => (node.attributes.marks as string[]).join(""),
-  },
-
   /** Stack frames, innermost first. */
   frames: {
     selfClosing: true,
