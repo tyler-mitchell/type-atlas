@@ -95,22 +95,31 @@ Extend the classification that already exists rather than inventing one:
 `planExecution` refuses by source at construction; `enabled` and dispatch
 need the same treatment, and the verified blocker is that `PassDeclaration`
 (declaration.ts:841–873) carries no `enabled`, so the compiler cannot see
-what the runtime evaluates live (compute-runtime.ts:162–167). Sequence:
-declare `enabled`'s source on the declaration; refuse functional `enabled`
-at step moments in `planExecution` beside the condition refusal; delete the
-thunk `SystemDispatch` form (after `occurrences` confirms zero active uses);
-promote the physics seam as `defineScheduledCommand` — the helper is a
-19-line journal filter plus the command wrapper repeated seven times, so the
-promotion is extraction, not invention.
+what the runtime evaluates live (compute-runtime.ts:162–167). The flow to
+change is a four-step chain, each anchored: the union declared at
+`SystemComputePass.enabled` (system.ts:303); lowered untouched by
+`computePass` (system.ts:698) into the runtime spec; never projected by
+`toPassDeclaration` (assembly.ts:1726) — the one function to extend so the
+declaration states the source; refused in `planExecution` beside the
+condition refusal (execution.ts:322–344), with the runtime evaluation left
+where it is. Then delete the thunk `SystemDispatch` form (after
+`occurrences` confirms zero active uses); promote the physics seam as
+`defineScheduledCommand` — a 19-line journal filter plus the command
+wrapper repeated seven times, so the promotion is extraction, not
+invention.
 
 ## Task 4 — tear down the deprecated coupling
 
 Remove `world-engine`/`world-graph` dependencies and aliases from
 webgpu-engine's package.json; delete `PipelineSystem.contract` and its
 construction (system.ts:153, 1799, 1922) once its only consumers go; delete
-or archive open-world-v2 and the legacy world witnesses; add the repository
-check forbidding re-imports. The world-engine references inside
-webgpu-engine's own project answers are the visible symptom that closes.
+or archive open-world-v2 (its tree also holds two more tests under
+`world-engine/` the handoff's list omits) and the legacy witnesses — all
+five exist exactly as named at `src/`, and a sixth sibling the handoff did
+not list, `physics-composed-world.typegpu.test.ts`, needs import triage
+before deletion rather than assumption; add the repository check forbidding
+re-imports. The world-engine references inside webgpu-engine's own project
+answers are the visible symptom that closes.
 
 ## Task 5 — continuation policy, then capture/restore, then CoreTime wiring
 
