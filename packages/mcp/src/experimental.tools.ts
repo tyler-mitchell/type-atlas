@@ -586,10 +586,14 @@ export const registerExperimentalTools = (
     async ({ workspace: root, file, position }, { mcpReq: { signal } }) => {
       const workspace = await workspaces.get(root);
       const intelligence = createTypeAtlas(workspace);
-      const declaration = await declarationAtPosition({
+      // The one subject owner: the resolved name is right even when the
+      // asked position is a use site, where the enclosing-declaration walk
+      // answered the wrong thing.
+      const declaration = await subjectAtPosition({
         workspace,
         uri: workspace.getWorkspaceUri(file),
         position,
+        signal,
       }).catch(() => undefined);
       // A decision needs the whole blast radius, and the reference fan-out
       // reaches only projects something already loaded. Retrieval sees the
