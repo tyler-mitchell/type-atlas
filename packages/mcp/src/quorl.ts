@@ -159,12 +159,14 @@ export const createQuorl =
             site.range.start.character === node.selection.start.character
           ),
       );
-    const branch = (node: Node): Row => {
+    const branch = (node: Node, underFile = false): Row => {
       const id = key(node.uri, node.selection);
       return {
         name: node.name,
         fields: [
-          `${displayPath(node.uri, request.workspace)}:${positionText(node.selection.start)}`,
+          underFile
+            ? `:${positionText(node.selection.start)}`
+            : `${displayPath(node.uri, request.workspace)}:${positionText(node.selection.start)}`,
           frontier.has(id) ? frontierMark : undefined,
         ],
         children: [
@@ -172,10 +174,32 @@ export const createQuorl =
             name: positionText(site.range.start),
             fields: [site.text],
           })),
-          ...(children.get(id) ?? []).map(branch),
+          ...folded(children.get(id) ?? []),
         ],
       };
     };
+    // Structure owns the nesting; file grouping is run-length collapse only:
+    // consecutive siblings sharing a file fold under one file line, in
+    // structure order, never re-sorted — seven kek test-file siblings each
+    // spent ~50 characters restating one path. A run of one keeps its path
+    // on the line, because a header over a single row costs more than it
+    // saves.
+    const folded = (nodes: readonly Node[]): Row[] =>
+      nodes
+        .reduce<Node[][]>((held, node) => {
+          const run = held[held.length - 1];
+          return run && run[0]!.uri === node.uri
+            ? [...held.slice(0, -1), [...run, node]]
+            : [...held, [node]];
+        }, [])
+        .map((run) =>
+          run.length === 1
+            ? branch(run[0]!)
+            : {
+                name: displayPath(run[0]!.uri, request.workspace),
+                children: run.map((node) => branch(node, true)),
+              },
+        );
 
     const rendered = await renderDocument({
       document: "quorl.tool.mdoc",
