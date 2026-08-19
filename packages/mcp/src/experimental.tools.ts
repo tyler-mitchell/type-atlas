@@ -4,7 +4,6 @@ import { fdir } from "fdir";
 import { isGitIgnored } from "globby";
 import * as path from "pathe";
 import {
-  type CallHierarchyIncomingCall,
   type Diagnostic,
   type DocumentSymbol,
   DocumentDiagnosticRequest,
@@ -14,7 +13,6 @@ import {
 import { isFileInDir } from "@volar/language-server/node.js";
 import {
   createTypeAtlas,
-  declarationAtPosition,
   declarationChainAtPosition,
   documentSymbols,
   renderComposition,
