@@ -64,7 +64,7 @@ const candidateGroups = (items: readonly Located[], root: string) =>
     selection: item.selectionRange,
     extent: sameRange(item.range, item.selectionRange) ? undefined : item.range,
     name: item.name,
-    kind: item.kind === undefined ? undefined : symbolKind(item.kind),
+    kind: item.kind,
     within: item.within,
     detail: item.detail,
     text: item.sourceLine?.trim() || undefined,
@@ -76,7 +76,7 @@ const callGroups = (calls: readonly CallSite[], root: string, sharedSiteUri?: st
   // callable spends two lines and a connector saying what fits on one.
   const facts = ({ item, siteUri, sites }: CallSite) => ({
         name: item.name,
-        kind: symbolKind(item.kind),
+        kind: item.kind,
         selection: item.selectionRange,
         extent:
           item.kind === SymbolKind.Module || sameRange(item.range, item.selectionRange)

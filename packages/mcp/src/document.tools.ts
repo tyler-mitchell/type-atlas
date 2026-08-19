@@ -300,7 +300,10 @@ export const registerDocumentTools = (server: McpServer, workspaces: VolarWorksp
           const extent = "range" in entry ? entry.range : entry.location.range;
           return {
             name: entry.name,
-            kind: symbolKind(entry.kind),
+            // The number, not the word. Which word stands for kind 12 belongs
+            // to the message catalog the document reaches, and a handler that
+            // resolves it first puts the answer beyond renaming.
+            kind: entry.kind,
             selection,
             extent: sameRange(extent, selection) ? undefined : extent,
             detail: "detail" in entry ? entry.detail : undefined,

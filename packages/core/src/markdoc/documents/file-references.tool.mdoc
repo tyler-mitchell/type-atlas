@@ -6,7 +6,7 @@
 Nothing references {% $file %}. This answer is assembled from references to what the module declares, so a module that declares nothing, or one imported only for its side effects, reports none even when other files import it.
 {% /if %}
 {% if not(equals($total, 0)) %}
-{% $file %} is referenced from {% $total %} {% plural count=$total forms={"one": "place", "other": "places"} /%}, across every project loaded this session, anchored at {% $anchor %}.
+{% $file %} is referenced from {% $total %} {% plural count=$total forms={"one": "place", "other": "places"} /%}, across every project loaded this session{% if any($anchor) %}, anchored at {% $anchor %}{% /if %}.
 
 {% tree entries=$groups partial="reference-node.mdoc" /%}
 {% /if %}

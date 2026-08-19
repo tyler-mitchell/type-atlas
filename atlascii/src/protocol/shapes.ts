@@ -39,7 +39,14 @@ export type LocationNode = {
   readonly selection?: Range;
   readonly range?: Range;
   readonly name?: string;
-  readonly kind?: string;
+  /**
+   * The protocol's number, not a word.
+   *
+   * Which word stands for kind 12 is the message catalog's, reached by the
+   * document that renders the row. A caller resolving it first puts the answer
+   * beyond renaming and beyond translation.
+   */
+  readonly kind?: number;
   readonly within?: string;
   readonly detail?: string;
   readonly text?: string;

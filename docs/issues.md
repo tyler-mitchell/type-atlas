@@ -10,7 +10,10 @@ before acting on it.
 
 An entry leaves this file when it is fixed, not when it is explained.
 
-**〈raised〉** marks an issue Tyler raised rather than one found while working.
+**〈raised〉** marks an issue User raised rather than one found while working,
+whether or not the message said `issue:` — anything he points out that reads as
+a defect belongs here, and waiting for the prefix loses the ones he mentions in
+passing.
 Those are deferred on arrival — captured here and left alone — unless they
 happen to land on whatever is already open at that moment. The mark exists so
 the distinction survives the session that recorded it.
@@ -129,12 +132,39 @@ Both this and `find_successor` above break the same rule: **a tool may report
 what it observed, and may not report what that observation implies about the
 world.** Ranking is an observation; "this is relevant" is a conclusion.
 
+### 〈raised〉 Plumbing on the consumer side is a framework deficit
+
+Standing lens, not a single defect: wherever `packages/mcp` fits, adapts, or
+transforms on its way into `atlascii`, treat it as evidence that the framework
+lacks an affordance — and ask each time whether the fault is the consumer using
+it wrongly, the framework missing the affordance, or both. Presentation still
+living in the MCP is the loudest form.
+
+Confirmed instances, each the same shape — the consumer decided something the
+document is supposed to own, because the document offered no way to say it:
+
+- A nested ternary chose between two English phrases for a missing project
+  (`"an inferred project"` / `"the project inferred for this file"`), in three
+  handlers. Fixed: the handler passes the project or nothing, the document
+  writes the sentence.
+- `symbolKind(...)` is called in four handlers to turn a protocol kind number
+  into a word, while the document layer exposes `symbolKind()` as a function for
+  exactly that. A consumer that resolves the word first makes the message
+  catalog unreachable — renaming a kind cannot reach an answer whose word was
+  already chosen.
+- `noun({ singular, plural })` precomputes English plurals into variables the
+  documents no longer read, having moved to `{% plural %}` with CLDR forms.
+  Dead plumbing whose own docstring calls the two-form API "an English
+  assumption wearing an API".
+
+The sweep is not finished; these are the ones confirmed so far.
+
 ### 〈raised〉 The `file_references` preamble needs rethinking
 
 ```
 packages/mcp/src/experimental.tools.ts is referenced from 2 places, across every
 project loaded this session, anchored at packages/mcp/tsconfig.json in
-/Users/tylermitchell/Projects/featuretype.
+/Users/Usermitchell/Projects/featuretype.
 ```
 
 One sentence carrying five facts — subject, count, scope, anchor, root — read

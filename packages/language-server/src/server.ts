@@ -22,6 +22,7 @@ import {
 } from "volar-service-typescript";
 import { withEffectLanguageService } from "./effect-language-service.ts";
 import {
+  isProbeDocument,
   type ProjectDiagnostics,
   ProjectDiagnosticsRequest,
   ResolveDependencySourceRequest,
@@ -139,7 +140,12 @@ const projectDiagnostics = (
   // once takes the undecorated path and silently drops them. The checker is
   // shared across these calls, so this is the same program pass, entered the
   // way the plugin contract requires.
-  const sourceFiles = program.getSourceFiles().filter((file) => !file.isDeclarationFile);
+  // Not the probes this server opened to ask its own questions. TypeScript
+  // retains them, so a whole-project check found their half-written lines and
+  // reported them as problems in the caller's project.
+  const sourceFiles = program
+    .getSourceFiles()
+    .filter((file) => !file.isDeclarationFile && !isProbeDocument(file.fileName));
   const byFile = new Map<string, Diagnostic[]>();
   // One file at a time, appending in place. Collecting every diagnostic in the
   // program into a single array before reading any of it held the whole report

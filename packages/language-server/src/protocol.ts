@@ -83,6 +83,26 @@ export const WorkspaceDeclarationsRequest = {
   >("type-atlas/workspaceDeclarations"),
 } as const;
 
+/**
+ * Marks a document this server opened to ask a question, not one anyone wrote.
+ *
+ * Asking what a module exports means opening a file beside the importing one
+ * and completing against it. TypeScript keeps what it has seen, so the probe
+ * stays in the program — and a later whole-project check reported its
+ * half-written line as a problem in the caller's project:
+ *
+ *   === src/presentation.ts.type-atlas-probe.ts ===
+ *   error typescript(1003) 1:48-1:48  Identifier expected.
+ *
+ * One marker, named here rather than spelled out at each end, because the side
+ * that creates these files and the side that must not report them are in
+ * different packages and drifted apart once already.
+ */
+export const probeMarker = ".type-atlas-";
+
+/** Whether a file is this server's own scaffolding rather than a reader's source. */
+export const isProbeDocument = (fileName: string) => fileName.includes(probeMarker);
+
 /** Resolves an installed module from the TypeScript project containing a document. */
 export const ResolveDependencySourceRequest = {
   type: new RequestType<

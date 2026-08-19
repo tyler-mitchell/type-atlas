@@ -167,7 +167,7 @@ const callHierarchyVariables = <Call extends { readonly fromRanges: readonly Ran
         const callable = input.callable(call);
         return {
           name: callable.name,
-          kind: symbolKind(callable.kind),
+          kind: callable.kind,
           selection: callable.selectionRange,
           extent: sameRange(callable.range, callable.selectionRange)
             ? undefined
@@ -458,7 +458,7 @@ export const registerNavigationTools = (
             : page<SymbolInformation | WorkspaceSymbol>(symbols, offset, limit);
       const named = (output?.items ?? []).map((symbol) => ({
         name: symbol.name,
-        kind: symbolKind(symbol.kind),
+        kind: symbol.kind,
         deprecated: ("deprecated" in symbol && symbol.deprecated) || symbol.tags?.includes(1),
         file: displayPath(symbol.location.uri, root),
         range:
@@ -469,8 +469,7 @@ export const registerNavigationTools = (
         document: "workspace-symbols.tool.mdoc",
         variables: {
           query,
-          anchor: project ? displayPath(project.uri, root) : "an inferred project",
-          root,
+          anchor: project ? displayPath(project.uri, root) : undefined,
           // Null is a provider that did not answer; an empty array is one that
           // searched and found nothing. They read identically and mean opposite
           // things — the second says the name is absent, the first says nothing
@@ -879,16 +878,12 @@ export const registerNavigationTools = (
                 at: { line: declarationSite.line - 1, character: declarationSite.character - 1 },
               }
             : undefined,
-          // The root is stated once and every path below is relative to it.
-          // Naming it on each row repeated fifty characters a line; leaving it
-          // out entirely left `tsconfig.json` naming no project in particular.
           everyProject: scope === "workspace",
-          anchor: matched
-            ? displayPath(matched.uri, root)
-            : scope === "workspace"
-              ? "an inferred project"
-              : "the project inferred for this file",
-          root,
+          // The project, or nothing. What to say when a file belongs to no
+          // configured project is a sentence, and sentences are the document's
+          // — this decided between two English phrases here, in a package that
+          // is supposed to hold none.
+          anchor: matched ? displayPath(matched.uri, root) : undefined,
           total: output?.total ?? 0,
           useCount: uses.length,
           useNoun: noun({ count: uses.length, singular: "use", plural: "uses" }),
@@ -953,8 +948,7 @@ export const registerNavigationTools = (
         document: "file-references.tool.mdoc",
         variables: {
           file: displayPath(textDocument.uri, root),
-          anchor: matched ? displayPath(matched.uri, root) : "an inferred project",
-          root,
+          anchor: matched ? displayPath(matched.uri, root) : undefined,
           total: output?.total ?? 0,
           groups: referenceGroups(
             [...sites].sort(

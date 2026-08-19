@@ -1,4 +1,4 @@
-import { ResolveDependencySourceRequest } from "@type-atlas/language-server/protocol";
+import { probeMarker, ResolveDependencySourceRequest } from "@type-atlas/language-server/protocol";
 import {
   type CompletionItem,
   CompletionItemKind,
@@ -187,9 +187,14 @@ export const listModuleExports = async ({
   // seen, so a fresh name each time leaves another synthetic source file in the
   // project and the server grows by one per call. A stable name is an ordinary
   // edit to one file, and `withTextDocument` serializes callers sharing it.
-  const probeUri = parsedUri.with({ path: `${parsedUri.path}.type-atlas-probe.ts` }).toString();
+  // The marker is shared with the server, which uses it to keep these out of a
+  // whole-project check: they are this tool's scaffolding, and their unfinished
+  // lines were being reported as problems in the caller's own project.
+  const probeUri = parsedUri
+    .with({ path: `${parsedUri.path}${probeMarker}probe.ts` })
+    .toString();
   const locationUri = parsedUri
-    .with({ path: `${parsedUri.path}.type-atlas-locations.ts` })
+    .with({ path: `${parsedUri.path}${probeMarker}locations.ts` })
     .toString();
   const effectiveSurface = type || path.length ? "runtime" : surface;
   const { source, position, definitionPosition } = probe({

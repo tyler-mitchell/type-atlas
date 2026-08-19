@@ -17,6 +17,27 @@ import { containingGitSubmodule, findGitSubmoduleRoots } from "./git-submodules.
 /** Files a TypeScript project can report diagnostics for. */
 const sourceFile = /\.(?:[cm]?[jt]s|[jt]sx)$/i;
 
+/**
+ * Whether an installed file belongs to a package manager serving this root.
+ *
+ * A dependency is not named by a caller — TypeScript resolved it from an import
+ * inside the workspace — and a package manager installs above the package that
+ * depends on it. So a workspace opened at one package of a monorepo reaches its
+ * dependencies through a `node_modules` its own root does not contain, and
+ * containment alone refused them: every `search_dependency_code` from a nested
+ * root answered `File is outside the workspace`.
+ *
+ * The widening is exactly hoisting and nothing else. What sits before the first
+ * `node_modules` is where the manager put the tree, and that must be this root
+ * or something above it, so an unrelated checkout's `node_modules` stays out.
+ */
+const installedForThisRoot = (filePath: string, workspaceRoot: string) => {
+  const marker = filePath.indexOf("/node_modules/");
+  if (marker < 0) return false;
+  const installedUnder = filePath.slice(0, marker);
+  return workspaceRoot === installedUnder || isFileInDir(workspaceRoot, installedUnder);
+};
+
 const startVolarWorkspace = async (workspaceRoot: string, languageServerEntry: URL) => {
   const workspaceStat = await stat(workspaceRoot).catch(() => undefined);
   if (!workspaceStat?.isDirectory()) {
@@ -117,7 +138,7 @@ const startVolarWorkspace = async (workspaceRoot: string, languageServerEntry: U
   let documentVersion = 0;
   const getWorkspaceUri = (file: string) => {
     const filePath = path.resolve(workspaceRoot, file);
-    if (!isFileInDir(filePath, workspaceRoot)) {
+    if (!isFileInDir(filePath, workspaceRoot) && !installedForThisRoot(filePath, workspaceRoot)) {
       throw new Error(`File is outside the workspace: ${file}`);
     }
     const submoduleRoot = containingGitSubmodule(filePath, submoduleRoots);
@@ -344,7 +365,7 @@ const nestedWorkspace = (input: {
   const { parent, parentRoot, workspaceRoot } = input;
   const getWorkspaceUri = (file: string) => {
     const filePath = path.resolve(workspaceRoot, file);
-    if (!isFileInDir(filePath, workspaceRoot)) {
+    if (!isFileInDir(filePath, workspaceRoot) && !installedForThisRoot(filePath, workspaceRoot)) {
       throw new Error(`File is outside the workspace: ${file}`);
     }
     return parent.getWorkspaceUri(filePath);
