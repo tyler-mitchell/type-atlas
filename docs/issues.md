@@ -272,6 +272,33 @@ and the isTsgoBackedProgram-before-sync throw; reproduce by running
 `packages/language-server/test/references-probe.test.ts` whole. Observed
 2026-08-19.
 
+### `rename_symbol` will happily patch a dependency's declaration file
+
+```
+rename_symbol { newName: "workspacePackageOf" } → 12 files · 85 edits
+*** Update File: @ark/schema/out/shared/jsonSchema.d.ts
+```
+
+A rename whose resolved declaration lives in an installed package produces a
+patch that edits that package's `.d.ts` — under a header reading "Scope:
+project only". Applied, it corrupts the installed dependency (and through
+pnpm's hard links, potentially the store). A rename reaching outside the
+workspace should refuse, or at minimum lead with that fact instead of
+burying it as one file among twelve. Observed 2026-08-19: a drifted
+position landed on the word `description` inside `.configure({...})` and
+the tool renamed arktype's schema property surface-wide.
+
+### `rename_symbol` never names what it is renaming
+
+The same answer's whole preamble: "Rename to workspacePackageOf · Scope:
+project only · packages/mcp/tsconfig.json · 12 files · 85 edits". The one
+fact that would let a reader catch a mistargeted rename — the resolved
+subject, `description [property] · @ark/schema/…/jsonSchema.d.ts` in the
+location grammar every other tool pays for — is absent, so the misfire is
+only discoverable by reading 85 edits. Every rename answer should lead
+with what was resolved at the position, exactly as `references` does.
+Observed 2026-08-19, same call as above.
+
 ### `rename_files` emits a confidently incomplete patch
 
 ```

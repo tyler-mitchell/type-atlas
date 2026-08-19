@@ -2,7 +2,11 @@
 { "tool": "patch" }
 ---
 
-{% $title %}{% if $scope %} · Scope: {% if equals($scope.kind, "project") %}project only{% /if %}{% if equals($scope.kind, "loaded") %}loaded projects{% /if %}{% if equals($scope.kind, "file") %}this file{% /if %}{% if $scope.anchor %} · {% $scope.anchor %}{% /if %}{% /if %} · {% $fileCount %} {% plural count=$fileCount forms={"one": "file", "other": "files"} /%} · {% $editCount %} {% plural count=$editCount forms={"one": "edit", "other": "edits"} /%}
+{% if $foreign %}
+{% $title %} refused: the position resolves to {% if $subject.name %}{% $subject.name %}, {% /if %}declared at {% $subject.file %}{% if $subject.at %}:{% position($subject.at) %}{% /if %} — an installed dependency, not this workspace. A patch editing a dependency must never be applied; pick the position of the workspace symbol you meant.
+{% /if %}
+{% if not($foreign) %}
+{% $title %}{% if $subject %} · resolved {% if $subject.name %}{% $subject.name %} · {% /if %}{% $subject.file %}{% if $subject.at %}:{% position($subject.at) %}{% /if %}{% /if %}{% if $scope %} · Scope: {% if equals($scope.kind, "project") %}project only{% /if %}{% if equals($scope.kind, "loaded") %}loaded projects{% /if %}{% if equals($scope.kind, "file") %}this file{% /if %}{% if $scope.anchor %} · {% $scope.anchor %}{% /if %}{% /if %} · {% $fileCount %} {% plural count=$fileCount forms={"one": "file", "other": "files"} /%} · {% $editCount %} {% plural count=$editCount forms={"one": "edit", "other": "edits"} /%}
 
 {% if equals($editCount, 0) %}
 No edits. The action resolved to an empty workspace edit, so what it describes is already in place or applies to nothing in the range it was asked about.
@@ -13,4 +17,5 @@ No edits. The action resolved to an empty workspace edit, so what it describes i
 
 {% if $note %}
 {% $note %}
+{% /if %}
 {% /if %}

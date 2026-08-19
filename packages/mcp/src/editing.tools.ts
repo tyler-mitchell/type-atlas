@@ -2,15 +2,17 @@ import type { McpServer } from "@modelcontextprotocol/server";
 import {
   DocumentFormattingRequest,
   GetMatchTsConfigRequest,
+  type Range,
   RenameRequest,
   WillRenameFilesRequest,
   WorkspaceChange,
 } from "@volar/language-server/protocol.js";
+import { isFileInDir } from "@volar/language-server/node.js";
 import { type } from "arktype";
 import * as path from "pathe";
 import { URI } from "vscode-uri";
 import { readOnlyToolAnnotations } from "./metadata.ts";
-import { displayPath } from "atlascii";
+import { displayPath, slash } from "atlascii";
 import { textResult } from "./mcp-result.ts";
 import { fileInput, positionInput } from "./tool-input.ts";
 import { createTypeAtlas, type VolarWorkspace, type VolarWorkspacePool } from "@type-atlas/core";
@@ -142,17 +144,91 @@ export const registerEditingTools = (server: McpServer, workspaces: VolarWorkspa
     async ({ workspace: root, file, position, newName }, { mcpReq: { signal } }) => {
       const workspace = await workspaces.get(root);
       const textDocument = await workspace.getTextDocument(file);
-      const [edit, project] = await Promise.all([
+      const [edit, project, defined] = await Promise.all([
         workspace.sendRequest(RenameRequest.type, { textDocument, position, newName }, signal),
         workspace.sendRequest(GetMatchTsConfigRequest.type, textDocument, signal),
+        // What the position resolved to. A rename is applied unread more than
+        // any other answer, and a drifted position renames something real —
+        // the subject on the first line is what lets a reader catch it.
+        createTypeAtlas(workspace)
+          .definitions({ file, signal, params: { position } })
+          .then(({ result }) => (Array.isArray(result) ? result[0] : (result ?? undefined)))
+          .catch(() => undefined) as Promise<
+          | { uri?: string; targetUri?: string; range?: Range; targetSelectionRange?: Range }
+          | undefined
+        >,
       ]);
       if (!edit) return textResult("");
-      const rendered = await renderWorkspaceEdit(workspace, root, edit);
+      const subjectUri = defined?.targetUri ?? defined?.uri;
+      const subjectRange = defined?.targetSelectionRange ?? defined?.range;
+      const subjectName =
+        subjectUri && subjectRange
+          ? await workspace
+              .readTextDocumentUri(subjectUri, signal)
+              .then(({ source }) =>
+                (source.split("\n")[subjectRange.start.line] ?? "").slice(
+                  subjectRange.start.character,
+                  subjectRange.end.character,
+                ),
+              )
+              .catch(() => undefined)
+          : undefined;
+      const subject = subjectUri
+        ? {
+            name: subjectName || undefined,
+            file: displayPath(subjectUri, root),
+            at: subjectRange?.start,
+          }
+        : undefined;
+      // Installed code lives under the workspace directory, so containment
+      // is the wrong boundary — the first witnessed misfire resolved to a
+      // file both inside the root and inside node_modules. Editable means in
+      // the workspace and not installed.
+      const inside = (uri: string) => {
+        const fsPath = URI.parse(uri).fsPath;
+        return (
+          isFileInDir(fsPath, path.resolve(root)) && !/(^|\/)node_modules\//u.test(slash(fsPath))
+        );
+      };
+      // A subject declared in an installed dependency means the rename would
+      // patch installed code — through pnpm's hard links, potentially every
+      // project's copy. Refused with the subject named, which is also how a
+      // drifted position announces itself: one such position renamed
+      // arktype's `description` property across twelve files.
+      if (subjectUri && !inside(subjectUri)) {
+        return formatPatchResult(
+          `Rename to ${newName}`,
+          await renderWorkspaceEdit(workspace, root, {}),
+          { subject, foreign: true },
+        );
+      }
+      // Defensive: a local subject whose edit set still reaches outside the
+      // workspace is trimmed to it, and the exclusion is stated.
+      const documentChanges = (edit.documentChanges ?? []).filter((change) =>
+        "textDocument" in change ? inside(change.textDocument.uri) : true,
+      );
+      const changes = edit.changes
+        ? Object.fromEntries(Object.entries(edit.changes).filter(([uri]) => inside(uri)))
+        : undefined;
+      const excluded =
+        (edit.documentChanges?.length ?? 0) -
+        documentChanges.length +
+        (edit.changes ? Object.keys(edit.changes).length - Object.keys(changes ?? {}).length : 0);
+      const rendered = await renderWorkspaceEdit(workspace, root, {
+        ...edit,
+        ...(edit.documentChanges ? { documentChanges } : {}),
+        ...(changes ? { changes } : {}),
+      });
       return formatPatchResult(`Rename to ${newName}`, rendered, {
+        subject,
         scope: {
           kind: "project",
           anchor: project ? displayPath(project.uri, root) : undefined,
         },
+        note:
+          excluded > 0
+            ? `${excluded} ${excluded === 1 ? "file" : "files"} outside this workspace ${excluded === 1 ? "was" : "were"} excluded from the patch.`
+            : undefined,
       });
     },
   );
