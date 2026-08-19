@@ -11,7 +11,7 @@ Nothing at this position declares a definition, and no declaration contains it â
 {% /if %}
 {% /if %}
 {% if not(equals($total, 0)) %}
-{% $subject %} is {% if $kind %}{% article($kind) %}{% /if %}{% if not($kind) %}a symbol{% /if %} with {% $total %} {% plural count=$total forms={"one": "definition", "other": "definitions"} /%}.
+{% if any($subject) %}{% $subject %}{% if $kind %} [{% $kind %}]{% /if %} Â· {% /if %}{% $total %} {% plural count=$total forms={"one": "definition", "other": "definitions"} /%}
 
 {% each items=$items as="target" partial="target.mdoc" tight=true /%}
 {% /if %}

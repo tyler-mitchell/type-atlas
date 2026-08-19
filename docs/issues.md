@@ -262,6 +262,24 @@ The distinction may be real — a single jump target is not a list, and a file's
 problems are blocks rather than rows — but nothing states the rule, so the next
 tool will pick by feel. Either write the rule down or collapse them.
 
+### 〈raised〉 `references` at 3.24s on kek needs looking into
+
+```
+references { system.ts:303 } → 2 references
+· 3.24s · 5 language-server requests totalling 2.63s ·
+  slowest type-atlas/workspaceReferences 2.27s · first since the server started
+```
+
+Raised with calibration: under 1 second is the target, 2 seconds is "cope,
+might be reality", 2.5+ probably indicates a problem. The observed call was
+the first after a backend restart on webgpu-engine (3.5k files), so program
+construction is inside the 2.27s workspaceReferences — but whether warm
+calls also breach, and where the other ~0.6s of tool-layer time goes
+(subject resolution runs definitions + a file read; per-row enrichment runs
+the outline chain), is the investigation. Deferred on arrival per the
+standing rule; the cost trailer that surfaced it is the instrument to
+measure with. Observed 2026-08-19.
+
 ### `inspect_symbol` sections vary with server warmth
 
 The same call — `inspect_symbol` on `TimelineExactCoordinate`, kek-monorepo —

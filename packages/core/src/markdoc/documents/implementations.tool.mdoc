@@ -9,7 +9,7 @@ tool: implementations
 No implementation answered at this position. Implementations are reported for a symbol that something overrides or realises — an interface, an abstract member, an overload — and the walk reaches only files this session has opened, so an implementor in an untouched file reports nothing here. references finds every use, including the declarations that realise this.
 {% /if %}
 {% if not(equals($total, 0)) %}
-{% $subject %} is {% if $kind %}{% article($kind) %}{% /if %}{% if not($kind) %}a symbol{% /if %} implemented in {% $total %} place{% if not(equals($total, 1)) %}s{% /if %}.
+{% if any($subject) %}{% $subject %}{% if $kind %} [{% $kind %}]{% /if %} · {% /if %}implemented in {% $total %} {% plural count=$total forms={"one": "place", "other": "places"} /%}
 
 {% each items=$items as="target" partial="target.mdoc" tight=true /%}
 {% /if %}

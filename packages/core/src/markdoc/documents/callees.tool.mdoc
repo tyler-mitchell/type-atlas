@@ -10,7 +10,7 @@ Nothing at this position is callable, so it calls nothing. Callees reports what 
 {% $name %} invokes nothing the owning project resolves. A call to something the project cannot resolve is not reported here — diagnostics say why a name does not resolve.
 {% /if %}
 {% if not(equals($total, 0)) %}
-{% $name %} calls {% $total %} {% plural count=$total forms={"one": "callable", "other": "callables"} /%}.
+{% $name %} · calls {% $total %} {% plural count=$total forms={"one": "callable", "other": "callables"} /%}
 
 {% tree entries=$groups partial="call-node.mdoc" /%}
 {% /if %}
