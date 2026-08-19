@@ -31,23 +31,32 @@ the top because a list of defects with no stated intent is a list nobody acts
 on, and this is the part that goes stale first — if it disagrees with the work,
 the work is right and this needs rewriting.
 
-Current objective: presentation consistency across the MCP surface, and
-configurable path rendering.
+Presentation consistency and configurable path rendering are done. Release
+readiness is the objective now, and development passed to Fable 5 at `c5b946a`.
 
-1. **Ground `kindAt` in `SymbolKind`.** Language-neutral, and required before a
-   second language is worth attempting.
-3. **`workspace_symbols` returning empty** is the most damaging correctness bug
-   here — it makes `find_successor` assert removal of live code — but it is a
-   language-server indexing question rather than a presentation one, and has not
-   been diagnosed.
+1. **`workspace_symbols` returning empty** is the most damaging thing here — it
+   makes `find_successor` assert removal of live code. Diagnosed but not fixed;
+   the cause is the first entry under Correctness, and a failing test in
+   `packages/language-server/test/server.test.ts` reports when it clears.
+2. **The probe document leaking into `diagnostics`** as a phantom error in the
+   user's own project. Release-blocking for the same reason: it is wrong about
+   their code, not about ours.
+3. **Ground `kindAt` in `SymbolKind`.** Language-neutral, and required before a
+   second language is worth attempting — not before release.
 4. **Retire the terminal-control exports**, or find the consumer that justifies
    them. Nothing here calls them and they are not code intelligence.
 
-Done under this objective, for context on what the entries below survived: one
-nesting mechanism replacing three, the banner, `displayPath` with three working
-styles on `pathe`, presentation settings reaching the server from its
-environment, the document lint, the rendered-hole check, and a page line that
-states a range and names the parameter that continues it.
+Done under the previous objective, for context on what the entries below
+survived: one nesting mechanism replacing three, one location shape with one
+rule for when a file becomes a level, the banner, `displayPath` with three
+working styles on `pathe`, presentation settings reaching the server from its
+environment and proven across the process boundary, the document lint, and a
+page line that states a range and names the parameter that continues it.
+
+A rendered-output "hole" check was also built and then removed. It scanned
+answers for the punctuation a missing value leaves behind, and broke `read_file`
+three times on content that legitimately contained it. The reasoning is kept at
+`packages/core/src/markdoc/render.ts` so it is not attempted again unchanged.
 
 ---
 
