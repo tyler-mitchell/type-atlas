@@ -6,8 +6,11 @@ tool: references
 Nothing was found at this position, so there is no symbol to report references for. Check the line and character — both are one-based, and they must land on the symbol's own name.
 {% /if %}
 {% if not(equals($total, 0)) %}
-{% $subject %} is {% if $kind %}{% article($kind) %}{% /if %}{% if not($kind) %}a symbol{% /if %}{% if $container %} declared inside {% $container %}{% /if %}{% if $declaredAt %}, at {% $declaredAt.file %}:{% position($declaredAt.at) %}{% /if %}.
-Searched {% if $everyProject %}the {% $projects %} {% plural count=$projects forms={"one": "project", "other": "projects"} /%} loaded this session{% if any($anchor) %}, anchored at {% $anchor %}{% /if %}{% /if %}{% if not($everyProject) %}{% if any($anchor) %}the project {% $anchor %}{% /if %}{% if not(any($anchor)) %}the project inferred for this file{% /if %}{% /if %} and found {% $total %} {% plural count=$total forms={"one": "reference", "other": "references"} /%}.
+{% tight %}
+{% $subject %}{% if $kind %} [{% $kind %}]{% /if %}{% if $container %} · inside {% $container %}{% /if %}{% if $declaredAt %} · {% $declaredAt.file %}:{% position($declaredAt.at) %}{% /if %}
+
+{% $total %} {% plural count=$total forms={"one": "reference", "other": "references"} /%} · {% if $everyProject %}{% $projects %} {% plural count=$projects forms={"one": "project", "other": "projects"} /%} loaded{% /if %}{% if not($everyProject) %}project scope{% /if %}{% if any($anchor) %} · {% $anchor %}{% /if %}
+{% /tight %}
 {% partial file="page.mdoc" /%}
 
 {% if $noUses %}

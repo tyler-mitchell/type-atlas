@@ -12,25 +12,33 @@ part; a tool that seems to need a fourth is describing one of these three badly.
 
 ## 1. Preamble — what was asked, and how far the answer reaches
 
-One paragraph. The subject, the scale, and the scope searched. It exists so a
-reader can tell an empty answer from an unasked question, and a partial answer
-from a complete one.
+Two lines, in the grammar the rest of the surface already speaks — never a
+paragraph. The first line is the subject in the location grammar; the second
+is the result's facts as segments:
+
+```
+indentGuide [const] · src/layout/hierarchy.ts:54:14
+7 references · 2 projects loaded · tsconfig.json
+```
+
+Prose belongs to absence and explanation, and only there. A presence header
+written as sentences buries five facts in one run-on clause — subject, kind,
+count, scope, anchor — and each tool phrases the sentence differently, so the
+same fact reads differently across siblings. Segments carry one fact each,
+in one order, in every tool: what follows `inspect_symbol`'s header and the
+diagnostics summary line is the same form here.
+
+The scope segment is not decoration. "2 projects loaded" is the difference
+between *this name is unused* and *this name is unused in what has been
+opened* — and a reader that cannot tell those apart deletes working code. The
+count is what makes the claim weighable; "every project loaded" reassured
+where "1 project loaded" warns.
 
 Not the workspace root. The caller passed it, so restating it hands back their
 own argument — and it is the one absolute path that would otherwise appear in
 every answer, in a surface whose paths are workspace-relative by default. Where
 a path genuinely cannot be relative, `displayPath` renders it absolute and says
 so by being absolute.
-
-```
-indentGuide is a const, at src/layout/hierarchy.ts:54:14. Searched every
-project loaded this session, anchored at tsconfig.json in /repo and found
-7 uses.
-```
-
-The scope clause is not decoration. "Every project loaded this session" is the
-difference between *this name is unused* and *this name is unused in what has
-been opened* — and a reader that cannot tell those apart deletes working code.
 
 Counts belong here when they describe the answer as a whole, and in the banner
 when they describe one subject. They are never in both.

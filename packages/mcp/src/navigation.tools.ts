@@ -802,13 +802,15 @@ export const registerNavigationTools = (
             declarationSite?.within === (declarationSource || subject)
               ? undefined
               : declarationSite?.within,
-          declaredAt: declarationSite
-            ? {
-                file: declarationSite.file,
-                // Already counted from one, so it is stated as it stands.
-                at: { line: declarationSite.line - 1, character: declarationSite.character - 1 },
-              }
-            : undefined,
+          // From the definition itself, not from the page rows: the subject
+          // line owes its location in every state, and deriving it from the
+          // page dropped it whenever the declaration row fell outside the
+          // window — project scope with includeDeclaration answered a
+          // located list under an unlocated subject.
+          declaredAt:
+            declarationUri && declarationRange
+              ? { file: displayPath(declarationUri, root), at: declarationRange.start }
+              : undefined,
           everyProject: scope === "workspace",
           // How many projects the fan-out asked — the observation that says
           // how far "found N references" actually reaches.

@@ -175,7 +175,8 @@ test("references reads as prose with owners named", async () => {
   });
   expect(undefinedVariables).toEqual([]);
   expect(text).toMatchInlineSnapshot(`
-    "down is a property declared inside Figures, at src/config/figures.ts:14:12. Searched the project tsconfig.json and found 3 references.
+    "down [property] · inside Figures · src/config/figures.ts:14:12
+    3 references · project scope · tsconfig.json
 
     src/config/figures.ts
     ├  30:3  — inside figures

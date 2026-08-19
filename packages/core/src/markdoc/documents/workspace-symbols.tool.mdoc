@@ -11,7 +11,7 @@ Nothing matched {% $query %} in the {% $projects %} {% plural count=$projects fo
 Only {% plural count=$projects forms={"one": "that project was", "other": "those projects were"} /%} searched, so this is absent from what has been opened, not from the repository. A name in a project nothing has touched reports nothing here — asking anything semantic about a file in a project loads it, and the same query then answers. Use document_symbols when you know the file, or search_code to find it by meaning.
 {% /if %}
 {% if not(equals($total, 0)) %}
-{% $total %} {% plural count=$total forms={"one": "symbol", "other": "symbols"} /%} {% plural count=$total forms={"one": "matches", "other": "match"} /%} {% $query %}, across the {% $projects %} {% plural count=$projects forms={"one": "project", "other": "projects"} /%} loaded this session{% if any($anchor) %}, anchored at {% $anchor %}{% /if %}.
+{% $total %} {% plural count=$total forms={"one": "symbol", "other": "symbols"} /%} matching {% $query %} · {% $projects %} {% plural count=$projects forms={"one": "project", "other": "projects"} /%} loaded{% if any($anchor) %} · {% $anchor %}{% /if %}
 {% partial file="page.mdoc" /%}
 
 {% tree entries=$items partial="workspace-symbol.mdoc" as="item" /%}

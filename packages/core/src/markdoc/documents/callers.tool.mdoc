@@ -10,7 +10,7 @@ Nothing at this position is callable, so nothing can call it. Callers reports wh
 {% $name %} is called from nowhere in the {% $projects %} {% plural count=$projects forms={"one": "project", "other": "projects"} /%} loaded this session. A caller is a call from inside a declaration, so a re-export or a bare mention is not one — use references for every mention, including those.
 {% /if %}
 {% if not(equals($total, 0)) %}
-{% $name %} is called from {% $total %} {% plural count=$total forms={"one": "place", "other": "places"} /%}, across the {% $projects %} {% plural count=$projects forms={"one": "project", "other": "projects"} /%} loaded this session.
+{% $name %} · called from {% $total %} {% plural count=$total forms={"one": "place", "other": "places"} /%} · {% $projects %} {% plural count=$projects forms={"one": "project", "other": "projects"} /%} loaded
 
 {% tree entries=$groups partial="call-node.mdoc" /%}
 {% /if %}
