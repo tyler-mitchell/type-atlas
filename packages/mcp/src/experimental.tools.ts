@@ -1,9 +1,17 @@
 import type { McpServer } from "@modelcontextprotocol/server";
-import type { VolarWorkspacePool } from "@type-atlas/core";
+import { GetMatchTsConfigRequest } from "@volar/language-server/protocol.js";
+import {
+  createTypeAtlas,
+  declarationAtPosition,
+  renderDocument,
+  type VolarWorkspacePool,
+} from "@type-atlas/core";
 import { type } from "arktype";
+import { displayPath } from "atlascii";
 import { textResult } from "./mcp-result.ts";
 import { readOnlyToolAnnotations } from "./metadata.ts";
 import { createQuorl } from "./quorl.ts";
+import type { Semble } from "./semble.ts";
 import { registerTool } from "./tool.ts";
 import { fileInput, positionInput } from "./tool-input.ts";
 
@@ -23,13 +31,133 @@ const input = type.module({
       description: "Maximum declarations expanded before the rest are reported as a frontier.",
     }),
   }),
+  Impact: type({
+    ...fileInput,
+    position: positionInput.configure(
+      { description: "Position of the symbol whose change is being weighed." },
+      "self",
+    ),
+  }),
 });
+
+/** The workspace package a display path belongs to, as a reader names it. */
+const packageOf = (file: string) => {
+  const segments = file.split("/");
+  return segments.length === 1
+    ? "workspace root"
+    : segments[0] === "packages" || segments[0] === "apps"
+      ? segments.slice(0, 2).join("/")
+      : (segments[0] ?? "workspace root");
+};
+
+/** Whether a use sits in a test file, by the paths tests conventionally hold. */
+const isTestSite = (file: string) => /(^|\/)tests?\/|\.(test|spec|check)\./u.test(file);
 
 export const registerExperimentalTools = (
   server: McpServer,
   workspaces: VolarWorkspacePool,
+  semble: Semble,
 ): void => {
   const quorl = createQuorl({ workspaces });
+
+  registerTool(
+    server,
+    "impact",
+    {
+      title: "Impact",
+      description:
+        "Experimental: weigh a change to the symbol at a position — every use, grouped by package, with how many sit in tests. Loads the projects of consumers retrieval can see, so the answer reaches past what this session happened to touch. Composed for the decision, not the enumeration; references lists the sites themselves.",
+      inputSchema: input.Impact,
+      annotations: readOnlyToolAnnotations,
+    },
+    async ({ workspace: root, file, position }, { mcpReq: { signal } }) => {
+      const workspace = await workspaces.get(root);
+      const intelligence = createTypeAtlas(workspace);
+      const declaration = await declarationAtPosition({
+        workspace,
+        uri: workspace.getWorkspaceUri(file),
+        position,
+      }).catch(() => undefined);
+      // A decision needs the whole blast radius, and the reference fan-out
+      // reaches only projects something already loaded. Retrieval sees the
+      // name across the entire repository, so packages it names that no
+      // loaded project covers get loaded first — project selection for one
+      // of their files is the load — bounded to a handful so one question
+      // cannot demand every project in a monorepo.
+      const consumerBudget = 4;
+      const candidates = declaration?.name
+        ? await semble
+            .search({ repo: root, query: declaration.name, limit: 20, signal })
+            .then(({ results }) =>
+              [
+                ...new Set(
+                  results
+                    .map(({ file_path }) => packageOf(file_path))
+                    .filter((name) => name !== packageOf(displayPath(workspace.getWorkspaceUri(file), root))),
+                ),
+              ].slice(0, consumerBudget),
+            )
+            .catch(() => [])
+        : [];
+      const loaded = await Promise.all(
+        candidates.map((name) =>
+          semble
+            .search({ repo: root, query: `${declaration?.name ?? ""} ${name}`, limit: 3, signal })
+            .then(async ({ results }) => {
+              const inside = results.find(({ file_path }) => packageOf(file_path) === name);
+              if (!inside) return undefined;
+              await workspace.sendRequest(
+                GetMatchTsConfigRequest.type,
+                { uri: workspace.getWorkspaceUri(inside.file_path) },
+                signal,
+              );
+              return name;
+            })
+            .catch(() => undefined),
+        ),
+      );
+      const { result: references } = await intelligence.references({
+        file,
+        signal,
+        params: { position, context: { includeDeclaration: false }, scope: "workspace" },
+      });
+      const sites = (references ?? []).map(({ uri }) => displayPath(uri, root));
+      const explored = new Set(loaded.filter((name) => name !== undefined));
+      const byPackage = Map.groupBy(sites, packageOf);
+      const rows = [...byPackage]
+        .map(([name, held]) => ({
+          name,
+          uses: held.length,
+          files: new Set(held).size,
+          tests: held.filter(isTestSite).length,
+        }))
+        .sort((left, right) => right.uses - left.uses);
+      const rendered = await renderDocument({
+        document: "impact.tool.mdoc",
+        variables: {
+          subject: declaration?.name ?? "the symbol at this position",
+          answered: references !== null,
+          total: sites.length,
+          fileCount: new Set(sites).size,
+          packageCount: rows.length,
+          testCount: rows.reduce((total, { tests }) => total + tests, 0),
+          // Named by retrieval, not loaded or not confirming a use — the
+          // characterised remainder a decision still has to weigh.
+          beyond: candidates.filter(
+            (name) => !explored.has(name) && !rows.some((row) => row.name === name),
+          ),
+          columns: [{}, { align: "end" }, { align: "end" }, { align: "end" }],
+          rows: rows.map(({ name, uses, files, tests }) => [
+            name,
+            String(uses),
+            String(files),
+            tests ? String(tests) : "",
+          ]),
+        },
+      });
+      return textResult(rendered.text);
+    },
+  );
 
   registerTool(
     server,

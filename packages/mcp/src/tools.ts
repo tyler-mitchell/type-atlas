@@ -25,6 +25,6 @@ export const registerTools = (
   registerEditingTools(server, workspaces);
   registerCodeActionTools(server, workspaces);
   registerIntelligenceTools(server, workspaces, semble);
-  registerExperimentalTools(server, workspaces);
+  registerExperimentalTools(server, workspaces, semble);
   registerDiagnosticWatchTool(server, workspaces);
 };
