@@ -824,29 +824,34 @@ export const registerNavigationTools = (
               )
               .catch(() => undefined)
           : undefined;
-      const sites = [];
-      for (const { uri, range } of output?.items ?? []) {
-        const chain = await declarationChainAtPosition({
-          workspace,
-          uri,
-          position: range.start,
-        }).catch(() => []);
-        // The innermost declaration is often the reference itself — an
-        // object-literal property is a declaration in the outline — so the
-        // holder is the last one that does not stand on this very position.
-        const owner = enclosingDeclaration(chain, range);
-        sites.push({
-          file: displayPath(uri, root),
-          line: range.start.line + 1,
-          character: range.start.character + 1,
-          within: owner?.name,
-          declaration:
-            uri === declarationUri &&
-            declarationRange !== undefined &&
-            declarationRange.start.line === range.start.line &&
-            declarationRange.start.character === range.start.character,
-        });
-      }
+      // Concurrent over the page: each row's owner is one outline chain, and
+      // awaiting them one by one serialized twenty file reads behind each
+      // other — the tool-layer share of a references answer that breached
+      // the one-second calibration. The page is bounded, so so is the fan.
+      const sites = await Promise.all(
+        (output?.items ?? []).map(async ({ uri, range }) => {
+          const chain = await declarationChainAtPosition({
+            workspace,
+            uri,
+            position: range.start,
+          }).catch(() => []);
+          // The innermost declaration is often the reference itself — an
+          // object-literal property is a declaration in the outline — so the
+          // holder is the last one that does not stand on this very position.
+          const owner = enclosingDeclaration(chain, range);
+          return {
+            file: displayPath(uri, root),
+            line: range.start.line + 1,
+            character: range.start.character + 1,
+            within: owner?.name,
+            declaration:
+              uri === declarationUri &&
+              declarationRange !== undefined &&
+              declarationRange.start.line === range.start.line &&
+              declarationRange.start.character === range.start.character,
+          };
+        }),
+      );
       const ordered = [...sites].sort(
         (left, right) =>
           left.file.localeCompare(right.file) ||
@@ -944,21 +949,23 @@ export const registerNavigationTools = (
       // A bare `40:10` names no declaration and resolves from nowhere. The same
       // two facts every located answer owes a reader — which declaration holds
       // this, and a path that opens — apply here.
-      const sites = [];
-      for (const { uri, range } of output?.items ?? []) {
-        const chain = await declarationChainAtPosition({
-          workspace,
-          uri,
-          position: range.start,
-        }).catch(() => []);
-        const owner = enclosingDeclaration(chain, range);
-        sites.push({
-          file: displayPath(uri, root),
-          line: range.start.line + 1,
-          character: range.start.character + 1,
-          within: owner?.name,
-        });
-      }
+      // Concurrent over the bounded page, as the references rows are.
+      const sites = await Promise.all(
+        (output?.items ?? []).map(async ({ uri, range }) => {
+          const chain = await declarationChainAtPosition({
+            workspace,
+            uri,
+            position: range.start,
+          }).catch(() => []);
+          const owner = enclosingDeclaration(chain, range);
+          return {
+            file: displayPath(uri, root),
+            line: range.start.line + 1,
+            character: range.start.character + 1,
+            within: owner?.name,
+          };
+        }),
+      );
       const matched = await project;
       const rendered = await renderDocument({
         document: "file-references.tool.mdoc",
