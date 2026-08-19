@@ -90,6 +90,25 @@ test("compose renders a dossier from ask declarations", async () => {
     expect(holedText).toContain("Undefined in this composition: shpae");
     expect(holedText).toContain("the asks bind shape");
 
+    // The markup is the query language: a document of bare asks is a complete
+    // composition, and each answer renders in its canonical block without any
+    // authored body.
+    const bare = await client.callTool({
+      name: "compose",
+      arguments: {
+        workspace: workspaceRoot,
+        document: [
+          '{% ask "hover" as="head" file="packages/core/src/projection.ts" line=28 character=14 /%}',
+          '{% ask "references" as="uses" file="packages/core/src/projection.ts" line=28 character=14 /%}',
+        ].join("\n"),
+      },
+    });
+    const bareText = bare.content.find((item) => item.type === "text")?.text ?? "";
+    expect(bareText).toContain("const page");
+    expect(bareText).toContain("## References — packages/core/src/projection.ts:28:14");
+    expect(bareText).toMatch(/\d+ uses in \d+ files, across \d+ projects\./u);
+    expect(bareText).not.toContain("Undefined in this composition");
+
     // The exact presentation, over data stable enough to pin: the syntactic
     // outline and a source window compose exactly as their dedicated tools
     // render them, under headings the composer chose.

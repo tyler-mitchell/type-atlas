@@ -180,7 +180,7 @@ export const registerExperimentalTools = (
     {
       title: "Compose",
       description:
-        'Experimental: compose one code-intelligence answer by authoring a Markdoc document in the atlascii design language. Declare data with self-closing ask tags, then compose what they bind with the shipped tags and partials — headings via ##, counts read directly ({% $uses.total %}).\n\nOperations and what each binds:\n- {% ask "hover" as="head" file="src/x.ts" line=5 character=10 /%} (one-based, on the symbol\'s name) → {text}: the signature and documentation, rendered with {% $head.text %}\n- {% ask "references" as="uses" file="src/x.ts" line=5 character=10 /%} → {total, files, projects, groups}; render sites with {% tree entries=$uses.groups partial="reference-node.mdoc" /%}\n- {% ask "outline" as="shape" file="src/x.ts" /%} → {total, tree}; render with {% tree entries=$shape.tree partial="symbol-node.mdoc" /%}\n- {% ask "diagnostics" as="problems" file="src/x.ts" /%} → {total, groups}; render with {% each items=$problems.groups as="group" partial="diagnostic-group.mdoc" /%}\n- {% ask "source" as="body" file="src/x.ts" from=10 to=40 /%} → {lines, startLine}; render with {% source lines=$body.lines startLine=$body.startLine /%}',
+        'Experimental: author and compose your own code-intelligence queries in markup. A document of self-closing ask tags is a complete composition — each answer renders in its canonical block, in your order. Add body markup only to shape the answer yourself: what an ask binds is readable anywhere below it ({% $uses.total %}), and the shipped tags and partials compose it.\n\nOperations and what each binds:\n- {% ask "hover" as="head" file="src/x.ts" line=5 character=10 /%} (one-based, on the symbol\'s name) → {text}: the signature and documentation, rendered with {% $head.text %}\n- {% ask "references" as="uses" file="src/x.ts" line=5 character=10 /%} → {total, files, projects, groups}; render sites with {% tree entries=$uses.groups partial="reference-node.mdoc" /%}\n- {% ask "outline" as="shape" file="src/x.ts" /%} → {total, tree}; render with {% tree entries=$shape.tree partial="symbol-node.mdoc" /%}\n- {% ask "diagnostics" as="problems" file="src/x.ts" /%} → {total, groups}; render with {% each items=$problems.groups as="group" partial="diagnostic-group.mdoc" /%}\n- {% ask "source" as="body" file="src/x.ts" from=10 to=40 /%} → {lines, startLine}; render with {% source lines=$body.lines startLine=$body.startLine /%}',
       inputSchema: input.Compose,
       annotations: readOnlyToolAnnotations,
     },
@@ -311,7 +311,30 @@ export const registerExperimentalTools = (
           asks.map(async (ask) => [ask.bind, await operations[ask.operation]!(ask)] as const),
         ),
       );
-      const rendered = await renderComposition({ source: document, variables: bound });
+      // The markup is the query language, so a body is optional: a document
+      // of bare asks renders each answer in its canonical block, and an
+      // authored body takes over only when the composer wants the shaping.
+      const subject = (ask: DocumentAsk) =>
+        [ask.attributes.file, ask.attributes.line, ask.attributes.character]
+          .filter((part) => part !== undefined)
+          .join(":");
+      const canonicalSection: Record<string, (ask: DocumentAsk) => string> = {
+        hover: (ask) => `## ${subject(ask)}\n\n{% $${ask.bind}.text %}`,
+        references: (ask) =>
+          `## References — ${subject(ask)}\n\n{% $${ask.bind}.total %} uses in {% $${ask.bind}.files %} files, across {% $${ask.bind}.projects %} projects.\n\n{% tree entries=$${ask.bind}.groups partial="reference-node.mdoc" /%}`,
+        outline: (ask) =>
+          `## Outline — ${subject(ask)}\n\n{% tree entries=$${ask.bind}.tree partial="symbol-node.mdoc" /%}`,
+        diagnostics: (ask) =>
+          `## Problems — ${subject(ask)}\n\n{% if equals($${ask.bind}.total, 0) %}No problem in this file.{% /if %}\n{% each items=$${ask.bind}.groups as="group" partial="diagnostic-group.mdoc" /%}`,
+        source: (ask) =>
+          `## ${subject(ask)}\n\n{% source lines=$${ask.bind}.lines startLine=$${ask.bind}.startLine /%}`,
+      };
+      const bare = document.replace(/\{%\s*ask\b[\s\S]*?\/%\}/gu, "").trim() === "";
+      const source =
+        bare && asks.length > 0
+          ? `${document}\n\n${asks.map((ask) => canonicalSection[ask.operation]!(ask)).join("\n\n")}`
+          : document;
+      const rendered = await renderComposition({ source, variables: bound });
       // A name the body reads that no ask bound renders as a hole; naming it is
       // the feedback a composer can act on.
       return textResult(
