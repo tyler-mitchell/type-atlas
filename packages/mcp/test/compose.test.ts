@@ -31,11 +31,14 @@ test("compose renders a dossier from ask declarations", async () => {
       arguments: {
         workspace: workspaceRoot,
         document: [
+          '{% ask "hover" as="head" file="packages/core/src/projection.ts" line=28 character=14 /%}',
           '{% ask "references" as="uses" file="packages/core/src/projection.ts" line=28 character=14 /%}',
           '{% ask "outline" as="shape" file="packages/core/src/projection.ts" /%}',
           '{% ask "source" as="body" file="packages/core/src/projection.ts" from=28 to=30 /%}',
           "",
           "## page, before the edit",
+          "",
+          "{% $head.text %}",
           "",
           "{% $uses.total %} uses in {% $uses.files %} files, across {% $uses.projects %} projects.",
           "",
@@ -53,6 +56,8 @@ test("compose renders a dossier from ask declarations", async () => {
     });
     const text = dossier.content.find((item) => item.type === "text")?.text ?? "";
     expect(text).toContain("## page, before the edit");
+    // The hover header carries the real signature.
+    expect(text).toContain("const page");
     // The composed sentence reads real counts, not holes.
     expect(text).toMatch(/\d+ uses in \d+ files, across \d+ projects\./u);
     // The outline partial rendered the declaration this file exports.

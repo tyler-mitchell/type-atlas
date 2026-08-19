@@ -16,7 +16,7 @@ import {
   type VolarWorkspacePool,
 } from "@type-atlas/core";
 import { type } from "arktype";
-import { displayPath, sameRange } from "atlascii";
+import { displayPath, markupText, sameRange } from "atlascii";
 import { type DocumentAsk, documentAsks } from "atlascii/document";
 import { textResult } from "./mcp-result.ts";
 import { readOnlyToolAnnotations } from "./metadata.ts";
@@ -180,7 +180,7 @@ export const registerExperimentalTools = (
     {
       title: "Compose",
       description:
-        'Experimental: compose one code-intelligence answer by authoring a Markdoc document in the atlascii design language. Declare data with self-closing ask tags, then compose what they bind with the shipped tags and partials — headings via ##, counts read directly ({% $uses.total %}).\n\nOperations and what each binds:\n- {% ask "references" as="uses" file="src/x.ts" line=5 character=10 /%} (one-based, on the symbol\'s name) → {total, files, projects, groups}; render sites with {% tree entries=$uses.groups partial="reference-node.mdoc" /%}\n- {% ask "outline" as="shape" file="src/x.ts" /%} → {total, tree}; render with {% tree entries=$shape.tree partial="symbol-node.mdoc" /%}\n- {% ask "diagnostics" as="problems" file="src/x.ts" /%} → {total, groups}; render with {% each items=$problems.groups as="group" partial="diagnostic-group.mdoc" /%}\n- {% ask "source" as="body" file="src/x.ts" from=10 to=40 /%} → {lines, startLine}; render with {% source lines=$body.lines startLine=$body.startLine /%}',
+        'Experimental: compose one code-intelligence answer by authoring a Markdoc document in the atlascii design language. Declare data with self-closing ask tags, then compose what they bind with the shipped tags and partials — headings via ##, counts read directly ({% $uses.total %}).\n\nOperations and what each binds:\n- {% ask "hover" as="head" file="src/x.ts" line=5 character=10 /%} (one-based, on the symbol\'s name) → {text}: the signature and documentation, rendered with {% $head.text %}\n- {% ask "references" as="uses" file="src/x.ts" line=5 character=10 /%} → {total, files, projects, groups}; render sites with {% tree entries=$uses.groups partial="reference-node.mdoc" /%}\n- {% ask "outline" as="shape" file="src/x.ts" /%} → {total, tree}; render with {% tree entries=$shape.tree partial="symbol-node.mdoc" /%}\n- {% ask "diagnostics" as="problems" file="src/x.ts" /%} → {total, groups}; render with {% each items=$problems.groups as="group" partial="diagnostic-group.mdoc" /%}\n- {% ask "source" as="body" file="src/x.ts" from=10 to=40 /%} → {lines, startLine}; render with {% source lines=$body.lines startLine=$body.startLine /%}',
       inputSchema: input.Compose,
       annotations: readOnlyToolAnnotations,
     },
@@ -188,18 +188,31 @@ export const registerExperimentalTools = (
       const workspace = await workspaces.get(root);
       const intelligence = createTypeAtlas(workspace);
       const askedFile = (ask: DocumentAsk) => String(ask.attributes.file ?? "");
+      // Ask positions are one-based, like every position this surface accepts.
+      const askedPosition = (ask: DocumentAsk) => ({
+        line: Number(ask.attributes.line ?? 1) - 1,
+        character: Number(ask.attributes.character ?? 1) - 1,
+      });
       // The operations a composition can ask for, each binding the shape its
       // partial reads — the same shapes the dedicated tools compose from.
       const operations: Record<string, (ask: DocumentAsk) => Promise<unknown>> = {
+        hover: async (ask) => {
+          const { result } = await intelligence.hover({
+            file: askedFile(ask),
+            signal,
+            params: { position: askedPosition(ask) },
+          });
+          return { text: markupText(result?.contents) ?? "" };
+        },
         references: async (ask) => {
-          const position = {
-            line: Number(ask.attributes.line ?? 1) - 1,
-            character: Number(ask.attributes.character ?? 1) - 1,
-          };
           const { result, projects } = await intelligence.references({
             file: askedFile(ask),
             signal,
-            params: { position, context: { includeDeclaration: false }, scope: "workspace" },
+            params: {
+              position: askedPosition(ask),
+              context: { includeDeclaration: false },
+              scope: "workspace",
+            },
           });
           const sites = [];
           for (const { uri, range } of result ?? []) {
