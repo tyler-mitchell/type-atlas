@@ -68,8 +68,9 @@ The rebuild's mapping is already documented at the harness itself
 `runtime.lastFrame()` → `lastSummary()` returning encoded/skipped counts,
 with `read(id)` for data assertions; schedule-backed command payloads are
 admitted as durable facts through the exposed `timeline` door — the exact
-affordance the command-feed behaviors need; the full `engine` door remains
-for submits and product fills. The stale `PipelineCommandContext.frame` uses
+affordance the command-feed behaviors need; external command submission is
+`engine.submit`, the host door at engine.ts:183, with `engine.read` and
+`products` beside it for fills and assertions. The stale `PipelineCommandContext.frame` uses
 in the submit callback map to the current context's step facts.
 
 Then the fix, at the seam navigation confirmed: both `encodeGroup` invocation
