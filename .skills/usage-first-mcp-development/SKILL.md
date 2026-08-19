@@ -44,6 +44,15 @@ itself — it arrives looking like an answer and you act on it. Which is why:
 source, types, and tests say what the code *says*; only a call says what an agent
 *receives*. Claims about behaviour need a call behind them.
 
+One boundary on that rule, learned the hard way. It governs the MCP surface —
+what an agent receives. For the substrate beneath it — Volar, TypeScript, the
+bridge — the repo's recorded evidence outranks your live probe:
+`docs/volar-affordance-evidence.md` says what was true, and instrumentation
+only says what changed. A substrate diagnosis built from probes alone was
+confidently wrong here for ten days, while the observation contradicting it
+sat unread in the ledger the whole time. Read the ledger first; probe second;
+and when they disagree, you have found a change, not a refutation.
+
 ---
 
 ## Reading what comes back
@@ -56,6 +65,17 @@ obvious to anyone reading *without* your intent.
 
 So read the whole result as if you had not asked the question. "I was looking for
 something else" is not a defence.
+
+This binds hardest on calls made in passing. A result you only consumed as a
+stepping stone — a hover on the way to an edit, an ambient block under an
+answer you wanted for something else — still gets the floor, because those are
+the answers nobody ever reads deliberately, so their defects live longest. A
+diagnostics block was consumed twice in one session, used successfully both
+times, while its rows named no referent at all — bare positions a reader must
+open a file to decode — and the person watching caught it before the session
+did. Every located row names what stands there; a tool answer that shows a
+position without its owner has broken the surface's own location grammar, and
+noticing that is not the asker's job.
 
 Three kinds of coherence fail independently, and passing one tells you nothing
 about the others:
@@ -232,12 +252,31 @@ special cases, or added one more.
 ## Rails
 
 Cheap, invisible, and each one is here because its absence cost real time. Follow
-them; do not perform them.
+them; do not perform them. And do not mistake them for the checklist bloat the
+gates section warns against: a rail is a mechanical tripwire that holds
+precisely when reasoning is tired or thin, and the weaker the reasoning, the
+harder it binds. The prohibition is on narrating steps and on letting steps
+replace thought — never on the guard itself.
 
+- **Affordances before machinery.** Before writing any helper, name the
+  existing affordance that fails to serve the need and the call that proved it
+  fails. A parameter you did not try is not a missing affordance. When a fix
+  grows past a dozen lines, stop and re-read the involved tool's surface — a
+  ~90-line hand-rolled declaration walk here was one unread parameter
+  (`getNavigateToItems`'s per-file form) away from ten lines that also ranked
+  results better.
+- **Name the proving call before the edit.** The exact tool and arguments that
+  will show the change worked, chosen while the edit is still a plan. If you
+  cannot name it, the change is not ready to make.
 - **Reload immediately after editing.** The next tool call, nothing between — not
   a read, not a search, not a reply describing what the edit *will* do. Then run
   the call that proves it, then the neighbours that share the changed code,
-  enumerated by call rather than from memory.
+  enumerated by call rather than from memory. A turn never ends, and no
+  unrelated work begins, while an edit sits unproven. This is MDD —
+  MCP-driven development: the produce witnessed through the live tool is the
+  only "done", the way a failing-then-passing test is TDD's. A change whose
+  produce cannot be witnessed yet is not claimed; it is named as unwitnessed,
+  with what would witness it.
 - **Know the code you are editing is the code that runs.** A path-proof is a
   call, not a resemblance. Editing a formatter the tool never invokes looks
   exactly like progress.
@@ -254,6 +293,12 @@ them; do not perform them.
   benchmark improves.
 - **Measure alone, never across an edit.** A call in a parallel batch inherits
   its slowest sibling's wait; a byte-identical repeat measures a cache.
+- **Measure cold first, worst case first.** Any change that adds asynchronous
+  work is checked before/after, starting from a fresh server so no cache
+  obscures the real cost, and starting from the case that multiplies — the
+  page cap, the many-file spread, the largest project — with the warm repeat
+  measured separately and labelled as the cached case. A best-case number
+  presented alone is a false understanding.
 - **One observation is not a general claim.** A call about one symbol says
   nothing about its file or the codebase.
 - **Ask the authority, not a proxy.** A derived answer that is usually right is a
@@ -265,6 +310,11 @@ them; do not perform them.
   and buries the one fact worth reading in a form nobody reads.
 - **An inherited prohibition is a symptom to re-measure**, not a fact to obey
   forever.
+- **Findings leave the head immediately.** Anything noticed outside the
+  immediate workstream goes to `docs/issues.md` at the moment of discovery,
+  with how it was observed — a finding deferred to the end of a session is a
+  finding lost, and one raised by Tyler is captured whether or not he prefixed
+  it `issue:`.
 - **Never end a turn waiting for input.** If an action is available, take it.
 
 ---
@@ -292,6 +342,9 @@ The examples are local; the patterns are not.
 | A file read that never said which file, or that it had hidden the bodies | absence and bounds |
 | Completion reported with parts silently untested | say what you did not verify |
 | Told the user what happened from memory; it was false | from a call, or from memory? |
+| ~90 lines of AST walking written beside a one-parameter affordance | affordances before machinery |
+| A substrate bug diagnosed by live probe against unread recorded evidence | ledger first, probe second |
+| `11 symbols match` above ten rows, no page line; the hidden row was the answer | read the whole result |
 
 ---
 
