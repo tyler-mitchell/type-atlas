@@ -62,6 +62,16 @@ behaviors — single consumption, offset re-zeroing, pending-until-crossing, no
 double consumption across mapped crossings, `perCommand` draining to zero,
 origin reset discarding pending input, independent present/step settlement.
 
+The rebuild's mapping is already documented at the harness itself
+(witness-engine.ts:1–100): `runtime.frame()` → `advance({ ticks: N })`
+(deterministic tick admission, chunked under a refuse-declared step limit);
+`runtime.lastFrame()` → `lastSummary()` returning encoded/skipped counts,
+with `read(id)` for data assertions; schedule-backed command payloads are
+admitted as durable facts through the exposed `timeline` door — the exact
+affordance the command-feed behaviors need; the full `engine` door remains
+for submits and product fills. The stale `PipelineCommandContext.frame` uses
+in the submit callback map to the current context's step facts.
+
 Then the fix, at the seam navigation confirmed: both `encodeGroup` invocation
 sites are inside `makeExecutionHost` (frameGroup at execution.ts:585, the
 step path at execution.ts:615), so the least-machinery change is one optional
