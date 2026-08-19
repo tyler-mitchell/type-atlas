@@ -154,6 +154,13 @@ export const enrichRetrievalPage = async (input: {
   readonly includeTypes: boolean;
   readonly snippetLines: number | null;
   readonly anchorIdentifiers?: readonly string[];
+  /**
+   * The text anchors are read from, when the query line is a caption rather
+   * than a question. A similarity seed's "Related to <path>" is not typed by
+   * a caller, and anchoring on it declared the literal word "Related" a name
+   * nobody asked for — pass "" and the answer says it ranked by meaning.
+   */
+  readonly anchorText?: string;
   readonly workspaces: VolarWorkspacePool;
   readonly signal: AbortSignal;
 }): Promise<RetrievalPage> => {
@@ -161,7 +168,7 @@ export const enrichRetrievalPage = async (input: {
   const intelligence = createTypeAtlas(workspace);
   const anchorIdentifiers = new Set(input.anchorIdentifiers ?? []);
   const queryIdentifiers = new Set([
-    ...queryAnchors(input.page.query),
+    ...queryAnchors(input.anchorText ?? input.page.query),
     ...(input.anchorIdentifiers ?? []),
   ]);
   return {
@@ -509,6 +516,8 @@ export const createRetrievalIntelligence = (dependencies: {
       searchRoot,
       includeTypes: request.includeTypes,
       snippetLines: request.snippetLines,
+      // The query line is a caption; nobody typed it, so nothing anchors.
+      anchorText: "",
       workspaces: dependencies.workspaces,
       signal: request.signal,
     });
