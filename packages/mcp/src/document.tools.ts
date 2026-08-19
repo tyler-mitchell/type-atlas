@@ -239,7 +239,10 @@ export const registerDocumentTools = (server: McpServer, workspaces: VolarWorksp
           unchanged: report.unchanged,
           unloaded: !asked && !report.unchanged && !report.projectCount,
           checked: !asked && !report.unchanged && report.projectCount > 0,
-          wholeProject: scope !== "changed",
+          // The scope word follows the actual selection, not the argument: a
+          // named project is checked whole regardless of scope, and "Changed
+          // files · 203 files checked" read as a contradiction.
+          wholeProject: scope !== "changed" || named !== undefined,
           total: shown.total,
           // `shown` counted the page's distinct files while the page line below
           // counted its diagnostics, so one answer carried `3 shown` above
