@@ -104,6 +104,13 @@ same judgement `referenceGroups` already makes. Partial filenames become
 internal. A composer who wants a different shape still has the full document
 layer; the default asks nothing of them.
 
+An engine constraint discovered by trying (2026-08-19): Markdoc refuses the
+`partial` tag inline — "'partial' tag should be block" — so a phrase or a
+kind rendered mid-sentence must be a tag or a function, never a partial.
+Kind-addressed rendering is therefore tag-shaped (`{% locations of=$x %}`),
+and sentence-level phrases stay written in each document, which the
+sentences-belong-to-documents rule wants anyway.
+
 ## Migration shape
 
 Ordered by dependency, no calendar:
