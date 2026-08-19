@@ -21,6 +21,7 @@ import {
   type Provide as TypeScriptService,
 } from "volar-service-typescript";
 import { withEffectLanguageService } from "./effect-language-service.ts";
+import { withReferencesAtPosition } from "./references-at-position.ts";
 import {
   isProbeDocument,
   type ProjectDiagnostics,
@@ -329,13 +330,13 @@ export const registerLanguageServer = (connection: Connection): void => {
       createTypeScriptProject(projectTypeScript, undefined, () => ({
         languagePlugins: [documentLanguagePlugin],
       })),
-      [
+      withReferencesAtPosition([
         ...createTypeScriptServices(projectTypeScript),
         createJsonService(),
         createMarkdownService({
           fileExtensions: [...markdownFileExtensions],
         }),
-      ],
+      ]),
     ),
   );
   connection.onInitialized(async () => {

@@ -1,6 +1,7 @@
 import type { LanguageServer } from "@volar/language-server/node.js";
 import { type Location, SymbolKind } from "@volar/language-server/protocol.js";
 import type { Provide as TypeScriptService } from "volar-service-typescript";
+import { isProbeDocument } from "./protocol.ts";
 
 type Service = Awaited<ReturnType<LanguageServer["project"]["getLanguageService"]>>;
 
@@ -19,12 +20,18 @@ export type Declaration = {
  * asks TypeScript for the matches and then converts each one through
  * `ctx.getTextDocument(...)`, which resolves only files Volar holds open — so
  * every match in a file nobody opened converts to nothing and is filtered away.
- * A workspace search is almost entirely such files, which is why it answered an
- * empty array for every query while `document_symbols` listed the same names.
  *
- * TypeScript is asked directly instead, and a position is computed from the
- * program's own source file rather than from an open document. The same
- * bypass `references-at-position.ts` makes, for the same reason.
+ * TypeScript is asked directly instead — but per file, not per program. The
+ * whole-program form walks `program.getSourceFiles()`, and on the tsgo bridge
+ * that enumerates shell files — no statements, empty name tables — so it
+ * answers nothing, structurally, for every query. The single-file form
+ * acquires its file through `getValidSourceFile`, the materializing accessor,
+ * so TypeScript's own matcher, kinds, containers, and filters all run on the
+ * parsed file. `test/navigate-to.test.ts` holds the shell reproduction and
+ * reports when the platform's whole-program form starts answering.
+ *
+ * Items are ordered by TypeScript's own match quality across files — one call
+ * ranks only within its file.
  *
  * Aliases without a container are dropped, matching what the plugin does: a
  * bare re-export is the name arriving somewhere, not being declared there.
@@ -40,10 +47,22 @@ export const workspaceDeclarations = (
   if (!languageService) return [];
 
   const program = languageService.getProgram();
-  return (languageService.getNavigateToItems(query) ?? [])
+  if (!program) return [];
+  return program
+    .getSourceFiles()
+    .flatMap((file) =>
+      isProbeDocument(file.fileName)
+        ? []
+        : (languageService.getNavigateToItems(query, undefined, file.fileName) ?? []),
+    )
     .filter((item) => item.containerName || item.kind !== "alias")
+    .sort(
+      (left, right) =>
+        matchQuality.indexOf(left.matchKind) - matchQuality.indexOf(right.matchKind) ||
+        left.name.localeCompare(right.name),
+    )
     .flatMap((item): Declaration[] => {
-      const source = program?.getSourceFile(item.fileName);
+      const source = program.getSourceFile(item.fileName);
       if (!source) return [];
       const uri = service.context.inject<TypeScriptService, "typescript/documentUri">(
         "typescript/documentUri",
@@ -66,6 +85,9 @@ export const workspaceDeclarations = (
       ];
     });
 };
+
+/** TypeScript's own ranking vocabulary, best first. */
+const matchQuality = ["exact", "prefix", "substring", "camelCase"];
 
 /**
  * TypeScript's kind strings as protocol symbol kinds.

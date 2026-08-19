@@ -34,12 +34,21 @@ export const withReferencesAtPosition = (services: Services): Services =>
               ...instance,
               provideReferences(document, position, referenceContext, token) {
                 const fileName = provide["typescript/documentFileName"](URI.parse(document.uri));
-                const entries = fileName
-                  ? provide["typescript/languageService"]().getReferencesAtPosition(
-                      fileName,
-                      document.offsetAt(position),
-                    )
-                  : undefined;
+                // findReferences, not getReferencesAtPosition: the tsgo bridge
+                // routes only the former to its Go-side implementation
+                // (`program.findReferencesTsgo`), and the unrouted JS walk
+                // answers undefined or a subset over the bridge's shell files.
+                // test/references-probe.test.ts holds both observations.
+                const languageService = provide["typescript/languageService"]();
+                // The bridge reads `program.isTsgoBackedProgram` before it
+                // synchronizes, so a service that has never built a program
+                // throws; building it first is the accommodation.
+                const entries =
+                  fileName && languageService.getProgram()
+                    ? languageService
+                        .findReferences(fileName, document.offsetAt(position))
+                        ?.flatMap((group) => group.references)
+                    : undefined;
                 if (!entries) {
                   return original(document, position, referenceContext, token);
                 }

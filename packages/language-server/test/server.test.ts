@@ -77,18 +77,14 @@ describe("language server", () => {
   });
 
   /**
-   * Known failing, deliberately, so it says so when it stops.
-   *
-   * The program demonstrably holds the file — this test prints both source
-   * files when it fails — and `getNavigateToItems` still answers nothing for a
-   * name declared in one of them. The same call against a plain TypeScript
-   * language service over the same file returns the declaration, so the loss is
-   * somewhere in the hosted service rather than in the query.
-   *
-   * Written as a failing expectation rather than deleted, because the fix is
-   * upstream and this is what will notice it arriving.
+   * The declaring file is never opened as a document, so this passes only if
+   * the server reads declarations from the program itself. It once failed
+   * because the answer leaned on `getNavigateToItems`, which walks the tsgo
+   * bridge's shell source files and answers nothing — the reproduction lives
+   * in `navigate-to.test.ts`, and `workspace-declarations.ts` now reads each
+   * file's name table through the materializing accessor instead.
    */
-  it.fails("finds a declaration in a file no document has opened", async () => {
+  it("finds a declaration in a file no document has opened", async () => {
     const root = await mkdtemp(path.join(packageRoot, ".language-server-test-"));
     temporaryRoots.add(root);
     await mkdir(path.join(root, "src"));
