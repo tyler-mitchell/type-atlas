@@ -345,6 +345,10 @@ export const registerNavigationTools = (
       const named = (output?.items ?? []).map((symbol) => ({
         name: symbol.name,
         kind: symbol.kind,
+        // TypeScript's own word when the server carried it — the number
+        // cannot say "type", so a type alias projected as something it is
+        // not until the word rode along.
+        word: "word" in symbol ? (symbol as { word?: string }).word : undefined,
         deprecated: ("deprecated" in symbol && symbol.deprecated) || symbol.tags?.includes(1),
         file: displayPath(symbol.location.uri, root),
         range:

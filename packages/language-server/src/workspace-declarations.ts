@@ -9,6 +9,13 @@ type Service = Awaited<ReturnType<LanguageServer["project"]["getLanguageService"
 export type Declaration = {
   readonly name: string;
   readonly kind: SymbolKind;
+  /**
+   * TypeScript's own kind word, carried past the protocol's numbers: the
+   * protocol has no alias kind, so a type alias projected to a number reads
+   * as something it is not. The word is the truth; the number is the lossy
+   * projection kept for protocol consumers.
+   */
+  readonly word?: string;
   readonly containerName?: string;
   readonly location: Location;
 };
@@ -80,6 +87,7 @@ export const workspaceDeclarations = (
         {
           name: item.name,
           kind: symbolKinds[item.kind] ?? SymbolKind.Variable,
+          ...(item.kind ? { word: item.kind } : {}),
           ...(item.containerName ? { containerName: item.containerName } : {}),
           location: {
             uri: uri.toString(),
