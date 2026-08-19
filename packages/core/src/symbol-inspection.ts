@@ -274,6 +274,71 @@ export const declarationAtPosition = async (input: {
   });
 
 /**
+ * What stands at a position — the one owner of subject resolution.
+ *
+ * Every positional answer opens with a subject, and resolving it per tool
+ * grew three mechanisms with four failure modes: hover prose misread a call
+ * site as its enclosing assignment, the outline answered the container for
+ * a member, and both could return nothing while the definition knew. The
+ * definition request answers what the position RESOLVES TO; a
+ * LocationLink's selection spans exactly the identifier, so the text under
+ * it is the name. The outline answers only when the definition cannot.
+ */
+export const subjectAtPosition = async (input: {
+  readonly workspace: VolarWorkspace;
+  readonly uri: string;
+  readonly position: Position;
+  readonly signal?: AbortSignal;
+}): Promise<
+  { readonly name: string; readonly declaredAt: { readonly uri: string; readonly selection: Range } } | undefined
+> => {
+  const defined = await input.workspace
+    .sendRequest(
+      DefinitionRequest.type,
+      { textDocument: { uri: input.uri }, position: input.position },
+      input.signal,
+    )
+    .catch(() => null);
+  const first = (Array.isArray(defined) ? defined[0] : defined) as
+    | { uri?: string; targetUri?: string; range?: Range; targetSelectionRange?: Range }
+    | null
+    | undefined;
+  const uri = first?.targetUri ?? first?.uri;
+  const selection = first?.targetSelectionRange ?? first?.range;
+  const sliced =
+    uri && selection
+      ? await input.workspace
+          .readTextDocumentUri(uri, input.signal)
+          .then(({ source }) =>
+            (source.split("\n")[selection.start.line] ?? "").slice(
+              selection.start.character,
+              selection.end.character,
+            ),
+          )
+          .catch(() => undefined)
+      : undefined;
+  if (uri && selection && sliced && /^[$A-Za-z_][\w$]*$/u.test(sliced)) {
+    return { name: sliced, declaredAt: { uri, selection } };
+  }
+  // A plain Location's range spans the whole declaration — slicing it
+  // yields nothing — and no definition at all leaves only the asked file.
+  const declared = await declarationAtPosition({
+    workspace: input.workspace,
+    uri: uri ?? input.uri,
+    position: selection?.start ?? input.position,
+  }).catch(() => undefined);
+  return declared?.name
+    ? {
+        name: declared.name,
+        declaredAt:
+          uri && selection
+            ? { uri, selection }
+            : { uri: declared.uri, selection: declared.selectionRange },
+      }
+    : undefined;
+};
+
+/**
  * The declarations containing a position, outermost first.
  *
  * The innermost one is not always the useful answer. A reference standing on an

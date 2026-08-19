@@ -15,7 +15,12 @@ import { readOnlyToolAnnotations } from "./metadata.ts";
 import { displayPath, slash } from "atlascii";
 import { textResult } from "./mcp-result.ts";
 import { fileInput, positionInput } from "./tool-input.ts";
-import { createTypeAtlas, type VolarWorkspace, type VolarWorkspacePool } from "@type-atlas/core";
+import {
+  createTypeAtlas,
+  subjectAtPosition,
+  type VolarWorkspace,
+  type VolarWorkspacePool,
+} from "@type-atlas/core";
 import { type FileMove, renderWorkspaceEdit } from "./workspace-edit.ts";
 import { formatPatchResult } from "./edit-result.ts";
 import { registerTool } from "./tool.ts";
@@ -144,40 +149,24 @@ export const registerEditingTools = (server: McpServer, workspaces: VolarWorkspa
     async ({ workspace: root, file, position, newName }, { mcpReq: { signal } }) => {
       const workspace = await workspaces.get(root);
       const textDocument = await workspace.getTextDocument(file);
-      const [edit, project, defined] = await Promise.all([
+      const [edit, project, resolved] = await Promise.all([
         workspace.sendRequest(RenameRequest.type, { textDocument, position, newName }, signal),
         workspace.sendRequest(GetMatchTsConfigRequest.type, textDocument, signal),
-        // What the position resolved to. A rename is applied unread more than
-        // any other answer, and a drifted position renames something real —
-        // the subject on the first line is what lets a reader catch it.
-        createTypeAtlas(workspace)
-          .definitions({ file, signal, params: { position } })
-          .then(({ result }) => (Array.isArray(result) ? result[0] : (result ?? undefined)))
-          .catch(() => undefined) as Promise<
-          | { uri?: string; targetUri?: string; range?: Range; targetSelectionRange?: Range }
-          | undefined
-        >,
+        // What the position resolved to, from the one subject owner. A rename
+        // is applied unread more than any other answer, and a drifted
+        // position renames something real — the subject on the first line is
+        // what lets a reader catch it.
+        subjectAtPosition({ workspace, uri: textDocument.uri, position, signal }).catch(
+          () => undefined,
+        ),
       ]);
       if (!edit) return textResult("");
-      const subjectUri = defined?.targetUri ?? defined?.uri;
-      const subjectRange = defined?.targetSelectionRange ?? defined?.range;
-      const subjectName =
-        subjectUri && subjectRange
-          ? await workspace
-              .readTextDocumentUri(subjectUri, signal)
-              .then(({ source }) =>
-                (source.split("\n")[subjectRange.start.line] ?? "").slice(
-                  subjectRange.start.character,
-                  subjectRange.end.character,
-                ),
-              )
-              .catch(() => undefined)
-          : undefined;
-      const subject = subjectUri
+      const subjectUri = resolved?.declaredAt.uri;
+      const subject = resolved
         ? {
-            name: subjectName || undefined,
-            file: displayPath(subjectUri, root),
-            at: subjectRange?.start,
+            name: resolved.name,
+            file: displayPath(resolved.declaredAt.uri, root),
+            at: resolved.declaredAt.selection.start,
           }
         : undefined;
       // Installed code lives under the workspace directory, so containment

@@ -15,6 +15,7 @@ export {
   declarationAtPosition,
   declarationChainAtPosition,
   inspectSymbol,
+  subjectAtPosition,
   type InspectSymbolOptions,
   type Located,
   type InspectSymbolResult,

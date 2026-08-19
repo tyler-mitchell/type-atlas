@@ -14,6 +14,7 @@ import {
   inspectSymbol,
   page,
   renderDocument,
+  subjectAtPosition,
   type VolarWorkspace,
 } from "@type-atlas/core";
 import type { McpServer } from "@modelcontextprotocol/server";
@@ -157,30 +158,6 @@ const callHierarchyVariables = <Call extends { readonly fromRanges: readonly Ran
   };
 };
 
-const navigationNoun = async (input: {
-  readonly base: string;
-  readonly preposition?: string;
-  readonly workspace: Awaited<ReturnType<VolarWorkspacePool["get"]>>;
-  readonly uri: string;
-  readonly position: { readonly line: number; readonly character: number };
-  readonly signal: AbortSignal;
-}) => {
-  const declaration = await declarationAtPosition({
-    workspace: input.workspace,
-    uri: input.uri,
-    position: input.position,
-  }).catch(() => undefined);
-  // The bare name. The kind used to be appended as `name [variable]`, taken
-  // from the syntactic outline — which has no entry for a type's members and so
-  // reported the enclosing type's kind for a property. Every consumer now reads
-  // the kind from hover, where TypeScript states it, and printing both produced
-  // sentences that disagreed with themselves: `references [variable] is a const`.
-  const subject = declaration?.name;
-  return {
-    subject,
-    noun: subject ? `${input.base} ${input.preposition ?? "of"} ${subject}` : input.base,
-  };
-};
 
 /**
  * The kind TypeScript assigned to whatever stands at a position.
@@ -508,15 +485,7 @@ export const registerNavigationTools = (
       // targets carry no name.
       const subject =
         targets.items.find(({ name }) => name)?.name ||
-        (
-          await navigationNoun({
-            base: "definitions",
-            workspace,
-            uri: textDocument.uri,
-            position,
-            signal,
-          })
-        ).subject;
+        (await subjectAtPosition({ workspace, uri: textDocument.uri, position, signal }))?.name;
       const rendered = await renderDocument({
         document: "definitions.tool.mdoc",
         variables: {
@@ -561,14 +530,13 @@ export const registerNavigationTools = (
               document: "type-definitions.tool.mdoc",
               variables: {
                 subject: (
-                  await navigationNoun({
-                    base: "type definitions",
+                  await subjectAtPosition({
                     workspace,
                     uri: textDocument.uri,
                     position,
                     signal,
                   })
-                ).subject,
+                )?.name,
                 kind: await kindAt({
                   intelligence: createTypeAtlas(workspace),
                   file,
@@ -616,14 +584,13 @@ export const registerNavigationTools = (
               document: "implementations.tool.mdoc",
               variables: {
                 subject: (
-                  await navigationNoun({
-                    base: "implementations",
+                  await subjectAtPosition({
                     workspace,
                     uri: textDocument.uri,
                     position,
                     signal,
                   })
-                ).subject,
+                )?.name,
                 kind: await kindAt({
                   intelligence: createTypeAtlas(workspace),
                   file,
@@ -780,50 +747,24 @@ export const registerNavigationTools = (
         position,
       );
       const project = workspace.sendRequest(GetMatchTsConfigRequest.type, textDocument, signal);
-      const { subject } = await navigationNoun({
-        base: "references",
-        workspace,
-        uri: textDocument.uri,
-        position,
-        signal,
-      });
       const output =
         references === null
           ? null
           : raw
             ? page(references, 0, references.length)
             : page(references, offset, limit);
-      // What a reader wants from a hit is which declaration holds it, not the
-      // line it sits on: a use split across lines shows a fragment, and the
-      // owner's name says what the fragment was trying to say. The outline is
-      // syntactic and cached per file, so a page of hits in one module costs
-      // one parse.
-      // Which hit is the declaration is not derivable from the outline: an
-      // object-literal property is a declaration there, so `down: "↓"` claimed
-      // to declare the type member it assigns. The definition request answers
-      // it exactly, and it is one request for the whole page.
-      const defined = (await intelligence
-        .definitions({ file, signal, params: { position } })
-        .then(({ result }) => (Array.isArray(result) ? result[0] : result))
-        .catch(() => undefined)) as { uri?: string; targetUri?: string; range?: Range; targetSelectionRange?: Range } | undefined;
-      const declarationUri = defined?.targetUri ?? defined?.uri;
-      const declarationRange = defined?.targetSelectionRange ?? defined?.range;
-      // The heading named the enclosing declaration, so pointing at a type's
-      // member reported the type: `Figures [variable]` for a question about
-      // `down`. The definition's selection range spans the identifier itself,
-      // and the text under it is the symbol that was actually resolved.
-      const declarationSource =
-        declarationUri && declarationRange
-          ? await workspace
-              .readTextDocumentUri(declarationUri, signal)
-              .then(({ source }) =>
-                (source.split("\n")[declarationRange.start.line] ?? "").slice(
-                  declarationRange.start.character,
-                  declarationRange.end.character,
-                ),
-              )
-              .catch(() => undefined)
-          : undefined;
+      // What the position resolved to, from the one subject owner — the name
+      // this answer opens with, and the declaration site the rows below mark
+      // themselves against. This replaced a hover noun and a hand-rolled
+      // definition slice that each failed their own way.
+      const resolved = await subjectAtPosition({
+        workspace,
+        uri: textDocument.uri,
+        position,
+        signal,
+      });
+      const declarationUri = resolved?.declaredAt.uri;
+      const declarationRange = resolved?.declaredAt.selection;
       // Concurrent over the page: each row's owner is one outline chain, and
       // awaiting them one by one serialized twenty file reads behind each
       // other — the tool-layer share of a references answer that breached
@@ -865,14 +806,12 @@ export const registerNavigationTools = (
       const rendered = await renderDocument({
         document: "references.tool.mdoc",
         variables: {
-          subject: declarationSource || subject,
+          subject: resolved?.name,
           kind,
           // A top-level declaration is its own enclosing declaration, so the
           // outline names it as its own container — which says nothing.
           container:
-            declarationSite?.within === (declarationSource || subject)
-              ? undefined
-              : declarationSite?.within,
+            declarationSite?.within === resolved?.name ? undefined : declarationSite?.within,
           // From the definition itself, not from the page rows: the subject
           // line owes its location in every state, and deriving it from the
           // page dropped it whenever the declaration row fell outside the
