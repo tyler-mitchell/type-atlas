@@ -187,7 +187,7 @@ export const registerExperimentalTools = (
       const consumerBudget = 4;
       const candidates = declaration?.name
         ? await semble
-            .search({ repo: root, query: declaration.name, limit: 20, signal })
+            .search({ repo: root, query: declaration.name, limit: 20, snippetLines: 0, signal })
             .then(({ results }) =>
               [
                 ...new Set(
@@ -202,7 +202,13 @@ export const registerExperimentalTools = (
       const loaded = await Promise.all(
         candidates.map((name) =>
           semble
-            .search({ repo: root, query: `${declaration?.name ?? ""} ${name}`, limit: 3, signal })
+            .search({
+              repo: root,
+              query: `${declaration?.name ?? ""} ${name}`,
+              limit: 3,
+              snippetLines: 0,
+              signal,
+            })
             .then(async ({ results }) => {
               const inside = results.find(({ file_path }) => packageOf(file_path) === name);
               if (!inside) return undefined;
