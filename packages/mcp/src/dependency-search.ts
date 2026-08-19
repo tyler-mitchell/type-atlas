@@ -41,6 +41,7 @@ type DependencySearchResult =
       readonly page: SembleSearchPage;
       readonly matches: readonly RetrievalMatch[];
       readonly elsewhere: number;
+      readonly elsewhereFiles: readonly string[];
       readonly api: readonly {
         readonly item: ModuleExportPage["items"][number];
         readonly evidence: SembleSearchPage["results"][number];
@@ -228,7 +229,7 @@ export const createDependencySearch =
             request.workspace,
           );
           const matches = found.filter((match) => match.displayFile.startsWith(withinPackage));
-          const elsewhere = found.length - matches.length;
+          const outside = found.filter((match) => !match.displayFile.startsWith(withinPackage));
           const api = (resolvedExports?.items ?? []).flatMap((item) => {
             const candidate = candidates.find((candidate) => candidate.item.label === item.label);
             return candidate ? [{ item, evidence: candidate.evidence }] : [];
@@ -241,7 +242,12 @@ export const createDependencySearch =
             searchRoot,
             page,
             matches,
-            elsewhere,
+            elsewhere: outside.length,
+            // Which files the count hides. When every result lands outside —
+            // observed for a package whose install path and resolved paths
+            // disagree — the count alone leaves a reader with no way to tell
+            // misattribution from true neighbours.
+            elsewhereFiles: [...new Set(outside.map((match) => match.displayFile))].slice(0, 3),
             api,
           };
         } catch (error) {
@@ -281,6 +287,7 @@ export const createDependencySearch =
             noExportMatched: result.api.length === 0,
             showSource: result.matches.length > 0 || result.elsewhere > 0,
             elsewhere: result.elsewhere,
+            elsewhereFiles: result.elsewhereFiles,
             // One entry per place. The name search and the meaning search both
             // reach the same declaration, and neither knows what the other
             // found, so a two-result page spent both slots on one snippet —

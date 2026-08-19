@@ -292,6 +292,26 @@ respects, or assembling rename edits from the (fan-out, working) references.
 The worst failure class: a wrong answer about completeness in an answer meant
 to be applied. Observed 2026-08-19.
 
+### `search_dependency_code` can rank only results it then refuses to show
+
+```
+search_dependency_code { package: ["typescript"], query: "findReferencesTsgo …" }
+→ No exported name matched this query …
+  6 ranked outside this package and are not shown · the search root reaches
+  past typescript-native-bridge, and source from a neighbour is not this package's
+```
+
+Twice in a row, every ranked result was filtered as outside the requested
+package, so the caller gets nothing and no way forward. The package is the
+pnpm `typescript` override (typescript-native-bridge), whose code is a few
+multi-megabyte bundles under `lib/` — likely over the index's 1MB file cap —
+so nothing inside the package can rank, and the root that was searched
+reaches neighbours instead. The answer is honest about the filtering but
+silent about why the package itself contributed nothing; a reader cannot
+tell "query matched nothing here" from "this package is structurally
+unindexable". Observed 2026-08-19 while chasing the bridge's implementation
+routing. The needed searches were abandoned.
+
 ### `search_dependency_code` once answered with nothing at all
 
 One call — `effect`, first touch, cold index of its ~1,500-file src — returned

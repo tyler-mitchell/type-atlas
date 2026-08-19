@@ -53,15 +53,18 @@ confidently wrong here for ten days, while the observation contradicting it
 sat unread in the ledger the whole time. Read the ledger first, and when it
 disagrees with a live call, you have found a change, not a refutation.
 
-**Probes are banned — no exceptions.** Never scaffold a raw language service,
-temp project, or scratch script to interrogate the substrate; that genre was
-banned here after repeated drift, and a "quick platform check" is how it
-returns. The observability lens is the live MCP surface: make the change,
-reload, call the tool, read the answer. A stdio test that witnesses a tool's
-real answer is the one sanctioned test shape; a test that builds its own
-`ts.createLanguageService` is a probe wearing a test's name. When the surface
-cannot show you something, that gap is itself the finding — record it and
-state the deficit as a provider ask instead of instrumenting around it.
+**Probes are banned — no exceptions, and no value.** Never scaffold a raw
+language service, temp project, or scratch script to interrogate the
+substrate; that genre was banned here after repeated drift, and a "quick
+platform check" is how it returns. The reloading MCP is the exact interface
+an agent meets in production, so a probe can only measure something no agent
+will ever experience — the moment a probe feels necessary, the need it would
+serve is not practical, and the practical move has been lost sight of. The
+loop is: make the change, reload, call the tool, read the answer. A stdio
+test that witnesses a tool's real answer is the one sanctioned test shape; a
+test that builds its own `ts.createLanguageService` is a probe wearing a
+test's name. When the surface cannot show you something, either the surface
+should show it — build that — or the thing was never needed.
 
 ---
 
