@@ -56,9 +56,16 @@ export const workspaceDeclarations = (
         : (languageService.getNavigateToItems(query, undefined, file.fileName) ?? []),
     )
     .filter((item) => item.containerName || item.kind !== "alias")
+    // The case the caller typed outranks TypeScript's case-insensitive
+    // buckets: a search for "Timeline" led with test-local `timeline`
+    // constants — case-insensitive "exact" — while every Timeline* type sat
+    // past the fold as mere "prefix". Then quality, then what the name IS
+    // (declarations above members and locals), then the name.
     .sort(
       (left, right) =>
+        caseRank(left.name, query) - caseRank(right.name, query) ||
         matchQuality.indexOf(left.matchKind) - matchQuality.indexOf(right.matchKind) ||
+        (kindRank[left.kind] ?? 1) - (kindRank[right.kind] ?? 1) ||
         left.name.localeCompare(right.name),
     )
     .flatMap((item): Declaration[] => {
@@ -88,6 +95,35 @@ export const workspaceDeclarations = (
 
 /** TypeScript's own ranking vocabulary, best first. */
 const matchQuality = ["exact", "prefix", "substring", "camelCase"];
+
+/** The caller's own casing: exact, then prefix, then everything else. */
+const caseRank = (name: string, query: string): number =>
+  name === query ? 0 : name.startsWith(query) ? 1 : 2;
+
+/**
+ * Within one match quality, the declarations a name usually means, first.
+ *
+ * 0 ranks the nameable program surface — types, classes, functions, modules;
+ * 1 is everything unlisted; members and locals follow. A search is by name,
+ * and a property is named by its container more than by itself.
+ */
+const kindRank: Readonly<Record<string, number>> = {
+  class: 0,
+  interface: 0,
+  type: 0,
+  enum: 0,
+  module: 0,
+  function: 0,
+  const: 0,
+  var: 0,
+  let: 0,
+  alias: 0,
+  method: 2,
+  property: 2,
+  "enum member": 2,
+  constructor: 2,
+  "type parameter": 3,
+};
 
 /**
  * TypeScript's kind strings as protocol symbol kinds.
