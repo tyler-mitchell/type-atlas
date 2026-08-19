@@ -239,6 +239,23 @@ is the absence-honesty failure in section form. Which upstream request goes
 empty on a cold project, and whether the section should say "unanswered"
 rather than vanish, is undiagnosed. Observed 2026-08-19.
 
+### The bridge's project registry rejects its own project on the third service
+
+```
+Error: api: client error: failed to update snapshot: project not found for
+update: /users/tylermitchell/projects/featuretype/…/.references-test-…/tsconfig.json
+```
+
+Creating and disposing plain language services in one process — the third
+scaffold in a vitest file — makes the tsgo bridge's Go-side registry reject a
+snapshot update for a project it should hold, and the path in the error is
+lowercased where the real path is mixed-case, suggesting register and update
+disagree on normalization. Sequence-dependent: the same test passes run solo.
+Upstream (typescript-native-bridge) material, alongside the shell-file walks
+and the isTsgoBackedProgram-before-sync throw; reproduce by running
+`packages/language-server/test/references-probe.test.ts` whole. Observed
+2026-08-19.
+
 ### `rename_files` emits a confidently incomplete patch
 
 ```
