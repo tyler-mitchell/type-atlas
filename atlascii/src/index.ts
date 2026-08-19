@@ -18,7 +18,6 @@
 
 /** What each component is given. A caller shaping data writes one of these. */
 export type {
-  Annotation,
   CallGroup,
   ChangeGroup,
   Diagnostic,
@@ -27,7 +26,6 @@ export type {
   LocationLink,
   LocationNode,
   StackFrame,
-  TapResult,
   WorkspaceSymbol,
 } from "./protocol/shapes.ts";
 export { severityNames, type SeverityNames } from "./protocol/shapes.ts";
@@ -46,13 +44,11 @@ export {
 export { displayPath, slash } from "./protocol/uri.ts";
 
 /** One answer each: data in, lines out, no document engine anywhere. */
-export { annotations } from "./components/annotations.ts";
 export { changes } from "./components/changes.ts";
 export { type CountState, counts } from "./components/counts.ts";
 export { diff } from "./components/diff.ts";
 export { frames } from "./components/location-links.ts";
 export { type RequestTrace, requestCost } from "./components/request-cost.ts";
-export { tap } from "./components/tap.ts";
 
 /** Source as a reader sees it: a window, a fold, a caret. */
 export { codeFrame } from "./source/frame.ts";
@@ -105,9 +101,7 @@ export { visibleTrailingSpace } from "./text/whitespace.ts";
 export { height, padEnd, padStart, truncate, width } from "./text/width.ts";
 
 /** Encoding for something that parses rather than reads. */
-export { command, commandProperty, commandText } from "./format/command.ts";
 export { codexPatch, type PatchFile } from "./format/patch.ts";
-export { tapLine, tapText, tapYamlText } from "./format/tap.ts";
 
 /**
  * The one thing every component takes besides its data.

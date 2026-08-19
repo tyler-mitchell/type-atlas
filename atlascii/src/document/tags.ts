@@ -3,41 +3,27 @@ import Markdoc, { type Config } from "@markdoc/markdoc";
 // Markdoc ships CommonJS; its values live on the default export, so naming
 // `Tag` in the import list would throw under Node even though it type-checks.
 const { Tag } = Markdoc;
-import {
-  type Annotation,
-  type ChangeGroup,
-  type Diagnostic,
-  type DiffChunk,
-  type DocumentSymbol,
-  type StackFrame,
-  type TapResult,
-  type WorkspaceSymbol,
-} from "../protocol/shapes.ts";
+import { type ChangeGroup, type DiffChunk, type StackFrame } from "../protocol/shapes.ts";
 import { blocks, paragraph, stack } from "./nodes.ts";
 import { render } from "./render.ts";
 import { defaultMarks } from "../config/marks.ts";
 import { resolve } from "../config/index.ts";
 import { guideNames } from "../config/guides.ts";
 import { diff } from "../components/diff.ts";
-import { annotations } from "../components/annotations.ts";
-import { tap } from "../components/tap.ts";
-import { type Row, rowBranches, rows } from "../layout/rows.ts";
+import { type Row, rowBranches } from "../layout/rows.ts";
 import { changes } from "../components/changes.ts";
 import { type FoldingRange, foldedSource } from "../source/folded.ts";
 import { frames } from "../components/location-links.ts";
 import { codeFrame } from "../source/frame.ts";
 import { divider } from "../layout/divider.ts";
-import { rangeText, sameRange } from "../protocol/range.ts";
 import { diagnosticSeverity } from "../protocol/kinds.ts";
 import { label } from "../layout/label.ts";
 import { breakdown } from "../text/time.ts";
 import { counts } from "../components/counts.ts";
 import { summaryRow } from "../layout/summary.ts";
 import { indented } from "../layout/indent.ts";
-import { tapLine, tapYamlText } from "../format/tap.ts";
 import { tableRows } from "../layout/table.ts";
 import { type Branch, hierarchy } from "../layout/hierarchy.ts";
-import { nestByDepth } from "../text/group.ts";
 import { plural } from "../text/plural.ts";
 import { formatTime } from "../text/time.ts";
 import { padEnd, padStart, truncate } from "../text/width.ts";
@@ -536,31 +522,6 @@ export const tags: Config["tags"] = {
             : { ...node.attributes.config, guide: node.attributes.guide },
         ).guide,
       ),
-  },
-
-  /**
-   * A TAP report: version, plan, then one line per result.
-   *
-   * Failures carry an indented YAML block, which is where TAP puts detail a
-   * parser can read and a human can still follow.
-   */
-  tap: {
-    selfClosing: true,
-    attributes: { results: { type: Array, required: true } },
-    transform: (node) => stack(tap(node.attributes.results as TapResult[])),
-  },
-
-  /** GitHub workflow annotations: one command per problem. */
-  annotations: {
-    selfClosing: true,
-    attributes: { problems: { type: Array, required: true }, kind: { type: String } },
-    transform: (node) => {
-      const lines = annotations({
-        problems: node.attributes.problems as Annotation[],
-        kind: node.attributes.kind,
-      });
-      return lines.length === 0 ? "" : stack(lines);
-    },
   },
 
   /**

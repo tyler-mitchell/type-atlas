@@ -141,22 +141,6 @@ export type StackFrame = {
   readonly character: number;
 };
 
-export type TapResult = {
-  readonly ok: boolean;
-  readonly name: string;
-  readonly directive?: "SKIP" | "TODO";
-  readonly milliseconds?: number;
-  readonly detail?: Readonly<Record<string, string>>;
-};
-
-export type Annotation = {
-  readonly message: string;
-  readonly file?: string;
-  readonly line?: number;
-  readonly column?: number;
-  readonly title?: string;
-};
-
 /**
  * Severity names, by the protocol's numbering.
  *
