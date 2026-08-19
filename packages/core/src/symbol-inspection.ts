@@ -89,6 +89,8 @@ export type InspectSymbolResult = {
     readonly shown: readonly Located[];
     readonly other: number;
     readonly total: number;
+    /** How many projects the reference fan-out asked — the answer's reach. */
+    readonly projects: number;
   };
   readonly source?: { readonly lines: readonly string[]; readonly startLine: number } | undefined;
 };
@@ -459,33 +461,39 @@ export const inspectSymbol = async (input: {
 
   const selected = "symbol" in target ? matches[0]! : undefined;
   const position = "position" in target ? target.position : selected!.selectionRange.start;
-  const [project, hover, definitionResult, implementationResult, references, items] =
+  const [project, hover, definitionResult, implementationResult, referenceAnswer, items] =
     await Promise.all([
       workspace.sendRequest(GetMatchTsConfigRequest.type, textDocument, signal),
       workspace.sendRequest(HoverRequest.type, { textDocument, position }, signal),
       workspace.sendRequest(DefinitionRequest.type, { textDocument, position }, signal),
       workspace.sendRequest(ImplementationRequest.type, { textDocument, position }, signal),
       options.scope === "workspace"
-        ? workspace
+        ? workspace.sendRequest(
+            WorkspaceReferencesRequest.type,
+            { textDocument, position, context: { includeDeclaration: true } },
+            signal,
+          )
+        : workspace
             .sendRequest(
-              WorkspaceReferencesRequest.type,
+              ReferencesRequest.type,
               { textDocument, position, context: { includeDeclaration: true } },
               signal,
             )
-            .then((answer) => answer?.locations ?? null)
-        : workspace.sendRequest(
-            ReferencesRequest.type,
-            { textDocument, position, context: { includeDeclaration: true } },
-            signal,
-          ),
+            .then((locations) => ({
+              locations: locations as Location[] | null,
+              // Document scope asks the one project owning the file.
+              projects: 1,
+            })),
       workspace.sendRequest(CallHierarchyPrepareRequest.type, { textDocument, position }, signal),
     ]);
+  const references = referenceAnswer?.locations ?? null;
+  const searchedProjects = referenceAnswer?.projects ?? 0;
   const [incoming, outgoing] = await Promise.all([
     items
       ? [
           await incomingCalls({
             workspace,
-            references: references as Location[] | null,
+            references,
             subject: items[0],
           }),
         ]
@@ -642,6 +650,7 @@ export const inspectSymbol = async (input: {
     limit: options.limit,
     references: {
       shown: shownReferences,
+      projects: searchedProjects,
       other: otherReferences.length,
       total: allReferences.length,
     },

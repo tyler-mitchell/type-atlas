@@ -246,6 +246,8 @@ export const inspectionVariables = (input: {
       // separately from the reference total, which counts calls too.
       listed: { shown: mentions.length, total: result.references?.other ?? 0 },
       total: result.references?.total ?? 0,
+      // The reach behind the counts, as every fan-out answer states it.
+      projects: result.references?.projects ?? 0,
     },
     source:
       result.source === undefined

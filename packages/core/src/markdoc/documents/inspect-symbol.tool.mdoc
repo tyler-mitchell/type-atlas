@@ -59,7 +59,7 @@ Dependency/runtime: {% list($callees.dependencies) %}
 {% /if %}
 
 {% if any($mentions.groups) %}
-## Mentions that are not calls ({% $mentions.listed.total %} of {% $mentions.total %} references{% if not(equals($mentions.listed.shown, $mentions.listed.total)) %} · {% $mentions.listed.shown %} shown{% /if %})
+## Mentions that are not calls ({% $mentions.listed.total %} of {% $mentions.total %} references{% if not(equals($mentions.listed.shown, $mentions.listed.total)) %} · {% $mentions.listed.shown %} shown{% /if %}{% if any($mentions.projects) %} · {% $mentions.projects %} {% plural count=$mentions.projects forms={"one": "project", "other": "projects"} /%} loaded{% /if %})
 
 {% tree entries=$mentions.groups partial="location-node.mdoc" /%}
 {% /if %}
