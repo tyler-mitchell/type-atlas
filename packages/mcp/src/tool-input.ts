@@ -20,16 +20,12 @@ export const positionInput = sourcePositionInput
     "Source position to inspect, as { line, character }. Both are one-based, matching what an editor displays. Point at the symbol name itself, not the line start.",
   );
 
-// A single position is the common ask, and the handler already accepted the
-// bare object — only this schema starved it, refusing { line, character }
-// with "expected array". One position or a list are both positions.
 export const positionsInput = sourcePositionInput
-  .or(sourcePositionInput.array().atLeastLength(1))
-  .pipe((positions) =>
-    Array.isArray(positions) ? positions.map(toLspPosition) : toLspPosition(positions),
-  )
+  .array()
+  .atLeastLength(1)
+  .pipe((positions) => positions.map(toLspPosition))
   .describe(
-    "One or more source positions to inspect together, each a one-based { line, character }.",
+    "Source positions to inspect together, each a one-based { line, character }.",
   );
 
 export const rangeInput = type({

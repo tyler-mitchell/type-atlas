@@ -33,7 +33,7 @@ import {
 } from "atlascii";
 import { appendDiagnosticContext, textResult } from "./mcp-result.ts";
 import { registerTool } from "./tool.ts";
-import { fileInput, observedFileInput, positionsInput } from "./tool-input.ts";
+import { fileInput, observedFileInput, positionInput, positionsInput } from "./tool-input.ts";
 import type { VolarWorkspacePool } from "@type-atlas/core";
 
 const input = type.module({
@@ -76,10 +76,16 @@ const input = type.module({
         "Return the complete symbol hierarchy, including object properties and anonymous callbacks. Potentially far larger than the source file.",
     }),
   }),
+  // `position` is one position on every tool of this surface; this was the
+  // lone tool where the singular name took an array, and a bare
+  // { line, character } — the common ask — was refused. A property cannot be
+  // a choice (clients coerce a choice-typed value to a string), so the
+  // together-ask is its own plural property.
   SelectionRanges: type({
     ...observedFileInput,
-    position: positionsInput.configure(
-      { description: "One or more source positions to inspect together." },
+    "position?": positionInput,
+    "positions?": positionsInput.configure(
+      { description: "Several source positions to inspect together, instead of position." },
       "self",
     ),
   }),
@@ -409,9 +415,19 @@ export const registerDocumentTools = (server: McpServer, workspaces: VolarWorksp
       inputSchema: input.SelectionRanges,
       annotations: readOnlyToolAnnotations,
     },
-    async ({ workspace: root, file, position, includeDiagnostics }, { mcpReq: { signal } }) => {
+    async (
+      { workspace: root, file, position, positions: several, includeDiagnostics },
+      { mcpReq: { signal } },
+    ) => {
+      if ((position === undefined) === (several === undefined)) {
+        throw new Error(
+          position === undefined
+            ? "Pass position, or positions for several at once."
+            : "position and positions are one ask twice — pass one of them.",
+        );
+      }
       const workspace = await workspaces.get(root);
-      const positions = Array.isArray(position) ? position : [position];
+      const positions = several ?? [position!];
       const intelligence = createTypeAtlas(workspace);
       const { textDocument, result: ranges } = await intelligence.selectionRanges({
         file,

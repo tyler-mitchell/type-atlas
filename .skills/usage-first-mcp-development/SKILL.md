@@ -61,7 +61,10 @@ an agent meets in production, so a probe can only measure something no agent
 will ever experience — the moment a probe feels necessary, the need it would
 serve is not practical, and the practical move has been lost sight of. The
 loop is: make the change, reload, call the tool against the real case study,
-read the answer, iterate. **A test file is not the witness, and reaching for
+read the answer, iterate. **Running tests is banned as a discovery or
+investigative device** — the reload gate typechecks and the live call
+witnesses behavior, and that pair is the only oracle; run a test suite only
+when an issue is otherwise completely unsolvable, never as the loop. **A test file is not the witness, and reaching for
 one first is how the work silos back into the MCP in isolation** — the
 discipline being practiced is gaining real understanding of a complex
 target (webgpu-engine-class) while iterating the tools that serve that
