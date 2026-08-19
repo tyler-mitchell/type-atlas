@@ -1,5 +1,9 @@
-import { GetMatchTsConfigRequest } from "@volar/language-server/protocol.js";
+import {
+  DocumentDiagnosticRequest,
+  GetMatchTsConfigRequest,
+} from "@volar/language-server/protocol.js";
 import type {
+  Diagnostic,
   DocumentSymbol,
   SelectionRange,
   SymbolInformation,
@@ -35,9 +39,13 @@ import type { VolarWorkspacePool } from "@type-atlas/core";
 const input = type.module({
   Diagnostics: type({
     workspace: fileInput.workspace,
+    "file?": type("string >= 1").configure({
+      description:
+        "Report on this one file instead: every diagnostic of every severity, problems before hints. project and scope are ignored when this is given.",
+    }),
     "project?": type("string >= 1").configure({
       description:
-        "Which TypeScript project to check, named by its directory or by any path inside it — this never reports on one file. Only needed when nothing has changed yet; the changed files choose the project otherwise.",
+        "Which TypeScript project to check, named by its directory or by any path inside it. Only needed when nothing has changed yet; the changed files choose the project otherwise.",
     }),
     "scope?": type.enumerated("changed", "project").configure(
       {
@@ -89,16 +97,55 @@ export const registerDocumentTools = (server: McpServer, workspaces: VolarWorksp
       annotations: readOnlyToolAnnotations,
     },
     async (
-      { workspace: root, project: named, scope = "changed", offset = 0, limit = 100 },
+      { workspace: root, file, project: named, scope = "changed", offset = 0, limit = 100 },
       { mcpReq: { signal } },
     ) => {
       const workspace = await workspaces.get(root);
-      const report = await createTypeAtlas(workspace).diagnose({
-        files: workspace.changedFiles(),
-        project: named,
-        scope,
-        signal,
-      });
+      // One file is a different question with the same answer shape: the
+      // document pull the ambient context reads, every severity kept, worst
+      // first — asked directly instead of by hovering whitespace for the
+      // ambient block, which is what real audit work resorted to twice.
+      const asked =
+        file === undefined
+          ? undefined
+          : await (async () => {
+              const { uri } = await workspace.getTextDocument(file);
+              const [pulled, project] = await Promise.all([
+                workspace.sendRequest(
+                  DocumentDiagnosticRequest.type,
+                  { textDocument: { uri } },
+                  signal,
+                ),
+                workspace.sendRequest(GetMatchTsConfigRequest.type, { uri }, signal),
+              ]);
+              const items = (
+                pulled && typeof pulled === "object" && "items" in pulled
+                  ? ((pulled as { items: readonly Diagnostic[] }).items ?? [])
+                  : []
+              )
+                .map((diagnostic) => ({ uri, diagnostic }))
+                .sort(
+                  (left, right) =>
+                    (left.diagnostic.severity ?? 1) - (right.diagnostic.severity ?? 1) ||
+                    left.diagnostic.range.start.line - right.diagnostic.range.start.line,
+                );
+              return { uri, items, project };
+            })();
+      const report = asked
+        ? {
+            diagnostics: asked.items,
+            unchanged: false,
+            projectCount: 1,
+            fileCount: 1,
+            affectedCount: asked.items.length > 0 ? 1 : 0,
+            configFile: asked.project?.uri,
+          }
+        : await createTypeAtlas(workspace).diagnose({
+            files: workspace.changedFiles(),
+            project: named,
+            scope,
+            signal,
+          });
       const shown = page(report.diagnostics, offset, limit);
       // Every located row names what stands there — the referent reference
       // rows already carry, bounded to the page.
@@ -176,9 +223,16 @@ export const registerDocumentTools = (server: McpServer, workspaces: VolarWorksp
       const rendered = await renderDocument({
         document: "diagnostics.tool.mdoc",
         variables: {
+          oneFile: asked ? displayPath(asked.uri, root) : undefined,
+          problemCount: asked
+            ? asked.items.filter(({ diagnostic }) => (diagnostic.severity ?? 1) <= 2).length
+            : undefined,
+          hintCount: asked
+            ? asked.items.filter(({ diagnostic }) => (diagnostic.severity ?? 1) > 2).length
+            : undefined,
           unchanged: report.unchanged,
-          unloaded: !report.unchanged && !report.projectCount,
-          checked: !report.unchanged && report.projectCount > 0,
+          unloaded: !asked && !report.unchanged && !report.projectCount,
+          checked: !asked && !report.unchanged && report.projectCount > 0,
           wholeProject: scope !== "changed",
           total: shown.total,
           // `shown` counted the page's distinct files while the page line below

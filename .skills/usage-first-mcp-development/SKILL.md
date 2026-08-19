@@ -60,11 +60,20 @@ platform check" is how it returns. The reloading MCP is the exact interface
 an agent meets in production, so a probe can only measure something no agent
 will ever experience — the moment a probe feels necessary, the need it would
 serve is not practical, and the practical move has been lost sight of. The
-loop is: make the change, reload, call the tool, read the answer. A stdio
-test that witnesses a tool's real answer is the one sanctioned test shape; a
-test that builds its own `ts.createLanguageService` is a probe wearing a
-test's name. When the surface cannot show you something, either the surface
-should show it — build that — or the thing was never needed.
+loop is: make the change, reload, call the tool against the real case study,
+read the answer, iterate. **A test file is not the witness, and reaching for
+one first is how the work silos back into the MCP in isolation** — the
+discipline being practiced is gaining real understanding of a complex
+target (webgpu-engine-class) while iterating the tools that serve that
+understanding, and a test file serves neither track; write one much later
+as bookkeeping, if at all. A test that builds its own
+`ts.createLanguageService` is a probe wearing a test's name. When the
+surface cannot show you something, either the surface should show it —
+build that — or the thing was never needed. One boundary stated honestly
+rather than routed around: the live harness pins tool schemas at connect,
+so a brand-new tool or parameter cannot be called from the session that
+created it — say so and queue its witness for the next session; never fake
+it through a scratch client.
 
 ---
 

@@ -2,6 +2,19 @@
 { "tool": "diagnostics" }
 ---
 
+{% if $oneFile %}
+{% if equals($total, 0) %}
+No diagnostic of any severity in {% $oneFile %}{% if $configFile %} · {% $configFile %}{% /if %}.
+{% /if %}
+{% if not(equals($total, 0)) %}
+{% $oneFile %} · {% $problemCount %} {% plural count=$problemCount forms={"one": "problem", "other": "problems"} /%}{% if any($hintCount) %} · {% $hintCount %} {% plural count=$hintCount forms={"one": "hint", "other": "hints"} /%}{% /if %}{% if $configFile %} · {% $configFile %}{% /if %}
+
+{% partial file="page.mdoc" /%}
+
+{% each items=$groups as="group" partial="diagnostic-group.mdoc" /%}
+{% /if %}
+{% /if %}
+
 {% if $unchanged %}
 No write has reached this workspace's watcher yet. That is not the same as nothing having been written — a file saved moments ago may not have been reported, and asking again in a second often answers differently. Pass scope: "project" to check the whole project regardless, or name a project.
 {% /if %}
