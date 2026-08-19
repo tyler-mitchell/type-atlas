@@ -129,24 +129,6 @@ Both this and `find_successor` above break the same rule: **a tool may report
 what it observed, and may not report what that observation implies about the
 world.** Ranking is an observation; "this is relevant" is a conclusion.
 
-### 〈raised〉 An absolute path appears where the default is workspace-relative
-
-```
-file_references { file: packages/mcp/src/experimental.tools.ts }
-→ … anchored at packages/mcp/tsconfig.json in /Users/tylermitchell/Projects/featuretype.
-```
-
-Paths default to workspace-relative and `displayPath` renders them that way
-everywhere. The root itself is the exception: preambles print it absolutely, on
-the reasoning that a reader needs to know what the relative paths are read
-against. That reasoning was never checked against the ask, and the ask was that
-absolute paths are opt-in.
-
-To settle broadly rather than per tool, because the root is stated in nearly
-every preamble — and because there are other places an absolute path can still
-surface: `project_config` asks for one deliberately, and `displayPath` falls
-back to one for any file outside the root it was measured from.
-
 ### 〈raised〉 The `file_references` preamble needs rethinking
 
 ```

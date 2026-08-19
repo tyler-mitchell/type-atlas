@@ -9,7 +9,7 @@ tool: implementations
 Nothing at this position is implemented elsewhere. Implementations are reported for a symbol that something overrides or realises — an interface, an abstract member, an overload.
 {% /if %}
 {% if not(equals($total, 0)) %}
-{% $subject %} is {% if $kind %}{% article($kind) %}{% /if %}{% if not($kind) %}a symbol{% /if %} implemented in {% $total %} place{% if not(equals($total, 1)) %}s{% /if %}, under {% $root %}.
+{% $subject %} is {% if $kind %}{% article($kind) %}{% /if %}{% if not($kind) %}a symbol{% /if %} implemented in {% $total %} place{% if not(equals($total, 1)) %}s{% /if %}.
 
 {% each items=$items as="target" partial="target.mdoc" tight=true /%}
 {% /if %}

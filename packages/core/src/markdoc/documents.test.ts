@@ -16,7 +16,7 @@ test("hover names the file and states the type", async () => {
   });
   expect(undefinedVariables).toEqual([]);
   expect(text).toMatchInlineSnapshot(`
-    "src/app.ts:88:14, under /repo.
+    "src/app.ts:88:14
 
     const openRuntime: () => Runtime"
   `);
@@ -49,7 +49,7 @@ test("completions state the count and the incomplete fact", async () => {
     },
   });
   expect(text).toMatchInlineSnapshot(`
-    "Completions at 88:14 in src/app.ts, under /repo · the list is incomplete, so typing more narrows it.
+    "Completions at 88:14 in src/app.ts · the list is incomplete, so typing more narrows it.
 
     openRuntime () => Runtime
     openWindow"
@@ -73,7 +73,7 @@ test("signature help names the active overload", async () => {
   });
   expect(undefinedVariables).toEqual([]);
   expect(text).toMatchInlineSnapshot(`
-    "1 signature at 88:14 in src/app.ts, under /repo · number 1 is the one in use.
+    "1 signature at 88:14 in src/app.ts · number 1 is the one in use.
 
     openRuntime(frames: number): Runtime
     └  frames"
@@ -94,7 +94,7 @@ test("inlay hints group under the file", async () => {
   });
   expect(undefinedVariables).toEqual([]);
   expect(text).toMatchInlineSnapshot(`
-    "1 hint in 80:1-90:1 of src/app.ts, under /repo.
+    "1 hint in 80:1-90:1 of src/app.ts.
 
     88:14 : Runtime"
   `);
@@ -119,7 +119,7 @@ test("module exports name the surface asked for", async () => {
     },
   });
   expect(text).toMatchInlineSnapshot(`
-    "Seen from src/app.ts under /repo · runtime surface · matching use.
+    "Seen from src/app.ts · runtime surface · matching use.
 
     === react · 2 exports ===
 
@@ -175,7 +175,7 @@ test("references reads as prose with owners named", async () => {
   });
   expect(undefinedVariables).toEqual([]);
   expect(text).toMatchInlineSnapshot(`
-    "down is a property declared inside Figures, at src/config/figures.ts:14:12. Searched the project tsconfig.json in /repo and found 2 uses.
+    "down is a property declared inside Figures, at src/config/figures.ts:14:12. Searched the project tsconfig.json and found 2 uses.
 
     src/config/figures.ts
     ├  30:3  — inside figures

@@ -6,7 +6,7 @@ tool: completions
 Nothing completes at {% $at %} in {% $file %}. Completions answer where an identifier can be written, so a position inside a string, a comment, or whitespace reports none.
 {% /if %}
 {% if not(equals($total, 0)) %}
-Completions at {% $at %} in {% $file %}, under {% $root %}{% if $incomplete %} · the list is incomplete, so typing more narrows it{% /if %}.
+Completions at {% $at %} in {% $file %}{% if $incomplete %} · the list is incomplete, so typing more narrows it{% /if %}.
 {% partial file="page.mdoc" /%}
 
 {% tree entries=$items /%}

@@ -7,7 +7,7 @@ Nothing was found at this position, so there is no symbol to report references f
 {% /if %}
 {% if not(equals($total, 0)) %}
 {% $subject %} is {% if $kind %}{% article($kind) %}{% /if %}{% if not($kind) %}a symbol{% /if %}{% if $container %} declared inside {% $container %}{% /if %}{% if $declaredAt %}, at {% $declaredAt.file %}:{% position($declaredAt.at) %}{% /if %}.
-Searched {% if $everyProject %}every project loaded this session, anchored at {% $anchor %} in {% $root %}{% /if %}{% if not($everyProject) %}the project {% $anchor %} in {% $root %}{% /if %} and found {% $useCount %} {% plural count=$useCount forms={"one": "use", "other": "uses"} /%}.
+Searched {% if $everyProject %}every project loaded this session, anchored at {% $anchor %}{% /if %}{% if not($everyProject) %}the project {% $anchor %}{% /if %} and found {% $useCount %} {% plural count=$useCount forms={"one": "use", "other": "uses"} /%}.
 
 {% if equals($useCount, 0) %}
 Nothing references it. If you expected otherwise, the projects holding those uses may not be loaded yet — open a file in one and ask again.

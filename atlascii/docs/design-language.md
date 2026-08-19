@@ -12,9 +12,15 @@ part; a tool that seems to need a fourth is describing one of these three badly.
 
 ## 1. Preamble — what was asked, and how far the answer reaches
 
-One paragraph. The subject, the scale, the scope searched, and the root the
-paths are relative to. It exists so a reader can tell an empty answer from an
-unasked question, and a partial answer from a complete one.
+One paragraph. The subject, the scale, and the scope searched. It exists so a
+reader can tell an empty answer from an unasked question, and a partial answer
+from a complete one.
+
+Not the workspace root. The caller passed it, so restating it hands back their
+own argument — and it is the one absolute path that would otherwise appear in
+every answer, in a surface whose paths are workspace-relative by default. Where
+a path genuinely cannot be relative, `displayPath` renders it absolute and says
+so by being absolute.
 
 ```
 indentGuide is a const, at src/layout/hierarchy.ts:54:14. Searched every

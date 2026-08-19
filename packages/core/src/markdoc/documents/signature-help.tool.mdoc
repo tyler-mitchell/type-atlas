@@ -6,7 +6,7 @@ tool: signature_help
 Nothing at this position is a call, so there is no signature to report. Signature help answers inside a call's parentheses, after the callee's name.
 {% /if %}
 {% if not(equals($total, 0)) %}
-{% $total %} {% plural count=$total forms={"one": "signature", "other": "signatures"} /%} at {% $at %} in {% $file %}, under {% $root %}{% if $activeIndex %} · number {% $activeIndex %} is the one in use{% /if %}.
+{% $total %} {% plural count=$total forms={"one": "signature", "other": "signatures"} /%} at {% $at %} in {% $file %}{% if $activeIndex %} · number {% $activeIndex %} is the one in use{% /if %}.
 
 {% tree entries=$signatures /%}
 {% /if %}

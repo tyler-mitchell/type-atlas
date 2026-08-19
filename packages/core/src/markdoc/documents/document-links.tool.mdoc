@@ -9,7 +9,7 @@ No provider answered for {% $file %}, so this is unanswered rather than empty.
 Nothing in {% $file %} links anywhere. A link is a target an editor can follow — a Markdown link, a JSON `$schema` — and a TypeScript import is not one of them, so a module full of imports reports none here. For what a module imports, read it; for what imports it, use file_references.
 {% /if %}
 {% if not(equals($total, 0)) %}
-{% $file %} names {% $total %} {% plural count=$total forms={"one": "link", "other": "links"} /%}, under {% $root %}.
+{% $file %} names {% $total %} {% plural count=$total forms={"one": "link", "other": "links"} /%}.
 
 {% tree entries=$groups partial="location-node.mdoc" /%}
 {% /if %}

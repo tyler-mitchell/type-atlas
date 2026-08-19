@@ -6,12 +6,12 @@
 No provider answered for {% $query %}. Symbol search across a workspace is served by the TypeScript language service, and a server that registers no provider for it returns nothing rather than an empty result — so this is unanswered, not absent. document_symbols answers for a file you can name, and search_code finds a declaration by meaning.
 {% /if %}
 {% if and($answered, equals($total, 0)) %}
-Nothing matched {% $query %}, searched across every project loaded this session, anchored at {% $anchor %} in {% $root %}.
+Nothing matched {% $query %}, searched across every project loaded this session, anchored at {% $anchor %}.
 
 Only projects already loaded are searched, so this is absent from what has been opened, not from the repository. A name in a project nothing has touched reports nothing here, and an unloaded workspace answers nothing at all — asking anything semantic about a file in a project loads it, and the same query then answers. Use document_symbols when you know the file, or search_code to find it by meaning.
 {% /if %}
 {% if not(equals($total, 0)) %}
-{% $total %} {% plural count=$total forms={"one": "symbol", "other": "symbols"} /%} {% plural count=$total forms={"one": "matches", "other": "match"} /%} {% $query %}, across every project loaded this session, anchored at {% $anchor %} in {% $root %}.
+{% $total %} {% plural count=$total forms={"one": "symbol", "other": "symbols"} /%} {% plural count=$total forms={"one": "matches", "other": "match"} /%} {% $query %}, across every project loaded this session, anchored at {% $anchor %}.
 
 {% tree entries=$items partial="workspace-symbol.mdoc" as="item" /%}
 {% /if %}

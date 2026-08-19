@@ -6,7 +6,7 @@
 Nothing at these positions expands to a range in {% $file %}. A selection expands outward from a symbol, so a position in whitespace or past the end of a line reports none.
 {% /if %}
 {% if not(equals($total, 0)) %}
-{% $fromCount %} {% plural count=$fromCount forms={"one": "position", "other": "positions"} /%} in {% $file %} {% plural count=$fromCount forms={"one": "expands", "other": "expand"} /%} through {% $total %} {% plural count=$total forms={"one": "range", "other": "ranges"} /%}, under {% $root %} · each range contains the one above it.
+{% $fromCount %} {% plural count=$fromCount forms={"one": "position", "other": "positions"} /%} in {% $file %} {% plural count=$fromCount forms={"one": "expands", "other": "expand"} /%} through {% $total %} {% plural count=$total forms={"one": "range", "other": "ranges"} /%} · each range contains the one above it.
 
 {% tree entries=$chains /%}
 {% /if %}
