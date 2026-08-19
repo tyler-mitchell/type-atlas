@@ -56,6 +56,33 @@ const targets = (request: typeof input.infer) =>
     };
   });
 
+/**
+ * Where a view's window actually ends: the requested end, the file's end, or
+ * the answer bound, whichever comes first.
+ *
+ * The bound exists because a 91.7KB answer was once produced in one call and
+ * the client refused to deliver it — an unbounded answer's fate is decided by
+ * whoever is listening. Roughly 10k tokens of source per file, cut at a line.
+ */
+const answerLines = 600;
+const answerCharacters = 40_000;
+const servedEnd = (
+  lines: readonly string[],
+  from: number,
+  requestedEnd: number,
+  characterBudget: number,
+) => {
+  const end = Math.min(requestedEnd, lines.length, from + answerLines - 1);
+  const counted = lines.slice(from - 1, end).reduce(
+    (walk, line) =>
+      walk.characters > characterBudget
+        ? walk
+        : { at: walk.at + 1, characters: walk.characters + line.length + 1 },
+    { at: from - 1, characters: 0 },
+  );
+  return Math.max(counted.at, from);
+};
+
 export const registerReadFileTool = (server: McpServer, workspaces: VolarWorkspacePool): void => {
   registerTool(
     server,
@@ -71,27 +98,44 @@ export const registerReadFileTool = (server: McpServer, workspaces: VolarWorkspa
       const root = request.workspace;
       const workspace = await workspaces.get(root);
       const read = targets(request);
+      // The budget is the answer's, not each file's: two capped views once
+      // still summed past what a client would deliver.
+      const characterBudget = Math.max(8_000, Math.floor(answerCharacters / read.length));
       const views = await Promise.all(
         read.map(async (target) => {
           try {
             const view = await readSourceView({ workspace, ...target, signal });
+            const from = target.window.startLine ?? 1;
+            // Clamped to the file: a header that echoes a request past the end
+            // claims lines the answer never held.
+            const requestedEnd = Math.min(
+              target.window.endLine ?? view.lines.length,
+              view.lines.length,
+            );
+            const end = servedEnd(view.lines, from, requestedEnd, characterBudget);
+            const bounded = end < requestedEnd;
             // Measured here, rendered by the document: the heading has to say
             // how much was folded, and only folding knows that. The document
             // asks for the same source again to show it.
             const measured = foldedSource({
               lines: view.lines,
               ranges: view.foldingRanges,
-              window: target.window,
+              window: bounded ? { startLine: from, endLine: end } : target.window,
             });
             const shown = measured.text === "" ? 0 : measured.text.split("\n").length;
+            const windowed =
+              bounded ||
+              target.window.startLine !== undefined ||
+              target.window.endLine !== undefined;
             return {
               file: displayPath(view.uri, root),
               lines: view.lines,
               foldingRanges: view.foldingRanges,
               lineCount: view.lines.length,
-              windowed: target.window.startLine !== undefined || target.window.endLine !== undefined,
-              startLine: target.window.startLine,
-              endLine: target.window.endLine ?? view.lines.length,
+              windowed,
+              startLine: windowed ? from : target.window.startLine,
+              endLine: end,
+              next: bounded ? end + 1 : undefined,
               folded: measured.folded,
               shownLines: shown,
             };

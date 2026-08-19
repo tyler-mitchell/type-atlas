@@ -47,7 +47,7 @@ Symbol "{% $choice.name %}" is {% $choice.reason %} · {% $choice.file %}
 ## Calls ({% fraction($callees) %} workspace · {% $callees.dependencyTotal %} dependency/runtime)
 
 {% if $callees.sharedSite %}
-Every call happens in {% $callees.sharedSite %}.
+Every call site is in {% $callees.sharedSite %}; each row names where the callee is declared.
 {% /if %}
 {% tree entries=$callees.groups partial="call-node.mdoc" /%}
 {% if any($callees.dependencies) %}
@@ -56,7 +56,7 @@ Dependency/runtime: {% list($callees.dependencies) %}
 {% /if %}
 
 {% if any($mentions.groups) %}
-## Mentions that are not calls ({% fraction($mentions.listed) %} of {% $mentions.total %} references)
+## Mentions that are not calls ({% $mentions.listed.total %} of {% $mentions.total %} references{% if not(equals($mentions.listed.shown, $mentions.listed.total)) %} · {% $mentions.listed.shown %} shown{% /if %})
 
 {% tree entries=$mentions.groups partial="location-node.mdoc" /%}
 {% /if %}

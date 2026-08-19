@@ -7,6 +7,7 @@ Nothing references {% $file %}. This answer is assembled from references to what
 {% /if %}
 {% if not(equals($total, 0)) %}
 {% $file %} is referenced from {% $total %} {% plural count=$total forms={"one": "place", "other": "places"} /%}, across every project loaded this session{% if any($anchor) %}, anchored at {% $anchor %}{% /if %}.
+{% partial file="page.mdoc" /%}
 
 {% tree entries=$groups partial="reference-node.mdoc" /%}
 {% /if %}

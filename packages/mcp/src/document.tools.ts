@@ -7,6 +7,7 @@ import type {
 import {
   codeFrame,
   createTypeAtlas,
+  declarationChainAtPosition,
   documentSymbols,
   type Row,
   page,
@@ -17,13 +18,13 @@ import {
 import type { McpServer } from "@modelcontextprotocol/server";
 import { type } from "arktype";
 import { requestDiagnosticContext } from "./ambient-diagnostics.ts";
+import { enclosingDeclaration } from "./reference-groups.ts";
 import { readOnlyToolAnnotations } from "./metadata.ts";
 import {
   defaultDimensions,
   positionText,
   rangeText,
   sameRange,
-  symbolKind,
   displayPath,
 } from "atlascii";
 import { appendDiagnosticContext, textResult } from "./mcp-result.ts";
@@ -99,6 +100,23 @@ export const registerDocumentTools = (server: McpServer, workspaces: VolarWorksp
         signal,
       });
       const shown = page(report.diagnostics, offset, limit);
+      // Every located row names what stands there — the referent reference
+      // rows already carry, bounded to the page.
+      const owners = new Map(
+        await Promise.all(
+          shown.items.map(async ({ uri, diagnostic }) => {
+            const chain = await declarationChainAtPosition({
+              workspace,
+              uri,
+              position: diagnostic.range.start,
+            }).catch(() => []);
+            return [
+              `${uri} ${diagnostic.range.start.line}:${diagnostic.range.start.character}`,
+              enclosingDeclaration(chain, diagnostic.range)?.name,
+            ] as const;
+          }),
+        ),
+      );
       const sources = new Map<string, Promise<string>>();
       const sourceFor = (uri: string) => {
         const held = sources.get(uri);
@@ -202,6 +220,9 @@ export const registerDocumentTools = (server: McpServer, workspaces: VolarWorksp
               source: diagnostic.source,
               code: diagnostic.code,
               range: diagnostic.range,
+              within: owners.get(
+                `${uri} ${diagnostic.range.start.line}:${diagnostic.range.start.character}`,
+              ),
               message: diagnostic.message,
               frame: frames.get(`${uri} ${diagnostic.range.start.line}`) || undefined,
             })),

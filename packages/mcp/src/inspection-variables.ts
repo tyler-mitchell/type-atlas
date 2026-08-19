@@ -1,5 +1,5 @@
 import type { CallSite, InspectSymbolResult, Located } from "@type-atlas/core";
-import { type LocationNode, rangeText, sameRange, symbolKind, displayPath } from "atlascii";
+import { type LocationNode, rangeText, sameRange, displayPath } from "atlascii";
 import { isFileInDir } from "@volar/language-server/node.js";
 import { SymbolKind } from "vscode-languageserver-protocol";
 import { URI } from "vscode-uri";
@@ -207,9 +207,10 @@ export const inspectionVariables = (input: {
       // Named only when it differs from the selection: restating an
       // identifier's own span costs a second read to learn nothing.
       extent: sameRange(primary.range, primary.selectionRange) ? undefined : primary.range,
-      // Relativised against the workspace this became the bare string
-      // `tsconfig.json`, which picks out no project in a monorepo.
-      project: result.project ? `${root}/${displayPath(result.project, root)}` : undefined,
+      // The same path style every sibling anchor wears. At the workspace root
+      // this reads as the bare `tsconfig.json`, which the other tools already
+      // accept — one absolute path here was the surface's only style break.
+      project: result.project ? displayPath(result.project, root) : undefined,
     },
     documentation: result.hover,
     additionalDefinitions: counted(

@@ -21,7 +21,7 @@ export const registerTools = (
   registerWorkspaceTools(server);
   registerDocumentTools(server, workspaces);
   registerAssistanceTools(server, workspaces);
-  registerNavigationTools(server, workspaces, semble);
+  registerNavigationTools(server, workspaces);
   registerEditingTools(server, workspaces);
   registerCodeActionTools(server, workspaces);
   registerIntelligenceTools(server, workspaces, semble);

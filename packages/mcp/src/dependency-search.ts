@@ -107,13 +107,24 @@ export const createDependencySearch =
           const query = [request.type, request.path.join("."), request.query]
             .filter(Boolean)
             .join(" ");
-          const packageRetrieval = await dependencies.semble.search({
-            repo: packageRoot,
-            query,
-            limit: Math.min(20, request.limit * 4),
-            snippetLines: null,
-            signal: request.signal,
-          });
+          // A package whose code lives only under `dist/` has nothing Semble
+          // will index at its root — Semble ignores `dist` below a queried
+          // root, and its "No supported files" is that policy speaking, not
+          // an absence of code. The resolved entrypoint's own directory
+          // indexes the same published files, so an unindexable root falls
+          // through to it below instead of failing the whole ask.
+          const packageRetrieval = await dependencies.semble
+            .search({
+              repo: packageRoot,
+              query,
+              limit: Math.min(20, request.limit * 4),
+              snippetLines: null,
+              signal: request.signal,
+            })
+            .catch((error): SembleSearchPage => {
+              if (request.signal.aborted) throw error;
+              return { query, results: [] };
+            });
           const definitionRoot = definitionUri
             ? path.dirname(URI.parse(definitionUri).fsPath)
             : packageRoot;

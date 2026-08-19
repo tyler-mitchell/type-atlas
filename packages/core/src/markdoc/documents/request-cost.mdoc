@@ -2,4 +2,4 @@
 { "tool": "request cost" }
 ---
 
-· {% time($elapsedMs) %}{% if $cost %} · {% $cost.requests %} language-server {% plural count=$cost.requests forms={"one": "request", "other": "requests"} /%} · {% time($cost.totalMs) %} · {% if equals($cost.requests, 1) %}{% $cost.method %}{% /if %}{% if not(equals($cost.requests, 1)) %}slowest {% $cost.method %} {% time($cost.slowestMs) %}{% /if %}{% if $cost.firstAfterStart %} · first since the server started{% /if %}{% if any($cost.queuedBehind) %} · queued behind {% $cost.queuedBehind %}{% /if %}{% /if %}
+· {% time($elapsedMs) %}{% if $cost %} · {% $cost.requests %} language-server {% plural count=$cost.requests forms={"one": "request", "other": "requests"} /%} totalling {% time($cost.totalMs) %} · {% if equals($cost.requests, 1) %}{% $cost.method %}{% /if %}{% if not(equals($cost.requests, 1)) %}slowest {% $cost.method %} {% time($cost.slowestMs) %}{% /if %}{% if any($cost.queuedBehind) %}, queued behind {% $cost.queuedBehind %} earlier {% plural count=$cost.queuedBehind forms={"one": "request", "other": "requests"} /%}{% /if %}{% if $cost.firstAfterStart %} · first since the server started{% /if %}{% /if %}

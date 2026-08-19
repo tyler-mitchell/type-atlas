@@ -1,4 +1,46 @@
 import { width } from "atlascii";
+import { type Range, SymbolKind } from "vscode-languageserver-protocol";
+
+/** Declarations that hold other code, rather than merely name a value. */
+const holdingKinds = new Set<number>([
+  SymbolKind.Function,
+  SymbolKind.Method,
+  SymbolKind.Constructor,
+  SymbolKind.Class,
+  SymbolKind.Interface,
+  SymbolKind.Enum,
+  SymbolKind.Module,
+  SymbolKind.Namespace,
+]);
+
+/**
+ * The declaration a located row sits in, as a reader would name it.
+ *
+ * Two entries in the chain are never the answer. The row's own declaration is
+ * one — an object-literal property is a declaration in the outline, so
+ * `down: "↓"` reported "inside down". A local binding is the other:
+ * `const lines = references(...)` reported "inside lines", where what holds the
+ * call is the function around it. So the innermost holder wins, and only when
+ * the chain has none does the innermost remaining declaration answer — which is
+ * what names a top-level `const figures` as the holder of the properties in it.
+ */
+export const enclosingDeclaration = (
+  chain: readonly {
+    readonly name?: string;
+    readonly kind?: number;
+    readonly selectionRange: Range;
+  }[],
+  range: Range,
+) => {
+  const others = [...chain]
+    .reverse()
+    .filter(
+      (entry) =>
+        entry.selectionRange.start.line !== range.start.line ||
+        entry.selectionRange.start.character !== range.start.character,
+    );
+  return others.find((entry) => entry.kind !== undefined && holdingKinds.has(entry.kind)) ?? others[0];
+};
 
 export type ReferenceSite = {
   readonly file: string;

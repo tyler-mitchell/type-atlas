@@ -6,10 +6,5 @@
 {% each items=$groups as="group" partial="diagnostic-group.mdoc" /%}
 {% /if %}
 {% if not($verbose) %}
-{% if $here %}
-{% $count %} {% plural count=$count forms={"one": "problem", "other": "problems"} /%} at this position{% if $cost %} · {% $cost %}{% /if %}
-{% /if %}
-{% if not($here) %}
-{% $count %} {% plural count=$count forms={"one": "problem", "other": "problems"} /%} in {% $file %}{% if $cost %} · {% $cost %}{% /if %}
-{% /if %}
+{% if any($problems) %}{% $problems %} {% plural count=$problems forms={"one": "problem", "other": "problems"} /%}{% if any($hints) %} · {% /if %}{% /if %}{% if any($hints) %}{% $hints %} {% plural count=$hints forms={"one": "hint", "other": "hints"} /%}{% /if %} {% if $here %}at this position{% /if %}{% if not($here) %}in {% $file %}{% /if %}{% if $cost %} · {% if $cost.reused %}reused a {% time($cost.elapsedMs) %} check{% /if %}{% if not($cost.reused) %}{% time($cost.elapsedMs) %}{% /if %}{% /if %}
 {% /if %}

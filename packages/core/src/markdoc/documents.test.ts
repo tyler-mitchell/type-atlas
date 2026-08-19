@@ -160,8 +160,7 @@ test("references reads as prose with owners named", async () => {
       anchor: "tsconfig.json",
       root: "/repo",
       total: 3,
-      useCount: 2,
-      useNoun: "uses",
+      noUses: false,
       groups: [
         {
           file: "src/config/figures.ts",
@@ -175,7 +174,7 @@ test("references reads as prose with owners named", async () => {
   });
   expect(undefinedVariables).toEqual([]);
   expect(text).toMatchInlineSnapshot(`
-    "down is a property declared inside Figures, at src/config/figures.ts:14:12. Searched the project tsconfig.json and found 2 uses.
+    "down is a property declared inside Figures, at src/config/figures.ts:14:12. Searched the project tsconfig.json and found 3 references.
 
     src/config/figures.ts
     ├  30:3  — inside figures

@@ -3,9 +3,7 @@ import {
   type CallHierarchyItem,
   type CallHierarchyOutgoingCall,
   GetMatchTsConfigRequest,
-  type Location,
   type Range,
-  SymbolKind,
   type SymbolInformation,
   type WorkspaceSymbol,
 } from "@volar/language-server/protocol.js";
@@ -14,7 +12,6 @@ import {
   declarationAtPosition,
   declarationChainAtPosition,
   inspectSymbol,
-  noun,
   page,
   renderDocument,
   type VolarWorkspace,
@@ -24,54 +21,14 @@ import { type } from "arktype";
 import { rangeText as siteText, sameRange } from "atlascii";
 import { requestDiagnosticContext } from "./ambient-diagnostics.ts";
 import { inspectionVariables } from "./inspection-variables.ts";
-import { referenceGroups } from "./reference-groups.ts";
-import { createRetrievalIntelligence } from "./intelligence.ts";
-import type { Semble } from "./semble.ts";
+import { enclosingDeclaration, referenceGroups } from "./reference-groups.ts";
 import { readOnlyToolAnnotations } from "./metadata.ts";
-import {
-  containsPosition,
-  rangeText,
-  symbolKind,
-  displayPath,
-} from "atlascii";
+import { containsPosition, displayPath } from "atlascii";
 import { appendDiagnosticContext, textResult } from "./mcp-result.ts";
 import { registerTool } from "./tool.ts";
 import { fileInput, observedFileInput, paginationInput, positionInput } from "./tool-input.ts";
 import type { VolarWorkspacePool } from "@type-atlas/core";
 
-/**
- * Reads the lines a page of locations lands on, once per file.
- *
- * A range alone says where a reference is, never what it is, so every reading
- * of one costs a second call to open the file. The files are already on disk
- * and each is read once for however many locations it holds.
- */
-const locationSourceLines = async (
-  workspace: Awaited<ReturnType<VolarWorkspacePool["get"]>>,
-  locations: readonly Location[] | undefined,
-  signal: AbortSignal,
-): Promise<ReadonlyMap<string, readonly string[]> | undefined> => {
-  if (!locations?.length) return undefined;
-  const uris = [...new Set(locations.map(({ uri }) => uri))];
-  const read = await Promise.all(
-    uris.map(async (uri) => {
-      const source = await workspace
-        .readTextDocumentUri(uri, signal)
-        .then(({ source }) => source)
-        .catch(() => undefined);
-      return [uri, source?.split("\n")] as const;
-    }),
-  );
-  return new Map(read.flatMap(([uri, lines]) => (lines ? [[uri, lines] as const] : [])));
-};
-
-/**
- * Names a result after the identifier its position landed in.
- *
- * A bare count answers a question the reader has to remember having asked, and a
- * position that resolved to a neighbouring symbol reads exactly like one that
- * resolved correctly. Reading the line costs no language-server request.
- */
 /**
  * Shapes navigation results into the records a document renders.
  *
@@ -140,7 +97,6 @@ const callHierarchyVariables = <Call extends { readonly fromRanges: readonly Ran
   readonly calls: readonly (readonly Call[] | null)[] | null;
   readonly root: string;
   readonly callable: (call: Call) => CallHierarchyItem;
-  readonly scope?: string;
 }) => {
   const subject = input.items?.[0];
   const flat = (input.calls ?? []).flatMap((group) => group ?? []);
@@ -150,7 +106,6 @@ const callHierarchyVariables = <Call extends { readonly fromRanges: readonly Ran
   }, new Map<string, Call[]>());
   return {
     name: subject?.name,
-    scope: input.scope,
     total: flat.length,
     origin: subject
       ? [
@@ -239,47 +194,6 @@ const kindAt = (input: {
       return kind;
     })
     .catch(() => undefined);
-
-/** Declarations that hold other code, rather than merely name a value. */
-const holdingKinds = new Set<number>([
-  SymbolKind.Function,
-  SymbolKind.Method,
-  SymbolKind.Constructor,
-  SymbolKind.Class,
-  SymbolKind.Interface,
-  SymbolKind.Enum,
-  SymbolKind.Module,
-  SymbolKind.Namespace,
-]);
-
-/**
- * The declaration a reference sits in, as a reader would name it.
- *
- * Two entries in the chain are never the answer. The reference's own
- * declaration is one — an object-literal property is a declaration in the
- * outline, so `down: "↓"` reported "inside down". A local binding is the other:
- * `const lines = references(...)` reported "inside lines", where what holds the
- * call is the function around it. So the innermost holder wins, and only when
- * the chain has none does the innermost remaining declaration answer — which is
- * what names a top-level `const figures` as the holder of the properties in it.
- */
-const enclosingDeclaration = (
-  chain: readonly {
-    readonly name?: string;
-    readonly kind?: number;
-    readonly selectionRange: Range;
-  }[],
-  range: Range,
-) => {
-  const others = [...chain]
-    .reverse()
-    .filter(
-      (entry) =>
-        entry.selectionRange.start.line !== range.start.line ||
-        entry.selectionRange.start.character !== range.start.character,
-    );
-  return others.find((entry) => entry.kind !== undefined && holdingKinds.has(entry.kind)) ?? others[0];
-};
 
 const referenceScopeInput = type("'project' | 'workspace'").configure(
   {
@@ -378,9 +292,7 @@ export const symbolTarget = (target: {
 export const registerNavigationTools = (
   server: McpServer,
   workspaces: VolarWorkspacePool,
-  semble: Semble,
 ): void => {
-  const retrieval = createRetrievalIntelligence({ semble, workspaces });
   registerTool(
     server,
     "inspect_symbol",
@@ -477,6 +389,17 @@ export const registerNavigationTools = (
           answered: symbols !== null,
           total: output?.total ?? 0,
           items: named,
+          // Only when the answer is a window — a whole set needs no page line.
+          page:
+            output && (output.nextOffset !== undefined || output.offset > 0)
+              ? {
+                  from: output.offset + 1,
+                  to: output.offset + output.items.length,
+                  total: output.total,
+                  unit: "symbols",
+                  next: output.nextOffset,
+                }
+              : undefined,
         },
       });
       return textResult(rendered.text);
@@ -686,7 +609,6 @@ export const registerNavigationTools = (
           calls,
           root,
           callable: (call) => call.from,
-          scope: "loaded projects",
         }),
       });
       return appendDiagnosticContext(
@@ -885,8 +807,19 @@ export const registerNavigationTools = (
           // is supposed to hold none.
           anchor: matched ? displayPath(matched.uri, root) : undefined,
           total: output?.total ?? 0,
-          useCount: uses.length,
-          useNoun: noun({ count: uses.length, singular: "use", plural: "uses" }),
+          // Exact at offset 0, where a declaration row can appear; deeper
+          // windows always have more references than one declaration.
+          noUses: (output?.total ?? 0) - (declarationSite ? 1 : 0) <= 0,
+          page:
+            output && (output.nextOffset !== undefined || output.offset > 0)
+              ? {
+                  from: output.offset + 1,
+                  to: output.offset + output.items.length,
+                  total: output.total,
+                  unit: "references",
+                  next: output.nextOffset,
+                }
+              : undefined,
           groups: referenceGroups(uses),
         },
       });
@@ -950,6 +883,16 @@ export const registerNavigationTools = (
           file: displayPath(textDocument.uri, root),
           anchor: matched ? displayPath(matched.uri, root) : undefined,
           total: output?.total ?? 0,
+          page:
+            output && (output.nextOffset !== undefined || output.offset > 0)
+              ? {
+                  from: output.offset + 1,
+                  to: output.offset + output.items.length,
+                  total: output.total,
+                  unit: "places",
+                  next: output.nextOffset,
+                }
+              : undefined,
           groups: referenceGroups(
             [...sites].sort(
               (left, right) =>

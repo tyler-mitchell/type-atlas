@@ -6,9 +6,10 @@ import {
   type Range,
   type TextDocumentIdentifier,
 } from "@volar/language-server/protocol.js";
-import { containsPosition, renderDocument } from "@type-atlas/core";
+import { containsPosition, declarationChainAtPosition, renderDocument } from "@type-atlas/core";
 import { displayPath } from "atlascii";
 import type { VolarWorkspace } from "@type-atlas/core";
+import { enclosingDeclaration } from "./reference-groups.ts";
 
 export type DiagnosticMode = "summary" | "verbose" | "off";
 
@@ -27,20 +28,27 @@ export const formatDiagnosticMode = async (input: {
   readonly workspaceRoot: string;
   readonly mode: DiagnosticMode;
   readonly focus?: Position | Range;
-  readonly cost?: string;
+  readonly cost?: { readonly elapsedMs: number; readonly reused: boolean };
 }): Promise<string | undefined> => {
   const entries = reported(input.report);
   if (entries.length === 0) return undefined;
   const file = displayPath(input.uri, input.workspaceRoot);
   const here = focused(entries, input.focus);
+  const counted = here.length > 0 ? here : entries;
   const rendered = await renderDocument({
     document: "diagnostic-context.mdoc",
     variables: {
       verbose: input.mode === "verbose",
       // One file, so one group: the path leads it once rather than every row.
       groups: [{ file, problems: entries }],
-      here: here.length > 0,
-      count: here.length || entries.length,
+      // A positionless request may not claim a position, however many of the
+      // file's rows happen to sit where no focus was given.
+      here: input.focus !== undefined && here.length > 0,
+      // Two words, two counts: an unused-import hint is not a problem, and a
+      // summary that counted it as one contradicted the whole-project check
+      // that rightly ignores it.
+      problems: counted.filter((entry) => (entry.severity ?? 1) <= 2).length,
+      hints: counted.filter((entry) => (entry.severity ?? 1) >= 3).length,
       file,
       cost: input.cost,
     },
@@ -89,15 +97,38 @@ export function requestDiagnosticContext(
       return request;
     })();
   return pending.then(
-    ({ report, elapsedMs }) =>
-      formatDiagnosticMode({
+    async ({ report, elapsedMs }) => {
+      // Every located row names what stands there. A diagnostic's position
+      // without its holder is a row a reader must open the file to decode —
+      // the same referent every reference row already carries.
+      // Cost, measured cold-first 2026-08-19 (fresh server per measurement,
+      // so no cache obscures it): 828ms cold for a 1-row file — dominated by
+      // the project build and the report, not the chain — and 17ms on the
+      // warm repeat, which re-runs the chain every call against the cached
+      // report. The multiplying worst case is rows across distinct files on
+      // the page-capped tool path, each first-touch outline ~25ms: ~+2.5s at
+      // the 100-row cap, on top of a whole-project check that itself costs
+      // tens of seconds at that scale. If that ever bites, the lever is one
+      // outline per file instead of one chain request per row.
+      const named = await Promise.all(
+        reported(report).map(async (entry) => {
+          const chain = await declarationChainAtPosition({
+            workspace,
+            uri: textDocument.uri,
+            position: entry.range.start,
+          }).catch(() => []);
+          return { ...entry, within: enclosingDeclaration(chain, entry.range)?.name };
+        }),
+      );
+      return formatDiagnosticMode({
         uri: textDocument.uri,
-        report,
+        report: report && "items" in report ? { ...report, items: named } : report,
         workspaceRoot,
         mode,
         focus,
-        cost: held ? `reused, first cost ${elapsedMs}ms` : `${elapsedMs}ms`,
-      }),
+        cost: { elapsedMs, reused: held !== undefined },
+      });
+    },
     () => undefined,
   );
 }

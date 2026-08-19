@@ -1,5 +1,5 @@
 {% tight %}
-{% severity value=$problem.severity config=$config /%}{% if $problem.source %} {% $problem.source %}{% if any($problem.code) %}({% $problem.code %}){% /if %}{% /if %} {% range($problem.range) %}
+{% severity value=$problem.severity config=$config /%}{% if $problem.source %} {% $problem.source %}{% if any($problem.code) %}({% $problem.code %}){% /if %}{% /if %} {% range($problem.range) %}{% if $problem.within %} — inside {% $problem.within %}{% /if %}
 {% indent %}
 {% $problem.message %}
 {% /indent %}

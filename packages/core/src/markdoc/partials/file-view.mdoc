@@ -7,4 +7,7 @@
 {% banner config=$config %}{% $view.file %} · {% if $view.windowed %}lines {% $view.startLine %}-{% $view.endLine %} of {% $view.lineCount %}{% /if %}{% if not($view.windowed) %}{% $view.lineCount %} {% plural count=$view.lineCount forms={"one": "line", "other": "lines"} /%}{% /if %}{% /banner %}
 
 {% source lines=$view.lines ranges=$view.foldingRanges from=$view.startLine to=$view.endLine /%}
+{% if $view.next %}
+Bounded at line {% $view.endLine %} of {% $view.lineCount %} · pass startLine: {% $view.next %} for the rest
+{% /if %}
 {% /if %}
