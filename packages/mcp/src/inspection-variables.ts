@@ -218,6 +218,13 @@ export const inspectionVariables = (input: {
       locationGroups(additionalDefinitions, root),
     ),
     implementations: counted(implementations, locationGroups(implementations, root)),
+    // An interface with no implementations section reads as "realised
+    // nowhere", and on this platform the implementation walk answers only
+    // from files the session has opened — a kek interface with realisers in
+    // untouched files misled exactly that way. Only for kinds a reader
+    // expects the section on; a variable's absent section claims nothing.
+    unansweredImplementations:
+      primary.kind === SymbolKind.Interface && implementations.length === 0,
     typeDefinitions: counted(typeDefinitions, locationGroups(typeDefinitions, root)),
     callers:
       callers.length > 0

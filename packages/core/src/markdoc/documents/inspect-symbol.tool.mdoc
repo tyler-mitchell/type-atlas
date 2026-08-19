@@ -30,6 +30,9 @@ Symbol "{% $choice.name %}" is {% $choice.reason %} · {% $choice.file %}
 
 {% tree entries=$implementations.groups partial="location-node.mdoc" /%}
 {% /if %}
+{% if $unansweredImplementations %}
+No implementation answered — the walk reaches only files this session has opened, so a declaration realising this in an untouched file reports nothing here. references lists every use, including those declarations.
+{% /if %}
 
 {% if any($typeDefinitions.groups) %}
 ## Type definitions ({% $typeDefinitions.total %})
