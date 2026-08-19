@@ -4,6 +4,9 @@
 {% if any($match.within) %}
 Structure: {% breadcrumb($match.within) %}
 {% /if %}
+{% if $match.plumbing %}
+Structure: import/export statements — this range names concepts, it does not implement them
+{% /if %}
 {% if $match.name %}
 Symbol: {% $match.name %}{% if any($match.kind) %} [{% symbolKind($match.kind) %}]{% /if %} · selection {% range($match.selection) %}{% if $match.extent %} · range {% range($match.extent) %}{% /if %}{% if $match.anchored %} · declares a name the query asked for{% /if %}
 {% /if %}

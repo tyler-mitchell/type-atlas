@@ -39,6 +39,8 @@ export type RetrievalMatch = {
   readonly path?: readonly SymbolPathItem[];
   readonly selected?: SymbolPathItem;
   readonly exactIdentifier: boolean;
+  /** The range is import/export statements only — names, not behavior. */
+  readonly plumbing: boolean;
   readonly content?: string;
   readonly contentStartLine: number;
   readonly hover?: Hover | null;
@@ -126,6 +128,24 @@ const resolveSearchRoot = async (root: string, directory: string | undefined): P
  */
 const sourceRange = (range: Range): string =>
   `${range.start.line + 1}:${range.start.character + 1}-${range.end.line + 1}:${range.end.character + 1}`;
+
+/**
+ * Whether a range is only import/export statements — names, not behavior.
+ *
+ * A barrel names every concept a package exports, so it outranks the code
+ * implementing them for almost any behavioral query, and a reader acting on
+ * it learns nothing. The observation is stated on the match rather than used
+ * to reorder: relevance is score-relative, and an order that contradicts the
+ * printed percentages would be a second defect.
+ */
+const moduleStatementsOnly = (text: string) => {
+  const stripped = text
+    .replace(/\/\*[\s\S]*?\*\//gu, "")
+    .split("\n")
+    .filter((line) => line.trim() && !/^\s*\/\//u.test(line))
+    .join("\n");
+  return stripped.length > 0 && /^\s*(?:(?:import|export)\b[^;]*;\s*)+$/u.test(stripped);
+};
 
 export const enrichRetrievalPage = async (input: {
   readonly page: SembleSearchPage;
@@ -217,6 +237,16 @@ export const enrichRetrievalPage = async (input: {
           path: symbolPath,
           selected,
           exactIdentifier,
+          // A range in a file whose outline is empty is a barrel or manifest
+          // — the range test alone misses a slice from the middle of one
+          // long re-export statement, which starts no statement and closes
+          // none.
+          plumbing:
+            symbolPath === undefined &&
+            ((symbols ?? []).length === 0 ||
+              moduleStatementsOnly(
+                sourceLines.slice(resultStartLine, resultEndLine + 1).join("\n"),
+              )),
           content:
             input.snippetLines === 0
               ? undefined
@@ -297,6 +327,7 @@ const searchPage = (input: {
             ? match.selected.range
             : undefined,
         anchored: match.exactIdentifier,
+        plumbing: match.plumbing,
         documentation: match.hover
           ? markupText(match.hover.contents) || "No hover content."
           : undefined,
