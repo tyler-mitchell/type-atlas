@@ -26,15 +26,20 @@ export const formatPatchResult = async (
     };
     /** The subject is an installed dependency's — the patch is refused. */
     readonly foreign?: boolean;
+    /** The provider returned no edit at all, as opposed to an empty one. */
+    readonly unanswered?: boolean;
   },
 ) => {
-  if (!result.fileCount && !extra?.foreign) return textResult("");
+  // An empty result renders the document's own "No edits" sentence — this
+  // used to return "", and format_document on an already-formatted file
+  // answered with nothing at all, the blank the design language forbids.
   const rendered = await renderDocument({
     document: "patch.tool.mdoc",
     variables: {
       title,
       subject: extra?.subject,
       foreign: extra?.foreign ?? false,
+      unanswered: extra?.unanswered ?? false,
       scope: extra?.scope,
       fileCount: result.fileCount,
       editCount: result.editCount,
