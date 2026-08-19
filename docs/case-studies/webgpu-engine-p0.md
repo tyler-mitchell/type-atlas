@@ -135,9 +135,14 @@ payload-verified-before-digest-recorded.
 
 ## Task 6 — device requirements, then device loss
 
-Capability-contributed requirements merged at `openEngine` (union features,
-max limits) before any backing builds. Device loss initially stops and
-reports — the listener seam is engine.ts:280's sibling; recovery waits for
+Acquisition is one site: `tgpu.init` at engine.ts:209–234, where required
+features are requested as optional and post-checked against
+`enabledFeatures` with destroy-on-missing (226–229) — so
+capability-contributed requirements (union features, element-wise max
+limits) merge into exactly that assembly before any backing builds, and
+the application may add but not weaken. Device loss initially stops and
+reports: `root.device.lost` is available immediately after acquisition,
+beside the `uncapturederror` listener at engine.ts:280; recovery waits for
 task 5's restoration contract, at which point it is a normal restore.
 
 ## Standing semantics to pin, not change
