@@ -1,4 +1,8 @@
+import { readFile } from "node:fs/promises";
 import type { McpServer } from "@modelcontextprotocol/server";
+import { fdir } from "fdir";
+import { isGitIgnored } from "globby";
+import * as path from "pathe";
 import {
   type Diagnostic,
   type DocumentSymbol,
@@ -6,6 +10,7 @@ import {
   GetMatchTsConfigRequest,
   type SymbolInformation,
 } from "@volar/language-server/protocol.js";
+import { isFileInDir } from "@volar/language-server/node.js";
 import {
   createTypeAtlas,
   declarationAtPosition,
@@ -68,6 +73,19 @@ const input = type.module({
     document: type("string >= 1").configure({
       description:
         "Markdoc source: ask declarations followed by a body composing what they bind.",
+    }),
+  }),
+  Occurrences: type({
+    workspace: fileInput.workspace,
+    text: type("string >= 1").configure({
+      description: "The exact text to find — literal, not a pattern or a meaning.",
+    }),
+    "directory?": type("string >= 1").configure({
+      description: "Workspace-relative directory to scan. Defaults to the workspace.",
+    }),
+    "limit?": type("1 <= number.integer <= 200").configure({
+      default: 40,
+      description: "Maximum occurrences returned; the totals count every one found.",
     }),
   }),
 });
@@ -490,6 +508,106 @@ export const registerExperimentalTools = (
             String(files),
             tests ? String(tests) : "",
           ]),
+        },
+      });
+      return textResult(rendered.text);
+    },
+  );
+
+  registerTool(
+    server,
+    "occurrences",
+    {
+      title: "Occurrences",
+      description:
+        "Experimental: every place an exact text occurs under a directory, with an honest zero — the literal proof of absence a semantic search cannot give. Scans workspace files (gitignore honored, dependencies excluded); use it for teardown checks, string keys, config references, and \"is this token ever used\" questions. search_code finds meaning; this finds bytes.",
+      inputSchema: input.Occurrences,
+      annotations: readOnlyToolAnnotations,
+    },
+    async ({ workspace: root, text, directory = ".", limit = 40 }, { mcpReq: { signal } }) => {
+      const workspaceRoot = path.resolve(root);
+      const scanRoot = path.resolve(workspaceRoot, directory);
+      if (scanRoot !== workspaceRoot && !isFileInDir(scanRoot, workspaceRoot)) {
+        throw new Error(`Directory is outside the workspace: ${directory}`);
+      }
+      // The same walk list_files answers from: gitignore honored, dependency
+      // and VCS internals excluded — an absence claim is only as strong as
+      // the set it scanned, and this is the set a reader expects.
+      const isIgnored = await isGitIgnored({
+        cwd: scanRoot,
+        followSymbolicLinks: false,
+        ignore: ["**/.git/**", "**/node_modules/**"],
+      });
+      const fileBudget = 4000;
+      const files = await new fdir()
+        .withPathSeparator("/")
+        .withRelativePaths()
+        .withMaxFiles(fileBudget + 1)
+        .withErrors()
+        .withAbortSignal(signal)
+        .filter((file) => !isIgnored(file))
+        .exclude((name) => name === ".git" || name === "node_modules" || name.startsWith("."))
+        .crawl(scanRoot)
+        .withPromise();
+      const over = files.length > fileBudget;
+      const scanned = files.slice(0, fileBudget);
+      const sites: { file: string; line: number; character: number; text: string }[] = [];
+      let total = 0;
+      const seenFiles = new Set<string>();
+      for (const relative of scanned) {
+        const source = await readFile(path.resolve(scanRoot, relative), "utf8").catch(
+          () => undefined,
+        );
+        // A NUL byte marks content no reader lines up; skipped, not counted.
+        if (source === undefined || source.includes("\0")) continue;
+        if (!source.includes(text)) continue;
+        const display = path.relative(workspaceRoot, path.resolve(scanRoot, relative));
+        for (const [index, line] of source.split("\n").entries()) {
+          for (
+            let at = line.indexOf(text);
+            at !== -1;
+            at = line.indexOf(text, at + Math.max(1, text.length))
+          ) {
+            total += 1;
+            seenFiles.add(display);
+            if (sites.length < limit) {
+              sites.push({
+                file: display,
+                line: index + 1,
+                character: at + 1,
+                text: line.trim(),
+              });
+            }
+          }
+        }
+      }
+      const groups = [...Map.groupBy(sites, ({ file }) => file)].map(([file, held]) =>
+        held.length === 1 && held[0]
+          ? { file, at: `${held[0].line}:${held[0].character}`, text: held[0].text }
+          : {
+              file,
+              children: held.map((site) => ({
+                at: `${site.line}:${site.character}`,
+                column: Math.max(...held.map(({ line, character }) => `${line}:${character}`.length)),
+                text: site.text,
+              })),
+            },
+      );
+      const rendered = await renderDocument({
+        document: "occurrences.tool.mdoc",
+        variables: {
+          text,
+          directory:
+            path.relative(workspaceRoot, scanRoot) === "" ? "the workspace" : directory,
+          total,
+          fileCount: seenFiles.size,
+          scanned: scanned.length,
+          over,
+          groups,
+          page:
+            total > sites.length
+              ? { from: 1, to: sites.length, total, unit: "occurrences" }
+              : undefined,
         },
       });
       return textResult(rendered.text);

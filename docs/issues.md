@@ -118,6 +118,23 @@ explanation is the part that misinforms. Observed 2026-08-19 —
 loaded.
 
 
+### The surface cannot prove a literal token absent
+
+Verifying a real architectural audit against kek (2026-08-19) required
+"`device.lost` is never handled" — a literal-occurrence question. Every
+search this surface has is semantic (semble ranks by meaning and cannot say
+no — its best match for `device.lost` was a comment about "lost substance"
+at relevance 100%) or symbolic (workspace_symbols needs a declaration;
+references needs a position). There is no tool answering "where does this
+exact text occur under this directory", and teardown work — the audit's
+delete items, alias checks, string keys, config references — lives on
+exactly that proof. Absence today is argued from ranked non-answers, which
+the confidence-for-nothing entry above shows is unreadable. A literal
+occurrence check with an honest zero ("nothing under src/ contains this
+token, N files scanned") is a missing capability, not a presentation gap.
+Observed 2026-08-19 while verifying the webgpu-engine P0 audit's device-loss
+claim through three approximating calls.
+
 ### `search_code` reports full confidence for a query that matched nothing
 
 Relevance is relative to the strongest match, so the best of a bad set always

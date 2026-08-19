@@ -1,0 +1,13 @@
+---
+{ "tool": "occurrences" }
+---
+
+{% if equals($total, 0) %}
+Nothing under {% $directory %} contains "{% $text %}" · {% $scanned %} {% plural count=$scanned forms={"one": "file", "other": "files"} /%} scanned{% if $over %} — the first {% $scanned %}; narrow the directory to scan the rest{% /if %}. This is a literal answer: the exact text does not occur in what was scanned, which is the proof a semantic search cannot give.
+{% /if %}
+{% if not(equals($total, 0)) %}
+"{% $text %}" occurs {% $total %} {% plural count=$total forms={"one": "time", "other": "times"} /%} in {% $fileCount %} {% plural count=$fileCount forms={"one": "file", "other": "files"} /%} · {% $scanned %} {% plural count=$scanned forms={"one": "file", "other": "files"} /%} scanned under {% $directory %}{% if $over %} — the first {% $scanned %}; narrow the directory to scan the rest{% /if %}.
+{% partial file="page.mdoc" /%}
+
+{% tree entries=$groups partial="occurrence-node.mdoc" /%}
+{% /if %}
