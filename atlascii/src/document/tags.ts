@@ -95,6 +95,8 @@ export const tags: Config["tags"] = {
       primary: { type: String, required: true },
       as: { type: String, required: true },
       file: { type: String },
+      /** Files from an earlier ask's answer: `files=$uses.paths`. */
+      files: { type: Array },
       line: { type: Number },
       character: { type: Number },
       query: { type: String },

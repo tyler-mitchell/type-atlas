@@ -49,6 +49,21 @@ export type DocumentAsk = {
 };
 
 /**
+ * An attribute value that reads another ask's answer: `files=$uses.paths`.
+ *
+ * The engine's variable node stays behind this entry point; a fulfiller sees
+ * only the path it names, and resolves it against what earlier asks bound —
+ * which is what lets one query compose over another's result.
+ */
+export type AskReference = { readonly reference: readonly string[] };
+
+export const isAskReference = (value: unknown): value is AskReference =>
+  typeof value === "object" &&
+  value !== null &&
+  "reference" in value &&
+  Array.isArray((value as AskReference).reference);
+
+/**
  * The intelligence a composed document declares it wants, in document order.
  *
  * `ask` tags are declarations, so they are read from the parse rather than
@@ -63,7 +78,14 @@ export const documentAsks = (source: string): readonly DocumentAsk[] =>
     .map((node) => ({
       operation: String(node.attributes.primary ?? ""),
       bind: String(node.attributes.as ?? ""),
-      attributes: node.attributes as Record<string, unknown>,
+      attributes: Object.fromEntries(
+        Object.entries(node.attributes as Record<string, unknown>).map(([name, value]) => [
+          name,
+          value instanceof Markdoc.Ast.Variable
+            ? ({ reference: value.path.map(String) } satisfies AskReference)
+            : value,
+        ]),
+      ),
     }));
 
 /**

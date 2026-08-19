@@ -109,6 +109,35 @@ test("compose renders a dossier from ask declarations", async () => {
     expect(bareText).toMatch(/\d+ uses in \d+ files, across \d+ projects\./u);
     expect(bareText).not.toContain("Undefined in this composition");
 
+    // Asks chain: the second query reads the first answer's file list, so one
+    // composition expresses "find the uses, then check the health of every
+    // file holding one" — and the reversed order is an error a composer can
+    // act on, not a hole.
+    const chained = await client.callTool({
+      name: "compose",
+      arguments: {
+        workspace: workspaceRoot,
+        document: [
+          '{% ask "references" as="uses" file="packages/core/src/projection.ts" line=28 character=14 /%}',
+          '{% ask "diagnostics" as="health" files=$uses.paths /%}',
+        ].join("\n"),
+      },
+    });
+    const chainedText = chained.content.find((item) => item.type === "text")?.text ?? "";
+    expect(chainedText).toContain("## Problems — $uses.paths");
+    expect(chainedText).toMatch(/No problem in \d+ files? checked\./u);
+    const reversed = await client.callTool({
+      name: "compose",
+      arguments: {
+        workspace: workspaceRoot,
+        document: '{% ask "diagnostics" as="health" files=$uses.paths /%}',
+      },
+    });
+    expect(reversed.isError).toBe(true);
+    expect(reversed.content.find((item) => item.type === "text")?.text ?? "").toContain(
+      "reads earlier asks only",
+    );
+
     // The exact presentation, over data stable enough to pin: the syntactic
     // outline and a source window compose exactly as their dedicated tools
     // render them, under headings the composer chose.

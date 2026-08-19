@@ -17,7 +17,7 @@ import {
 } from "@type-atlas/core";
 import { type } from "arktype";
 import { displayPath, markupText, sameRange } from "atlascii";
-import { type DocumentAsk, documentAsks } from "atlascii/document";
+import { type DocumentAsk, documentAsks, isAskReference } from "atlascii/document";
 import { textResult } from "./mcp-result.ts";
 import { readOnlyToolAnnotations } from "./metadata.ts";
 import { createQuorl } from "./quorl.ts";
@@ -180,7 +180,7 @@ export const registerExperimentalTools = (
     {
       title: "Compose",
       description:
-        'Experimental: author and compose your own code-intelligence queries in markup. A document of self-closing ask tags is a complete composition — each answer renders in its canonical block, in your order. Add body markup only to shape the answer yourself: what an ask binds is readable anywhere below it ({% $uses.total %}), and the shipped tags and partials compose it.\n\nOperations and what each binds:\n- {% ask "hover" as="head" file="src/x.ts" line=5 character=10 /%} (one-based, on the symbol\'s name) → {text}: the signature and documentation, rendered with {% $head.text %}\n- {% ask "references" as="uses" file="src/x.ts" line=5 character=10 /%} → {total, files, projects, groups}; render sites with {% tree entries=$uses.groups partial="reference-node.mdoc" /%}\n- {% ask "outline" as="shape" file="src/x.ts" /%} → {total, tree}; render with {% tree entries=$shape.tree partial="symbol-node.mdoc" /%}\n- {% ask "diagnostics" as="problems" file="src/x.ts" /%} → {total, groups}; render with {% each items=$problems.groups as="group" partial="diagnostic-group.mdoc" /%}\n- {% ask "source" as="body" file="src/x.ts" from=10 to=40 /%} → {lines, startLine}; render with {% source lines=$body.lines startLine=$body.startLine /%}',
+        'Experimental: author and compose your own code-intelligence queries in markup. A document of self-closing ask tags is a complete composition — each answer renders in its canonical block, in your order. Asks chain: a later ask reads an earlier answer, e.g. {% ask "diagnostics" as="health" files=$uses.paths /%} checks the files the reference search found. Add body markup only to shape the answer yourself: what an ask binds is readable anywhere below it ({% $uses.total %}), and the shipped tags and partials compose it.\n\nOperations and what each binds:\n- {% ask "hover" as="head" file="src/x.ts" line=5 character=10 /%} (one-based, on the symbol\'s name) → {text}: the signature and documentation, rendered with {% $head.text %}\n- {% ask "references" as="uses" file="src/x.ts" line=5 character=10 /%} → {total, files, paths, projects, groups}; render sites with {% tree entries=$uses.groups partial="reference-node.mdoc" /%}\n- {% ask "outline" as="shape" file="src/x.ts" /%} → {total, tree}; render with {% tree entries=$shape.tree partial="symbol-node.mdoc" /%}\n- {% ask "diagnostics" as="problems" file="src/x.ts" /%} → {total, groups}; render with {% each items=$problems.groups as="group" partial="diagnostic-group.mdoc" /%}\n- {% ask "source" as="body" file="src/x.ts" from=10 to=40 /%} → {lines, startLine}; render with {% source lines=$body.lines startLine=$body.startLine /%}',
       inputSchema: input.Compose,
       annotations: readOnlyToolAnnotations,
     },
@@ -234,9 +234,13 @@ export const registerExperimentalTools = (
               left.line - right.line ||
               left.character - right.character,
           );
+          const paths = [...new Set(ordered.map(({ file }) => file))];
           return {
             total: ordered.length,
-            files: new Set(ordered.map(({ file }) => file)).size,
+            files: paths.length,
+            // The list behind the count, so a later ask can compose over it:
+            // {% ask "diagnostics" files=$uses.paths /%}.
+            paths,
             projects,
             groups: referenceGroups(ordered),
           };
@@ -263,27 +267,39 @@ export const registerExperimentalTools = (
           return { total: parsed.length, tree: nest(parsed) };
         },
         diagnostics: async (ask) => {
-          const { uri } = await workspace.getTextDocument(askedFile(ask));
-          const report = await workspace.sendRequest(
-            DocumentDiagnosticRequest.type,
-            { textDocument: { uri } },
-            signal,
+          // One file named directly, or the files an earlier ask answered
+          // with — bounded, because each file is a whole document check.
+          const named = Array.isArray(ask.attributes.files)
+            ? ask.attributes.files.map(String)
+            : [askedFile(ask)];
+          const checked = named.slice(0, 5);
+          const perFile = await Promise.all(
+            checked.map(async (file) => {
+              const { uri } = await workspace.getTextDocument(file);
+              const report = await workspace.sendRequest(
+                DocumentDiagnosticRequest.type,
+                { textDocument: { uri } },
+                signal,
+              );
+              const problems = (
+                report && typeof report === "object" && "items" in report
+                  ? ((report as { items: readonly Diagnostic[] }).items ?? [])
+                  : []
+              ).map((entry) => ({
+                severity: entry.severity,
+                source: entry.source,
+                code: entry.code,
+                range: entry.range,
+                message: entry.message,
+              }));
+              return { file: displayPath(uri, root), problems };
+            }),
           );
-          const problems = (
-            report && typeof report === "object" && "items" in report
-              ? ((report as { items: readonly Diagnostic[] }).items ?? [])
-              : []
-          ).map((entry) => ({
-            severity: entry.severity,
-            source: entry.source,
-            code: entry.code,
-            range: entry.range,
-            message: entry.message,
-          }));
           return {
-            total: problems.length,
-            groups:
-              problems.length > 0 ? [{ file: displayPath(uri, root), problems }] : [],
+            total: perFile.reduce((sum, { problems }) => sum + problems.length, 0),
+            groups: perFile.filter(({ problems }) => problems.length > 0),
+            checked: checked.length,
+            of: named.length,
           };
         },
         source: async (ask) => {
@@ -306,18 +322,46 @@ export const registerExperimentalTools = (
             .join(", ")}; the operations are ${Object.keys(operations).join(", ")}.`,
         );
       }
-      const bound = Object.fromEntries(
-        await Promise.all(
-          asks.map(async (ask) => [ask.bind, await operations[ask.operation]!(ask)] as const),
-        ),
-      );
+      // Asks fulfill in document order, each seeing what earlier asks bound —
+      // `files=$uses.paths` reads the reference answer above it. Order is the
+      // dependency rule: a reference to a later or unknown bind is an error a
+      // composer can act on, not a hole.
+      const bound: Record<string, unknown> = {};
+      for (const ask of asks) {
+        const resolved: DocumentAsk = {
+          ...ask,
+          attributes: Object.fromEntries(
+            Object.entries(ask.attributes).map(([name, value]) => {
+              if (!isAskReference(value)) return [name, value];
+              const [head, ...rest] = value.reference;
+              if (head === undefined || !(head in bound)) {
+                throw new Error(
+                  `${ask.operation} reads $${value.reference.join(".")}, but only ${
+                    Object.keys(bound).join(", ") || "nothing"
+                  } is bound above it — an ask reads earlier asks only.`,
+                );
+              }
+              return [
+                name,
+                rest.reduce<unknown>(
+                  (held, step) => (held as Record<string, unknown> | undefined)?.[step],
+                  bound[head],
+                ),
+              ];
+            }),
+          ),
+        };
+        bound[ask.bind] = await operations[ask.operation]!(resolved);
+      }
       // The markup is the query language, so a body is optional: a document
       // of bare asks renders each answer in its canonical block, and an
       // authored body takes over only when the composer wants the shaping.
       const subject = (ask: DocumentAsk) =>
-        [ask.attributes.file, ask.attributes.line, ask.attributes.character]
-          .filter((part) => part !== undefined)
-          .join(":");
+        isAskReference(ask.attributes.files)
+          ? `$${ask.attributes.files.reference.join(".")}`
+          : [ask.attributes.file, ask.attributes.line, ask.attributes.character]
+              .filter((part) => part !== undefined)
+              .join(":");
       const canonicalSection: Record<string, (ask: DocumentAsk) => string> = {
         hover: (ask) => `## ${subject(ask)}\n\n{% $${ask.bind}.text %}`,
         references: (ask) =>
@@ -325,7 +369,7 @@ export const registerExperimentalTools = (
         outline: (ask) =>
           `## Outline — ${subject(ask)}\n\n{% tree entries=$${ask.bind}.tree partial="symbol-node.mdoc" /%}`,
         diagnostics: (ask) =>
-          `## Problems — ${subject(ask)}\n\n{% if equals($${ask.bind}.total, 0) %}No problem in this file.{% /if %}\n{% each items=$${ask.bind}.groups as="group" partial="diagnostic-group.mdoc" /%}`,
+          `## Problems — ${subject(ask)}\n\n{% if equals($${ask.bind}.total, 0) %}No problem in {% $${ask.bind}.checked %} {% plural count=$${ask.bind}.checked forms={"one": "file", "other": "files"} /%} checked.{% /if %}{% if not(equals($${ask.bind}.checked, $${ask.bind}.of)) %} Checked the first {% $${ask.bind}.checked %} of {% $${ask.bind}.of %} files.{% /if %}\n{% each items=$${ask.bind}.groups as="group" partial="diagnostic-group.mdoc" /%}`,
         source: (ask) =>
           `## ${subject(ask)}\n\n{% source lines=$${ask.bind}.lines startLine=$${ask.bind}.startLine /%}`,
       };

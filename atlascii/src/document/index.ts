@@ -10,7 +10,13 @@
  * components, and the day this library composes them another way, this
  * directory is what changes.
  */
-export { type DocumentAsk, documentAsks, renderDocument } from "./pipeline.ts";
+export {
+  type AskReference,
+  type DocumentAsk,
+  documentAsks,
+  isAskReference,
+  renderDocument,
+} from "./pipeline.ts";
 export { render } from "./render.ts";
 export { tags } from "./tags.ts";
 export { functions } from "./functions.ts";
