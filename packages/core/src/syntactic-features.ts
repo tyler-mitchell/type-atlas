@@ -3,7 +3,7 @@ import ts from "typescript";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import { getLanguageServiceByDocument } from "volar-service-typescript/lib/plugins/syntactic.js";
 import { convertNavTree, convertOutliningSpan } from "volar-service-typescript/lib/utils/lspConverters.js";
-import { foldingAffectsView, sourceLines } from "atlascii";
+import { foldingAffectsView, sourceLines, truncate } from "atlascii";
 
 /**
  * What a source file says about itself, read from its text alone.
@@ -119,9 +119,27 @@ export const documentSymbols = (input: {
     }
   };
   collect(roots);
+  // TypeScript's navigation tree names what it cannot name `<unknown>` — a
+  // conditional spread has no identifier — and a parser token is not a name a
+  // reader can act on. The member's own source is: collapsed to one line and
+  // cut to a label's width, it says exactly what stands at that range.
+  const named = (symbol: DocumentSymbol) =>
+    symbol.name === "<unknown>"
+      ? truncate({
+          value: input.source
+            .slice(
+              parse.document.offsetAt(symbol.range.start),
+              parse.document.offsetAt(symbol.range.end),
+            )
+            .replace(/\s+/gu, " ")
+            .trim(),
+          columns: 40,
+        })
+      : symbol.name;
   const corrected = (symbols: readonly DocumentSymbol[]): DocumentSymbol[] =>
     symbols.map((symbol) => ({
       ...symbol,
+      name: named(symbol),
       kind: typeAliases.has(symbol.name) ? 11 : symbol.kind,
       ...(symbol.children ? { children: corrected(symbol.children) } : {}),
     }));
