@@ -110,6 +110,101 @@ const packageOf = (file: string) => {
 /** Whether a use sits in a test file, by the paths tests conventionally hold. */
 const isTestSite = (file: string) => /(^|\/)tests?\/|\.(test|spec|check)\./u.test(file);
 
+/**
+ * Every place an exact text occurs under a directory, and the honest scan
+ * count behind an absence claim. One owner, two askers: the occurrences tool
+ * and the compose op — the gateway that reaches a live session no schema
+ * change can.
+ */
+const scanOccurrences = async (input: {
+  readonly root: string;
+  readonly text: string;
+  readonly directory: string;
+  readonly limit: number;
+  readonly signal: AbortSignal;
+}) => {
+  const workspaceRoot = path.resolve(input.root);
+  const scanRoot = path.resolve(workspaceRoot, input.directory);
+  if (scanRoot !== workspaceRoot && !isFileInDir(scanRoot, workspaceRoot)) {
+    throw new Error(`Directory is outside the workspace: ${input.directory}`);
+  }
+  // The same walk list_files answers from: gitignore honored, dependency
+  // and VCS internals excluded — an absence claim is only as strong as
+  // the set it scanned, and this is the set a reader expects.
+  const isIgnored = await isGitIgnored({
+    cwd: scanRoot,
+    followSymbolicLinks: false,
+    ignore: ["**/.git/**", "**/node_modules/**"],
+  });
+  const fileBudget = 4000;
+  const files = await new fdir()
+    .withPathSeparator("/")
+    .withRelativePaths()
+    .withMaxFiles(fileBudget + 1)
+    .withErrors()
+    .withAbortSignal(input.signal)
+    .filter((file) => !isIgnored(file))
+    .exclude((name) => name === ".git" || name === "node_modules" || name.startsWith("."))
+    .crawl(scanRoot)
+    .withPromise();
+  const over = files.length > fileBudget;
+  const scanned = files.slice(0, fileBudget);
+  const sites: { file: string; line: number; character: number; text: string }[] = [];
+  let total = 0;
+  const seenFiles = new Set<string>();
+  for (const relative of scanned) {
+    const source = await readFile(path.resolve(scanRoot, relative), "utf8").catch(
+      () => undefined,
+    );
+    // A NUL byte marks content no reader lines up; skipped, not counted.
+    if (source === undefined || source.includes("\0")) continue;
+    if (!source.includes(input.text)) continue;
+    const display = path.relative(workspaceRoot, path.resolve(scanRoot, relative));
+    for (const [index, line] of source.split("\n").entries()) {
+      for (
+        let at = line.indexOf(input.text);
+        at !== -1;
+        at = line.indexOf(input.text, at + Math.max(1, input.text.length))
+      ) {
+        total += 1;
+        seenFiles.add(display);
+        if (sites.length < input.limit) {
+          sites.push({
+            file: display,
+            line: index + 1,
+            character: at + 1,
+            text: line.trim(),
+          });
+        }
+      }
+    }
+  }
+  const groups = [...Map.groupBy(sites, ({ file }) => file)].map(([file, held]) =>
+    held.length === 1 && held[0]
+      ? { file, at: `${held[0].line}:${held[0].character}`, text: held[0].text }
+      : {
+          file,
+          children: held.map((site) => ({
+            at: `${site.line}:${site.character}`,
+            column: Math.max(...held.map(({ line, character }) => `${line}:${character}`.length)),
+            text: site.text,
+          })),
+        },
+  );
+  return {
+    text: input.text,
+    directory:
+      path.relative(workspaceRoot, scanRoot) === "" ? "the workspace" : input.directory,
+    total,
+    fileCount: seenFiles.size,
+    scanned: scanned.length,
+    over,
+    groups,
+    page:
+      total > sites.length ? { from: 1, to: sites.length, total, unit: "occurrences" } : undefined,
+  };
+};
+
 export const registerExperimentalTools = (
   server: McpServer,
   workspaces: VolarWorkspacePool,
@@ -198,7 +293,7 @@ export const registerExperimentalTools = (
     {
       title: "Compose",
       description:
-        'Experimental: author and compose your own code-intelligence queries in markup. A document of self-closing ask tags is a complete composition — each answer renders in its canonical block, in your order. Asks chain: a later ask reads an earlier answer, e.g. {% ask "diagnostics" as="health" files=$uses.paths /%} checks the files the reference search found. Add body markup only to shape the answer yourself: what an ask binds is readable anywhere below it ({% $uses.total %}), and the shipped tags and partials compose it.\n\nOperations and what each binds:\n- {% ask "hover" as="head" file="src/x.ts" line=5 character=10 /%} (one-based, on the symbol\'s name) → {text}: the signature and documentation, rendered with {% $head.text %}\n- {% ask "references" as="uses" file="src/x.ts" line=5 character=10 /%} → {total, files, paths, projects, groups}; render sites with {% tree entries=$uses.groups partial="reference-node.mdoc" /%}\n- {% ask "outline" as="shape" file="src/x.ts" /%} → {total, tree}; render with {% tree entries=$shape.tree partial="symbol-node.mdoc" /%}\n- {% ask "diagnostics" as="problems" file="src/x.ts" /%} → {total, groups}; render with {% each items=$problems.groups as="group" partial="diagnostic-group.mdoc" /%}\n- {% ask "source" as="body" file="src/x.ts" from=10 to=40 /%} → {lines, startLine}; render with {% source lines=$body.lines startLine=$body.startLine /%}',
+        'Experimental: author and compose your own code-intelligence queries in markup. A document of self-closing ask tags is a complete composition — each answer renders in its canonical block, in your order. Asks chain: a later ask reads an earlier answer, e.g. {% ask "diagnostics" as="health" files=$uses.paths /%} checks the files the reference search found. Add body markup only to shape the answer yourself: what an ask binds is readable anywhere below it ({% $uses.total %}), and the shipped tags and partials compose it.\n\nOperations and what each binds:\n- {% ask "hover" as="head" file="src/x.ts" line=5 character=10 /%} (one-based, on the symbol\'s name) → {text}: the signature and documentation, rendered with {% $head.text %}\n- {% ask "references" as="uses" file="src/x.ts" line=5 character=10 /%} → {total, files, paths, projects, groups}; render sites with {% tree entries=$uses.groups partial="reference-node.mdoc" /%}\n- {% ask "outline" as="shape" file="src/x.ts" /%} → {total, tree}; render with {% tree entries=$shape.tree partial="symbol-node.mdoc" /%}\n- {% ask "diagnostics" as="problems" file="src/x.ts" /%} → {total, groups}; render with {% each items=$problems.groups as="group" partial="diagnostic-group.mdoc" /%}\n- {% ask "source" as="body" file="src/x.ts" from=10 to=40 /%} → {lines, startLine}; render with {% source lines=$body.lines startLine=$body.startLine /%}\n- {% ask "occurrences" as="hits" text="device.lost" file="src" /%} (file is the directory to scan) → {total, fileCount, scanned, groups}: every place the exact text occurs, or an honest zero with the scan count',
       inputSchema: input.Compose,
       annotations: readOnlyToolAnnotations,
     },
@@ -330,6 +425,14 @@ export const registerExperimentalTools = (
             startLine: from,
           };
         },
+        occurrences: async (ask) =>
+          scanOccurrences({
+            root,
+            text: String(ask.attributes.text ?? ask.attributes.query ?? ""),
+            directory: askedFile(ask) || ".",
+            limit: 40,
+            signal,
+          }),
       };
       const asks = documentAsks(document);
       const unfulfillable = asks.filter(({ operation }) => !(operation in operations));
@@ -390,6 +493,8 @@ export const registerExperimentalTools = (
           `## Problems — ${subject(ask)}\n\n{% if equals($${ask.bind}.total, 0) %}No problem in {% $${ask.bind}.checked %} {% plural count=$${ask.bind}.checked forms={"one": "file", "other": "files"} /%} checked.{% /if %}{% if not(equals($${ask.bind}.checked, $${ask.bind}.of)) %} Checked the first {% $${ask.bind}.checked %} of {% $${ask.bind}.of %} files.{% /if %}\n{% each items=$${ask.bind}.groups as="group" partial="diagnostic-group.mdoc" /%}`,
         source: (ask) =>
           `## ${subject(ask)}\n\n{% source lines=$${ask.bind}.lines startLine=$${ask.bind}.startLine /%}`,
+        occurrences: (ask) =>
+          `## "${String(ask.attributes.text ?? ask.attributes.query ?? "")}" — occurrences\n\n{% if equals($${ask.bind}.total, 0) %}Nothing under {% $${ask.bind}.directory %} contains it · {% $${ask.bind}.scanned %} files scanned.{% /if %}{% if not(equals($${ask.bind}.total, 0)) %}{% $${ask.bind}.total %} in {% $${ask.bind}.fileCount %} files · {% $${ask.bind}.scanned %} files scanned.\n\n{% tree entries=$${ask.bind}.groups partial="occurrence-node.mdoc" /%}{% /if %}`,
       };
       const bare = document.replace(/\{%\s*ask\b[\s\S]*?\/%\}/gu, "").trim() === "";
       const source =
@@ -525,90 +630,9 @@ export const registerExperimentalTools = (
       annotations: readOnlyToolAnnotations,
     },
     async ({ workspace: root, text, directory = ".", limit = 40 }, { mcpReq: { signal } }) => {
-      const workspaceRoot = path.resolve(root);
-      const scanRoot = path.resolve(workspaceRoot, directory);
-      if (scanRoot !== workspaceRoot && !isFileInDir(scanRoot, workspaceRoot)) {
-        throw new Error(`Directory is outside the workspace: ${directory}`);
-      }
-      // The same walk list_files answers from: gitignore honored, dependency
-      // and VCS internals excluded — an absence claim is only as strong as
-      // the set it scanned, and this is the set a reader expects.
-      const isIgnored = await isGitIgnored({
-        cwd: scanRoot,
-        followSymbolicLinks: false,
-        ignore: ["**/.git/**", "**/node_modules/**"],
-      });
-      const fileBudget = 4000;
-      const files = await new fdir()
-        .withPathSeparator("/")
-        .withRelativePaths()
-        .withMaxFiles(fileBudget + 1)
-        .withErrors()
-        .withAbortSignal(signal)
-        .filter((file) => !isIgnored(file))
-        .exclude((name) => name === ".git" || name === "node_modules" || name.startsWith("."))
-        .crawl(scanRoot)
-        .withPromise();
-      const over = files.length > fileBudget;
-      const scanned = files.slice(0, fileBudget);
-      const sites: { file: string; line: number; character: number; text: string }[] = [];
-      let total = 0;
-      const seenFiles = new Set<string>();
-      for (const relative of scanned) {
-        const source = await readFile(path.resolve(scanRoot, relative), "utf8").catch(
-          () => undefined,
-        );
-        // A NUL byte marks content no reader lines up; skipped, not counted.
-        if (source === undefined || source.includes("\0")) continue;
-        if (!source.includes(text)) continue;
-        const display = path.relative(workspaceRoot, path.resolve(scanRoot, relative));
-        for (const [index, line] of source.split("\n").entries()) {
-          for (
-            let at = line.indexOf(text);
-            at !== -1;
-            at = line.indexOf(text, at + Math.max(1, text.length))
-          ) {
-            total += 1;
-            seenFiles.add(display);
-            if (sites.length < limit) {
-              sites.push({
-                file: display,
-                line: index + 1,
-                character: at + 1,
-                text: line.trim(),
-              });
-            }
-          }
-        }
-      }
-      const groups = [...Map.groupBy(sites, ({ file }) => file)].map(([file, held]) =>
-        held.length === 1 && held[0]
-          ? { file, at: `${held[0].line}:${held[0].character}`, text: held[0].text }
-          : {
-              file,
-              children: held.map((site) => ({
-                at: `${site.line}:${site.character}`,
-                column: Math.max(...held.map(({ line, character }) => `${line}:${character}`.length)),
-                text: site.text,
-              })),
-            },
-      );
       const rendered = await renderDocument({
         document: "occurrences.tool.mdoc",
-        variables: {
-          text,
-          directory:
-            path.relative(workspaceRoot, scanRoot) === "" ? "the workspace" : directory,
-          total,
-          fileCount: seenFiles.size,
-          scanned: scanned.length,
-          over,
-          groups,
-          page:
-            total > sites.length
-              ? { from: 1, to: sites.length, total, unit: "occurrences" }
-              : undefined,
-        },
+        variables: await scanOccurrences({ root, text, directory, limit, signal }),
       });
       return textResult(rendered.text);
     },

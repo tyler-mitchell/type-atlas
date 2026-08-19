@@ -100,6 +100,8 @@ export const tags: Config["tags"] = {
       line: { type: Number },
       character: { type: Number },
       query: { type: String },
+      /** Exact text for a literal ask, as distinct from a query by meaning. */
+      text: { type: String },
       from: { type: Number },
       to: { type: Number },
     },

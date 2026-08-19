@@ -90,6 +90,40 @@ const rejectingUndeclared = <Schema extends StandardSchemaWithJSON>(schema: Sche
   return typeof chain === "function" ? chain.call(schema, "reject") : schema;
 };
 
+/**
+ * Every registered tool, by name, for the development gateway.
+ *
+ * A client pins tool schemas when it connects, so a tool or parameter added
+ * mid-session is stripped or refused client-side before the server ever sees
+ * it — which blocks the edit → reload → use loop this repository develops by.
+ * The gateway dispatches through this registry instead, validating with the
+ * target's live schema, so capability added after connect stays reachable.
+ */
+type ToolContext = Parameters<ToolCallback<StandardSchemaWithJSON>>[1];
+type ErasedToolCallback = (argument: unknown, context: ToolContext) => unknown;
+
+const registered = new Map<
+  string,
+  { readonly schema: StandardSchemaWithJSON; readonly callback: ErasedToolCallback }
+>();
+
+/** Calls a registered tool by name, validated by its current schema. */
+export const dispatchTool = async (name: string, argument: unknown, context: ToolContext) => {
+  const target = registered.get(name);
+  if (!target) {
+    throw new Error(
+      `No tool "${name}". The tools are ${[...registered.keys()].sort().join(", ")}.`,
+    );
+  }
+  const validated = await target.schema["~standard"].validate(argument ?? {});
+  if (validated.issues) {
+    throw new Error(
+      `${name} arguments: ${validated.issues.map((issue) => issue.message).join("; ")}`,
+    );
+  }
+  return await target.callback(validated.value, context);
+};
+
 export const registerTool = <
   Input extends StandardSchemaWithJSON,
   Output extends StandardSchemaWithJSON = StandardSchemaWithJSON,
@@ -127,9 +161,13 @@ export const registerTool = <
     );
   }) as ToolCallback<Input>;
 
-  return server.registerTool<Output, Input>(
-    name,
-    { ...config, inputSchema: rejectingUndeclared(config.inputSchema) },
-    boundedCallback,
-  );
+  const inputSchema = rejectingUndeclared(config.inputSchema);
+  // The raw callback, not the bounded one: the gateway wraps its own call in
+  // one timeout and one elapsed trailer, and a doubly-wrapped target would
+  // print two.
+  registered.set(name, {
+    schema: inputSchema,
+    callback: callback as unknown as ErasedToolCallback,
+  });
+  return server.registerTool<Output, Input>(name, { ...config, inputSchema }, boundedCallback);
 };
