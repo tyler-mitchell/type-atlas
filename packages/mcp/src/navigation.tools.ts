@@ -168,65 +168,6 @@ const callHierarchyVariables = <Call extends { readonly fromRanges: readonly Ran
  * declarations in their own right, `(property) down: string`, and as the
  * declaring keyword otherwise, `const countHeader: …` — so both are read.
  */
-/** The words hover states a kind with; anything else is prose, not a kind. */
-const knownKinds = new Set([
-  "const",
-  "let",
-  "var",
-  "function",
-  "local function",
-  "method",
-  "class",
-  "interface",
-  "type",
-  "type parameter",
-  "enum",
-  "enum member",
-  "namespace",
-  "module",
-  "property",
-  "parameter",
-  "alias",
-  "getter",
-  "setter",
-  "accessor",
-]);
-
-const kindAt = (input: {
-  readonly intelligence: ReturnType<typeof createTypeAtlas>;
-  readonly file: string;
-  readonly position: { readonly line: number; readonly character: number };
-  readonly signal: AbortSignal;
-}) =>
-  input.intelligence
-    .hover({ file: input.file, signal: input.signal, params: { position: input.position } })
-    .then(({ result }) => {
-      const contents = result?.contents;
-      const text =
-        typeof contents === "object" && contents && "value" in contents
-          ? String(contents.value)
-          : "";
-      // Anchored to the hover's opening, and bounded to the words TypeScript
-      // actually uses: the unanchored form matched "(or refinement" inside a
-      // hover's documentation prose and answered "[or refinement]" as a kind.
-      const kind =
-        /^(?:```\w*\s*)?\((?<kind>[a-z ]+)\)\s/.exec(text)?.groups?.kind ??
-        /^(?:```\w*\s*)?(?<kind>const|let|var|function|class|interface|type|enum|namespace|module)\b/m.exec(
-          text,
-        )?.groups?.kind;
-      // Nature over storage: a const whose hover shows a callable type IS a
-      // function — `planTensorStorage` read [constant] here and [function]
-      // one tool over for being a const arrow. Storage words survive only
-      // when the value's nature is not visible.
-      const natured =
-        kind !== undefined && ["const", "let", "var"].includes(kind) && /\)\s*=>/.test(text)
-          ? "function"
-          : kind;
-      // The bare kind. Which article belongs in front of it is English grammar,
-      // and grammar is the document's to state.
-      return natured !== undefined && knownKinds.has(natured) ? natured : undefined;
-    })
-    .catch(() => undefined);
 
 const referenceScopeInput = type("'project' | 'workspace'").configure(
   {
@@ -483,14 +424,18 @@ export const registerNavigationTools = (
       // site as its enclosing assignment ("targets" for a question about
       // navigationTargets), so it is only the fallback for answers whose
       // targets carry no name.
-      const subject =
-        targets.items.find(({ name }) => name)?.name ||
-        (await subjectAtPosition({ workspace, uri: textDocument.uri, position, signal }))?.name;
+      const resolved = await subjectAtPosition({
+        workspace,
+        uri: textDocument.uri,
+        position,
+        signal,
+      });
+      const subject = targets.items.find(({ name }) => name)?.name || resolved?.name;
       const rendered = await renderDocument({
         document: "definitions.tool.mdoc",
         variables: {
           subject,
-          kind: await kindAt({ intelligence: createTypeAtlas(workspace), file, position, signal }),
+          kind: resolved?.kind,
           root,
           landedIn: landedIn?.name,
           landedAt: landedIn?.selectionRange.start,
@@ -529,20 +474,12 @@ export const registerNavigationTools = (
             await renderDocument({
               document: "type-definitions.tool.mdoc",
               variables: {
-                subject: (
-                  await subjectAtPosition({
-                    workspace,
-                    uri: textDocument.uri,
-                    position,
-                    signal,
-                  })
-                )?.name,
-                kind: await kindAt({
-                  intelligence: createTypeAtlas(workspace),
-                  file,
+                ...(await subjectAtPosition({
+                  workspace,
+                  uri: textDocument.uri,
                   position,
                   signal,
-                }),
+                }).then((resolved) => ({ subject: resolved?.name, kind: resolved?.kind }))),
                 root,
                 ...(await navigationTargets({ result, root, workspace, signal })),
               },
@@ -583,20 +520,12 @@ export const registerNavigationTools = (
             await renderDocument({
               document: "implementations.tool.mdoc",
               variables: {
-                subject: (
-                  await subjectAtPosition({
-                    workspace,
-                    uri: textDocument.uri,
-                    position,
-                    signal,
-                  })
-                )?.name,
-                kind: await kindAt({
-                  intelligence: createTypeAtlas(workspace),
-                  file,
+                ...(await subjectAtPosition({
+                  workspace,
+                  uri: textDocument.uri,
                   position,
                   signal,
-                }),
+                }).then((resolved) => ({ subject: resolved?.name, kind: resolved?.kind }))),
                 root,
                 ...(await navigationTargets({
                   result,
@@ -801,13 +730,12 @@ export const registerNavigationTools = (
       );
       const declarationSite = ordered.find((site) => site.declaration);
       const uses = ordered.filter((site) => !site.declaration);
-      const kind = await kindAt({ intelligence, file, position, signal });
       const matched = await project;
       const rendered = await renderDocument({
         document: "references.tool.mdoc",
         variables: {
           subject: resolved?.name,
-          kind,
+          kind: resolved?.kind,
           // A top-level declaration is its own enclosing declaration, so the
           // outline names it as its own container — which says nothing.
           container:
@@ -954,45 +882,39 @@ export const registerNavigationTools = (
         params: { position },
       });
       const highlights = result ?? [];
-      const intelligence = createTypeAtlas(workspace);
-      const kind = await kindAt({ intelligence, file, position, signal });
+      // The one subject owner, replacing this handler's own slice copy and
+      // its separate kind request.
+      const resolved = await subjectAtPosition({
+        workspace,
+        uri: textDocument.uri,
+        position,
+        signal,
+      });
       // One document, so the path belongs in the sentence and not above a group
       // of one: printing it as a heading over its own rows stated it twice.
-      const sites = [];
-      for (const { range } of highlights) {
-        const chain = await declarationChainAtPosition({
-          workspace,
-          uri: textDocument.uri,
-          position: range.start,
-        }).catch(() => []);
-        sites.push({
-          file: displayPath(textDocument.uri, root),
-          line: range.start.line + 1,
-          character: range.start.character + 1,
-          within: enclosingDeclaration(chain, range)?.name,
-        });
-      }
-      // Every highlight is the same symbol, so the text under any of them is its
-      // name; the one on the queried line is preferred so a caller sees the name
-      // they pointed at.
-      const source = await workspace
-        .readTextDocumentUri(textDocument.uri, signal)
-        .then(({ source: text }) => text.split("\n"))
-        .catch(() => [] as string[]);
-      const named =
-        highlights.find(({ range }) => range.start.line === position.line) ?? highlights[0];
+      // Concurrent over the highlights, as every sibling's rows are.
+      const sites = await Promise.all(
+        highlights.map(async ({ range }) => {
+          const chain = await declarationChainAtPosition({
+            workspace,
+            uri: textDocument.uri,
+            position: range.start,
+          }).catch(() => []);
+          return {
+            file: displayPath(textDocument.uri, root),
+            line: range.start.line + 1,
+            character: range.start.character + 1,
+            within: enclosingDeclaration(chain, range)?.name,
+          };
+        }),
+      );
       const rendered = await renderDocument({
         document: "document-highlights.tool.mdoc",
         variables: {
           file: displayPath(textDocument.uri, root),
           root,
-          subject: named
-            ? (source[named.range.start.line] ?? "").slice(
-                named.range.start.character,
-                named.range.end.character,
-              )
-            : undefined,
-          kind,
+          subject: resolved?.name,
+          kind: resolved?.kind,
           total: highlights.length,
           groups: referenceGroups(
             [...sites].sort(

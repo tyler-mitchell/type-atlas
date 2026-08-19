@@ -284,21 +284,91 @@ export const declarationAtPosition = async (input: {
  * LocationLink's selection spans exactly the identifier, so the text under
  * it is the name. The outline answers only when the definition cannot.
  */
+/** The words hover states a kind with; anything else is prose, not a kind. */
+const hoverKinds = new Set([
+  "const",
+  "let",
+  "var",
+  "function",
+  "local function",
+  "method",
+  "class",
+  "interface",
+  "type",
+  "type parameter",
+  "enum",
+  "enum member",
+  "namespace",
+  "module",
+  "property",
+  "parameter",
+  "alias",
+  "getter",
+  "setter",
+  "accessor",
+]);
+
+/**
+ * The kind word at a position, from hover, anchored and bounded.
+ *
+ * The syntactic outline has no entry for a type's members and reports the
+ * enclosing type instead; hover states the kind itself, two ways —
+ * parenthesised for things that are not declarations in their own right,
+ * and as the declaring keyword otherwise. Unanchored matching once answered
+ * "[or refinement]" from a hover's documentation prose, and storage words
+ * yield to nature: a const whose type is callable is a function.
+ */
+const hoverKindAt = async (input: {
+  readonly workspace: VolarWorkspace;
+  readonly uri: string;
+  readonly position: Position;
+  readonly signal?: AbortSignal;
+}): Promise<string | undefined> => {
+  const hover = await input.workspace
+    .sendRequest(
+      HoverRequest.type,
+      { textDocument: { uri: input.uri }, position: input.position },
+      input.signal,
+    )
+    .catch(() => null);
+  const contents = hover?.contents;
+  const text =
+    typeof contents === "object" && contents && "value" in contents ? String(contents.value) : "";
+  const kind =
+    /^(?:```\w*\s*)?\((?<kind>[a-z ]+)\)\s/.exec(text)?.groups?.kind ??
+    /^(?:```\w*\s*)?(?<kind>const|let|var|function|class|interface|type|enum|namespace|module)\b/m.exec(
+      text,
+    )?.groups?.kind;
+  const natured =
+    kind !== undefined && ["const", "let", "var"].includes(kind) && /\)\s*=>/.test(text)
+      ? "function"
+      : kind;
+  return natured !== undefined && hoverKinds.has(natured) ? natured : undefined;
+};
+
 export const subjectAtPosition = async (input: {
   readonly workspace: VolarWorkspace;
   readonly uri: string;
   readonly position: Position;
   readonly signal?: AbortSignal;
 }): Promise<
-  { readonly name: string; readonly declaredAt: { readonly uri: string; readonly selection: Range } } | undefined
+  | {
+      readonly name: string;
+      readonly kind?: string;
+      readonly declaredAt: { readonly uri: string; readonly selection: Range };
+    }
+  | undefined
 > => {
-  const defined = await input.workspace
-    .sendRequest(
-      DefinitionRequest.type,
-      { textDocument: { uri: input.uri }, position: input.position },
-      input.signal,
-    )
-    .catch(() => null);
+  const [defined, kind] = await Promise.all([
+    input.workspace
+      .sendRequest(
+        DefinitionRequest.type,
+        { textDocument: { uri: input.uri }, position: input.position },
+        input.signal,
+      )
+      .catch(() => null),
+    hoverKindAt(input),
+  ]);
   const first = (Array.isArray(defined) ? defined[0] : defined) as
     | { uri?: string; targetUri?: string; range?: Range; targetSelectionRange?: Range }
     | null
@@ -318,7 +388,7 @@ export const subjectAtPosition = async (input: {
           .catch(() => undefined)
       : undefined;
   if (uri && selection && sliced && /^[$A-Za-z_][\w$]*$/u.test(sliced)) {
-    return { name: sliced, declaredAt: { uri, selection } };
+    return { name: sliced, ...(kind === undefined ? {} : { kind }), declaredAt: { uri, selection } };
   }
   // A plain Location's range spans the whole declaration — slicing it
   // yields nothing — and no definition at all leaves only the asked file.
@@ -330,6 +400,7 @@ export const subjectAtPosition = async (input: {
   return declared?.name
     ? {
         name: declared.name,
+        ...(kind === undefined ? {} : { kind }),
         declaredAt:
           uri && selection
             ? { uri, selection }
