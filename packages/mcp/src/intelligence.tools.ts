@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/server";
 import { type } from "arktype";
 import { createDependencySearch } from "./dependency-search.ts";
 import { createRetrievalIntelligence } from "./intelligence.ts";
+import { createSuccessorSearch } from "./successor.ts";
 import { readOnlyToolAnnotations } from "./metadata.ts";
 import { textResult } from "./mcp-result.ts";
 import type { Semble } from "./semble.ts";
@@ -117,6 +118,17 @@ const input = type.module({
     "limit?": resultLimit,
     "snippetLines?": snippetLines,
   }),
+  Successor: type({
+    ...fileInput,
+    name: type("string >= 1").configure({
+      description: "The symbol name that no longer resolves.",
+    }),
+    "module?": type("string >= 1").configure({
+      description:
+        "The module it was imported from, when it had one. Its current surface is the strongest evidence of what replaced it.",
+    }),
+    "limit?": resultLimit,
+  }),
   Search: type({
     workspace: fileInput.workspace,
     "directory?": directory,
@@ -176,6 +188,21 @@ export const registerIntelligenceTools = (
 ): void => {
   const intelligence = createRetrievalIntelligence({ semble, workspaces });
   const searchDependencies = createDependencySearch({ semble, workspaces });
+  const findSuccessor = createSuccessorSearch({ semble, workspaces });
+
+  registerTool(
+    server,
+    "find_successor",
+    {
+      title: "Find successor",
+      description:
+        "Establish what happened to a symbol that no longer resolves: whether it still exists somewhere, or was withdrawn, and what currently occupies its role. Use this before concluding a capability is gone — a name that returns nothing from search is the case this answers, not evidence of removal.",
+      inputSchema: input.Successor,
+      annotations: readOnlyToolAnnotations,
+    },
+    async ({ workspace, file, name, module, limit = 5 }, { mcpReq: { signal } }) =>
+      textResult(await findSuccessor({ workspace, file, name, module, limit, signal })),
+  );
 
   registerTool(
     server,

@@ -1,0 +1,4 @@
+{% if $group.file %}
+{% banner config=$config %}{% $group.file %}{% /banner %}
+{% /if %}
+{% each items=$group.problems as="problem" partial="diagnostic.mdoc" /%}

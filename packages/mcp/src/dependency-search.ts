@@ -1,24 +1,46 @@
 import {
   listModuleExports,
   type ModuleExportPage,
+  renderDocument,
   type VolarWorkspacePool,
 } from "@type-atlas/core";
-import { formatModuleDeclarations, workspacePath } from "@type-atlas/core/text";
-import { ResolveDependencySourceRequest } from "@type-atlas/language-server/protocol";
+import { markupText, displayPath } from "atlascii";
 import * as path from "pathe";
 import { URI } from "vscode-uri";
 import { enrichRetrievalPage, type RetrievalMatch } from "./intelligence.ts";
 import type { Semble, SembleSearchPage } from "./semble.ts";
 
+/**
+ * Whether a snippet is a CommonJS module preamble rather than source.
+ *
+ * A built package's entry file opens with the interop banner and one very long
+ * `exports.a = exports.b = … = void 0` chain. That line names every export the
+ * module has, so any query about a name in the package matches it above the
+ * code implementing that name, and it tells a reader nothing about behaviour.
+ */
+const modulePreamble = (content: string | undefined) => {
+  const lines = (content ?? "").split("\n").filter((line) => line.trim());
+  return (
+    lines.length > 0 &&
+    lines.every(
+      (line) =>
+        /^\s*(?:"use strict";?|Object\.defineProperty\(exports,|exports\.[\w$]+\s*=|module\.exports\s*=|(?:const|let|var)\s+[\w$]+\s*=\s*require\()/.test(
+          line,
+        ) || /^\s*(?:\/\*|\*|\/\/)/.test(line),
+    )
+  );
+};
+
 type DependencySearchResult =
   | {
       readonly requested: string;
       readonly name: string;
-      readonly version: string;
+      readonly version?: string;
       readonly packageRoot: string;
       readonly searchRoot: string;
       readonly page: SembleSearchPage;
       readonly matches: readonly RetrievalMatch[];
+      readonly elsewhere: number;
       readonly api: readonly {
         readonly item: ModuleExportPage["items"][number];
         readonly evidence: SembleSearchPage["results"][number];
@@ -54,24 +76,6 @@ export const createDependencySearch =
     const results = await Promise.all(
       request.packages.map(async (name): Promise<DependencySearchResult> => {
         try {
-          const resolved = await workspace.sendRequest(
-            ResolveDependencySourceRequest.type,
-            {
-              textDocument: {
-                uri: workspace.getWorkspaceUri(request.file),
-              },
-              moduleName: name,
-            },
-            request.signal,
-          );
-          if (!resolved?.packageId) {
-            throw new Error(`Package is not resolved from ${request.file}.`);
-          }
-
-          const subModuleName = resolved.packageId.subModuleName;
-          const packageRoot = subModuleName
-            ? resolved.resolvedFileName.slice(0, -subModuleName.length)
-            : path.dirname(resolved.resolvedFileName);
           const queryTerms = new Set(
             (request.query.toLowerCase().match(/[a-z0-9]+/gu) ?? []).flatMap((term) =>
               term.endsWith("s") ? [term, term.slice(0, -1)] : [term],
@@ -95,6 +99,10 @@ export const createDependencySearch =
             signal: request.signal,
           };
           const exports = await listModuleExports(exportRequest);
+          const packageRoot = exports.packageRoot;
+          if (!packageRoot) {
+            throw new Error(`Package is not resolved from ${request.file}.`);
+          }
           const definitionUri = exports.definitionUris[0];
           const query = [request.type, request.path.join("."), request.query]
             .filter(Boolean)
@@ -137,12 +145,12 @@ export const createDependencySearch =
             (result) =>
               /\.[cm]?jsx?$/u.test(result.file_path) && !/\.min\.[cm]?js$/u.test(result.file_path),
           );
-          const representation = [
-            authoredTypeScript,
-            declarations,
-            readableJavaScript,
-            evidenceResults,
-          ].find((results) => results.length > 0)!;
+          const compiled = [...declarations, ...readableJavaScript].sort(
+            (left, right) => right.score - left.score,
+          );
+          const representation = [authoredTypeScript, compiled, evidenceResults].find(
+            (results) => results.length > 0,
+          )!;
           const selectedEvidence = representation.filter(
             (result, index, results) =>
               results.findIndex((other) => other.content === result.content) === index,
@@ -188,7 +196,7 @@ export const createDependencySearch =
                 includeDefinition: false,
               })
             : undefined;
-          const matches = (
+          const found = (
             await enrichRetrievalPage({
               page,
               root: request.workspace,
@@ -199,19 +207,30 @@ export const createDependencySearch =
               workspaces: dependencies.workspaces,
               signal: request.signal,
             })
-          ).matches;
+          ).matches.filter((match) => !modulePreamble(match.content));
+          // The search root reaches past the package a caller named — a bridge
+          // package resolves next to the implementation it wraps — so source
+          // attributed to this package must come from it. Results from
+          // elsewhere are counted rather than shown under the wrong name.
+          const withinPackage = displayPath(
+            URI.file(packageRoot).toString(),
+            request.workspace,
+          );
+          const matches = found.filter((match) => match.displayFile.startsWith(withinPackage));
+          const elsewhere = found.length - matches.length;
           const api = (resolvedExports?.items ?? []).flatMap((item) => {
             const candidate = candidates.find((candidate) => candidate.item.label === item.label);
             return candidate ? [{ item, evidence: candidate.evidence }] : [];
           });
           return {
             requested: name,
-            name: resolved.packageId.name,
-            version: resolved.packageId.version,
+            name: exports.packageName ?? name,
+            version: exports.packageVersion,
             packageRoot,
             searchRoot,
             page,
             matches,
+            elsewhere,
             api,
           };
         } catch (error) {
@@ -229,58 +248,62 @@ export const createDependencySearch =
     const surfaceSegments = request.type ? [request.type, ...request.path] : request.path;
     const surfaceHeading = surfaceSegments.join(".");
 
-    return [
-      `From ${request.file}`,
-      ...(hasMatches ? ["Relative relevance within each package."] : []),
-      "",
-      ...results.flatMap((result) => {
-        const topScore = "error" in result ? undefined : result.matches[0]?.result.score;
-        return [
-          `## ${
-            "error" in result
-              ? result.requested
-              : `${result.name}@${result.version}${
-                  result.name === result.requested ? "" : ` (requested as ${result.requested})`
-                } · ${workspacePath(URI.file(result.packageRoot).toString(), request.workspace)}`
-          }`,
-          ...("error" in result
-            ? [`Error: ${result.error}`]
-            : [
-                "",
-                ...(result.api.length
-                  ? [
-                      ...(surfaceHeading ? [`### ${surfaceHeading}`] : []),
-                      formatModuleDeclarations({
-                        items: result.api.map(({ item }) => item),
-                        qualifier: surfaceHeading,
-                        includeDocs: true,
-                        documentationLimit: 220,
-                      }),
-                      "",
-                      "### Relevant source",
-                    ]
-                  : []),
-                ...result.matches.flatMap((match, index) => {
-                  const source = match.content?.split("\n") ?? [];
-                  const startLine = match.contentStartLine + 1;
-                  const endLine = startLine + Math.max(0, source.length - 1);
-                  return [
-                    `${index + 1}. ${
-                      topScore && topScore > 0
-                        ? Math.round((match.result.score / topScore) * 100)
-                        : 0
-                    }% · ${match.displayFile}:${startLine}-${endLine}`,
-                    "```text",
-                    ...source.map((line, offset) => `${startLine + offset}|${line}`),
-                    "```",
-                    "",
-                  ];
-                }),
-              ]),
-          "",
-        ];
-      }),
-    ]
-      .join("\n")
-      .trimEnd();
+    const rendered = await renderDocument({
+      document: "dependency-search.tool.mdoc",
+      variables: {
+        from: request.file,
+        ranked: hasMatches,
+        packages: results.map((result) => {
+          if ("error" in result) return { name: result.requested, error: `Error: ${result.error}` };
+          const topScore = result.matches[0]?.result.score;
+          return {
+            name: result.name,
+            version: result.version,
+            requested: result.name === result.requested ? undefined : result.requested,
+            surface: surfaceHeading || undefined,
+            api: result.api.map(({ item }) => ({
+              name: item.label,
+              signature: item.detail,
+              deprecated: item.tags?.includes(1),
+              documentation: markupText(item.documentation).slice(0, 220) || undefined,
+            })),
+            noExportMatched: result.api.length === 0,
+            showSource: result.matches.length > 0 || result.elsewhere > 0,
+            elsewhere: result.elsewhere,
+            // One entry per place. The name search and the meaning search both
+            // reach the same declaration, and neither knows what the other
+            // found, so a two-result page spent both slots on one snippet —
+            // `chokidar/types/index.d.ts:186-191` at 100% and again at 41%.
+            // Matches arrive best-scored first, so the first of a repeat is the
+            // one to keep: a `Map` built from all of them keeps the *last*,
+            // which threw away the 100% and left a single result scored 41%
+            // against a match no longer shown.
+            sources: result.matches
+              .filter(
+                (match, index, all) =>
+                  all.findIndex(
+                    (seen) =>
+                      seen.file === match.file &&
+                      seen.contentStartLine === match.contentStartLine,
+                  ) === index,
+              )
+              .map((match, index) => {
+                const lines = match.content?.split("\n") ?? [];
+                return {
+                  rank: index + 1,
+                  relevance:
+                    topScore && topScore > 0
+                      ? Math.round((match.result.score / topScore) * 100)
+                      : 0,
+                  file: match.displayFile,
+                  startLine: match.contentStartLine + 1,
+                  endLine: match.contentStartLine + Math.max(1, lines.length),
+                  lines,
+                };
+              }),
+          };
+        }),
+      },
+    });
+    return rendered.text;
   };

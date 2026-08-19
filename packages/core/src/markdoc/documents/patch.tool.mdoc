@@ -1,0 +1,16 @@
+---
+{ "tool": "patch" }
+---
+
+{% $title %}{% if $scope %} · Scope: {% if equals($scope.kind, "project") %}project only{% /if %}{% if equals($scope.kind, "loaded") %}loaded projects{% /if %}{% if equals($scope.kind, "file") %}this file{% /if %}{% if $scope.anchor %} · {% $scope.anchor %}{% /if %}{% /if %} · {% $fileCount %} {% plural count=$fileCount forms={"one": "file", "other": "files"} /%} · {% $editCount %} {% plural count=$editCount forms={"one": "edit", "other": "edits"} /%}
+
+{% if equals($editCount, 0) %}
+No edits. The action resolved to an empty workspace edit, so what it describes is already in place or applies to nothing in the range it was asked about.
+{% /if %}
+{% if not(equals($editCount, 0)) %}
+{% $patch %}
+{% /if %}
+
+{% if $note %}
+{% $note %}
+{% /if %}

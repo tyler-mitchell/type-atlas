@@ -1,4 +1,5 @@
 packages:
+  - atlascii
   - packages/core
   - packages/language-server
   - packages/mcp
@@ -8,12 +9,14 @@ catalogMode: prefer
 overrides:
   linkify-it: 5.0.2
   markdown-it: 14.3.0
+  typescript: npm:typescript-native-bridge@6.0.3-bridge.13.tsgo.7.0.2
   # Volar's range also admits alpha.13 and 0.5.0, whose vscode-uri import fails in Node.
   vscode-markdown-languageservice: 0.5.0-alpha.12
 catalog:
   "@arethetypeswrong/core": ^0.18.5
   "@changesets/cli": ^2.31.1
   "@effect/language-service": ^0.87.1
+  "@markdoc/markdoc": ^0.5.7
   "@modelcontextprotocol/client": 2.0.0
   "@modelcontextprotocol/server": 2.0.0
   "@types/node": ^22.20.1
@@ -28,6 +31,7 @@ catalog:
   execa: ^10.0.1
   fdir: ^6.5.0
   globby: ^16.2.2
+  messageformat: ^4.0.0
   oxfmt: ^0.60.0
   oxlint: ^1.75.0
   pathe: ^2.0.3
@@ -35,8 +39,7 @@ catalog:
   pkg-types: ^2.3.1
   publint: ^0.3.22
   tsdown: ^0.22.14
-  typescript: 5.9.3
-  typescript-native-bridge: 6.0.3-bridge.13.tsgo.7.0.2
+  typescript: npm:typescript-native-bridge@6.0.3-bridge.13.tsgo.7.0.2
   vitest: ^4.1.10
   volar-service-json: 0.0.71
   volar-service-markdown: 0.0.71

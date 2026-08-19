@@ -1,0 +1,1 @@
+{% if not($node.at) %}{% $node.file %}{% /if %}{% if $node.at %}{% if $node.file %}{% $node.file %}:{% $node.at %}{% /if %}{% if not($node.file) %}{% pad value=$node.at columns=$node.column /%}{% /if %} — {% if $node.within %}inside {% $node.within %}{% /if %}{% if not($node.within) %}at module level{% /if %}{% /if %}

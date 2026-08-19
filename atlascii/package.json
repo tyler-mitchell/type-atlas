@@ -1,0 +1,73 @@
+{
+  "name": "atlascii",
+  "version": "0.0.0",
+  "description": "ASCII components for code intelligence: locations, navigation targets, call hierarchies, outlines, diagnostics, and source frames as plain text.",
+  "keywords": [
+    "ascii",
+    "code-intelligence",
+    "language-server",
+    "lsp",
+    "terminal",
+    "text"
+  ],
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "development": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./document": {
+      "development": "./src/document/index.ts",
+      "types": "./dist/document/index.d.ts",
+      "import": "./dist/document/index.js"
+    }
+  },
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      },
+      "./document": {
+        "types": "./dist/document/index.d.ts",
+        "import": "./dist/document/index.js"
+      }
+    },
+    "access": "public"
+  },
+  "peerDependencies": {
+    "@markdoc/markdoc": "*"
+  },
+  "peerDependenciesMeta": {
+    "@markdoc/markdoc": {
+      "optional": true
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsdown src/index.ts src/document/index.ts",
+    "check-types": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@markdoc/markdoc": "catalog:",
+    "@types/node": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "engines": {
+    "node": ">=22.20"
+  },
+  "dependencies": {
+    "messageformat": "catalog:",
+    "pathe": "catalog:"
+  }
+}

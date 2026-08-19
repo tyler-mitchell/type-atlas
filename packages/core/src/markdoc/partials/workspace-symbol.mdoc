@@ -1,0 +1,1 @@
+{% truncate value=$item.name /%} [{% $item.kind %}]{% if $item.deprecated %} [deprecated]{% /if %} · {% $item.file %}{% if $item.range %}:{% range($item.range) %}{% /if %}{% if $item.container %} — {% truncate value=$item.container /%}{% /if %}

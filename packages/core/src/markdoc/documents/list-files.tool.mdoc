@@ -1,0 +1,19 @@
+---
+{ "tool": "list_files" }
+---
+
+{% if any($entries) %}
+{% tree entries=$entries /%}
+{% /if %}
+{% if not(any($entries)) %}
+{% if $filtered %}
+No path matched. The patterns are Picomatch, relative to the directory, and a directory only matches a pattern ending in a slash.
+{% /if %}
+{% if not($filtered) %}
+Nothing here. The directory exists and holds no entry this listing reports — .gitignore matches, dependency and VCS internals, and nested submodules are all left out.
+{% /if %}
+{% /if %}
+{% if $over %}
+
+… {% $limit %} shown and more remain. Narrow the directory or a pattern, or raise the limit.
+{% /if %}

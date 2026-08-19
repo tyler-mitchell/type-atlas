@@ -1,0 +1,1 @@
+{% $node.name %} [{% $node.kind %}] {% range($node.selection) %}{% if $node.extent %} · range {% range($node.extent) %}{% /if %}{% if $node.detail %} — {% $node.detail %}{% /if %}

@@ -8,7 +8,7 @@ import {
 } from "@volar/language-server/protocol.js";
 import { type } from "arktype";
 import { readOnlyToolAnnotations } from "./metadata.ts";
-import { formatScope } from "@type-atlas/core/text";
+import { displayPath } from "atlascii";
 import { textResult } from "./mcp-result.ts";
 import { fileInput, positionInput } from "./tool-input.ts";
 import type { VolarWorkspacePool } from "@type-atlas/core";
@@ -80,10 +80,12 @@ export const registerEditingTools = (server: McpServer, workspaces: VolarWorkspa
       ]);
       if (!edit) return textResult("");
       const rendered = await renderWorkspaceEdit(workspace, root, edit);
-      return formatPatchResult(
-        `Rename to ${newName} · ${formatScope("project", project, root)}`,
-        rendered,
-      );
+      return formatPatchResult(`Rename to ${newName}`, rendered, {
+        scope: {
+          kind: "project",
+          anchor: project ? displayPath(project.uri, root) : undefined,
+        },
+      });
     },
   );
 
@@ -111,7 +113,7 @@ export const registerEditingTools = (server: McpServer, workspaces: VolarWorkspa
         signal,
       );
       return formatPatchResult(
-        `Rename ${moves.length} ${moves.length === 1 ? "file" : "files"}`,
+        "Rename",
         await renderWorkspaceEdit(workspace, root, edit ?? {}, moves),
       );
     },

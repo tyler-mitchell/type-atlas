@@ -1,0 +1,15 @@
+---
+{ "tool": "diagnostic context" }
+---
+
+{% if $verbose %}
+{% each items=$groups as="group" partial="diagnostic-group.mdoc" /%}
+{% /if %}
+{% if not($verbose) %}
+{% if $here %}
+{% $count %} {% plural count=$count forms={"one": "problem", "other": "problems"} /%} at this position{% if $cost %} · {% $cost %}{% /if %}
+{% /if %}
+{% if not($here) %}
+{% $count %} {% plural count=$count forms={"one": "problem", "other": "problems"} /%} in {% $file %}{% if $cost %} · {% $cost %}{% /if %}
+{% /if %}
+{% /if %}

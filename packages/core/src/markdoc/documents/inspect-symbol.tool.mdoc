@@ -1,0 +1,69 @@
+---
+{ "tool": "inspect_symbol" }
+---
+
+{% if $choice %}
+Symbol "{% $choice.name %}" is {% $choice.reason %} · {% $choice.file %}
+{% if any($choice.candidates) %}
+
+## Candidates ({% fraction($choice) %})
+
+{% tree entries=$choice.candidates partial="location-node.mdoc" /%}
+{% /if %}
+{% /if %}
+
+{% if $symbol %}
+{% $symbol.name %}{% if any($symbol.kind) %} [{% symbolKind($symbol.kind) %}]{% /if %} · {% $symbol.file %}:{% range($symbol.selection) %}{% if $symbol.extent %} · range {% range($symbol.extent) %}{% /if %} · {% if $symbol.project %}{% $symbol.project %}{% /if %}{% if not($symbol.project) %}an inferred project{% /if %}
+
+{% if $documentation %}
+{% $documentation %}
+{% /if %}
+
+{% if any($additionalDefinitions.groups) %}
+## Additional definitions ({% $additionalDefinitions.total %})
+
+{% tree entries=$additionalDefinitions.groups partial="location-node.mdoc" /%}
+{% /if %}
+
+{% if any($implementations.groups) %}
+## Implementations ({% $implementations.total %})
+
+{% tree entries=$implementations.groups partial="location-node.mdoc" /%}
+{% /if %}
+
+{% if any($typeDefinitions.groups) %}
+## Type definitions ({% $typeDefinitions.total %})
+
+{% tree entries=$typeDefinitions.groups partial="location-node.mdoc" /%}
+{% /if %}
+
+{% if $callers %}
+## Callers ({% fraction($callers) %})
+
+{% tree entries=$callers.groups partial="call-node.mdoc" /%}
+{% /if %}
+
+{% if $callees %}
+## Calls ({% fraction($callees) %} workspace · {% $callees.dependencyTotal %} dependency/runtime)
+
+{% if $callees.sharedSite %}
+Every call happens in {% $callees.sharedSite %}.
+{% /if %}
+{% tree entries=$callees.groups partial="call-node.mdoc" /%}
+{% if any($callees.dependencies) %}
+Dependency/runtime: {% list($callees.dependencies) %}
+{% /if %}
+{% /if %}
+
+{% if any($mentions.groups) %}
+## Mentions that are not calls ({% fraction($mentions.listed) %} of {% $mentions.total %} references)
+
+{% tree entries=$mentions.groups partial="location-node.mdoc" /%}
+{% /if %}
+
+{% if $source %}
+## Source · {% $source.file %}:{% range($source.range) %}
+
+{% source lines=$source.lines startLine=$source.startLine /%}
+{% /if %}
+{% /if %}

@@ -4,6 +4,7 @@ import type {
   Tool,
   ToolCallback,
 } from "@modelcontextprotocol/server";
+import { renderDocument, requestCost, takeRequestTraces } from "@type-atlas/core";
 
 const toolTimeout = 30_000;
 
@@ -16,31 +17,42 @@ const toolTimeout = 30_000;
  * free. The elapsed time rides along with the answer rather than being
  * something only a maintainer can see.
  */
-const withElapsed = <Result extends object>(result: Result, started: number): Result => {
+const withElapsed = async <Result extends object>(
+  result: Result,
+  started: number,
+): Promise<Result> => {
   // A tool may answer with an elicitation instead of content; only an answer
   // that ends in text has somewhere to put this.
   const content = (result as { readonly content?: readonly unknown[] }).content ?? [];
   const last = content.at(-1);
   const text = (last as { readonly type?: string; readonly text?: string } | undefined) ?? {};
   if (text.type !== "text") return result;
+  const rendered = await renderDocument({
+    document: "request-cost.mdoc",
+    variables: {
+      elapsedMs: performance.now() - started,
+      cost: requestCost({ traces: takeRequestTraces() }),
+    },
+  });
   return {
     ...result,
-    content: [
-      ...content.slice(0, -1),
-      { ...text, text: `${text.text}\n\n· ${Math.round(performance.now() - started)}ms` },
-    ],
+    content: [...content.slice(0, -1), { ...text, text: `${text.text}\n\n${rendered.text}` }],
   };
 };
 
 /**
- * Timing out does not stop the language server, so repeating the call only
- * queues behind it. The workspace ends a server that runs past its own, longer
- * deadline; until then the work continues.
+ * Timing out does not stop the language server; the work continues and whatever
+ * it loads is there for the next call, which is why repeating is the useful
+ * move rather than the wasteful one. The first question asked about a large
+ * project pays for building it — thirty seconds is not always enough, and a
+ * narrower question would have paid the same. The workspace ends a server that
+ * runs past its own, longer deadline, so a second timeout is the signal that
+ * the request itself is too large.
  */
 const timeoutReason = (tool: string, expiry: AbortSignal, signal: AbortSignal): Error =>
   expiry.aborted
     ? new Error(
-        `${tool} did not answer within ${toolTimeout / 1000} seconds. The language server is still working on it; ask for something smaller rather than repeating this call.`,
+        `${tool} did not answer within ${toolTimeout / 1000} seconds. The language server is still working, and the first question asked about a project pays to build it — a smaller question would cost the same. Repeat this call: it joins that work instead of restarting it. If it times out twice, ask for something smaller.`,
       )
     : signal.reason instanceof Error
       ? signal.reason
@@ -78,6 +90,14 @@ export const registerTool = <
 ) => {
   const boundedCallback = (async (arguments_, context) => {
     const started = performance.now();
+    // Whatever is in the trace buffer belongs to a call that never reported —
+    // one that threw, timed out, or died with the language server. Draining only
+    // on the way out left those entries to be attributed to this call: three
+    // requests killed by a memory limit reappeared under an unrelated answer as
+    // "4 language-server requests · 25.98s" on a call that took 589 ms. The
+    // footer is the only instrument this repository measures with, so it may
+    // only ever describe the call it is printed under.
+    takeRequestTraces();
     const expiry = AbortSignal.timeout(toolTimeout);
     const signal = AbortSignal.any([context.mcpReq.signal, expiry]);
     signal.throwIfAborted();

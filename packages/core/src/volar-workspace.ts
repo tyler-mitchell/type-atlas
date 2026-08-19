@@ -1,80 +1,21 @@
-import { fork } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { totalmem } from "node:os";
 import { readFile, stat } from "node:fs/promises";
 import { watch } from "chokidar";
 import * as path from "pathe";
 import {
-  CancellationTokenSource,
-  ConfigurationRequest,
-  createProtocolConnection,
   DidCloseTextDocumentNotification,
-  type DidChangeWatchedFilesRegistrationOptions,
-  DidChangeWatchedFilesNotification,
   DidOpenTextDocumentNotification,
-  ExitNotification,
-  type FileSystemWatcher,
   FileChangeType,
-  InitializedNotification,
-  InitializeRequest,
-  InlayHintRefreshRequest,
-  IPCMessageReader,
-  IPCMessageWriter,
-  RegistrationRequest,
-  SemanticTokensRefreshRequest,
   type RequestType,
-  ShutdownRequest,
-  UnregistrationRequest,
-  WatchKind,
 } from "vscode-languageserver-protocol/node.js";
 import { isFileInDir } from "@volar/language-server/node.js";
 import { GetMatchTsConfigRequest } from "@volar/language-server/protocol.js";
 import { URI } from "vscode-uri";
-import { clientCapabilities, getClientConfiguration } from "./language-client.ts";
+import { startLanguageServerProcess } from "./language-server-process.ts";
 import { containingGitSubmodule, findGitSubmoduleRoots } from "./git-submodules.ts";
-
-const watchKind = (type: FileChangeType): WatchKind =>
-  type === FileChangeType.Created
-    ? WatchKind.Create
-    : type === FileChangeType.Changed
-      ? WatchKind.Change
-      : WatchKind.Delete;
-
-const matchesWatcher = (watcher: FileSystemWatcher, relativePath: string, type: FileChangeType) =>
-  typeof watcher.globPattern === "string" &&
-  ((watcher.kind ?? WatchKind.Create | WatchKind.Change | WatchKind.Delete) & watchKind(type)) !==
-    0 &&
-  path.matchesGlob(relativePath, watcher.globPattern);
-
-/**
- * Heap ceiling for a workspace's language server.
- *
- * A forked child inherits none of the parent's exec arguments and takes Node's
- * default, which is derived from total memory and lands near 4 GB on a 16 GB
- * machine. One TypeScript program per package is real working set rather than
- * waste, and a monorepo with several large packages loaded at once reached that
- * default and aborted, leaving most of the machine unused.
- *
- * Half of total memory keeps the ceiling proportional on smaller machines,
- * where the default is already low and raising it blindly would only trade a
- * crash for swapping. This defers exhaustion rather than removing it: nothing
- * bounds how many projects a session loads, and Volar's `project.reload()` is
- * the affordance for reclaiming them if that becomes the failure again.
- */
-const languageServerHeapMegabytes = () =>
-  Math.max(2048, Math.min(8192, Math.floor(totalmem() / 1024 / 1024 / 2)));
 
 /** Files a TypeScript project can report diagnostics for. */
 const sourceFile = /\.(?:[cm]?[jt]s|[jt]sx)$/i;
-
-/**
- * How long one request may hold the language server before it is ended.
- *
- * Longer than the slowest legitimate answer measured here — a cold whole-project
- * check of a three-thousand-file program — so a slow project is not mistaken for
- * a stuck one.
- */
-const requestDeadline = 60_000;
 
 const startVolarWorkspace = async (workspaceRoot: string, languageServerEntry: URL) => {
   const workspaceStat = await stat(workspaceRoot).catch(() => undefined);
@@ -83,7 +24,7 @@ const startVolarWorkspace = async (workspaceRoot: string, languageServerEntry: U
   }
   const submoduleRoots = await findGitSubmoduleRoots(workspaceRoot);
 
-  let watcherError: Error | undefined;
+  const watcherFailure: { error?: Error } = {};
   /**
    * Notified for every workspace change, so callers need no watcher of their own.
    */
@@ -117,148 +58,51 @@ const startVolarWorkspace = async (workspaceRoot: string, languageServerEntry: U
     followSymlinks: false,
   });
 
-  const languageServer = fork(languageServerEntry, ["--node-ipc"], {
-    cwd: workspaceRoot,
-    execArgv: [`--max-old-space-size=${languageServerHeapMegabytes()}`],
-    stdio: ["ignore", "ignore", "inherit", "ipc"],
-  });
-  const languageServerExit = new Promise<void>((resolve) =>
-    languageServer.once("close", () => resolve()),
+  const server = startLanguageServerProcess({ workspaceRoot, entry: languageServerEntry });
+  server.closed.then(
+    () => void watcher.close(),
+    () => void watcher.close(),
   );
-  let languageServerError: Error | undefined;
-  languageServer.on("error", (error) => {
-    languageServerError = error;
-  });
-  const isLanguageServerRunning = () =>
-    languageServer.exitCode === null && languageServer.signalCode === null;
-  const terminateLanguageServer = () => {
-    if (isLanguageServerRunning()) languageServer.kill("SIGKILL");
-  };
-  const languageServerExitReason = () =>
-    languageServerError?.message ??
-    (languageServer.signalCode
-      ? `killed by ${languageServer.signalCode}, which a memory limit reports as SIGABRT`
-      : `exit code ${languageServer.exitCode}`);
 
-  const connection = createProtocolConnection(
-    new IPCMessageReader(languageServer),
-    new IPCMessageWriter(languageServer),
-  );
-  languageServer.once("close", () => connection.dispose());
-  connection.listen();
-  connection.onRequest(ConfigurationRequest.type, ({ items }) =>
-    items.map(({ section }) => getClientConfiguration(section)),
-  );
-  connection.onRequest(InlayHintRefreshRequest.type, () => undefined);
-  connection.onRequest(SemanticTokensRefreshRequest.type, () => undefined);
-
-  const registrations = new Map<string, DidChangeWatchedFilesRegistrationOptions>();
-  const { promise: registered, resolve: resolveRegistration } = Promise.withResolvers<void>();
-  connection.onRequest(RegistrationRequest.type, ({ registrations: items }) => {
-    for (const registration of items) {
-      if (registration.method !== DidChangeWatchedFilesNotification.method) {
-        continue;
-      }
-      registrations.set(
-        registration.id,
-        registration.registerOptions as DidChangeWatchedFilesRegistrationOptions,
-      );
-      resolveRegistration();
-    }
-  });
-  connection.onRequest(UnregistrationRequest.type, ({ unregisterations }) => {
-    for (const registration of unregisterations) {
-      if (registration.method === DidChangeWatchedFilesNotification.method) {
-        registrations.delete(registration.id);
-      }
-    }
-  });
-
-  languageServer.once("close", () => void watcher.close());
-
-  /**
-   * Completes the LSP handshake, once, on the first request that needs it.
-   *
-   * Reading a file, sizing it, and resolving its uri are filesystem work that
-   * this process can do alone, and they are the most common thing asked of a
-   * workspace. Initializing first made them wait a second for a TypeScript
-   * server they never spoke to.
-   */
-  const initialized = (async () => {
-    const workspaceUri = URI.file(workspaceRoot).toString();
-    await connection.sendRequest(InitializeRequest.type, {
-      processId: process.pid,
-      rootUri: workspaceUri,
-      workspaceFolders: [
-        {
-          uri: workspaceUri,
-          name: path.basename(workspaceRoot),
-        },
-      ],
-      capabilities: clientCapabilities,
-    });
-    await connection.sendNotification(InitializedNotification.type, {});
-    await Promise.race([
-      registered,
-      languageServerExit.then(() => {
-        throw languageServerError ?? new Error("The language server exited during initialization.");
-      }),
-    ]);
-
-    const sendFileChanges = async (relativePath: string, types: readonly FileChangeType[]) => {
-      const changes = types
-        .filter((type) =>
-          [...registrations.values()].some(({ watchers }) =>
-            watchers.some((watcher) => matchesWatcher(watcher, relativePath, type)),
-          ),
-        )
-        .map((type) => ({
-          uri: URI.file(path.resolve(workspaceRoot, relativePath)).toString(),
-          type,
-        }));
-      if (changes.length) {
-        await connection.sendNotification(DidChangeWatchedFilesNotification.type, { changes });
-      }
-    };
-
-    watcher.on("all", (event, filePath) => {
-      const relativePath = path.relative(workspaceRoot, filePath);
-      const types: readonly FileChangeType[] =
-        event === "change"
-          ? [FileChangeType.Changed]
-          : event === "add" || event === "addDir"
-            ? [FileChangeType.Created]
-            : [FileChangeType.Deleted];
-      // Observers see every workspace change, not only the ones a registered
-      // language-server watcher matched: a file this server ignores can still
-      // be the reason another file's diagnostics changed.
-      for (const observe of changeObservers) observe(relativePath);
-      if (event === "unlink" || event === "unlinkDir") changedFiles.delete(relativePath);
-      else if (sourceFile.test(relativePath)) changedFiles.add(relativePath);
-      void sendFileChanges(relativePath, types)
-        .then(() =>
-          path.matchesGlob(relativePath, "**/node_modules/{*,@*/*}")
-            ? sendFileChanges(path.join(relativePath, "package.json"), types)
-            : undefined,
-        )
-        .catch((error) => {
-          watcherError = error instanceof Error ? error : new Error(String(error));
-        });
-    });
-    watcher.on("error", (error) => {
-      watcherError = error;
-    });
-  })()
-    .catch(async (error) => {
+  // Volar registers its watchers during the handshake, so a change seen before
+  // that has nowhere to go; the watcher is wired once the server is ready.
+  const watching = server.ready
+    .then(() => {
+      watcher.on("all", (event, filePath) => {
+        const relativePath = path.relative(workspaceRoot, filePath);
+        const types: readonly FileChangeType[] =
+          event === "change"
+            ? [FileChangeType.Changed]
+            : event === "add" || event === "addDir"
+              ? [FileChangeType.Created]
+              : [FileChangeType.Deleted];
+        // Observers see every workspace change, not only the ones a registered
+        // language-server watcher matched: a file this server ignores can still
+        // be the reason another file's diagnostics changed.
+        for (const observe of changeObservers) observe(relativePath);
+        if (event === "unlink" || event === "unlinkDir") changedFiles.delete(relativePath);
+        else if (sourceFile.test(relativePath)) changedFiles.add(relativePath);
+        void server
+          .notifyFileChanges(relativePath, types)
+          .then(() =>
+            path.matchesGlob(relativePath, "**/node_modules/{*,@*/*}")
+              ? server.notifyFileChanges(path.join(relativePath, "package.json"), types)
+              : undefined,
+          )
+          .catch((error: unknown) => {
+            watcherFailure.error = error instanceof Error ? error : new Error(String(error));
+          });
+      });
+      watcher.on("error", (error) => {
+        watcherFailure.error = error;
+      });
+    })
+    .catch(async (error: unknown) => {
       await watcher.close();
-      connection.dispose();
-      terminateLanguageServer();
-      await languageServerExit;
-      throw languageServerError ?? error;
+      server.terminate();
+      throw error;
     });
-  // Nothing awaits this until a language-server request does, so an unhandled
-  // rejection here would crash the process before that.
-  void initialized.catch(() => undefined);
+  void watching.catch(() => undefined);
 
   let disposed = false;
   /** Tail of the in-flight `withTextDocument` chain for each open uri. */
@@ -284,6 +128,7 @@ const startVolarWorkspace = async (workspaceRoot: string, languageServerEntry: U
     }
     return URI.file(filePath).toString();
   };
+  const typeScriptDocument = /\.(?:[cm]?tsx?|[cm]?jsx?)$/i;
   /**
    * Starts the project owning a file, without waiting for it.
    *
@@ -297,97 +142,30 @@ const startVolarWorkspace = async (workspaceRoot: string, languageServerEntry: U
    * meets a program that is ready or nearly so.
    */
   const warmProject = (uri: string) => {
+    // Only for a document a TypeScript project can own. Resolving a tsconfig is
+    // safe on its own — measured: the server survives it for a file no project
+    // owns — but it is wasted work for a file that can never have one.
+    if (!typeScriptDocument.test(uri)) return;
     void sendRequest(GetMatchTsConfigRequest.type, { uri }).catch(() => undefined);
   };
   /**
-   * Ends the language server when a request has plainly stopped answering.
-   *
-   * A semantic request cannot be cancelled — see
-   * `docs/volar-affordance-evidence.md` § "Semantic requests cannot be
-   * cancelled": the token Volar hands TypeScript raises nothing, and a request
-   * abandoned at five seconds ran to completion at nearly ten. While it runs the
-   * server holds its only thread and stops reading its socket, so every later
-   * call for this workspace waits behind it — a folded five-line read needing no
-   * type checking has timed out at thirty seconds that way. Ending the process
-   * is the only bound a client has.
-   *
-   * The cost is one project rebuild on the next call, against a queue bounded
-   * only by however long the abandoned work runs. This fires on the deadline
-   * rather than on a caller giving up, because a caller giving up says nothing
-   * about whether the server is stuck.
+   * Asks the language server, refusing first if this workspace's view of the
+   * filesystem has failed — an answer computed from a stale file view is worse
+   * than none, and the watcher is the only thing keeping that view current.
    */
-  const wedged = (method: string) => {
-    const deadline: { timer?: ReturnType<typeof setTimeout> } = {};
-    const reached = new Promise<never>((_, reject) => {
-      deadline.timer = setTimeout(() => {
-        terminateLanguageServer();
-        reject(
-          new Error(
-            `The language server for ${workspaceRoot} stopped answering (${method} ran past ${requestDeadline / 1000} seconds) and was ended, because nothing can interrupt a check already under way and every later call would have waited behind it. The next call starts a new one and pays the project load again.`,
-          ),
-        );
-      }, requestDeadline);
-    });
-    // The race abandons the loser but does not stop it. Left running, every
-    // answered request would have armed a timer that killed the server a minute
-    // later — observed as a SIGKILL mid-request after a run of successful ones.
-    return { reached, clear: () => clearTimeout(deadline.timer) };
-  };
-
   const sendRequest = async <Params, Result, Error>(
     request: RequestType<Params, Result, Error>,
     params: Params,
     signal?: AbortSignal,
   ): Promise<Result> => {
-    await initialized;
-    if (watcherError) throw watcherError;
-    const cancellation = signal ? new CancellationTokenSource() : undefined;
-    const cancel = () => cancellation?.cancel();
-    signal?.addEventListener("abort", cancel, { once: true });
-    if (signal?.aborted) cancel();
-
-    const deadline = wedged(request.method);
-    try {
-      return await Promise.race([
-        connection.sendRequest<Result>(request.method, params, cancellation?.token),
-        deadline.reached,
-      ]);
-    } catch (error) {
-      if (signal?.aborted) {
-        throw signal.reason instanceof Error
-          ? signal.reason
-          : new Error("TypeAtlas request was cancelled.");
-      }
-      // A language server that exits mid-request disposes the connection, and
-      // the rejection every pending request then sees describes the transport
-      // rather than what happened. Name the exit instead, so a caller can tell
-      // a crash from a normal failure and knows whether retrying can help.
-      if (!isLanguageServerRunning()) {
-        throw new Error(
-          `The language server for ${workspaceRoot} exited during this request (${languageServerExitReason()}). It starts again on the next call. If the same request keeps ending this way, it is too large to answer at once — narrow it and retry.`,
-          { cause: languageServerError ?? error },
-        );
-      }
-      throw error;
-    } finally {
-      deadline.clear();
-      signal?.removeEventListener("abort", cancel);
-      cancellation?.dispose();
-    }
+    // Awaiting the watcher, not just the handshake: the watcher is wired once
+    // the server is ready, and a request answered before that would leave an
+    // edit made in the meantime out of this workspace's changed-file view.
+    await watching;
+    if (watcherFailure.error) throw watcherFailure.error;
+    return await server.sendRequest(request, params, signal);
   };
-  /**
-   * Reads a file's text from disk, without involving the language server.
-   *
-   * The language server is one process running one thread, and a semantic
-   * request holds that thread until TypeScript is finished, so anything asked
-   * of it while a check runs waits for the check. Reading a file needs none of
-   * that: measured against a busy workspace, the same read took 7.5 seconds
-   * through the server and is immediate from disk.
-   *
-   * Volar's own file system would only matter for language plugins that
-   * generate virtual code; this server registers none, so a `file:` read there
-   * resolves to exactly this.
-   */
+
   const readTextDocumentUri = async (uri: string, signal?: AbortSignal) => {
     signal?.throwIfAborted();
     const source = await readFile(fileURLToPath(uri), "utf8").catch(() => undefined);
@@ -397,7 +175,7 @@ const startVolarWorkspace = async (workspaceRoot: string, languageServerEntry: U
     return { textDocument: { uri }, source };
   };
   return {
-    closed: languageServerExit,
+    closed: server.closed,
     sendRequest,
     async getTextDocument(file: string) {
       const uri = getWorkspaceUri(file);
@@ -415,6 +193,8 @@ const startVolarWorkspace = async (workspaceRoot: string, languageServerEntry: U
     readTextDocumentUri,
     getWorkspaceUri,
     warmProject,
+    /** Where this workspace is rooted — a view's own root, not the server's. */
+    root: workspaceRoot,
     /**
      * Opens a document for the duration of one task, then closes it.
      *
@@ -437,17 +217,17 @@ const startVolarWorkspace = async (workspaceRoot: string, languageServerEntry: U
       readonly signal?: AbortSignal;
       readonly task: (textDocument: { readonly uri: string }) => Promise<T>;
     }): Promise<T> {
-      await initialized;
+      await server.ready;
       const preceding = openDocuments.get(uri) ?? Promise.resolve();
       const attempt = preceding.then(async () => {
         signal?.throwIfAborted();
-        await connection.sendNotification(DidOpenTextDocumentNotification.type, {
+        await server.sendNotification(DidOpenTextDocumentNotification.type, {
           textDocument: { uri, languageId, version: ++documentVersion, text: source },
         });
         try {
           return await task({ uri });
         } finally {
-          await connection.sendNotification(DidCloseTextDocumentNotification.type, {
+          await server.sendNotification(DidCloseTextDocumentNotification.type, {
             textDocument: { uri },
           });
         }
@@ -475,6 +255,32 @@ const startVolarWorkspace = async (workspaceRoot: string, languageServerEntry: U
     /** Source files written since this workspace opened. */
     changedFiles: (): readonly string[] => [...changedFiles],
 
+    /**
+     * Tells the language server about every write this workspace has seen,
+     * and waits for it to have been told.
+     *
+     * The watcher sends each change without awaiting it, so a question asked
+     * immediately after a write could be answered from a program that had not
+     * seen it — `scope: "changed"` reported two errors that no longer existed,
+     * at positions its own frames then rendered against the new text, so the
+     * carets underlined unrelated code. An answer that is stale and fast is
+     * worse than a slow one: nothing in it says which it is.
+     */
+    async flushChanges(): Promise<void> {
+      // Delivery is what matters, not acceptance. A server that refuses one
+      // change — an inferred project the native checker does not hold answers
+      // `project not found for update` — must not take the request with it: the
+      // watcher's own notifications were fire-and-forget, so awaiting them
+      // turned a swallowed failure into a dead call.
+      await Promise.all(
+        [...changedFiles].map((relativePath) =>
+          server
+            .notifyFileChanges(relativePath, [FileChangeType.Changed])
+            .catch(() => undefined),
+        ),
+      );
+    },
+
     observeChanges(observer: (relativePath: string) => void): () => void {
       changeObservers.add(observer);
       return () => void changeObservers.delete(observer);
@@ -486,20 +292,7 @@ const startVolarWorkspace = async (workspaceRoot: string, languageServerEntry: U
     if (disposed) return;
     disposed = true;
     await watcher.close();
-    const shutdownTimer = setTimeout(terminateLanguageServer, 2_000);
-    shutdownTimer.unref();
-    try {
-      if (isLanguageServerRunning()) {
-        await connection.sendRequest(ShutdownRequest.type);
-        await connection.sendNotification(ExitNotification.type);
-        await languageServerExit;
-      }
-    } finally {
-      clearTimeout(shutdownTimer);
-      connection.dispose();
-      terminateLanguageServer();
-      await languageServerExit;
-    }
+    await server.shutdown();
   }
 };
 
@@ -564,6 +357,7 @@ const nestedWorkspace = (input: {
   };
   return {
     ...parent,
+    root: workspaceRoot,
     getWorkspaceUri,
     async getTextDocument(file: string) {
       return await parent.getTextDocument(path.resolve(workspaceRoot, file));
@@ -624,33 +418,6 @@ export const createVolarWorkspaces = (languageServer: URL) => {
 
   return {
     get,
-    /**
-     * Ends a workspace's language server, if it has one.
-     *
-     * A semantic request cannot be cancelled — see
-     * `docs/volar-affordance-evidence.md` § "Semantic requests cannot be
-     * cancelled" — and while one runs the server holds its only thread and stops
-     * reading IPC, so every later call for that workspace waits behind it. A
-     * request abandoned at five seconds ran to completion at nearly ten, and a
-     * folded five-line read needing no type checking timed out at thirty against
-     * a workspace in that state. Ending the process is the only bound a client
-     * has. The next call starts a fresh workspace, trading one program rebuild
-     * for a queue with no bound but the abandoned work's own duration.
-     */
-    async release(root: string) {
-      // Ends the server that answers for this root, which may be one opened at
-      // an outer root; a view of it disposes to nothing, so releasing the view
-      // would leave the wedged process running and every later call behind it.
-      const serverRoot = owner(path.resolve(root));
-      if (serverRoot === undefined) return;
-      const held = entries.get(serverRoot);
-      if (!held) return;
-      entries.delete(serverRoot);
-      await held.then(
-        (active) => active.dispose(),
-        () => undefined,
-      );
-    },
     async dispose() {
       const current = [...entries.values()];
       entries.clear();

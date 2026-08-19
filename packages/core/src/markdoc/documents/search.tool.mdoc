@@ -1,0 +1,14 @@
+---
+{ "tool": "search_code" }
+---
+
+Search: {% $query %}
+
+{% if equals($count, 0) %}
+Nothing matched. The index holds files from projects opened this session, and a query is matched by meaning as well as by name — so this is absent from what has been indexed rather than from the repository. Naming an identifier you expect anchors the search to it; reading a file in an unopened project indexes that project, and the same query then answers.
+{% /if %}
+{% if not(equals($count, 0)) %}
+{% $count %} {% plural count=$count forms={"one": "match", "other": "matches"} /%}{% if $explainRelevance %} · relevance is relative to the strongest match{% /if %}{% if any($anchoredCount) %} · {% $anchoredCount %} declaring a name the query asked for, listed first{% /if %}{% if $unanchored %} · nothing here declares {% list($anchors) %}{% /if %}{% if $unanchorable %} · no identifier to anchor on, so these are ranked by meaning alone{% /if %}
+
+{% each items=$matches as="match" partial="search-match.mdoc" /%}
+{% /if %}

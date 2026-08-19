@@ -1,0 +1,15 @@
+---
+tool: document_symbols
+---
+
+{% if not($answered) %}
+{% $file %} is not a language this outline reads. Declarations are parsed from TypeScript and JavaScript; a Markdown or JSON file has none to report, so this is unanswered rather than empty.
+{% /if %}
+{% if and($answered, equals($total, 0)) %}
+{% $file %} declares nothing at the top level. Re-exports and imports are not declarations, so a barrel that only forwards other modules reports none.
+{% /if %}
+{% if not(equals($total, 0)) %}
+{% banner %}{% $file %} · {% $total %} top-level {% plural count=$total forms={"one": "symbol", "other": "symbols"} /%}{% /banner %}
+
+{% tree entries=$outline partial="symbol-node.mdoc" /%}
+{% /if %}

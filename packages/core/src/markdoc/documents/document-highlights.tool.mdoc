@@ -1,0 +1,12 @@
+---
+tool: document_highlights
+---
+
+{% if equals($total, 0) %}
+Nothing at this position is highlighted in {% $file %}. Highlights are same-document usages, so a position that names no symbol — whitespace, punctuation, a comment — reports none.
+{% /if %}
+{% if not(equals($total, 0)) %}
+{% $subject %} is {% if $kind %}{% article($kind) %}{% /if %}{% if not($kind) %}a symbol{% /if %} used in {% $total %} {% plural count=$total forms={"one": "place", "other": "places"} /%}, under {% $root %}.
+
+{% tree entries=$groups partial="reference-node.mdoc" /%}
+{% /if %}

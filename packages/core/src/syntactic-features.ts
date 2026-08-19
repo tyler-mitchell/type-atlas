@@ -3,6 +3,7 @@ import ts from "typescript";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import { getLanguageServiceByDocument } from "volar-service-typescript/lib/plugins/syntactic.js";
 import { convertNavTree, convertOutliningSpan } from "volar-service-typescript/lib/utils/lspConverters.js";
+import { foldingAffectsView, sourceLines } from "atlascii";
 
 /**
  * What a source file says about itself, read from its text alone.
@@ -45,6 +46,46 @@ const parsed = (input: { readonly uri: string; readonly source: string }) => {
   return { document, ...getLanguageServiceByDocument(ts, document) };
 };
 
+export type SourceWindow = {
+  readonly startLine?: number;
+  readonly endLine?: number;
+};
+
+export type SourceView = {
+  readonly uri: string;
+  readonly lines: readonly string[];
+  readonly foldingRanges: readonly FoldingRange[];
+};
+
+export const readSourceView = async (input: {
+  readonly workspace: {
+    readonly getWorkspaceUri: (file: string) => string;
+    readonly readTextDocumentUri: (
+      uri: string,
+      signal?: AbortSignal,
+    ) => Promise<{ readonly source: string }>;
+  };
+  readonly file: string;
+  readonly window?: SourceWindow;
+  readonly fold?: boolean;
+  readonly signal?: AbortSignal;
+}): Promise<SourceView> => {
+  const uri = input.workspace.getWorkspaceUri(input.file);
+  const { source } = await input.workspace.readTextDocumentUri(uri, input.signal);
+  const lines = sourceLines(source);
+  const window = input.window ?? {};
+  const viewLineCount =
+    (window.endLine ?? lines.length) - (window.startLine ?? 1) + 1;
+  return {
+    uri,
+    lines,
+    foldingRanges:
+      input.fold !== false && foldingAffectsView(viewLineCount)
+        ? foldingRanges({ uri, source })
+        : [],
+  };
+};
+
 /** Folding ranges for one source document. */
 export const foldingRanges = (input: {
   readonly uri: string;
@@ -66,12 +107,23 @@ export const foldingRanges = (input: {
 export const documentSymbols = (input: {
   readonly uri: string;
   readonly source: string;
-}): readonly DocumentSymbol[] => {
+}): readonly DocumentSymbol[] | undefined => {
   const parse = parsed(input);
-  if (!parse) return [];
-  return (
-    parse.languageService
-      .getNavigationTree(parse.fileName)
-      .childItems?.flatMap((item) => convertNavTree(item, parse.document)) ?? []
-  );
+  if (!parse) return undefined;
+  const roots = parse.languageService.getNavigationTree(parse.fileName).childItems ?? [];
+  const typeAliases = new Set<string>();
+  const collect = (items: readonly ts.NavigationTree[]) => {
+    for (const item of items) {
+      if (item.kind === "type") typeAliases.add(item.text);
+      collect(item.childItems ?? []);
+    }
+  };
+  collect(roots);
+  const corrected = (symbols: readonly DocumentSymbol[]): DocumentSymbol[] =>
+    symbols.map((symbol) => ({
+      ...symbol,
+      kind: typeAliases.has(symbol.name) ? 11 : symbol.kind,
+      ...(symbol.children ? { children: corrected(symbol.children) } : {}),
+    }));
+  return corrected(roots.flatMap((item) => convertNavTree(item, parse.document)));
 };

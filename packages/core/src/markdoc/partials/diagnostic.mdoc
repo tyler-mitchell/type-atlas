@@ -1,0 +1,11 @@
+{% tight %}
+{% severity value=$problem.severity config=$config /%}{% if $problem.source %} {% $problem.source %}{% if any($problem.code) %}({% $problem.code %}){% /if %}{% /if %} {% range($problem.range) %}
+{% indent %}
+{% $problem.message %}
+{% /indent %}
+{% if $problem.frame %}
+{% indent %}
+{% $problem.frame %}
+{% /indent %}
+{% /if %}
+{% /tight %}

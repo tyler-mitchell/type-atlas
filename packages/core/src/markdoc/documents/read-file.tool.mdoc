@@ -1,0 +1,7 @@
+---
+{ "tool": "read_file" }
+---
+
+{% $count %} {% plural count=$count forms={"one": "file", "other": "files"} /%} · {% $shownLines %} {% plural count=$shownLines forms={"one": "line", "other": "lines"} /%}{% if any($folded) %} · {% $folded %} folded to signatures, pass fold: false for the bodies{% /if %}, under {% $root %}.
+
+{% each items=$views as="view" partial="file-view.mdoc" /%}

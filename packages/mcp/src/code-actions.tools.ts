@@ -12,8 +12,9 @@ import {
   type TextDocumentIdentifier,
 } from "@volar/language-server/protocol.js";
 import type { VolarWorkspace, VolarWorkspacePool } from "@type-atlas/core";
-import { diagnosticIntersects } from "@type-atlas/core/text";
+import { containsPosition, rangeText, displayPath } from "atlascii";
 import { type } from "arktype";
+import { renderDocument } from "@type-atlas/core";
 import { formatPatchResult } from "./edit-result.ts";
 import { appendDiagnosticContext, textResult } from "./mcp-result.ts";
 import { readOnlyToolAnnotations } from "./metadata.ts";
@@ -146,18 +147,21 @@ const runSourceAction = async (
   const diagnosticContext =
     includeDiagnostics === "off"
       ? undefined
-      : formatDiagnosticMode(textDocument.uri, diagnosticReport, root, includeDiagnostics);
+      : await formatDiagnosticMode({
+          uri: textDocument.uri,
+          report: diagnosticReport,
+          workspaceRoot: root,
+          mode: includeDiagnostics,
+        });
   if (!resolved) return appendDiagnosticContext(textResult(empty), diagnosticContext);
   if (resolved.disabled) throw new Error(resolved.disabled.reason);
   if (!resolved.edit) {
     return appendDiagnosticContext(textResult(empty), diagnosticContext);
   }
   return appendDiagnosticContext(
-    formatPatchResult(
-      resolved.title,
-      await renderWorkspaceEdit(workspace, root, resolved.edit),
-      editorCommandText(resolved.command),
-    ),
+    await formatPatchResult(resolved.title, await renderWorkspaceEdit(workspace, root, resolved.edit), {
+      note: editorCommandText(resolved.command),
+    }),
     diagnosticContext,
   );
 };
@@ -198,13 +202,19 @@ export const registerCodeActionTools = (
       ]);
       const diagnostics =
         report?.kind === "full"
-          ? report.items.filter((diagnostic) => diagnosticIntersects(diagnostic, range))
+          ? report.items.filter((diagnostic) => containsPosition(diagnostic.range, range.start))
           : [];
       const diagnosticMode = includeDiagnostics ?? "summary";
       const diagnosticContext =
         diagnosticMode === "off"
           ? undefined
-          : formatDiagnosticMode(textDocument.uri, report, root, diagnosticMode, range);
+          : await formatDiagnosticMode({
+              uri: textDocument.uri,
+              report,
+              workspaceRoot: root,
+              mode: diagnosticMode,
+              focus: range,
+            });
       const actions =
         (await workspace.sendRequest(
           CodeActionRequest.type,
@@ -223,35 +233,31 @@ export const registerCodeActionTools = (
         ? actions
         : actions.filter((item) => Command.is(item) || !item.disabled);
       if (action === undefined) {
-        if (!visibleActions.length) {
-          const diagnosticCount = diagnostics.length
-            ? ` for ${diagnostics.length} ${diagnostics.length === 1 ? "diagnostic" : "diagnostics"}`
-            : "";
-          const scope =
-            only === CodeActionKind.QuickFix
-              ? `quick fixes${diagnosticCount}`
-              : only?.startsWith(CodeActionKind.Refactor)
-                ? "refactors"
-                : "code actions";
-          return appendDiagnosticContext(
-            textResult(`No ${scope} in this range.`),
-            diagnosticContext,
-          );
-        }
-        return appendDiagnosticContext(
-          textResult(
-            visibleActions
-              .map((item, index) => {
-                const command = Command.is(item);
-                const kind = command ? " [editor command]" : item.kind ? ` [${item.kind}]` : "";
-                const disabled =
-                  !command && item.disabled ? ` — unavailable: ${item.disabled.reason}` : "";
-                return `${index + 1}. ${item.title}${kind}${disabled}`;
-              })
-              .join("\n"),
-          ),
-          diagnosticContext,
-        );
+        const rendered = await renderDocument({
+          document: "code-actions.tool.mdoc",
+          variables: {
+            actions: visibleActions.map((item, index) => ({
+              marker: `${index + 1}.`,
+              name: item.title,
+              kind: Command.is(item) ? "editor command" : item.kind,
+              detail:
+                !Command.is(item) && item.disabled
+                  ? `unavailable: ${item.disabled.reason}`
+                  : undefined,
+            })),
+            file: displayPath(textDocument.uri, root),
+            at: rangeText(range),
+            root,
+            scope:
+              only === CodeActionKind.QuickFix
+                ? "quickFix"
+                : only?.startsWith(CodeActionKind.Refactor)
+                  ? "refactor"
+                  : "any",
+            diagnosticCount: diagnostics.length,
+          },
+        });
+        return appendDiagnosticContext(textResult(rendered.text), diagnosticContext);
       }
       const selected = visibleActions[action - 1];
       if (!selected) throw new Error(`Code action ${action} is not available.`);
@@ -277,10 +283,10 @@ export const registerCodeActionTools = (
         );
       }
       return appendDiagnosticContext(
-        formatPatchResult(
+        await formatPatchResult(
           resolved.title,
           await renderWorkspaceEdit(workspace, root, resolved.edit),
-          editorCommandText(resolved.command),
+          { note: editorCommandText(resolved.command) },
         ),
         diagnosticContext,
       );

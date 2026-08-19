@@ -1,0 +1,54 @@
+---
+{ "tool": "find_successor" }
+---
+
+{% if equals($verdict, "exported") %}
+Still exported · {% $name %} · {% $module %}
+
+{% tree entries=$declarations /%}
+
+This name is on the module's current surface. A call site that cannot see it has an import or project problem, not a missing export.
+{% /if %}
+
+{% if equals($verdict, "declared") %}
+{% if $module %}
+Withdrawn from the surface ({% $declaredTotal %}) · {% $name %} · still declared, no longer exported by {% $module %}
+{% /if %}
+{% if not($module) %}
+Still declared ({% $declaredTotal %}) · {% $name %}
+{% /if %}
+
+{% tree entries=$declarations /%}
+
+{% if $module %}
+The capability still exists; {% $module %} no longer publishes it. Reaching it means an export or a different entry point, not a rewrite.
+{% /if %}
+{% if not($module) %}
+This name resolves. A call site that cannot see it has an import or project problem, not a missing declaration.
+{% /if %}
+{% /if %}
+
+{% if equals($verdict, "removed") %}
+Not found · {% $name %} · no declaration of this name is in the symbol index
+
+Searched {% $searched %}. Only projects opened this session are searched, so a name declared in a project nothing has touched reports nothing here — ask something semantic about a file in that project, then ask this again. This states what the index holds, not what the repository contains: an absent declaration is evidence, and references or document_symbols on a file you suspect will confirm or contradict it.
+
+{% if any($candidates) %}
+Candidates ({% $candidates.length %})
+
+{% tree entries=$candidates /%}
+{% /if %}
+{% if not(any($candidates)) %}
+Candidates (0) · no existing name shares a word with this one.
+{% /if %}
+
+{% if any($discussing) %}
+Files discussing it ({% $discussing.length %})
+
+{% tree entries=$discussing /%}
+
+A file naming something the index does not declare is either discussing it from outside — a comment, a document, an import of someone else's — or declaring it in a project the index has not read. Read one before concluding which.
+{% /if %}
+
+A candidate is a lead, not a verdict. Confirm one by reading it before treating this capability as replaced, and treat an empty candidate list as evidence the capability was withdrawn rather than renamed.
+{% /if %}

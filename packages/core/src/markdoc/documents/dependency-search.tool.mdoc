@@ -1,0 +1,10 @@
+---
+{ "tool": "search_dependency_code" }
+---
+
+From {% $from %}
+{% if $ranked %}
+Relative relevance within each package.
+{% /if %}
+
+{% each items=$packages as="package" partial="dependency-package.mdoc" /%}

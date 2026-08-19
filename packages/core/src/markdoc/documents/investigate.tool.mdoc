@@ -1,0 +1,20 @@
+---
+{ "tool": "investigate_code" }
+---
+
+{% $search %}
+
+{% if $exact %}
+Verified relationships for the exact identifier match · retrieved candidate {% list($ranks) %}
+{% /if %}
+{% if not($exact) %}
+Verified relationships for structurally connected retrieved {% plural count=$candidateCount forms={"one": "candidate", "other": "candidates"} /%} {% list($ranks) %}
+{% /if %}
+
+{% sections items=$inspections /%}
+
+{% if $related %}
+Related code · similarity is not a call or reference relationship
+
+{% $related %}
+{% /if %}

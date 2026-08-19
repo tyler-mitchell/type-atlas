@@ -1,0 +1,3 @@
+{% if $page %}
+{% $page.from %}-{% $page.to %} of {% $page.total %} {% $page.unit %}{% if $page.next %} · pass offset: {% $page.next %} for the rest{% /if %}
+{% /if %}

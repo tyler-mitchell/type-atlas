@@ -1,0 +1,17 @@
+---
+tool: definitions
+---
+
+{% if equals($total, 0) %}
+{% if $landedIn %}
+Nothing at this position declares a definition. The position is inside {% $landedIn %}, whose name is at {% position($landedAt) %} — a definition is reported for a position on a symbol's own name, so ask again there.
+{% /if %}
+{% if not($landedIn) %}
+Nothing at this position declares a definition, and no declaration contains it — the position is in whitespace, a comment, or past the end of the file. Both line and character are one-based.
+{% /if %}
+{% /if %}
+{% if not(equals($total, 0)) %}
+{% $subject %} is {% if $kind %}{% article($kind) %}{% /if %}{% if not($kind) %}a symbol{% /if %} with {% $total %} {% plural count=$total forms={"one": "definition", "other": "definitions"} /%}, under {% $root %}.
+
+{% each items=$items as="target" partial="target.mdoc" tight=true /%}
+{% /if %}

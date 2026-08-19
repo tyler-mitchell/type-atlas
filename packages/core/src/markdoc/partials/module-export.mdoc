@@ -1,0 +1,2 @@
+{% if $node.kind %}{% $node.kind %} {% /if %}{% $node.name %}{% if $node.deprecated %} [deprecated]{% /if %}{% if $node.signature %}: {% $node.signature %}{% /if %}{% if $node.documentation %}\
+{% $node.documentation %}{% /if %}

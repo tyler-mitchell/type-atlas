@@ -4,9 +4,11 @@ import {
   CompletionItemKind,
   CompletionRequest,
   CompletionResolveRequest,
+  DefinitionRequest,
   TypeDefinitionRequest,
 } from "@volar/language-server/protocol.js";
-import { readPackageJSON } from "pkg-types";
+import { dirname, relative } from "pathe";
+import { readPackageJSON, resolvePackageJSON } from "pkg-types";
 import { URI } from "vscode-uri";
 import { page } from "./projection.ts";
 import type { VolarWorkspace } from "./volar-workspace.ts";
@@ -19,15 +21,72 @@ export type ModuleExportPage = {
   readonly path: readonly string[];
   readonly surface: ModuleExportSurface;
   readonly query: string;
+  readonly population: number;
+  readonly broadened: boolean;
   readonly isIncomplete: boolean;
   readonly total: number;
   readonly offset: number;
   readonly items: readonly CompletionItem[];
   readonly definitionUris: readonly string[];
+  readonly locations?: ReadonlyMap<string, string>;
+  readonly packageRoot?: string;
+  readonly packageName?: string;
+  readonly packageVersion?: string;
   readonly subpaths: readonly string[];
   readonly includeDocs: boolean;
   readonly nextOffset?: number;
   readonly resolved?: boolean;
+};
+
+const declarationUris = async ({
+  workspace,
+  moduleName,
+  names,
+  uri,
+  signal,
+}: {
+  readonly workspace: VolarWorkspace;
+  readonly moduleName: string;
+  readonly names: readonly string[];
+  readonly uri: string;
+  readonly signal: AbortSignal;
+}): Promise<ReadonlyMap<string, string>> => {
+  const head = "import { ";
+  const source = `${head}${names.join(", ")} } from ${JSON.stringify(moduleName)};`;
+  const targets = names.map((name, index) => ({
+    name,
+    character:
+      head.length +
+      names.slice(0, index).reduce((total, previous) => total + previous.length + 2, 0),
+  }));
+  return await workspace.withTextDocument({
+    uri,
+    languageId: "typescript",
+    source,
+    signal,
+    task: async (textDocument) => {
+      const resolved = await Promise.all(
+        targets.map(async ({ name, character }) => {
+          const result = await workspace.sendRequest(
+            DefinitionRequest.type,
+            { textDocument, position: { line: 0, character } },
+            signal,
+          );
+          const found = (Array.isArray(result) ? result : [result]).flatMap((location) => {
+            const target = location && ("uri" in location ? location.uri : location.targetUri);
+            return target && target !== uri ? [target] : [];
+          });
+          return [
+            name,
+            found[0] && relative(workspace.root, URI.parse(found[0]).fsPath),
+          ] as const;
+        }),
+      );
+      return new Map(
+        resolved.flatMap(([name, target]) => (target ? [[name, target] as const] : [])),
+      );
+    },
+  });
 };
 
 const probe = ({
@@ -129,6 +188,9 @@ export const listModuleExports = async ({
   // project and the server grows by one per call. A stable name is an ordinary
   // edit to one file, and `withTextDocument` serializes callers sharing it.
   const probeUri = parsedUri.with({ path: `${parsedUri.path}.type-atlas-probe.ts` }).toString();
+  const locationUri = parsedUri
+    .with({ path: `${parsedUri.path}.type-atlas-locations.ts` })
+    .toString();
   const effectiveSurface = type || path.length ? "runtime" : surface;
   const { source, position, definitionPosition } = probe({
     moduleName,
@@ -136,23 +198,22 @@ export const listModuleExports = async ({
     path,
     surface: effectiveSurface,
   });
-  const resolvedModule = includeSubpaths
-    ? await workspace.sendRequest(
-        ResolveDependencySourceRequest.type,
-        {
-          textDocument: { uri },
-          moduleName,
-        },
-        signal,
-      )
+  const resolvedModule = await workspace.sendRequest(
+    ResolveDependencySourceRequest.type,
+    {
+      textDocument: { uri },
+      moduleName,
+    },
+    signal,
+  );
+  const manifestPath = resolvedModule?.resolvedFileName
+    ? await resolvePackageJSON(resolvedModule.resolvedFileName).catch(() => undefined)
     : undefined;
-  const packageJson = resolvedModule
-    ? await readPackageJSON(resolvedModule.resolvedFileName)
-    : undefined;
+  const packageJson = manifestPath ? await readPackageJSON(manifestPath) : undefined;
   const exports =
     !type && !path.length && packageJson?.name === moduleName ? packageJson.exports : undefined;
   const subpaths =
-    exports && typeof exports === "object" && !Array.isArray(exports)
+    includeSubpaths && exports && typeof exports === "object" && !Array.isArray(exports)
       ? Object.keys(exports)
           .filter((key) => key.startsWith("./") && key !== "./package.json")
           .map((key) => key.slice(2))
@@ -181,12 +242,18 @@ export const listModuleExports = async ({
         surface === "all"
           ? items.filter((item) => item.kind !== CompletionItemKind.Keyword)
           : items;
-      const normalizedQuery = query.toLocaleLowerCase();
-      const queriedItems = normalizedQuery
-        ? exportItems.filter((item) =>
-            (item.filterText ?? item.label).toLocaleLowerCase().includes(normalizedQuery),
-          )
+      const terms = query
+        .toLocaleLowerCase()
+        .split(/\s+/u)
+        .filter(Boolean);
+      const named = (item: CompletionItem) => (item.filterText ?? item.label).toLocaleLowerCase();
+      const everyTerm = terms.length
+        ? exportItems.filter((item) => terms.every((term) => named(item).includes(term)))
         : exportItems;
+      const broadened = !everyTerm.length && terms.length > 1;
+      const queriedItems = broadened
+        ? exportItems.filter((item) => terms.some((term) => named(item).includes(term)))
+        : everyTerm;
       const matchingItems = labels.length
         ? queriedItems.filter((item) => labels.includes(item.label))
         : queriedItems;
@@ -199,12 +266,25 @@ export const listModuleExports = async ({
               ),
             )
           : resultPage.items;
+      const importable =
+        includeDetails && !type && !path.length
+          ? resultPage.items
+              .map((item) => item.label)
+              .filter((label) => /^[$_\p{ID_Start}][$_\p{ID_Continue}]*$/u.test(label))
+          : [];
+      const unlisted = type && !resultPage.total && !path.length ? [type] : [];
+      const looked = [...importable, ...unlisted];
+      const locations = looked.length
+        ? await declarationUris({ workspace, moduleName, names: looked, uri: locationUri, signal })
+        : undefined;
       return {
         module: moduleName,
         type,
         path,
         surface: effectiveSurface,
         query,
+        population: exportItems.length,
+        broadened,
         includeDocs,
         definitionUris:
           definitions === undefined || definitions === null
@@ -212,6 +292,10 @@ export const listModuleExports = async ({
             : (Array.isArray(definitions) ? definitions : [definitions]).map((definition) =>
                 "uri" in definition ? definition.uri : definition.targetUri,
               ),
+        locations,
+        packageRoot: manifestPath ? dirname(manifestPath) : undefined,
+        packageName: packageJson?.name,
+        packageVersion: packageJson?.version,
         subpaths,
         isIncomplete: Array.isArray(completion) ? false : (completion?.isIncomplete ?? false),
         ...resultPage,

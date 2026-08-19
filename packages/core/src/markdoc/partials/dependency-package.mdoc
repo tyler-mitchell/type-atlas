@@ -1,0 +1,23 @@
+{% banner config=$config %}{% $package.name %}{% if $package.version %}@{% $package.version %}{% /if %}{% if $package.requested %} (requested as {% $package.requested %}){% /if %}{% /banner %}
+
+{% if $package.error %}
+{% $package.error %}
+{% /if %}
+
+{% if any($package.api) %}
+{% if $package.surface %}
+## {% $package.surface %}
+{% /if %}
+{% tree entries=$package.api partial="module-export.mdoc" /%}
+{% /if %}
+{% if $package.noExportMatched %}
+No exported name matched this query · the package's export surface was searched by name and by meaning, so read this as no match rather than an empty package. list_module_exports shows the surface itself.
+{% /if %}
+
+{% if $package.showSource %}
+## Relevant source
+{% /if %}
+{% if any($package.elsewhere) %}
+{% $package.elsewhere %} ranked outside this package and are not shown · the search root reaches past {% $package.name %}, and source from a neighbour is not this package's
+{% /if %}
+{% each items=$package.sources as="hit" partial="dependency-source.mdoc" /%}

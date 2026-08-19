@@ -1,4 +1,5 @@
 import type { McpServer } from "@modelcontextprotocol/server";
+import { renderDocument } from "@type-atlas/core";
 import { type } from "arktype";
 import { readOnlyToolAnnotations } from "./metadata.ts";
 import { textResult } from "./mcp-result.ts";
@@ -71,20 +72,23 @@ export const registerWorkspaceTools = (server: McpServer): void => {
       },
       { mcpReq: { signal } },
     ) => {
-      return textResult(
-        await workspaceTree({
-          workspace: root,
-          directory: directory ?? ".",
-          depth: depth ?? (glob ? 10 : 1),
-          glob,
-          includeHidden: includeHidden ?? false,
-          includeIgnored: includeIgnored ?? false,
-          includeSubmodules: includeSubmodules ?? false,
-          limit: limit ?? 500,
-          signal,
-          view: view ?? "files",
-        }),
-      );
+      const listing = await workspaceTree({
+        workspace: root,
+        directory: directory ?? ".",
+        depth: depth ?? (glob ? 10 : 1),
+        glob,
+        includeHidden: includeHidden ?? false,
+        includeIgnored: includeIgnored ?? false,
+        includeSubmodules: includeSubmodules ?? false,
+        limit: limit ?? 500,
+        signal,
+        view: view ?? "files",
+      });
+      const rendered = await renderDocument({
+        document: "list-files.tool.mdoc",
+        variables: { ...listing },
+      });
+      return textResult(rendered.text);
     },
   );
 };

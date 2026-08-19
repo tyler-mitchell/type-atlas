@@ -6,7 +6,7 @@ import {
 } from "vscode-languageserver-protocol";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import { URI } from "vscode-uri";
-import { workspacePath } from "@type-atlas/core/text";
+import { codexPatch, displayPath } from "atlascii";
 import type { VolarWorkspace } from "@type-atlas/core";
 
 export type FileMove = {
@@ -78,11 +78,11 @@ const positionFaithfulPatch = (source: string, updated: string) => {
   throw new Error("The edit cannot be represented by a position-faithful Codex patch.");
 };
 
-const patchLines = (patch: StructuredPatch) =>
-  patch.hunks.flatMap((hunk) => ["@@", ...hunk.lines.filter((line) => line[0] !== "\\")]);
+const patchHunks = (patch: StructuredPatch) =>
+  patch.hunks.map((hunk) => hunk.lines.filter((line) => line[0] !== "\\"));
 
 const safePath = (uri: string, workspaceRoot: string) => {
-  const file = workspacePath(uri, workspaceRoot);
+  const file = displayPath(uri, workspaceRoot);
   if (file.includes("\n") || file.includes("\r")) {
     throw new Error(`File path cannot be represented in a Codex patch: ${uri}`);
   }
@@ -124,20 +124,20 @@ export const renderWorkspaceEdit = async (
       if (move && moveAnchor === undefined) {
         throw new Error("Codex patches cannot represent moving an empty file.");
       }
-      const lines =
+      const hunks =
         source === updated
           ? move
-            ? ["@@", ` ${moveAnchor}`]
+            ? [[` ${moveAnchor}`]]
             : []
-          : patchLines(positionFaithfulPatch(source, updated));
-      if (!move && !lines.length) return undefined;
+          : patchHunks(positionFaithfulPatch(source, updated));
+      if (!move && !hunks.length) return undefined;
       return {
         editCount: edits.length,
-        lines: [
-          `*** Update File: ${safePath(uri, workspaceRoot)}`,
-          ...(move ? [`*** Move to: ${safePath(move, workspaceRoot)}`] : []),
-          ...lines,
-        ],
+        file: {
+          file: safePath(uri, workspaceRoot),
+          movedTo: move === undefined ? undefined : safePath(move, workspaceRoot),
+          hunks,
+        },
       };
     }),
   );
@@ -145,7 +145,7 @@ export const renderWorkspaceEdit = async (
 
   return {
     fileCount: files.length,
-    editCount: files.reduce((total, file) => total + file.editCount, 0),
-    patch: ["*** Begin Patch", ...files.flatMap(({ lines }) => lines), "*** End Patch"].join("\n"),
+    editCount: files.reduce((total, entry) => total + entry.editCount, 0),
+    patch: codexPatch(files.map(({ file }) => file)),
   };
 };

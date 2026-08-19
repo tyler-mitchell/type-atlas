@@ -1,0 +1,15 @@
+---
+tool: list_module_exports
+---
+
+{% if equals($total, 0) %}
+{% $module %} exports nothing{% if any($query) %} matching {% $query %}{% /if %}, seen from {% $from %} under {% $root %}. The surface asked for was {% $surface %}, so a module whose names are all of the other kind reports none here.
+{% /if %}
+{% if not(equals($total, 0)) %}
+Seen from {% $from %} under {% $root %} · {% $surface %} surface{% if $query %} · matching {% $query %}{% /if %}{% if $broadened %} · widened past the query to fill the page{% /if %}.
+{% partial file="page.mdoc" /%}
+
+{% banner %}{% $module %} · {% $total %} {% plural count=$total forms={"one": "export", "other": "exports"} /%}{% /banner %}
+
+{% tree entries=$items partial="module-export.mdoc" /%}
+{% /if %}

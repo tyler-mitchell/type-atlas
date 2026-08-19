@@ -33,16 +33,6 @@
       "development": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    },
-    "./text": {
-      "development": "./src/plain-text.ts",
-      "types": "./dist/plain-text.d.ts",
-      "import": "./dist/plain-text.js"
-    },
-    "./folded-source": {
-      "development": "./src/folded-source.ts",
-      "types": "./dist/folded-source.d.ts",
-      "import": "./dist/folded-source.js"
     }
   },
   "publishConfig": {
@@ -50,25 +40,19 @@
       ".": {
         "types": "./dist/index.d.ts",
         "import": "./dist/index.js"
-      },
-      "./text": {
-        "types": "./dist/plain-text.d.ts",
-        "import": "./dist/plain-text.js"
-      },
-      "./folded-source": {
-        "types": "./dist/folded-source.d.ts",
-        "import": "./dist/folded-source.js"
       }
     },
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown src/index.ts src/plain-text.ts src/folded-source.ts",
+    "build": "tsdown src/index.ts",
     "check-types": "tsc --noEmit -p tsconfig.json",
     "prepack": "pnpm run build",
     "test": "vitest run"
   },
   "dependencies": {
+    "@markdoc/markdoc": "catalog:",
+    "atlascii": "workspace:*",
     "@type-atlas/language-server": "workspace:*",
     "@volar/language-server": "catalog:",
     "chokidar": "catalog:",

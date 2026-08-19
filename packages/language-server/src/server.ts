@@ -25,6 +25,7 @@ import {
   type ProjectDiagnostics,
   ProjectDiagnosticsRequest,
   ResolveDependencySourceRequest,
+  WorkspaceReferencesRequest,
 } from "./protocol.ts";
 
 const markdownFileExtensions = [
@@ -39,15 +40,15 @@ const markdownFileExtensions = [
   "workbook",
 ] as const;
 
+const documentLanguageIds: Readonly<Record<string, string>> = {
+  json: "json",
+  jsonc: "jsonc",
+  ...Object.fromEntries(markdownFileExtensions.map((extension) => [extension, "markdown"])),
+};
+
 const documentLanguagePlugin = {
-  getLanguageId: ({ path }) => {
-    const extension = path.slice(path.lastIndexOf(".") + 1).toLowerCase();
-    return extension === "jsonc"
-      ? "jsonc"
-      : markdownFileExtensions.some((candidate) => candidate === extension)
-        ? "markdown"
-        : undefined;
-  },
+  getLanguageId: ({ path }) =>
+    documentLanguageIds[path.slice(path.lastIndexOf(".") + 1).toLowerCase()],
 } satisfies LanguagePlugin<URI>;
 
 /**
@@ -138,17 +139,26 @@ const projectDiagnostics = (
   // way the plugin contract requires.
   const sourceFiles = program.getSourceFiles().filter((file) => !file.isDeclarationFile);
   const byFile = new Map<string, Diagnostic[]>();
-  for (const diagnostic of sourceFiles.flatMap((file) => [
-    ...program.getSyntacticDiagnostics(file, compilerToken),
-    ...program.getSemanticDiagnostics(file, compilerToken),
-  ])) {
-    if (diagnostic.start === undefined || diagnostic.file === undefined) continue;
-    const uri = documentUri(diagnostic.file.fileName);
-    if (!uri) continue;
-    byFile.set(uri, [
-      ...(byFile.get(uri) ?? []),
-      convertProgramDiagnostic(diagnostic, diagnostic.file, diagnostic.start),
-    ]);
+  // One file at a time, appending in place. Collecting every diagnostic in the
+  // program into a single array before reading any of it held the whole report
+  // in memory at once, and rebuilding each file's array per diagnostic —
+  // `[...(byFile.get(uri) ?? []), converted]` — copied it again for every entry:
+  // quadratic in one file's count. `packages/core-time` reports 774 diagnostics
+  // of a single code and the request never returned; `apps/ardy` reports 1,101
+  // across 266 files and took 29 seconds.
+  for (const file of sourceFiles) {
+    for (const diagnostic of [
+      ...program.getSyntacticDiagnostics(file, compilerToken),
+      ...program.getSemanticDiagnostics(file, compilerToken),
+    ]) {
+      if (diagnostic.start === undefined || diagnostic.file === undefined) continue;
+      const uri = documentUri(diagnostic.file.fileName);
+      if (!uri) continue;
+      const converted = convertProgramDiagnostic(diagnostic, diagnostic.file, diagnostic.start);
+      const held = byFile.get(uri);
+      if (held) held.push(converted);
+      else byFile.set(uri, [converted]);
+    }
   }
   const configFilePath = host.getCompilationSettings().configFilePath;
   return {
@@ -168,6 +178,43 @@ export const registerLanguageServer = (connection: Connection): void => {
   let watchedFiles: { dispose(): void } | undefined;
 
   server.onInitialize(() => {
+    connection.onRequest(
+      WorkspaceReferencesRequest.type,
+      async ({ textDocument, position, context }, token) => {
+        const uri = URI.parse(textDocument.uri);
+        const owner = await server.project.getLanguageService(uri);
+        const loaded =
+          (await Promise.resolve(server.project.getExistingLanguageServices()).catch(
+            () => undefined,
+          )) ?? [];
+        // One project that cannot answer must not delete the answer the others
+        // have. A service resolves a URI it does not own by pulling the file
+        // into its own program, and that resolution is what fails here.
+        const found = await Promise.all(
+          [owner, ...loaded.filter((service) => service !== owner)].map((service) =>
+            Promise.resolve(service.getReferences(uri, position, context, token)).catch(
+              () => undefined,
+            ),
+          ),
+        );
+        // Two services answering about the same symbol report the same site, so
+        // the merged answer is deduplicated on what a location is: its file and
+        // its span.
+        return found
+          .flatMap((locations) => locations ?? [])
+          .filter(
+            (location, index, all) =>
+              all.findIndex(
+                (other) =>
+                  other.uri === location.uri &&
+                  other.range.start.line === location.range.start.line &&
+                  other.range.start.character === location.range.start.character &&
+                  other.range.end.line === location.range.end.line &&
+                  other.range.end.character === location.range.end.character,
+              ) === index,
+          );
+      },
+    );
     connection.onRequest(ProjectDiagnosticsRequest.type, async ({ textDocuments }, token) => {
       // Volar resolves a document to the service owning it, so files sharing a
       // project resolve to one service and it is checked once. Deduplicating
@@ -179,7 +226,19 @@ export const registerLanguageServer = (connection: Connection): void => {
       const services = textDocuments?.length
         ? [...new Set(owning)]
         : await server.project.getExistingLanguageServices();
-      return services.flatMap((service) => projectDiagnostics(service, token) ?? []);
+      // A project the checker cannot hold must not delete the answer the other
+      // projects have. Volar keeps an inferred project for a root with no
+      // configuration of its own — a monorepo root, or a package opened while a
+      // parent root was already served — and asking it for a program raises
+      // `project not found for <root>/jsconfig.json`, which ended the request
+      // for every project rather than the one that could not answer.
+      return services.flatMap((service) => {
+        try {
+          return projectDiagnostics(service, token) ?? [];
+        } catch {
+          return [];
+        }
+      });
     });
     connection.onRequest(
       ResolveDependencySourceRequest.type,
@@ -244,26 +303,14 @@ export const registerLanguageServer = (connection: Connection): void => {
   );
   connection.onInitialized(async () => {
     server.initialized();
-
-    connection.onReferences(async (params, token) => {
-      const uri = URI.parse(params.textDocument.uri);
-      const owner = await server.project.getLanguageService(uri);
-      if (!(params as typeof params & { crossProject?: boolean }).crossProject)
-        return owner.getReferences(uri, params.position, params.context, token);
-      const references = await Promise.all(
-        (await server.project.getExistingLanguageServices()).map((service) =>
-          service.getReferences(uri, params.position, params.context, token),
-        ),
-      );
-      return [
-        ...new Map(
-          references
-            .flatMap((found) => found ?? [])
-            .map((location) => [JSON.stringify(location), location]),
-        ).values(),
-      ];
-    });
-
+    // Volar exposes `watchFiles` and never calls it: no feature in
+    // `@volar/language-server` or any `volar-service-*` invokes it, and both the
+    // `workspace/didChangeWatchedFiles` listener and its dynamic registration
+    // live inside that one function. Until an embedder calls it the server never
+    // listens for file changes, so `features/fileSystem.js` keeps every file it
+    // has read and `project/typescriptProjectLs.js` never advances its project
+    // version — every answer describes the contents a file had when it was first
+    // opened. This is the call that makes the watcher real.
     watchedFiles = await server.fileWatcher.watchFiles(["**/*"]);
   });
   connection.onShutdown(() => {

@@ -3,12 +3,14 @@ import {
   containingGitSubmodule,
   documentSymbols,
   findGitSubmoduleRoots,
-  formatSymbolInspection,
   inspectSymbol,
+  type InspectSymbolResult,
   type InspectSymbolTarget,
+  renderDocument,
   type VolarWorkspacePool,
 } from "@type-atlas/core";
-import { hoverContentsText, symbolKind, workspacePath } from "@type-atlas/core/text";
+import { markupText, sameRange, displayPath } from "atlascii";
+import { inspectionVariables } from "./inspection-variables.ts";
 import { isFileInDir } from "@volar/language-server/node.js";
 import { stat } from "node:fs/promises";
 import { relative as platformRelative } from "node:path";
@@ -46,8 +48,16 @@ export type RetrievalPage = {
   readonly page: SembleSearchPage;
   readonly root: string;
   readonly searchRoot: string;
+  readonly anchors: readonly string[];
   readonly matches: readonly RetrievalMatch[];
 };
+
+const queryAnchors = (query: string): ReadonlySet<string> =>
+  new Set(
+    (query.match(/[$_\p{ID_Start}][$_\p{ID_Continue}]*/gu) ?? []).filter((identifier) =>
+      /[$_\p{Lu}]/u.test(identifier),
+    ),
+  );
 
 const symbolRange = (symbol: SourceSymbol): Range =>
   "location" in symbol ? symbol.location.range : symbol.range;
@@ -107,8 +117,15 @@ const resolveSearchRoot = async (root: string, directory: string | undefined): P
   return searchRoot;
 };
 
+/**
+ * Renders a range the way every position in this MCP is written and read.
+ *
+ * LSP counts lines and characters from zero. Every tool here takes and returns
+ * them from one, so a retrieval result feeds a navigation call directly; the
+ * zero-based form landed an agent one line above the code it searched for.
+ */
 const sourceRange = (range: Range): string =>
-  `${range.start.line}:${range.start.character}-${range.end.line}:${range.end.character}`;
+  `${range.start.line + 1}:${range.start.character + 1}-${range.end.line + 1}:${range.end.character + 1}`;
 
 export const enrichRetrievalPage = async (input: {
   readonly page: SembleSearchPage;
@@ -124,15 +141,14 @@ export const enrichRetrievalPage = async (input: {
   const intelligence = createTypeAtlas(workspace);
   const anchorIdentifiers = new Set(input.anchorIdentifiers ?? []);
   const queryIdentifiers = new Set([
-    ...(input.page.query.match(/[$_\p{ID_Start}][$_\p{ID_Continue}]*/gu) ?? []).filter(
-      (identifier) => /[$_\p{Lu}]/u.test(identifier),
-    ),
+    ...queryAnchors(input.page.query),
     ...(input.anchorIdentifiers ?? []),
   ]);
   return {
     page: input.page,
     root: input.root,
     searchRoot: input.searchRoot,
+    anchors: [...queryIdentifiers],
     matches: await Promise.all(
       input.page.results.map(async (result) => {
         const file = path.resolve(input.searchRoot, result.file_path);
@@ -161,30 +177,29 @@ export const enrichRetrievalPage = async (input: {
           symbolPaths.find((path) => queryIdentifiers.has(path.at(-1)!.symbol.name)) ??
           symbolPaths[0];
         const selected = symbolPath?.at(-1);
-        const contentLines = anchorIdentifiers.size
-          ? source.split("\n")
-          : (result.content?.split("\n") ?? []);
-        const contentStartLine = anchorIdentifiers.size ? 0 : resultStartLine;
-        const anchorLine = contentLines.findIndex(
+        const exactIdentifier = !!selected && queryIdentifiers.has(selected.symbol.name);
+        // The snippet is cut from the file, not from the matched chunk the
+        // search returned: that chunk arrives with its first line stripped of
+        // indentation, so a character read off it addressed the wrong column.
+        const sourceLines = source.split("\n");
+        const anchorLine = sourceLines.findIndex(
           (line) =>
             !/^\s*(?:\/\/|\/\*|\*)/u.test(line) &&
             (line.match(/[$_\p{ID_Start}][$_\p{ID_Continue}]*/gu) ?? []).some((identifier) =>
               anchorIdentifiers.has(identifier),
             ),
         );
-        const anchorSourceLine = anchorLine < 0 ? undefined : contentStartLine + anchorLine;
+        const focusLine =
+          anchorLine < 0 && exactIdentifier ? selected.selection.start.line : anchorLine;
         const snippetStart =
-          input.snippetLines === null
-            ? 0
+          focusLine < 0 || input.snippetLines === null
+            ? resultStartLine
             : Math.min(
-                Math.max(0, contentLines.length - input.snippetLines),
-                Math.max(
-                  0,
-                  (anchorSourceLine ?? selected?.selection.start.line ?? resultStartLine) -
-                    contentStartLine -
-                    Math.floor(input.snippetLines / 2),
-                ),
+                Math.max(0, sourceLines.length - input.snippetLines),
+                Math.max(0, focusLine - Math.floor(input.snippetLines / 2)),
               );
+        const snippetEnd =
+          input.snippetLines === null ? resultEndLine + 1 : snippetStart + input.snippetLines;
         const hover =
           selected && input.includeTypes
             ? (
@@ -198,20 +213,15 @@ export const enrichRetrievalPage = async (input: {
         return {
           result,
           file,
-          displayFile: workspacePath(URI.file(file).toString(), input.root),
+          displayFile: displayPath(URI.file(file).toString(), input.root),
           path: symbolPath,
           selected,
-          exactIdentifier: !!selected && queryIdentifiers.has(selected.symbol.name),
+          exactIdentifier,
           content:
             input.snippetLines === 0
               ? undefined
-              : contentLines
-                  .slice(
-                    snippetStart,
-                    input.snippetLines === null ? undefined : snippetStart + input.snippetLines,
-                  )
-                  .join("\n"),
-          contentStartLine: contentStartLine + snippetStart,
+              : sourceLines.slice(snippetStart, snippetEnd).join("\n"),
+          contentStartLine: snippetStart,
           hover,
         };
       }),
@@ -227,30 +237,12 @@ const sameAnchor = (
   left.position.line === right.position.line &&
   left.position.character === right.position.character;
 
-const formatMatch = (match: RetrievalMatch): string =>
-  [
-    `${match.displayFile}:${match.result.start_line - 1}-${match.result.end_line - 1}`,
-    ...(match.path?.length
-      ? [`Structure: ${match.path.map(({ symbol }) => symbol.name).join(" › ")}`]
-      : []),
-    ...(match.selected
-      ? [
-          `Symbol: ${match.selected.symbol.name} [${symbolKind(
-            match.selected.symbol.kind,
-          )}] · selection ${sourceRange(match.selected.selection)}${
-            sourceRange(match.selected.range) === sourceRange(match.selected.selection)
-              ? ""
-              : ` · body ${sourceRange(match.selected.range)}`
-          }`,
-        ]
-      : []),
-    ...(match.hover ? [hoverContentsText(match.hover.contents) ?? "No hover content."] : []),
-    ...(match.content
-      ? match.content.split("\n").map((line, index) => `${match.contentStartLine + index}|${line}`)
-      : []),
-  ].join("\n");
-
-const formatPage = (input: {
+/**
+ * A retrieval page as the facts a reader needs, with nothing decided about how
+ * it reads. Ranking happens here because it is selection, not presentation:
+ * which hits survive the exclusion and the limit, and in what order.
+ */
+const searchPage = (input: {
   readonly retrieval: RetrievalPage;
   readonly exclude?: {
     readonly file: string;
@@ -258,9 +250,9 @@ const formatPage = (input: {
   };
   readonly explainRelevance?: boolean;
   readonly limit?: number;
-}): string => {
+}) => {
   const exclude = input.exclude;
-  const matches = input.retrieval.matches
+  const ranked = input.retrieval.matches
     .filter(
       (match) =>
         !(
@@ -273,27 +265,65 @@ const formatPage = (input: {
           )
         ),
     )
+    .sort((left, right) => Number(right.exactIdentifier) - Number(left.exactIdentifier))
     .slice(0, input.limit);
-  const topScore = matches[0]?.result.score;
-  return [
-    `Search: ${input.retrieval.page.query}`,
-    `${matches.length} ${matches.length === 1 ? "match" : "matches"}${
-      matches.length && input.explainRelevance !== false
-        ? " · relevance is relative to the top result shown"
-        : ""
-    }`,
-    "",
-    ...matches.flatMap((match, index) => [
-      `## ${index + 1} · relevance ${
-        topScore && topScore > 0 ? Math.round((match.result.score / topScore) * 100) : 0
-      }%`,
-      formatMatch(match),
-      "",
-    ]),
-  ]
-    .join("\n")
-    .trimEnd();
+  const topScore = ranked.length ? Math.max(...ranked.map((match) => match.result.score)) : 0;
+  const anchoredCount = ranked.filter((match) => match.exactIdentifier).length;
+  const anchors = input.retrieval.anchors;
+  return {
+    query: input.retrieval.page.query,
+    count: ranked.length,
+    explainRelevance: ranked.length > 0 && input.explainRelevance !== false,
+    anchoredCount,
+    anchors,
+    unanchored: anchoredCount === 0 && anchors.length > 0,
+    unanchorable: anchoredCount === 0 && anchors.length === 0,
+    matches: ranked.map((match, index) => {
+      const lines = match.content?.split("\n");
+      return {
+        rank: index + 1,
+        file: match.displayFile,
+        startLine: lines?.length ? match.contentStartLine + 1 : match.result.start_line,
+        endLine: match.result.end_line,
+        relevance: topScore > 0 ? Math.round((match.result.score / topScore) * 100) : 0,
+        within: match.path?.map(({ symbol }) => symbol.name),
+        name: match.selected?.symbol.name,
+        kind: match.selected?.symbol.kind,
+        selection: match.selected?.selection,
+        // Named only when it differs from the selection: repeating an
+        // identifier's own span costs a second read to learn nothing.
+        extent:
+          match.selected && !sameRange(match.selected.range, match.selected.selection)
+            ? match.selected.range
+            : undefined,
+        anchored: match.exactIdentifier,
+        documentation: match.hover
+          ? markupText(match.hover.contents) || "No hover content."
+          : undefined,
+        lines,
+      };
+    }),
+  };
 };
+
+const renderInspection = async (
+  result: InspectSymbolResult,
+  root: string,
+): Promise<string> =>
+  (
+    await renderDocument({
+      document: "inspect-symbol.tool.mdoc",
+      variables: inspectionVariables({ result, root }),
+    })
+  ).text;
+
+const renderSearchPage = async (input: Parameters<typeof searchPage>[0]): Promise<string> =>
+  (
+    await renderDocument({
+      document: "search.tool.mdoc",
+      variables: searchPage(input),
+    })
+  ).text;
 
 /**
  * Renders the optional similarity section without discarding a completed
@@ -382,15 +412,27 @@ export const createRetrievalIntelligence = (dependencies: {
     readonly signal: AbortSignal;
   }): Promise<RetrievalPage> => {
     const searchRoot = await resolveSearchRoot(request.root, request.directory);
+    const anchors = queryAnchors(request.query);
+    const wide = await scopedSearch({
+      semble: dependencies.semble,
+      root: request.root,
+      searchRoot,
+      query: request.query,
+      limit: anchors.size ? Math.min(request.limit * 4, 40) : request.limit,
+      signal: request.signal,
+    });
+    const mentions = (content: string | null | undefined) =>
+      !!content &&
+      (content.match(/[$_\p{ID_Start}][$_\p{ID_Continue}]*/gu) ?? []).some((identifier) =>
+        anchors.has(identifier),
+      );
+    const results = anchors.size
+      ? [...wide.results]
+          .sort((left, right) => Number(mentions(right.content)) - Number(mentions(left.content)))
+          .slice(0, request.limit)
+      : wide.results;
     return await enrichRetrievalPage({
-      page: await scopedSearch({
-        semble: dependencies.semble,
-        root: request.root,
-        searchRoot,
-        query: request.query,
-        limit: request.limit,
-        signal: request.signal,
-      }),
+      page: { ...wide, results },
       root: request.root,
       searchRoot,
       includeTypes: request.includeTypes,
@@ -427,7 +469,7 @@ export const createRetrievalIntelligence = (dependencies: {
     return await enrichRetrievalPage({
       page: {
         ...page,
-        query: `Related to ${workspacePath(
+        query: `Related to ${displayPath(
           URI.file(file).toString(),
           request.root,
         )}:${request.line + 1}`,
@@ -443,9 +485,9 @@ export const createRetrievalIntelligence = (dependencies: {
 
   return {
     search: async (request: Parameters<typeof search>[0]) =>
-      formatPage({ retrieval: await search(request) }),
+      renderSearchPage({ retrieval: await search(request) }),
     findRelated: async (request: Parameters<typeof findRelated>[0]) =>
-      formatPage({ retrieval: await findRelated(request) }),
+      renderSearchPage({ retrieval: await findRelated(request) }),
     exploreSymbol: async (request: {
       readonly root: string;
       readonly directory?: string;
@@ -472,7 +514,7 @@ export const createRetrievalIntelligence = (dependencies: {
         signal: request.signal,
       });
       const { position } = inspection;
-      const inspectionText = formatSymbolInspection({ result: inspection, root: request.root });
+      const inspectionText = await renderInspection(inspection, request.root);
       if (!position) return inspectionText;
       const anchor = {
         file: path.resolve(request.root, request.file),
@@ -483,7 +525,7 @@ export const createRetrievalIntelligence = (dependencies: {
         "",
         ...(await relatedCodeSection(
           async () =>
-            formatPage({
+            renderSearchPage({
               retrieval: await findRelated({
                 root: request.root,
                 directory: request.directory,
@@ -523,7 +565,7 @@ export const createRetrievalIntelligence = (dependencies: {
         snippetLines: request.snippetLines,
         signal: request.signal,
       });
-      const searchText = formatPage({
+      const searchText = await renderSearchPage({
         retrieval,
         limit: request.candidateLimit,
       });
@@ -608,38 +650,36 @@ export const createRetrievalIntelligence = (dependencies: {
       const candidateRanks = candidates.map(
         (candidate) => retrieval.matches.indexOf(candidate) + 1,
       );
-      return [
-        searchText,
-        "",
-        `Verified relationships for ${
-          exact
-            ? `the exact identifier match · retrieved candidate ${candidateRanks[0]}`
-            : `structurally connected retrieved ${
-                inspections.length === 1 ? "candidate" : "candidates"
-              } ${candidateRanks.join(", ")}`
-        }`,
-        ...inspections.flatMap((inspection, index) => [
-          ...(inspections.length > 1
-            ? ["", `### Retrieved candidate ${candidateRanks[index]}`]
-            : []),
-          formatSymbolInspection({ result: inspection, root: request.root }),
-        ]),
-        ...(related
-          ? [
-              "",
-              "Related code · similarity is not a call or reference relationship",
-              formatPage({
-                retrieval: related,
-                exclude: {
-                  file: candidates[0]!.file,
-                  position: candidates[0]!.selected.selection.start,
-                },
-                explainRelevance: false,
-                limit: request.relatedLimit,
-              }),
-            ]
-          : []),
-      ].join("\n");
+      const inspectionTexts = await Promise.all(
+        inspections.map((inspection) => renderInspection(inspection, request.root)),
+      );
+      const relatedText = related
+        ? await renderSearchPage({
+            retrieval: related,
+            exclude: {
+              file: candidates[0]!.file,
+              position: candidates[0]!.selected.selection.start,
+            },
+            explainRelevance: false,
+            limit: request.relatedLimit,
+          })
+        : undefined;
+      const rendered = await renderDocument({
+        document: "investigate.tool.mdoc",
+        variables: {
+          search: searchText,
+          exact,
+          ranks: candidateRanks.map(String),
+          candidateCount: inspections.length,
+          inspections: inspectionTexts.map((text, index) => ({
+            title:
+              inspections.length > 1 ? `Retrieved candidate ${candidateRanks[index]}` : undefined,
+            text,
+          })),
+          related: relatedText,
+        },
+      });
+      return rendered.text;
     },
   };
 };

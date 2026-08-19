@@ -1,0 +1,31 @@
+---
+{ "tool": "diagnostics" }
+---
+
+{% if $unchanged %}
+No write has reached this workspace's watcher yet. That is not the same as nothing having been written — a file saved moments ago may not have been reported, and asking again in a second often answers differently. Pass scope: "project" to check the whole project regardless, or name a project.
+{% /if %}
+
+{% if $unloaded %}
+No project has been loaded yet, and nothing has changed. Name one with project, or read a file in it first.
+{% /if %}
+
+{% if $checked %}
+{% if equals($total, 0) %}
+No diagnostics · {% if $wholeProject %}Whole project{% /if %}{% if not($wholeProject) %}Changed files{% /if %} · {% $fileCount %} {% plural count=$fileCount forms={"one": "file", "other": "files"} /%} checked · {% if $manyProjects %}{% $projectCount %} projects{% /if %}{% if not($manyProjects) %}{% if $configFile %}{% $configFile %} in {% $root %}{% /if %}{% if not($configFile) %}inferred project{% /if %}{% /if %}
+{% /if %}
+
+{% if not(equals($total, 0)) %}
+{% if $wholeProject %}Whole project{% /if %}{% if not($wholeProject) %}Changed files{% /if %} · {% $total %} {% plural count=$total forms={"one": "problem", "other": "problems"} /%} in {% $affected %} {% plural count=$affected forms={"one": "file", "other": "files"} /%} · {% $fileCount %} {% plural count=$fileCount forms={"one": "file", "other": "files"} /%} checked · {% if $manyProjects %}{% $projectCount %} projects{% /if %}{% if not($manyProjects) %}{% if $configFile %}{% $configFile %} in {% $root %}{% /if %}{% if not($configFile) %}inferred project{% /if %}{% /if %}
+
+{% partial file="page.mdoc" /%}
+
+{% if any($codes) %}
+{% if $codePage %}{% $codePage.shown %} of {% $codePage.total %} codes shown{% /if %}{% if not($codePage) %}Codes ({% $codeTotal %}){% /if %}
+
+{% table columns=$codeColumns rows=$codes /%}
+{% /if %}
+
+{% each items=$groups as="group" partial="diagnostic-group.mdoc" /%}
+{% /if %}
+{% /if %}

@@ -1,11 +1,26 @@
 import { realpath, stat } from "node:fs/promises";
 import { containingGitSubmodule, findGitSubmoduleRoots } from "@type-atlas/core";
+import type { Row } from "atlascii";
 import { isFileInDir } from "@volar/language-server/node.js";
 import { fdir } from "fdir";
 import { isGitIgnored } from "globby";
 import * as path from "pathe";
 
 const collapsedDirectories = new Set([".git", "node_modules"]);
+
+/**
+ * What a listing found, before anything decides how it reads.
+ *
+ * `entries` is the tree itself — one row per directory in the files view, each
+ * holding the names inside it; one row per path in the directories view. The
+ * bound is reported rather than rendered, so the words belong to the document.
+ */
+export type WorkspaceListing = {
+  readonly entries: readonly Row[];
+  readonly over: boolean;
+  readonly limit: number;
+  readonly filtered: boolean;
+};
 
 export const workspaceTree = async (input: {
   readonly workspace: string;
@@ -18,7 +33,7 @@ export const workspaceTree = async (input: {
   readonly limit: number;
   readonly signal: AbortSignal;
   readonly view: "directories" | "files";
-}): Promise<string> => {
+}): Promise<WorkspaceListing> => {
   const root = path.resolve(input.workspace);
   const directory = path.resolve(root, input.directory);
   if (directory !== root && !isFileInDir(directory, root)) {
@@ -69,10 +84,22 @@ export const workspaceTree = async (input: {
   const crawler = new fdir()
     .withPathSeparator("/")
     .withRelativePaths()
-    .withMaxDepth(input.depth - 1)
+    // Depth counts levels below the named directory. A file sits at the depth of
+    // the directory holding it, so files stop one level earlier than the
+    // directories do — asking for depth 1 means the files here, and the
+    // directories immediately inside.
+    .withMaxDepth(input.view === "directories" ? input.depth : input.depth - 1)
     .withErrors()
     .withAbortSignal(input.signal)
-    .globWithOptions([...(input.glob ?? ["**/*"])], { dot: input.includeHidden })
+    // A directory is matched against the path it is reported under, which ends
+    // in a separator, so a caller's `pkg-*` matches nothing until it becomes
+    // `pkg-*/` — an empty answer that reads as "no such package".
+    .globWithOptions(
+      (input.glob ?? ["**/*"]).map((pattern) =>
+        input.view === "directories" && !pattern.endsWith("/") ? `${pattern}/` : pattern,
+      ),
+      { dot: input.includeHidden },
+    )
     .filter((file) => file === "." || file.length === 0 || !isIgnored(file))
     .exclude((name, absolute) => {
       const relative = path.relative(directory, absolute);
@@ -97,13 +124,12 @@ export const workspaceTree = async (input: {
           return relative.split("/").length <= input.depth ? [`${relative}/ [submodule]`] : [];
         });
     const directories = [...crawled.filter((entry) => entry !== "."), ...submodules].sort();
-    if (directories.length === 0 && input.glob) return "No matching paths.";
-    return [
-      ...directories.slice(0, input.limit),
-      ...(directories.length > input.limit
-        ? [`… ${input.limit}-directory limit reached; narrow directory or increase limit.`]
-        : []),
-    ].join("\n");
+    return {
+      entries: directories.slice(0, input.limit).map((name) => ({ name })),
+      over: directories.length > input.limit,
+      limit: input.limit,
+      filtered: input.glob !== undefined,
+    };
   }
 
   const crawled = await crawler
@@ -148,20 +174,18 @@ export const workspaceTree = async (input: {
         entry.name === undefined ? names : [...names, entry.name],
       );
     }, new Map());
-  const sections = [...groupedEntries]
-    .sort(
-      ([left], [right]) =>
-        Number(right === ".") - Number(left === ".") || left.localeCompare(right),
-    )
-    .flatMap(([relative, names]) => [
-      `${relative}/`,
-      ...[...names].sort().map((name) => `  ${name}`),
-    ]);
-  if (sections.length === 0 && input.glob) return "No matching paths.";
-  return [
-    ...sections,
-    ...(entries.length > input.limit
-      ? [`… ${input.limit}-entry limit reached; narrow directory or increase limit.`]
-      : []),
-  ].join("\n");
+  return {
+    entries: [...groupedEntries]
+      .sort(
+        ([left], [right]) =>
+          Number(right === ".") - Number(left === ".") || left.localeCompare(right),
+      )
+      .map(([relative, names]) => ({
+        name: `${relative}/`,
+        children: [...names].sort().map((name) => ({ name })),
+      })),
+    over: entries.length > input.limit,
+    limit: input.limit,
+    filtered: input.glob !== undefined,
+  };
 };

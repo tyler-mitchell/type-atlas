@@ -1,0 +1,1 @@
+{% if $target.name %}{% $target.name %} · {% /if %}{% $target.file %}:{% range($target.selection) %}{% if $target.extent %} · range {% range($target.extent) %}{% /if %}

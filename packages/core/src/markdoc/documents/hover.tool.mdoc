@@ -1,0 +1,12 @@
+---
+tool: hover
+---
+
+{% if not($text) %}
+Nothing at this position has a type to report in {% $file %}. Hover answers for a symbol's own name, so whitespace, punctuation, and comments report none.
+{% /if %}
+{% if $text %}
+{% $file %}{% if $at %}:{% $at %}{% /if %}, under {% $root %}.
+
+{% $text %}
+{% /if %}

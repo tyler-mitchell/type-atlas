@@ -1,0 +1,20 @@
+---
+{ "tool": "code_actions" }
+---
+
+{% if any($actions) %}
+{% $actions.length %} {% plural count=$actions.length forms={"one": "action", "other": "actions"} /%} at {% $at %} in {% $file %}, under {% $root %}.
+
+{% tree entries=$actions /%}
+{% /if %}
+{% if not(any($actions)) %}
+{% if equals($scope, "quickFix") %}
+No quick fixes{% if $diagnosticCount %} for {% $diagnosticCount %} {% plural count=$diagnosticCount forms={"one": "diagnostic", "other": "diagnostics"} /%}{% /if %} in this range.
+{% /if %}
+{% if equals($scope, "refactor") %}
+No refactors in this range.
+{% /if %}
+{% if equals($scope, "any") %}
+No code actions in this range.
+{% /if %}
+{% /if %}

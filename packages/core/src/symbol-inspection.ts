@@ -1,5 +1,5 @@
 import {
-  CallHierarchyIncomingCallsRequest,
+  type CallHierarchyIncomingCall,
   type CallHierarchyItem,
   CallHierarchyOutgoingCallsRequest,
   CallHierarchyPrepareRequest,
@@ -12,16 +12,17 @@ import {
   type Position,
   type Range,
   ReferencesRequest,
-  type ReferenceParams,
   SymbolKind,
   type DocumentSymbol,
   TypeDefinitionRequest,
 } from "@volar/language-server/protocol.js";
 import { isFileInDir } from "@volar/language-server/node.js";
-import { sourceLines } from "./folded-source.ts";
+import { WorkspaceReferencesRequest } from "@type-atlas/language-server/protocol";
+import type { ReferenceScope } from "./operations.ts";
+import { sourceLines } from "atlascii";
 import { documentSymbols } from "./syntactic-features.ts";
 import { URI } from "vscode-uri";
-import { hoverContentsText, rangeText, symbolKind, workspacePath } from "./plain-text.ts";
+import { markupText as hoverContentsText, rangeText } from "atlascii";
 import type { VolarWorkspace } from "./volar-workspace.ts";
 
 /** Selects either an exact document-symbol name or an LSP source position. */
@@ -30,26 +31,22 @@ export type InspectSymbolTarget = { readonly position: Position } | { readonly s
 /** Controls expensive source and type sections and bounds repeated relationships. */
 export type InspectSymbolOptions = {
   readonly compactExternalCalls?: boolean;
-  readonly crossProject?: boolean;
+  readonly scope?: ReferenceScope;
   readonly includeSource: boolean;
   readonly includeTypeDefinitions: boolean;
   readonly limit: number;
 };
 
-type Located = {
+export type Located = {
   readonly uri: string;
   readonly range: Range;
   readonly selectionRange: Range;
+  /** The declaration this one is nested in, when it is nested at all. */
+  readonly within?: string;
   readonly name?: string;
   readonly kind?: number;
   readonly detail?: string;
   readonly sourceLine?: string;
-};
-
-type RelatedCall = {
-  readonly item: CallHierarchyItem;
-  readonly siteUri: string;
-  readonly sites: readonly Range[];
 };
 
 /** A call and the exact places it happens, as the call hierarchy reports them. */
@@ -93,7 +90,7 @@ export type InspectSymbolResult = {
     readonly other: number;
     readonly total: number;
   };
-  readonly source?: readonly string[] | undefined;
+  readonly source?: { readonly lines: readonly string[]; readonly startLine: number } | undefined;
 };
 
 const located = (symbol: DocumentSymbol, uri: string): Located => ({
@@ -119,10 +116,15 @@ const located = (symbol: DocumentSymbol, uri: string): Located => ({
 function* declarations(
   symbols: readonly DocumentSymbol[],
   uri: string,
+  within?: string,
 ): Generator<Located, void, undefined> {
   for (const symbol of symbols) {
-    yield located(symbol, uri);
-    yield* declarations(symbol.children ?? [], uri);
+    // The declaration each one sits in, carried down as the walk descends. A
+    // name repeated throughout a file — twenty-nine `transform` methods in an
+    // object of tags — is indistinguishable without it, and the outline knows
+    // the parent here and nowhere later.
+    yield { ...located(symbol, uri), ...(within ? { within } : {}) };
+    yield* declarations(symbol.children ?? [], uri, symbol.name);
   }
 }
 
@@ -143,6 +145,38 @@ const enclosing = (input: {
     enclosing({ symbols: branch.children ?? [], position: input.position, uri: input.uri }) ??
     located(branch, input.uri)
   );
+};
+
+const callableKinds = new Set<number>([
+  SymbolKind.Function,
+  SymbolKind.Method,
+  SymbolKind.Constructor,
+]);
+
+/**
+ * The innermost callable containing a position, else the innermost declaration.
+ *
+ * A caller is a callable. The binding a call's result is assigned to is not
+ * one, and naming it reports `rendered` where the caller is the function that
+ * runs the call. The innermost declaration remains the right answer for naming
+ * what a position sits in, so this is a second descent rather than a change to
+ * that one.
+ */
+const enclosingCallable = (input: {
+  readonly symbols: readonly DocumentSymbol[];
+  readonly position: Position;
+  readonly uri: string;
+}): Located | undefined => {
+  const branch = input.symbols.find(({ range }) => contains(range, input.position));
+  if (!branch) return undefined;
+  const deeper = enclosingCallable({
+    symbols: branch.children ?? [],
+    position: input.position,
+    uri: input.uri,
+  });
+  if (deeper && deeper.kind !== undefined && callableKinds.has(deeper.kind)) return deeper;
+  if (callableKinds.has(branch.kind)) return located(branch, input.uri);
+  return deeper ?? located(branch, input.uri);
 };
 
 const contains = (range: Range, position: Position) =>
@@ -176,123 +210,22 @@ const unique = <Item>(items: readonly Item[], itemKey: (item: Item) => string) =
 const groups = <Item extends { readonly uri: string }>(items: readonly Item[]) =>
   [...Map.groupBy(items, ({ uri }) => uri)].map(([uri, grouped]) => ({ uri, items: grouped }));
 
-const locationText = ({ range, selectionRange }: Located) => {
-  const selection = rangeText(selectionRange);
-  const body = rangeText(range);
-  return `selection ${selection}${body === selection ? "" : ` · body ${body}`}`;
-};
-
-const locationGroups = (items: readonly Located[], root: string) =>
-  groups(items).flatMap(({ uri, items: related }) => [
-    workspacePath(uri, root),
-    ...related.map(
-      (item) => `  ${locationText(item)}${item.sourceLine ? `  ${item.sourceLine.trim()}` : ""}`,
-    ),
-  ]);
-
-const callGroups = (calls: readonly RelatedCall[], root: string, sharedSiteUri?: string) =>
-  groups(calls.map((call) => ({ ...call, uri: call.item.uri }))).flatMap(({ uri, items }) => [
-    workspacePath(uri, root),
-    ...items.map(({ item, siteUri, sites }) => {
-      const selection = rangeText(item.selectionRange);
-      const body = rangeText(item.range);
-      const callSites = sites.map(rangeText).join(", ");
-      const bodyLocation = body === selection ? "" : ` · body ${body}`;
-      const location =
-        item.kind === SymbolKind.Module ? "" : ` selection ${selection}${bodyLocation}`;
-      return `  ${item.name} [${symbolKind(item.kind)}]${location} · calls ${
-        siteUri === sharedSiteUri || siteUri === item.uri
-          ? callSites
-          : `${workspacePath(siteUri, root)}:${callSites}`
-      }${item.detail && item.kind !== SymbolKind.Module ? ` — ${item.detail}` : ""}`;
-    }),
-  ]);
-
-const callSection = (input: {
-  readonly calls: readonly RelatedCall[];
-  readonly includeExternalDetails?: boolean;
-  readonly limit: number;
-  readonly name: string;
-  readonly root: string;
-  readonly sharedSiteUri?: string;
-}) => {
-  const classified = input.calls.map((call) => {
-    const uri = URI.parse(call.item.uri);
-    return {
-      call,
-      external: !isFileInDir(uri.fsPath, input.root) || uri.path.includes("/node_modules/"),
-    };
-  });
-  const external = input.includeExternalDetails
-    ? []
-    : classified.filter(({ external }) => external).map(({ call }) => call);
-  const calls = input.includeExternalDetails
-    ? input.calls
-    : classified.filter(({ external }) => !external).map(({ call }) => call);
-  const shown = calls.slice(0, input.limit);
-  const externalNames = [...new Set(external.map(({ item }) => item.name))];
-  if (!shown.length && !external.length) return [];
-  const shownCount =
-    shown.length === calls.length ? `${calls.length}` : `${shown.length}/${calls.length}`;
-  const count = input.includeExternalDetails
-    ? shownCount
-    : `${shownCount} workspace${external.length ? ` · ${external.length} dependency/runtime` : ""}`;
-  return [
-    `${input.name} (${count})${
-      input.sharedSiteUri
-        ? ` · call sites in ${workspacePath(input.sharedSiteUri, input.root)}`
-        : ""
-    }`,
-    ...callGroups(shown, input.root, input.sharedSiteUri),
-    ...(shown.length < calls.length ? [`${calls.length - shown.length} more`] : []),
-    ...(external.length
-      ? [
-          `Dependency/runtime: ${externalNames.slice(0, input.limit).join(", ")}${
-            externalNames.length > input.limit
-              ? ` · ${externalNames.length - input.limit} more`
-              : ""
-          }`,
-        ]
-      : []),
-  ];
-};
-
-const symbolChoice = (
-  status: "ambiguous" | "not found",
-  symbol: string,
-  fileUri: string,
-  candidates: readonly Located[],
-  total: number,
-  root: string,
-) => {
-  return [
-    `Symbol "${symbol}" is ${status} · ${workspacePath(fileUri, root)}`,
-    ...(candidates.length
-      ? [
-          `Candidates (${candidates.length === total ? candidates.length : `${candidates.length}/${total}`})`,
-          ...candidates.map(
-            (candidate) =>
-              `  ${candidate.name} [${symbolKind(candidate.kind!)}] ${locationText(
-                candidate,
-              )}${candidate.detail ? ` — ${candidate.detail}` : ""}${
-                candidate.sourceLine ? `  ${candidate.sourceLine.trim()}` : ""
-              }`,
-          ),
-          ...(candidates.length < total ? [`${total - candidates.length} more`] : []),
-        ]
-      : []),
-  ].join("\n");
-};
-
 const documentLines = async (workspace: VolarWorkspace, uri: string) =>
   sourceLines((await workspace.readTextDocumentUri(uri)).source);
 
+/**
+ * A declaration's own lines, and the number the first of them carries.
+ *
+ * The lines are returned as they stand. Numbering them is presentation, and a
+ * second copy of that numbering drifted once already — it padded nothing, so
+ * `1|export` put code in column three and `10|}` put it in column four, and the
+ * excerpt lost the straight left edge that makes a body readable.
+ */
 const excerpt = async (workspace: VolarWorkspace, target: Located) => {
   const lines = await documentLines(workspace, target.uri);
   const end = target.range.end.line + (target.range.end.character > 0 ? 1 : 0);
-  return lines
-    .slice(target.range.start.line, end)
-    .map((line, index) => `${target.range.start.line + index + 1}|${line}`);
+  const start = target.range.start.line;
+  return { lines: lines.slice(start, end), startLine: start + 1 };
 };
 
 const withSourceLines = async (workspace: VolarWorkspace, items: readonly Located[]) =>
@@ -318,7 +251,118 @@ const withSourceLines = async (workspace: VolarWorkspace, items: readonly Locate
  * name a definition in another file. None of them are worth a program.
  */
 const outline = async (workspace: VolarWorkspace, uri: string) =>
-  documentSymbols({ uri, source: (await workspace.readTextDocumentUri(uri)).source });
+  documentSymbols({ uri, source: (await workspace.readTextDocumentUri(uri)).source }) ?? [];
+
+/**
+ * The declaration a position sits in, named and kinded, from one syntactic outline.
+ *
+ * A result that reports only a count answers a question the reader has to
+ * remember having asked, and a position that resolved to a neighbouring symbol
+ * reads exactly like one that resolved correctly.
+ */
+export const declarationAtPosition = async (input: {
+  readonly workspace: VolarWorkspace;
+  readonly uri: string;
+  readonly position: Position;
+}): Promise<Located | undefined> =>
+  enclosing({
+    symbols: await outline(input.workspace, input.uri),
+    position: input.position,
+    uri: input.uri,
+  });
+
+/**
+ * The declarations containing a position, outermost first.
+ *
+ * The innermost one is not always the useful answer. A reference standing on an
+ * object-literal property *is* that property in the outline, so naming what
+ * holds a use reported the use itself — `down: "↓"` inside `figures` answered
+ * "inside down". A caller that wants the holder takes the last entry that is
+ * not the reference, which needs the chain rather than its tip.
+ */
+export const declarationChainAtPosition = async (input: {
+  readonly workspace: VolarWorkspace;
+  readonly uri: string;
+  readonly position: Position;
+}): Promise<readonly Located[]> => {
+  const chain = (symbols: readonly DocumentSymbol[]): readonly Located[] => {
+    const branch = symbols.find(({ range }) => contains(range, input.position));
+    return branch ? [located(branch, input.uri), ...chain(branch.children ?? [])] : [];
+  };
+  return chain(await outline(input.workspace, input.uri));
+};
+
+/** Whether a callable stands at one declaration's identifier. */
+const declaredAt = (
+  callable: { readonly uri: string; readonly selectionRange: Range },
+  uri: string,
+  selectionRange: Range,
+) =>
+  callable.uri === uri &&
+  callable.selectionRange.start.line === selectionRange.start.line &&
+  callable.selectionRange.start.character === selectionRange.start.character;
+
+/**
+ * Incoming calls, assembled from references and the syntactic outline.
+ *
+ * The call hierarchy's incoming direction answers nothing under the active
+ * TypeScript backend — it returns in single-digit milliseconds without
+ * searching — while references and the outline answer normally. A reference
+ * whose enclosing declaration is not the symbol itself is a declaration that
+ * uses the symbol, which is the relationship the incoming direction reports;
+ * imports and re-exports sit in no declaration and fall out on their own.
+ */
+export const incomingCalls = async (input: {
+  readonly workspace: VolarWorkspace;
+  readonly references: readonly Location[] | null;
+  readonly subject: CallHierarchyItem | undefined;
+}): Promise<readonly CallHierarchyIncomingCall[]> => {
+  const sources = await Promise.all(
+    (input.references ?? []).map(async (location) => ({
+      location,
+      declaration: enclosingCallable({
+        symbols: await outline(input.workspace, location.uri),
+        position: location.range.start,
+        uri: location.uri,
+      }),
+    })),
+  );
+  return sources.reduce<readonly CallHierarchyIncomingCall[]>(
+    (callers, { location, declaration }) => {
+      // A declaration the outline could not name is one an agent cannot go to,
+      // so it is no more useful as a caller than the absence it stands in for.
+      if (!declaration?.name || declaration.kind === undefined) return callers;
+      // A reference standing exactly where its enclosing declaration is named is
+      // that declaration, not a use inside one — the symbol's own definition, or
+      // a shorthand property that is its own identifier.
+      if (declaredAt({ uri: location.uri, selectionRange: location.range }, location.uri, declaration.selectionRange)) {
+        return callers;
+      }
+      if (input.subject && declaredAt(input.subject, location.uri, declaration.selectionRange)) {
+        return callers;
+      }
+      const held = callers.find((call) =>
+        declaredAt(call.from, location.uri, declaration.selectionRange),
+      );
+      const caller: CallHierarchyIncomingCall = {
+        from: {
+          name: declaration.name,
+          kind: declaration.kind as CallHierarchyItem["kind"],
+          uri: location.uri,
+          range: declaration.range,
+          selectionRange: declaration.selectionRange,
+        },
+        fromRanges: [location.range],
+      };
+      return held
+        ? callers.map((call) =>
+            call === held ? { ...call, fromRanges: [...call.fromRanges, location.range] } : call,
+          )
+        : [...callers, caller];
+    },
+    [],
+  );
+};
 
 /**
  * The declaration a definition points at, in whichever file that is.
@@ -370,19 +414,37 @@ export const inspectSymbol = async (input: {
   // one parse.
   const fileSymbols = await outline(workspace, textDocument.uri);
   // Walked once, keeping only what a name asked for. A position needs no walk.
-  const matches =
+  const named =
     "symbol" in target
       ? [...declarations(fileSymbols, textDocument.uri)].filter(
           ({ name }) => name === target.symbol,
         )
       : [];
+  // A nested entry carrying the same name is usually not a second declaration.
+  // A spread — `...defaultMarks` inside another object — appears in the outline
+  // as a property named for what it spreads, which made a symbol declared
+  // exactly once report as ambiguous and refuse to answer. When one match sits
+  // at the top level, that is what a bare name means; genuine ambiguity, two
+  // declarations at the same level, still asks.
+  const outermost = named.filter(({ within }) => within === undefined);
+  const matches = outermost.length === 1 ? outermost : named;
   if ("symbol" in target && matches.length !== 1) {
     const wanted = target.symbol.toLowerCase();
-    const candidates = matches.length
-      ? matches
-      : [...declarations(fileSymbols, textDocument.uri)].filter(({ name }) =>
-          name?.toLowerCase().includes(wanted),
-        );
+    const all = [...declarations(fileSymbols, textDocument.uri)];
+    const similar = all.filter(({ name }) => name?.toLowerCase().includes(wanted));
+    // A name that matches nothing is usually a typo, and a substring test does
+    // not survive one — a transposed pair leaves the caller with no candidates
+    // and the name it wanted sitting in the same file. The file's own
+    // declarations are already parsed here, so showing them costs nothing and
+    // answers the question the caller was actually asking.
+    // The fallback lists what a caller could have meant, which is what the file
+    // declares — not every binding inside those declarations. Walking the whole
+    // outline offered `map() callback`, `by [method]` and `columns [property]`
+    // as candidates for a name someone typed, and repeated one source line
+    // across three of them. A substring match still searches the full depth,
+    // since a nested name the caller half-remembered is worth finding.
+    const topLevel = fileSymbols.map((symbol) => located(symbol, textDocument.uri));
+    const candidates = matches.length ? matches : similar.length ? similar : topLevel;
     const shownCandidates = await withSourceLines(workspace, candidates.slice(0, options.limit));
     return {
       textDocument,
@@ -403,30 +465,35 @@ export const inspectSymbol = async (input: {
       workspace.sendRequest(HoverRequest.type, { textDocument, position }, signal),
       workspace.sendRequest(DefinitionRequest.type, { textDocument, position }, signal),
       workspace.sendRequest(ImplementationRequest.type, { textDocument, position }, signal),
-      workspace.sendRequest(
-        ReferencesRequest.type,
-        {
-          textDocument,
-          position,
-          context: { includeDeclaration: true },
-          crossProject: options.crossProject,
-        } as ReferenceParams & { readonly crossProject?: boolean },
-        signal,
-      ),
+      options.scope === "workspace"
+        ? workspace.sendRequest(
+            WorkspaceReferencesRequest.type,
+            { textDocument, position, context: { includeDeclaration: true } },
+            signal,
+          )
+        : workspace.sendRequest(
+            ReferencesRequest.type,
+            { textDocument, position, context: { includeDeclaration: true } },
+            signal,
+          ),
       workspace.sendRequest(CallHierarchyPrepareRequest.type, { textDocument, position }, signal),
     ]);
   const [incoming, outgoing] = await Promise.all([
     items
-      ? Promise.all(
-          items.map((item) =>
-            workspace.sendRequest(CallHierarchyIncomingCallsRequest.type, { item }, signal),
-          ),
-        )
+      ? [
+          await incomingCalls({
+            workspace,
+            references: references as Location[] | null,
+            subject: items[0],
+          }),
+        ]
       : null,
     items
       ? Promise.all(
           items.map((item) =>
-            workspace.sendRequest(CallHierarchyOutgoingCallsRequest.type, { item }, signal),
+            workspace
+              .sendRequest(CallHierarchyOutgoingCallsRequest.type, { item }, signal)
+              .catch(() => null),
           ),
         )
       : null,
@@ -536,6 +603,26 @@ export const inspectSymbol = async (input: {
   const name = primary.name ?? ("symbol" in target ? target.symbol : "Symbol");
   const hoverText = hover ? hoverContentsText(hover.contents) : undefined;
 
+  // A jump target answered as a range alone makes the reader open the file to
+  // learn what is there — `Type definitions (1) · 14:21-54:2` never said the
+  // type is `Marks`, while the standalone tool for the same question does. The
+  // outline at the target names it, and the outline for that file is usually
+  // already parsed.
+  const withDeclaredNames = async (items: readonly Located[]) =>
+    Promise.all(
+      items.map(async (item) => ({
+        ...item,
+        name:
+          item.name ??
+          (
+            await declarationAtPosition({
+              workspace,
+              uri: item.uri,
+              position: item.selectionRange.start,
+            }).catch(() => undefined)
+          )?.name,
+      })),
+    );
   return {
     textDocument,
     position,
@@ -543,9 +630,9 @@ export const inspectSymbol = async (input: {
     name,
     project: project ? project.uri : undefined,
     hover: hoverText,
-    additionalDefinitions,
-    implementations: distinctImplementations,
-    typeDefinitions: distinctTypes,
+    additionalDefinitions: await withDeclaredNames(additionalDefinitions),
+    implementations: await withDeclaredNames(distinctImplementations),
+    typeDefinitions: await withDeclaredNames(distinctTypes),
     callers: items?.length ? callers : [],
     callees: items?.length ? callees : [],
     sharedCalleeUri: sharedSiteUri,
@@ -560,101 +647,3 @@ export const inspectSymbol = async (input: {
   };
 };
 
-/** Renders an inspection as the agent-facing text the MCP returns. */
-export const formatSymbolInspection = (input: {
-  readonly result: InspectSymbolResult;
-  readonly root: string;
-}): string => {
-  const { result, root } = input;
-  if (result.choice) {
-    return symbolChoice(
-      result.choice.reason,
-      result.choice.name,
-      result.textDocument.uri,
-      result.choice.candidates,
-      result.choice.total,
-      root,
-    );
-  }
-  const primary = result.primary;
-  if (!primary) return "";
-  const additionalDefinitions = result.additionalDefinitions ?? [];
-  const distinctImplementations = result.implementations ?? [];
-  const distinctTypes = result.typeDefinitions ?? [];
-  const callers = result.callers ?? [];
-  const callees = result.callees ?? [];
-  const shownReferences = result.references?.shown ?? [];
-  const otherReferences = result.references?.other ?? 0;
-  const allReferences = result.references?.total ?? 0;
-  const limit = result.limit ?? shownReferences.length;
-  return [
-      `${result.name}${primary.kind === undefined ? "" : ` [${symbolKind(primary.kind)}]`}`,
-      workspacePath(primary.uri, root),
-      `  ${locationText(primary)}`,
-      `  project ${result.project ? workspacePath(result.project, root) : "inferred"}`,
-      ...(result.hover ? ["", result.hover] : []),
-      ...(additionalDefinitions.length
-        ? [
-            "",
-            `Additional definitions (${additionalDefinitions.length})`,
-            ...locationGroups(additionalDefinitions, root),
-          ]
-        : []),
-      ...(distinctImplementations.length
-        ? [
-            "",
-            `Implementations (${distinctImplementations.length})`,
-            ...locationGroups(distinctImplementations, root),
-          ]
-        : []),
-      ...(distinctTypes.length
-        ? ["", `Type definitions (${distinctTypes.length})`, ...locationGroups(distinctTypes, root)]
-        : []),
-      ...(callers.length
-        ? [
-            "",
-            ...callSection({
-              name: "Callers",
-              calls: callers,
-              limit,
-              root,
-              includeExternalDetails: true,
-            }),
-          ]
-        : []),
-      ...(callees.length
-        ? [
-            "",
-            ...callSection({
-              name: "Calls",
-              calls: callees,
-              limit,
-              root,
-              sharedSiteUri: result.sharedCalleeUri,
-              includeExternalDetails: result.compactExternalCalls === false,
-            }),
-          ]
-        : []),
-      ...(otherReferences
-        ? [
-            "",
-            `Other references (${
-              shownReferences.length === otherReferences
-                ? `${otherReferences} of ${allReferences} total`
-                : `${shownReferences.length}/${otherReferences} other · ${allReferences} total`
-            })`,
-            ...locationGroups(shownReferences, root),
-            ...(shownReferences.length < otherReferences
-              ? [`${otherReferences - shownReferences.length} more`]
-              : []),
-          ]
-        : []),
-      ...(result.source
-        ? [
-            "",
-            `Source · ${workspacePath(primary.uri, root)}:${rangeText(primary.range)}`,
-            ...result.source,
-          ]
-        : []),
-  ].join("\n");
-};

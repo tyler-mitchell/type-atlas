@@ -1,7 +1,7 @@
 import { fileURLToPath } from "node:url";
 import * as path from "pathe";
-import { createTypeAtlas, type VolarWorkspacePool } from "@type-atlas/core";
-import { formatDiagnostics } from "@type-atlas/core/text";
+import { createTypeAtlas, renderDocument, type VolarWorkspacePool } from "@type-atlas/core";
+import { displayPath } from "atlascii";
 
 /**
  * How long the workspace must stop changing before diagnostics are read.
@@ -41,7 +41,13 @@ export const createDiagnosticWatch = (
       file: filePath,
       signal,
     });
-    return formatDiagnostics(textDocument.uri, result, workspace);
+    const file = displayPath(textDocument.uri, workspace);
+    const items = result && "items" in result ? result.items : [];
+    const rendered = await renderDocument({
+      document: "diagnostic-context.mdoc",
+      variables: { verbose: true, groups: [{ file, problems: items }] },
+    });
+    return rendered.text;
   };
 
   const stop = (key: string): void => {

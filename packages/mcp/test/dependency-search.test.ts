@@ -1,8 +1,21 @@
+import { fileURLToPath } from "node:url";
 import { CompletionItemKind } from "vscode-languageserver-protocol";
 import { expect, test, vi } from "vitest";
 import type { VolarWorkspacePool } from "@type-atlas/core";
 import { createDependencySearch } from "../src/dependency-search.ts";
 import type { Semble } from "../src/semble.ts";
+
+/**
+ * A file that exists, because finding a package root reads the disk.
+ *
+ * The language server answers where a module resolved to, and `pkg-types` then
+ * walks up from that file to its `package.json` — a real read, which a made-up
+ * `/workspace/node_modules/example` cannot satisfy. Pointing at this package's
+ * own source costs nothing to set up and exercises the real resolution instead
+ * of a mock of it.
+ */
+const resolvedFileName = fileURLToPath(new URL("../src/index.ts", import.meta.url));
+const packageRoot = fileURLToPath(new URL("..", import.meta.url)).replace(/\/$/, "");
 
 test("prefers authored package source with one search and two completion pages", async () => {
   const calls = { completion: 0, resolve: 0, search: 0 };
@@ -52,7 +65,7 @@ test("prefers authored package source with one search and two completion pages",
       if (params && typeof params === "object" && "moduleName" in params) {
         return {
           packageId: { name: "example", subModuleName: "", version: "1.0.0" },
-          resolvedFileName: "/workspace/node_modules/example/index.d.ts",
+          resolvedFileName,
         };
       }
       if (params && typeof params === "object" && "label" in params) {
@@ -127,16 +140,22 @@ test("prefers authored package source with one search and two completion pages",
     signal: new AbortController().signal,
   });
 
-  expect(calls).toEqual({ completion: 2, resolve: 2, search: 1 });
-  expect(semble.search).toHaveBeenCalledWith(
-    expect.objectContaining({ repo: "/workspace/node_modules/example" }),
-  );
-  expect(output).toContain("```ts\n/** Creates an actor from supplied logic.");
-  expect(output).toContain("export function createActor(): void");
+  // `completion` is the mock's catch-all — every request that is not a type
+  // definition, an outline, a module resolution, or a label resolve lands here,
+  // so it counts the declaration-locations probe as well as the export probe.
+  // What the test is actually holding is the search: one, for the whole page,
+  // rather than one per export.
+  expect(calls).toEqual({ completion: 4, resolve: 2, search: 1 });
+  expect(semble.search).toHaveBeenCalledWith(expect.objectContaining({ repo: packageRoot }));
+  // An export list is scanned by name, so the name leads and its signature and
+  // documentation follow it. It was a fenced TypeScript declaration block; a
+  // fence marks *a* signature, as `inspect_symbol` still does for one symbol,
+  // and a list of exports is a list rather than a block of code.
+  expect(output).toContain("createActor: function createActor(): void");
+  expect(output).toContain("Creates an actor from supplied logic.");
   expect(output).not.toContain("SHOULD_NOT_APPEAR");
-  expect(output).toContain("export function createMachine(): void");
-  expect(output).toContain(" * @deprecated\n * Creates an actor from supplied logic.");
-  expect(output).toContain("2|export function createActor() {}");
+  expect(output).toContain("createMachine [deprecated]: function createMachine(): void");
+  expect(output).toContain("2 | export function createActor() {}");
   expect(output).toContain("src/index.ts");
   expect(output).not.toContain("example.min.js");
   expect(output).not.toContain("types/index.d.ts");
@@ -195,7 +214,7 @@ test.each([
       if (params && typeof params === "object" && "moduleName" in params) {
         return {
           packageId: { name: "example", subModuleName: "", version: "1.0.0" },
-          resolvedFileName: "/workspace/node_modules/example/index.d.ts",
+          resolvedFileName,
         };
       }
       if (params && typeof params === "object" && "label" in params) {
@@ -254,8 +273,11 @@ test.each([
       query: [surface.type, surface.path.join("."), surface.label].filter(Boolean).join(" "),
     }),
   );
-  expect(output).toContain(`### ${surface.type ?? surface.path.join(".")}`);
-  expect(output).toContain(`${surface.label}(): void;`);
+  // A section names a part within one subject, and every section in this
+  // surface is `##`. The named surface sits beside `## Relevant source` under
+  // the package's banner, which is what those two are: siblings.
+  expect(output).toContain(`## ${surface.type ?? surface.path.join(".")}`);
+  expect(output).toContain(`${surface.label}: function ${surface.label}(): void`);
   expect(output).not.toContain("unrelated");
 });
 
@@ -267,9 +289,10 @@ test("does not serialize independent dependency searches", async () => {
       params && typeof params === "object" && "moduleName" in params
         ? {
             packageId: { name: "example", subModuleName: "", version: "1.0.0" },
-            resolvedFileName: "/workspace/node_modules/example/index.d.ts",
+            resolvedFileName,
           }
         : [],
+
     ),
     withTextDocument: vi.fn(
       async ({ task }: { task: (document: { uri: string }) => Promise<unknown> }) =>

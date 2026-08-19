@@ -1,0 +1,14 @@
+---
+{ "tool": "quorl" }
+---
+
+Closure of {% $name %} · {% $declarations %} declarations · {% $sites %} sites · depth {% $depth %}
+
+{% tree entries=$entries /%}
+
+{% if $unexpanded %}
+{% $unexpanded %} marked … were not expanded · raise depth or limit to follow them
+{% /if %}
+{% if not($unexpanded) %}
+Frontier is empty · every declaration reached was expanded
+{% /if %}

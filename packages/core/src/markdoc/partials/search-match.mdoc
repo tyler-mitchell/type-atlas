@@ -1,0 +1,17 @@
+{% banner %}{% $match.rank %} · {% $match.file %}:{% $match.startLine %}-{% $match.endLine %} · relevance {% $match.relevance %}%{% /banner %}
+
+{% tight %}
+{% if any($match.within) %}
+Structure: {% breadcrumb($match.within) %}
+{% /if %}
+{% if $match.name %}
+Symbol: {% $match.name %}{% if any($match.kind) %} [{% symbolKind($match.kind) %}]{% /if %} · selection {% range($match.selection) %}{% if $match.extent %} · range {% range($match.extent) %}{% /if %}{% if $match.anchored %} · declares a name the query asked for{% /if %}
+{% /if %}
+{% if $match.documentation %}
+{% $match.documentation %}
+{% /if %}
+{% /tight %}
+
+{% if any($match.lines) %}
+{% source lines=$match.lines startLine=$match.startLine /%}
+{% /if %}

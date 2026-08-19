@@ -1,6 +1,5 @@
-import { readSourceView, type VolarWorkspacePool } from "@type-atlas/core";
-import { formatFoldedSource } from "@type-atlas/core/folded-source";
-import { workspacePath } from "@type-atlas/core/text";
+import { readSourceView, renderDocument, type VolarWorkspacePool } from "@type-atlas/core";
+import { foldedSource, displayPath } from "atlascii";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { type } from "arktype";
 import { textResult } from "./mcp-result.ts";
@@ -72,29 +71,57 @@ export const registerReadFileTool = (server: McpServer, workspaces: VolarWorkspa
       const root = request.workspace;
       const workspace = await workspaces.get(root);
       const read = targets(request);
-      const sections = await Promise.all(
+      const views = await Promise.all(
         read.map(async (target) => {
           try {
             const view = await readSourceView({ workspace, ...target, signal });
+            // Measured here, rendered by the document: the heading has to say
+            // how much was folded, and only folding knows that. The document
+            // asks for the same source again to show it.
+            const measured = foldedSource({
+              lines: view.lines,
+              ranges: view.foldingRanges,
+              window: target.window,
+            });
+            const shown = measured.text === "" ? 0 : measured.text.split("\n").length;
             return {
-              file: workspacePath(view.uri, root),
-              text: formatFoldedSource(view.lines, view.foldingRanges, target.window),
+              file: displayPath(view.uri, root),
+              lines: view.lines,
+              foldingRanges: view.foldingRanges,
+              lineCount: view.lines.length,
+              windowed: target.window.startLine !== undefined || target.window.endLine !== undefined,
+              startLine: target.window.startLine,
+              endLine: target.window.endLine ?? view.lines.length,
+              folded: measured.folded,
+              shownLines: shown,
             };
           } catch (error) {
             signal.throwIfAborted();
             if (read.length === 1) throw error;
             return {
               file: target.file,
-              text: `Error: ${error instanceof Error ? error.message : String(error)}`,
+              error: `Error: ${error instanceof Error ? error.message : String(error)}`,
+              folded: 0,
+              shownLines: 0,
             };
           }
         }),
       );
-      return textResult(
-        sections.length === 1
-          ? (sections[0]?.text ?? "")
-          : sections.map(({ file, text }) => `== ${file} ==\n${text}`).join("\n\n"),
-      );
+      const rendered = await renderDocument({
+        document: "read-file.tool.mdoc",
+        variables: {
+          root,
+          views,
+          single: views.length === 1,
+          only: views[0],
+          count: views.length,
+          folded: views.reduce((total, view) => total + view.folded, 0),
+          // What is on screen, not what the files hold: summing whole files
+          // above a set of windows states a number the reader was never shown.
+          shownLines: views.reduce((total, view) => total + view.shownLines, 0),
+        },
+      });
+      return textResult(rendered.text);
     },
   );
 };

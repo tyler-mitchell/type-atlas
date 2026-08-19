@@ -4,18 +4,12 @@ import {
   InlayHintRequest,
   SignatureHelpRequest,
 } from "@volar/language-server/protocol.js";
-import { createTypeAtlas, listModuleExports } from "@type-atlas/core";
+import { createTypeAtlas, listModuleExports, renderDocument } from "@type-atlas/core";
+import { markupText, positionText, rangeText, displayPath } from "atlascii";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { type } from "arktype";
 import { requestDiagnosticContext } from "./ambient-diagnostics.ts";
 import { readOnlyToolAnnotations } from "./metadata.ts";
-import {
-  formatCompletions,
-  formatHover,
-  formatInlayHints,
-  formatModuleExports,
-  formatSignatureHelp,
-} from "@type-atlas/core/text";
 import { appendDiagnosticContext, textResult } from "./mcp-result.ts";
 import { registerTool } from "./tool.ts";
 import { observedFileInput, paginationInput, positionInput, rangeInput } from "./tool-input.ts";
@@ -118,10 +112,16 @@ export const registerAssistanceTools = (
         signal,
         position,
       );
-      return appendDiagnosticContext(
-        textResult(formatHover(textDocument.uri, hover, root)),
-        await diagnosticContext,
-      );
+      const rendered = await renderDocument({
+        document: "hover.tool.mdoc",
+        variables: {
+          file: displayPath(textDocument.uri, root),
+          root,
+          at: positionText(position),
+          text: markupText(hover?.contents),
+        },
+      });
+      return appendDiagnosticContext(textResult(rendered.text), await diagnosticContext);
     },
   );
 
@@ -150,10 +150,40 @@ export const registerAssistanceTools = (
         { textDocument, position },
         signal,
       );
-      return appendDiagnosticContext(
-        textResult(formatSignatureHelp(result)),
-        await diagnosticContext,
-      );
+      const overloads = result?.signatures ?? [];
+      const active = overloads[result?.activeSignature ?? 0];
+      const rendered = await renderDocument({
+        document: "signature-help.tool.mdoc",
+        variables: {
+          total: overloads.length,
+          file: displayPath(textDocument.uri, root),
+          root,
+          at: positionText(position),
+          // Which overload is in use only tells a reader something when there
+          // is more than one; naming it beside a single signature repeated the
+          // signature they were about to read.
+          activeIndex:
+            overloads.length > 1 && active
+              ? String((result?.activeSignature ?? 0) + 1)
+              : undefined,
+          // Parameters name themselves and nothing else. Their documentation is
+          // the same sentence under every overload — `Array.filter` printed one
+          // description four times across two signatures — and it abutted the
+          // type with no separator, so `=> value is S A function that accepts…`
+          // read as one expression. The signature above already carries the
+          // types; hover is where prose about a symbol lives.
+          signatures: overloads.map((entry) => ({
+            name: entry.label,
+            children: (entry.parameters ?? []).map((parameter) => ({
+              name:
+                typeof parameter.label === "string"
+                  ? parameter.label
+                  : entry.label.slice(parameter.label[0], parameter.label[1]),
+            })),
+          })),
+        },
+      });
+      return appendDiagnosticContext(textResult(rendered.text), await diagnosticContext);
     },
   );
 
@@ -223,10 +253,31 @@ export const registerAssistanceTools = (
                 : {}),
               ...(!raw && end < items.length ? { nextOffset: end } : {}),
             };
-      return appendDiagnosticContext(
-        textResult(formatCompletions(result)),
-        await diagnosticContext,
-      );
+      const rendered = await renderDocument({
+        document: "completions.tool.mdoc",
+        variables: {
+          total: result?.total ?? 0,
+          file: displayPath(textDocument.uri, root),
+          root,
+          at: positionText(position),
+          incomplete: result?.isIncomplete ?? false,
+          page:
+            (result?.offset ?? 0) + (result?.items.length ?? 0) < (result?.total ?? 0)
+              ? {
+                  from: (result?.offset ?? 0) + 1,
+                  to: (result?.offset ?? 0) + (result?.items.length ?? 0),
+                  total: result?.total ?? 0,
+                  next: result?.nextOffset,
+                  unit: "completions",
+                }
+              : undefined,
+          items: (result?.items ?? []).map((item) => ({
+            name: item.label,
+            notes: [item.detail, markupText(item.documentation)].filter(Boolean),
+          })),
+        },
+      });
+      return appendDiagnosticContext(textResult(rendered.text), await diagnosticContext);
     },
   );
 
@@ -255,10 +306,27 @@ export const registerAssistanceTools = (
         { textDocument, range },
         signal,
       );
-      return appendDiagnosticContext(
-        textResult(formatInlayHints(textDocument.uri, result, root)),
-        await diagnosticContext,
-      );
+      const hints = result ?? [];
+      const rendered = await renderDocument({
+        document: "inlay-hints.tool.mdoc",
+        variables: {
+          file: displayPath(textDocument.uri, root),
+          root,
+          // The range asked about. A count with no extent could describe any
+          // part of the file, and this tool is always asked about a part.
+          at: rangeText(range),
+          total: hints.length,
+          hints: hints.map((hint) => ({
+            name: positionText(hint.position),
+            notes: [
+              typeof hint.label === "string"
+                ? hint.label
+                : hint.label.map((part) => part.value).join(""),
+            ],
+          })),
+        },
+      });
+      return appendDiagnosticContext(textResult(rendered.text), await diagnosticContext);
     },
   );
 
@@ -290,25 +358,51 @@ export const registerAssistanceTools = (
       { mcpReq: { signal } },
     ) => {
       const workspace = await workspaces.get(root);
-      return textResult(
-        formatModuleExports(
-          await listModuleExports({
-            workspace,
-            module,
-            fromFile,
-            type,
-            path,
-            surface,
-            query,
-            offset,
-            limit,
-            includeDetails,
-            includeDocs,
-            includeSubpaths,
-            signal,
-          }),
-        ),
-      );
+      const surfaced = await listModuleExports({
+        workspace,
+        module,
+        fromFile,
+        type,
+        path,
+        surface,
+        query,
+        offset,
+        limit,
+        includeDetails,
+        includeDocs,
+        includeSubpaths,
+        signal,
+      });
+      const rendered = await renderDocument({
+        document: "module-exports.tool.mdoc",
+        variables: {
+          module: surfaced.module,
+          surface: surfaced.surface,
+          // An empty query is absent, not empty: `matching ` with nothing after
+          // it read as a truncated sentence.
+          query: surfaced.query || undefined,
+          from: displayPath(workspace.getWorkspaceUri(fromFile), root),
+          root,
+          broadened: surfaced.broadened,
+          total: surfaced.total,
+          page:
+            surfaced.offset + surfaced.items.length < surfaced.total
+              ? {
+                  from: surfaced.offset + 1,
+                  to: surfaced.offset + surfaced.items.length,
+                  total: surfaced.total,
+                  next: surfaced.nextOffset,
+                  unit: "exports",
+                }
+              : undefined,
+          items: surfaced.items.map((item) => ({
+            name: item.label,
+            signature: item.detail,
+            deprecated: item.tags?.includes(1),
+          })),
+        },
+      });
+      return textResult(rendered.text);
     },
   );
 };
