@@ -111,12 +111,17 @@ describe("language server", () => {
         "type-atlas/workspaceDeclarations",
         { textDocument: { uri: document.uri }, query: "computeTotal" },
       );
-      expect(declarations).toEqual([
-        expect.objectContaining({
-          name: "computeTotal",
-          location: expect.objectContaining({ uri: URI.file(unopened).toString() }),
-        }),
-      ]);
+      expect(declarations).toEqual({
+        declarations: [
+          expect.objectContaining({
+            name: "computeTotal",
+            location: expect.objectContaining({ uri: URI.file(unopened).toString() }),
+          }),
+        ],
+        // One project owns the fixture; the count is what lets an empty
+        // answer say how much was searched.
+        projects: 1,
+      });
     } finally {
       await handle.shutdown();
       const exited = once(handle.process, "exit");

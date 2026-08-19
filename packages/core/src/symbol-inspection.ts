@@ -466,11 +466,13 @@ export const inspectSymbol = async (input: {
       workspace.sendRequest(DefinitionRequest.type, { textDocument, position }, signal),
       workspace.sendRequest(ImplementationRequest.type, { textDocument, position }, signal),
       options.scope === "workspace"
-        ? workspace.sendRequest(
-            WorkspaceReferencesRequest.type,
-            { textDocument, position, context: { includeDeclaration: true } },
-            signal,
-          )
+        ? workspace
+            .sendRequest(
+              WorkspaceReferencesRequest.type,
+              { textDocument, position, context: { includeDeclaration: true } },
+              signal,
+            )
+            .then((answer) => answer?.locations ?? null)
         : workspace.sendRequest(
             ReferencesRequest.type,
             { textDocument, position, context: { includeDeclaration: true } },

@@ -17,18 +17,21 @@ test("keeps workspace symbol results within source-code files", async () => {
     // Not `workspace/symbol`: that request carries no document, so Volar
     // resolves no project for it and searches one holding no files.
     if (request === WorkspaceDeclarationsRequest.type) {
-      return [
-        {
-          name: "TimelineCompositionAtInput",
-          kind: SymbolKind.Class,
-          location: { uri: "file:///workspace/source.ts" },
-        },
-        {
-          name: "## unrelated markdown heading",
-          kind: SymbolKind.String,
-          location: { uri: "file:///workspace/README.md" },
-        },
-      ];
+      return {
+        declarations: [
+          {
+            name: "TimelineCompositionAtInput",
+            kind: SymbolKind.Class,
+            location: { uri: "file:///workspace/source.ts" },
+          },
+          {
+            name: "## unrelated markdown heading",
+            kind: SymbolKind.String,
+            location: { uri: "file:///workspace/README.md" },
+          },
+        ],
+        projects: 2,
+      };
     }
     throw new Error("Unexpected request");
   });
@@ -44,6 +47,7 @@ test("keeps workspace symbol results within source-code files", async () => {
   });
 
   expect(result.symbols?.map(({ name }) => name)).toEqual(["TimelineCompositionAtInput"]);
+  expect(result.projects).toBe(2);
 });
 
 test("recovers the resource behind an editor command document link", async () => {

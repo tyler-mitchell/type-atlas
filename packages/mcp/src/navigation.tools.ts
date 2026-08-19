@@ -357,7 +357,7 @@ export const registerNavigationTools = (
       { mcpReq: { signal } },
     ) => {
       const workspace = await workspaces.get(root);
-      const { project, symbols } = await createTypeAtlas(workspace).workspaceSymbols({
+      const { project, projects, symbols } = await createTypeAtlas(workspace).workspaceSymbols({
         file,
         query,
         signal,
@@ -387,6 +387,9 @@ export const registerNavigationTools = (
           // things — the second says the name is absent, the first says nothing
           // at all — so the document is told which it has.
           answered: symbols !== null,
+          // How many projects the fan-out asked — the observation that turns
+          // "nothing matched" into a claim a reader can weigh.
+          projects,
           total: output?.total ?? 0,
           items: named,
           // Only when the answer is a window — a whole set needs no page line.
@@ -597,19 +600,25 @@ export const registerNavigationTools = (
     },
     async ({ workspace: root, file, position, includeDiagnostics }, { mcpReq: { signal } }) => {
       const workspace = await workspaces.get(root);
-      const { textDocument, items, calls } = await createTypeAtlas(workspace).callers({
+      const { textDocument, items, calls, projects } = await createTypeAtlas(workspace).callers({
         file,
         position,
         signal,
       });
       const rendered = await renderDocument({
         document: "callers.tool.mdoc",
-        variables: callHierarchyVariables<CallHierarchyIncomingCall>({
-          items,
-          calls,
-          root,
-          callable: (call) => call.from,
-        }),
+        variables: {
+          ...callHierarchyVariables<CallHierarchyIncomingCall>({
+            items,
+            calls,
+            root,
+            callable: (call) => call.from,
+          }),
+          // Callers assembles from the reference fan-out, so its reach is the
+          // same count of projects asked; callees is document-scoped and has
+          // no such number.
+          projects,
+        },
       });
       return appendDiagnosticContext(
         textResult(rendered.text),
@@ -691,7 +700,7 @@ export const registerNavigationTools = (
     ) => {
       const workspace = await workspaces.get(root);
       const intelligence = createTypeAtlas(workspace);
-      const { textDocument, result: references } = await intelligence.references({
+      const { textDocument, result: references, projects } = await intelligence.references({
         file,
         signal,
         params: { position, context: { includeDeclaration }, scope },
@@ -801,6 +810,9 @@ export const registerNavigationTools = (
               }
             : undefined,
           everyProject: scope === "workspace",
+          // How many projects the fan-out asked — the observation that says
+          // how far "found N references" actually reaches.
+          projects,
           // The project, or nothing. What to say when a file belongs to no
           // configured project is a sentence, and sentences are the document's
           // — this decided between two English phrases here, in a package that
@@ -851,7 +863,10 @@ export const registerNavigationTools = (
         signal,
       );
       const project = workspace.sendRequest(GetMatchTsConfigRequest.type, textDocument, signal);
-      const { result } = await createTypeAtlas(workspace).fileReferences({ file, signal });
+      const { result, projects } = await createTypeAtlas(workspace).fileReferences({
+        file,
+        signal,
+      });
       const output =
         result === null || result === undefined
           ? null
@@ -882,6 +897,7 @@ export const registerNavigationTools = (
         variables: {
           file: displayPath(textDocument.uri, root),
           anchor: matched ? displayPath(matched.uri, root) : undefined,
+          projects,
           total: output?.total ?? 0,
           page:
             output && (output.nextOffset !== undefined || output.offset > 0)

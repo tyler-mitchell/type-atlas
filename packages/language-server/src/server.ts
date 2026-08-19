@@ -209,19 +209,22 @@ export const registerLanguageServer = (connection: Connection): void => {
         // Two services answering about the same symbol report the same site, so
         // the merged answer is deduplicated on what a location is: its file and
         // its span.
-        return found
-          .flatMap((locations) => locations ?? [])
-          .filter(
-            (location, index, all) =>
-              all.findIndex(
-                (other) =>
-                  other.uri === location.uri &&
-                  other.range.start.line === location.range.start.line &&
-                  other.range.start.character === location.range.start.character &&
-                  other.range.end.line === location.range.end.line &&
-                  other.range.end.character === location.range.end.character,
-              ) === index,
-          );
+        return {
+          locations: found
+            .flatMap((locations) => locations ?? [])
+            .filter(
+              (location, index, all) =>
+                all.findIndex(
+                  (other) =>
+                    other.uri === location.uri &&
+                    other.range.start.line === location.range.start.line &&
+                    other.range.start.character === location.range.start.character &&
+                    other.range.end.line === location.range.end.line &&
+                    other.range.end.character === location.range.end.character,
+                ) === index,
+            ),
+          projects: new Set([owner, ...loaded]).size,
+        };
       },
     );
     connection.onRequest(WorkspaceDeclarationsRequest.type, async ({ textDocument, query }) => {
@@ -242,16 +245,19 @@ export const registerLanguageServer = (connection: Connection): void => {
       });
       // A declaration reached through two projects is one declaration: the same
       // name at the same place.
-      return found.filter(
-        (symbol, index, all) =>
-          all.findIndex(
-            (other) =>
-              other.name === symbol.name &&
-              other.location.uri === symbol.location.uri &&
-              other.location.range.start.line === symbol.location.range.start.line &&
-              other.location.range.start.character === symbol.location.range.start.character,
-          ) === index,
-      );
+      return {
+        declarations: found.filter(
+          (symbol, index, all) =>
+            all.findIndex(
+              (other) =>
+                other.name === symbol.name &&
+                other.location.uri === symbol.location.uri &&
+                other.location.range.start.line === symbol.location.range.start.line &&
+                other.location.range.start.character === symbol.location.range.start.character,
+            ) === index,
+        ),
+        projects: new Set([owner, ...loaded]).size,
+      };
     });
     connection.onRequest(ProjectDiagnosticsRequest.type, async ({ textDocuments }, token) => {
       // Volar resolves a document to the service owning it, so files sharing a

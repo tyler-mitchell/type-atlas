@@ -272,26 +272,28 @@ export const createTypeAtlas = (workspace: VolarWorkspace) => {
         input.signal,
       );
       const found = await Promise.all(
-        (outline ?? []).map(
-          (symbol) =>
-            workspace.sendRequest(
-              WorkspaceReferencesRequest.type,
-              {
-                textDocument,
-                position:
-                  "selectionRange" in symbol
-                    ? symbol.selectionRange.start
-                    : symbol.location.range.start,
-                context: { includeDeclaration: false },
-              },
-              input.signal,
-            ) as Promise<Location[] | null>,
+        (outline ?? []).map((symbol) =>
+          workspace.sendRequest(
+            WorkspaceReferencesRequest.type,
+            {
+              textDocument,
+              position:
+                "selectionRange" in symbol
+                  ? symbol.selectionRange.start
+                  : symbol.location.range.start,
+              context: { includeDeclaration: false },
+            },
+            input.signal,
+          ),
         ),
       );
       return {
         textDocument,
+        // Every fan-out asked the same session, so any answer's count is the
+        // count; a file declaring nothing asked nobody, and reports 0.
+        projects: found.reduce((most, answer) => Math.max(most, answer?.projects ?? 0), 0),
         result: found
-          .flatMap((locations) => locations ?? [])
+          .flatMap((answer) => answer?.locations ?? [])
           .filter((location) => location.uri !== textDocument.uri),
       };
     },
@@ -376,22 +378,36 @@ export const createTypeAtlas = (workspace: VolarWorkspace) => {
     }) {
       const textDocument = await workspace.getTextDocument(input.file);
       const context = { includeDeclaration: false };
-      const [items, references] = await Promise.all([
+      const [items, answer] = await Promise.all([
         workspace.sendRequest(
           CallHierarchyPrepareRequest.type,
           { textDocument, position: input.position },
           input.signal,
         ),
-        workspace.sendRequest(
-          (input.scope ?? "workspace") === "workspace"
-            ? WorkspaceReferencesRequest.type
-            : ReferencesRequest.type,
-          { textDocument, position: input.position, context },
-          input.signal,
-        ) as Promise<Location[] | null>,
+        (input.scope ?? "workspace") === "workspace"
+          ? workspace.sendRequest(
+              WorkspaceReferencesRequest.type,
+              { textDocument, position: input.position, context },
+              input.signal,
+            )
+          : workspace
+              .sendRequest(
+                ReferencesRequest.type,
+                { textDocument, position: input.position, context },
+                input.signal,
+              )
+              .then((locations) => ({
+                locations: locations as Location[] | null,
+                // Document scope asks the one project owning the file.
+                projects: 1,
+              })),
       ]);
-      const calls = await incomingCalls({ workspace, references, subject: items?.[0] });
-      return { textDocument, items, calls: items && [calls] };
+      const calls = await incomingCalls({
+        workspace,
+        references: answer?.locations ?? null,
+        subject: items?.[0],
+      });
+      return { textDocument, items, calls: items && [calls], projects: answer?.projects ?? 0 };
     },
 
     callees: callHierarchy(CallHierarchyOutgoingCallsRequest.type),
@@ -407,19 +423,27 @@ export const createTypeAtlas = (workspace: VolarWorkspace) => {
     }) {
       const textDocument = await workspace.getTextDocument(input.file);
       const { position, context, scope } = input.params;
-      const result =
+      const answer =
         scope === "workspace"
           ? await workspace.sendRequest(
               WorkspaceReferencesRequest.type,
               { textDocument, position, context },
               input.signal,
             )
-          : await workspace.sendRequest(
-              ReferencesRequest.type,
-              { textDocument, position, context },
-              input.signal,
-            );
-      return { textDocument, result: result as Location[] | null };
+          : {
+              locations: (await workspace.sendRequest(
+                ReferencesRequest.type,
+                { textDocument, position, context },
+                input.signal,
+              )) as Location[] | null,
+              // Document scope asks the one project owning the file.
+              projects: 1,
+            };
+      return {
+        textDocument,
+        result: answer?.locations ?? null,
+        projects: answer?.projects ?? 0,
+      };
     },
 
     async workspaceSymbols(input: {
@@ -437,7 +461,7 @@ export const createTypeAtlas = (workspace: VolarWorkspace) => {
       // a project from it and searches one holding no files. It answered an
       // empty array for every query, including names declared in a project the
       // same session had already checked.
-      const symbols = await workspace.sendRequest(
+      const answer = await workspace.sendRequest(
         WorkspaceDeclarationsRequest.type,
         { textDocument, query: input.query },
         input.signal,
@@ -445,11 +469,12 @@ export const createTypeAtlas = (workspace: VolarWorkspace) => {
       return {
         textDocument,
         project,
+        projects: answer?.projects ?? 0,
         symbols:
-          symbols?.filter(
+          answer?.declarations.filter(
             (symbol) =>
               sourceCodeUri.test(symbol.location.uri) && !declarationUri.test(symbol.location.uri),
-          ) ?? symbols,
+          ) ?? null,
       };
     },
   };

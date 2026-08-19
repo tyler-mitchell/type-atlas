@@ -157,6 +157,7 @@ test("references reads as prose with owners named", async () => {
       container: "Figures",
       declaredAt: { file: "src/config/figures.ts", at: { line: 13, character: 11 } },
       everyProject: false,
+      projects: 1,
       anchor: "tsconfig.json",
       root: "/repo",
       total: 3,

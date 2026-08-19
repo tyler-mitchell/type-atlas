@@ -98,10 +98,12 @@ describe(`reference paths on typescript ${ts.version}`, () => {
   /**
    * A rename's edits must reach every importer, including files nothing has
    * touched. A live rename through the MCP missed exactly the one importer no
-   * call had materialized, so this pins whether the platform's
-   * `getEditsForFileRename` walks shell files or real ones.
+   * call had materialized: on this platform `getEditsForFileRename` answers
+   * `[]` for unopened importers, which is why `missedSpecifierEdits` exists
+   * in the MCP's rename handler. Deliberately failing so it reports when the
+   * platform starts walking real files and the compensation can go.
    */
-  it("getEditsForFileRename updates every unopened importer", async () => {
+  it.fails("getEditsForFileRename updates every unopened importer", async () => {
     const { declaring, languageService } = await scaffold();
     try {
       languageService.getProgram();

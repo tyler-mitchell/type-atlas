@@ -54,7 +54,11 @@ export const WorkspaceReferencesRequest = {
       readonly position: Position;
       readonly context: { readonly includeDeclaration: boolean };
     },
-    readonly Location[],
+    {
+      readonly locations: readonly Location[];
+      /** How many projects were asked — what grounds the answer's reach. */
+      readonly projects: number;
+    },
     never
   >("type-atlas/workspaceReferences"),
 } as const;
@@ -78,7 +82,16 @@ export const WorkspaceDeclarationsRequest = {
       readonly textDocument: TextDocumentIdentifier;
       readonly query: string;
     },
-    readonly Declaration[],
+    {
+      readonly declarations: readonly Declaration[];
+      /**
+       * How many projects were asked. An empty answer's claim is only as
+       * strong as the search behind it, and the count is the observation
+       * that grounds it — "nothing matched, in the 3 projects loaded" is a
+       * statement a reader can weigh, where a bare nothing is not.
+       */
+      readonly projects: number;
+    },
     never
   >("type-atlas/workspaceDeclarations"),
 } as const;
