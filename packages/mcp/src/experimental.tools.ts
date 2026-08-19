@@ -4,6 +4,7 @@ import { fdir } from "fdir";
 import { isGitIgnored } from "globby";
 import * as path from "pathe";
 import {
+  type CallHierarchyIncomingCall,
   type Diagnostic,
   type DocumentSymbol,
   DocumentDiagnosticRequest,
@@ -18,10 +19,11 @@ import {
   documentSymbols,
   renderComposition,
   renderDocument,
+  subjectAtPosition,
   type VolarWorkspacePool,
 } from "@type-atlas/core";
 import { type } from "arktype";
-import { displayPath, markupText, sameRange } from "atlascii";
+import { displayPath, markupText, rangeText, sameRange } from "atlascii";
 import { type DocumentAsk, documentAsks, isAskReference } from "atlascii/document";
 import { textResult } from "./mcp-result.ts";
 import { readOnlyToolAnnotations } from "./metadata.ts";
@@ -293,7 +295,7 @@ export const registerExperimentalTools = (
     {
       title: "Compose",
       description:
-        'Experimental: author and compose your own code-intelligence queries in markup. A document of self-closing ask tags is a complete composition — each answer renders in its canonical block, in your order. Asks chain: a later ask reads an earlier answer, e.g. {% ask "diagnostics" as="health" files=$uses.paths /%} checks the files the reference search found. Add body markup only to shape the answer yourself: what an ask binds is readable anywhere below it ({% $uses.total %}), and the shipped tags and partials compose it.\n\nOperations and what each binds:\n- {% ask "hover" as="head" file="src/x.ts" line=5 character=10 /%} (one-based, on the symbol\'s name) → {text}: the signature and documentation, rendered with {% $head.text %}\n- {% ask "references" as="uses" file="src/x.ts" line=5 character=10 /%} → {total, files, paths, projects, groups}; render sites with {% tree entries=$uses.groups partial="reference-node.mdoc" /%}\n- {% ask "outline" as="shape" file="src/x.ts" /%} → {total, tree}; render with {% tree entries=$shape.tree partial="symbol-node.mdoc" /%}\n- {% ask "diagnostics" as="problems" file="src/x.ts" /%} → {total, groups}; render with {% each items=$problems.groups as="group" partial="diagnostic-group.mdoc" /%}\n- {% ask "source" as="body" file="src/x.ts" from=10 to=40 /%} → {lines, startLine}; render with {% source lines=$body.lines startLine=$body.startLine /%}\n- {% ask "occurrences" as="hits" text="device.lost" file="src" /%} (file is the directory to scan) → {total, fileCount, scanned, groups}: every place the exact text occurs, or an honest zero with the scan count',
+        'Experimental: author and compose your own code-intelligence queries in markup. A document of self-closing ask tags is a complete composition — each answer renders in its canonical block, in your order. Asks chain: a later ask reads an earlier answer, e.g. {% ask "diagnostics" as="health" files=$uses.paths /%} checks the files the reference search found. Add body markup only to shape the answer yourself: what an ask binds is readable anywhere below it ({% $uses.total %}), and the shipped tags and partials compose it.\n\nOperations and what each binds:\n- {% ask "hover" as="head" file="src/x.ts" line=5 character=10 /%} (one-based, on the symbol\'s name) → {text}: the signature and documentation, rendered with {% $head.text %}\n- {% ask "references" as="uses" file="src/x.ts" line=5 character=10 /%} → {total, files, paths, projects, groups}; render sites with {% tree entries=$uses.groups partial="reference-node.mdoc" /%}\n- {% ask "outline" as="shape" file="src/x.ts" /%} → {total, tree}; render with {% tree entries=$shape.tree partial="symbol-node.mdoc" /%}\n- {% ask "diagnostics" as="problems" file="src/x.ts" /%} → {total, groups}; render with {% each items=$problems.groups as="group" partial="diagnostic-group.mdoc" /%}\n- {% ask "source" as="body" file="src/x.ts" from=10 to=40 /%} → {lines, startLine}; render with {% source lines=$body.lines startLine=$body.startLine /%}\n- {% ask "occurrences" as="hits" text="device.lost" file="src" /%} (file is the directory to scan) → {total, fileCount, scanned, groups}: every place the exact text occurs, or an honest zero with the scan count\n- {% ask "subject" as="what" file="src/x.ts" line=5 character=10 /%} → {name, kind, file, at}: what the position resolves to, and where it is declared\n- {% ask "callers" as="calledBy" file="src/x.ts" line=5 character=10 /%} → {name, total, projects, groups}; render with {% tree entries=$calledBy.groups partial="call-node.mdoc" /%}\n\nOne ask failing binds {failed} and renders its own sentence; the rest of the composition still answers.',
       inputSchema: input.Compose,
       annotations: readOnlyToolAnnotations,
     },
@@ -316,6 +318,48 @@ export const registerExperimentalTools = (
             params: { position: askedPosition(ask) },
           });
           return { text: markupText(result?.contents) ?? "" };
+        },
+        subject: async (ask) => {
+          const resolved = await subjectAtPosition({
+            workspace,
+            uri: workspace.getWorkspaceUri(askedFile(ask)),
+            position: askedPosition(ask),
+            signal,
+          });
+          return resolved
+            ? {
+                name: resolved.name,
+                kind: resolved.kind,
+                file: displayPath(resolved.declaredAt.uri, root),
+                at: resolved.declaredAt.selection.start,
+              }
+            : {};
+        },
+        callers: async (ask) => {
+          const { items, calls, projects } = await intelligence.callers({
+            file: askedFile(ask),
+            position: askedPosition(ask),
+            signal,
+          });
+          const flat = (calls ?? []).flatMap((group) => group ?? []);
+          const grouped = Map.groupBy(flat, (call) => displayPath(call.from.uri, root));
+          return {
+            name: items?.[0]?.name,
+            total: flat.length,
+            projects,
+            groups: [...grouped].map(([file, entries]) => ({
+              file,
+              children: entries.map((call) => ({
+                name: call.from.name,
+                kind: call.from.kind,
+                selection: call.from.selectionRange,
+                extent: sameRange(call.from.range, call.from.selectionRange)
+                  ? undefined
+                  : call.from.range,
+                sites: [...new Set(call.fromRanges.map((site) => rangeText(site)))],
+              })),
+            })),
+          };
         },
         references: async (ask) => {
           const { result, projects } = await intelligence.references({
@@ -472,7 +516,11 @@ export const registerExperimentalTools = (
             }),
           ),
         };
-        bound[ask.bind] = await operations[ask.operation]!(resolved);
+        // One ask's failure is that ask's sentence, never the composition's:
+        // a dossier missing one section it names honestly beats no dossier.
+        bound[ask.bind] = await operations[ask.operation]!(resolved).catch((cause: unknown) => ({
+          failed: cause instanceof Error ? cause.message : String(cause),
+        }));
       }
       // The markup is the query language, so a body is optional: a document
       // of bare asks renders each answer in its canonical block, and an
@@ -485,6 +533,10 @@ export const registerExperimentalTools = (
               .join(":");
       const canonicalSection: Record<string, (ask: DocumentAsk) => string> = {
         hover: (ask) => `## ${subject(ask)}\n\n{% $${ask.bind}.text %}`,
+        subject: (ask) =>
+          `## ${subject(ask)}\n\n{% if $${ask.bind}.name %}{% $${ask.bind}.name %}{% if $${ask.bind}.kind %} [{% $${ask.bind}.kind %}]{% /if %} · {% $${ask.bind}.file %}:{% position($${ask.bind}.at) %}{% /if %}{% if not($${ask.bind}.name) %}Nothing at this position resolves to a subject.{% /if %}`,
+        callers: (ask) =>
+          `## Callers — ${subject(ask)}\n\n{% if equals($${ask.bind}.total, 0) %}\nCalled from nowhere in {% $${ask.bind}.projects %} {% plural count=$${ask.bind}.projects forms={"one": "project", "other": "projects"} /%} loaded.\n{% /if %}\n{% if not(equals($${ask.bind}.total, 0)) %}\n{% $${ask.bind}.name %} · called from {% $${ask.bind}.total %} {% plural count=$${ask.bind}.total forms={"one": "place", "other": "places"} /%} · {% $${ask.bind}.projects %} {% plural count=$${ask.bind}.projects forms={"one": "project", "other": "projects"} /%} loaded\n\n{% tree entries=$${ask.bind}.groups partial="call-node.mdoc" /%}\n{% /if %}`,
         references: (ask) =>
           `## References — ${subject(ask)}\n\n{% $${ask.bind}.total %} uses in {% $${ask.bind}.files %} files, across {% $${ask.bind}.projects %} projects.\n\n{% tree entries=$${ask.bind}.groups partial="reference-node.mdoc" /%}`,
         outline: (ask) =>
@@ -494,12 +546,19 @@ export const registerExperimentalTools = (
         source: (ask) =>
           `## ${subject(ask)}\n\n{% source lines=$${ask.bind}.lines startLine=$${ask.bind}.startLine /%}`,
         occurrences: (ask) =>
-          `## "${String(ask.attributes.text ?? ask.attributes.query ?? "")}" — occurrences\n\n{% if equals($${ask.bind}.total, 0) %}Nothing under {% $${ask.bind}.directory %} contains it · {% $${ask.bind}.scanned %} files scanned.{% /if %}{% if not(equals($${ask.bind}.total, 0)) %}{% $${ask.bind}.total %} in {% $${ask.bind}.fileCount %} files · {% $${ask.bind}.scanned %} files scanned.\n\n{% tree entries=$${ask.bind}.groups partial="occurrence-node.mdoc" /%}{% /if %}`,
+          `## "${String(ask.attributes.text ?? ask.attributes.query ?? "")}" — occurrences\n\n{% if equals($${ask.bind}.total, 0) %}\nNothing under {% $${ask.bind}.directory %} contains it · {% $${ask.bind}.scanned %} files scanned.\n{% /if %}\n{% if not(equals($${ask.bind}.total, 0)) %}\n{% $${ask.bind}.total %} in {% $${ask.bind}.fileCount %} files · {% $${ask.bind}.scanned %} files scanned.\n\n{% tree entries=$${ask.bind}.groups partial="occurrence-node.mdoc" /%}\n{% /if %}`,
       };
       const bare = document.replace(/\{%\s*ask\b[\s\S]*?\/%\}/gu, "").trim() === "";
       const source =
         bare && asks.length > 0
-          ? `${document}\n\n${asks.map((ask) => canonicalSection[ask.operation]!(ask)).join("\n\n")}`
+          ? `${document}\n\n${asks
+              .map((ask) => {
+                const held = bound[ask.bind] as { failed?: string } | undefined;
+                return held?.failed !== undefined
+                  ? `## ${ask.operation} — ${subject(ask)}\n\nThis ask failed: ${held.failed}`
+                  : canonicalSection[ask.operation]!(ask);
+              })
+              .join("\n\n")}`
           : document;
       const rendered = await renderComposition({ source, variables: bound });
       // A name the body reads that no ask bound renders as a hole; naming it is

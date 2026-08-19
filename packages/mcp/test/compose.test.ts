@@ -126,6 +126,25 @@ test("compose renders a dossier from ask declarations", async () => {
     const chainedText = chained.content.find((item) => item.type === "text")?.text ?? "";
     expect(chainedText).toContain("## Problems — $uses.paths");
     expect(chainedText).toMatch(/No problem in \d+ files? checked\./u);
+
+    // The fleshed surface: subject and callers ops, and one ask failing on a
+    // missing file renders its own sentence while the others still answer.
+    const fleshed = await client.callTool({
+      name: "compose",
+      arguments: {
+        workspace: workspaceRoot,
+        document: [
+          '{% ask "subject" as="what" file="packages/core/src/projection.ts" line=28 character=14 /%}',
+          '{% ask "callers" as="calledBy" file="packages/core/src/markdoc/render.ts" line=69 character=14 /%}',
+          '{% ask "outline" as="broken" file="packages/core/src/does-not-exist.ts" /%}',
+        ].join("\n"),
+      },
+    });
+    const fleshedText = fleshed.content.find((item) => item.type === "text")?.text ?? "";
+    expect(fleshedText).toContain("page [");
+    expect(fleshedText).toContain("packages/core/src/projection.ts:28:14");
+    expect(fleshedText).toMatch(/renderDocument · called from \d+ places · \d+ projects? loaded/u);
+    expect(fleshedText).toContain("This ask failed:");
     const reversed = await client.callTool({
       name: "compose",
       arguments: {
