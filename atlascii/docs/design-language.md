@@ -43,6 +43,32 @@ so by being absolute.
 Counts belong here when they describe the answer as a whole, and in the banner
 when they describe one subject. They are never in both.
 
+## The kind word — nature over storage
+
+A symbol's bracketed word states its **nature**: what it declares into the
+program. Storage words survive only as the residual when nature is not
+visible. The rule resolves every conflation the upstream vocabularies carry,
+because they answer two different questions — `const`/`let`/`var` say how a
+binding is held; `function`/`class`/`interface`/`type` say what the thing is
+— and a surface that mixes the axes makes one declaration wear two words
+across sibling answers.
+
+- A `const` holding a callable is a **function**. How the binding is held is
+  not what the thing is.
+- A type alias and an interface are both type-level; the protocol has no
+  alias kind, so both project to Interface — one word, consistently, rather
+  than Interface in one tool and Class in its sibling.
+- `const x = 5` stays a **constant**: immutability is its nature, not merely
+  its storage.
+- Member words (`method`, `property`, `getter`) are placement, kept because
+  placement is what a reader scans a container for.
+
+One vocabulary, one projection: TypeScript's kind strings and the protocol's
+numbers both map through the same decisions, and a new mapping site copies
+the decision, never re-makes it. The residual: the protocol's numbers cannot
+say "type alias" — carrying TypeScript's own strings end to end is the
+follow-up that removes the projection entirely.
+
 ## 2. Banner — the subject a reader reads *through*
 
 ```

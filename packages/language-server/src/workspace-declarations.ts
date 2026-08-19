@@ -146,6 +146,11 @@ const symbolKinds: Readonly<Record<string, SymbolKind>> = {
   let: SymbolKind.Variable,
   const: SymbolKind.Constant,
   "type parameter": SymbolKind.TypeParameter,
-  type: SymbolKind.Class,
-  alias: SymbolKind.Class,
+  // Nature over storage, and one word per nature across sibling tools: a
+  // type alias is type-level, and `document_symbols` already corrects
+  // aliases to Interface — mapping them to Class here made one declaration
+  // wear two words across two answers. The protocol has no alias kind;
+  // Interface is the nearest type-level projection, chosen consistently.
+  type: SymbolKind.Interface,
+  alias: SymbolKind.Interface,
 };

@@ -237,9 +237,17 @@ const kindAt = (input: {
         /^(?:```\w*\s*)?(?<kind>const|let|var|function|class|interface|type|enum|namespace|module)\b/m.exec(
           text,
         )?.groups?.kind;
+      // Nature over storage: a const whose hover shows a callable type IS a
+      // function — `planTensorStorage` read [constant] here and [function]
+      // one tool over for being a const arrow. Storage words survive only
+      // when the value's nature is not visible.
+      const natured =
+        kind !== undefined && ["const", "let", "var"].includes(kind) && /\)\s*=>/.test(text)
+          ? "function"
+          : kind;
       // The bare kind. Which article belongs in front of it is English grammar,
       // and grammar is the document's to state.
-      return kind !== undefined && knownKinds.has(kind) ? kind : undefined;
+      return natured !== undefined && knownKinds.has(natured) ? natured : undefined;
     })
     .catch(() => undefined);
 
