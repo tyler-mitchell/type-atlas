@@ -290,6 +290,23 @@ is the absence-honesty failure in section form. Which upstream request goes
 empty on a cold project, and whether the section should say "unanswered"
 rather than vanish, is undiagnosed. Observed 2026-08-19.
 
+### The bridge prints a type containing torn source text
+
+```
+inlay_hints { edit-result.ts 12:1-30:1 }
+→ 32:2 : Promise<{ [x: string]: unknown; _meta?: { [x: string]: unknown;
+  rom "./mcp-result.ts"; import… }; }>
+```
+
+A return-type inlay hint's label — the provider's own type printout —
+contains fragments of the file's import statements mid-type ("rom
+\"./mcp-result.ts\"; import" is a torn `from` clause). The label reaches us
+as the provider produced it; our layer now collapses and bounds it, but the
+content corruption is the platform's — the tsgo bridge assembling display
+parts from wrong spans, in the family of the shell-file walks. Upstream
+(typescript-native-bridge) material. Observed 2026-08-19,
+`packages/mcp/src/edit-result.ts`, the hint at 32:2.
+
 ### The bridge's project registry rejects its own project on the third service
 
 ```

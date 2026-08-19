@@ -3,7 +3,7 @@
 ---
 
 {% if any($actions) %}
-{% $actions.length %} {% plural count=$actions.length forms={"one": "action", "other": "actions"} /%} at {% $at %} in {% $file %}.
+{% $file %}:{% $at %} · {% $actions.length %} {% plural count=$actions.length forms={"one": "action", "other": "actions"} /%}
 
 {% tree entries=$actions /%}
 {% /if %}

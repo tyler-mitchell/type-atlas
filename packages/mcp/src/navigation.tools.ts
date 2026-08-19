@@ -44,11 +44,12 @@ const navigationTargets = async (input: {
   readonly origin?: { readonly uri: string; readonly position: { line: number; character: number } };
 }) => {
   const { result, root, origin } = input;
-  // A jump target answered as coordinates alone makes a reader open the file to
-  // learn what is there. The name comes from the outline rather than the text
-  // under the range: a plain `Location` carries no identifier range, so its
-  // range spans the whole declaration — slicing one line of a 40-line type
-  // yielded an empty string every time.
+  // A jump target answered as coordinates alone makes a reader open the file
+  // to learn the one thing they asked. A LocationLink's selection spans the
+  // identifier itself, so the text under it IS the name — the same fact the
+  // references subject reads. Only a plain `Location` falls back to the
+  // outline, because its range spans the whole declaration and slicing one
+  // line of a 40-line type yields an empty string.
   const all = !result ? [] : Array.isArray(result) ? result : [result];
   const declaresOrigin =
     origin !== undefined &&
@@ -64,21 +65,41 @@ const navigationTargets = async (input: {
     total: found.length,
     items: await Promise.all(
       found.map(async (item) => {
-        const uri = "targetUri" in item ? item.targetUri : item.uri;
-        const selection = "targetUri" in item ? item.targetSelectionRange : item.range;
-        const extent = "targetUri" in item ? item.targetRange : item.range;
-        const declared = await declarationAtPosition({
-          workspace: input.workspace,
-          uri,
-          position: selection.start,
-        }).catch(() => undefined);
+        const linked = "targetUri" in item;
+        const uri = linked ? item.targetUri : item.uri;
+        const selection = linked ? item.targetSelectionRange : item.range;
+        const extent = linked ? item.targetRange : item.range;
+        const sliced = linked
+          ? await input.workspace
+              .readTextDocumentUri(uri, input.signal)
+              .then(({ source }) =>
+                (source.split("\n")[selection.start.line] ?? "").slice(
+                  selection.start.character,
+                  selection.end.character,
+                ),
+              )
+              .catch(() => undefined)
+          : undefined;
+        const declared = sliced
+          ? undefined
+          : await declarationAtPosition({
+              workspace: input.workspace,
+              uri,
+              position: selection.start,
+            }).catch(() => undefined);
         return {
           file: displayPath(uri, root),
           selection,
           // Named only when it differs from the selection: repeating an
           // identifier's own span costs a second read to learn nothing.
           extent: sameRange(extent, selection) ? undefined : extent,
-          name: declared?.name,
+          // A name is an identifier. An overload signature's selection spans
+          // the whole signature line, and the slice of it is a listing, not
+          // a name — 74 characters of Effect's filter overload stood where
+          // "filter" belonged.
+          name:
+            (sliced && /^[$A-Za-z_][\w$]*$/u.test(sliced) ? sliced : undefined) ??
+            declared?.name,
         };
       }),
     ),
@@ -170,6 +191,30 @@ const navigationNoun = async (input: {
  * declarations in their own right, `(property) down: string`, and as the
  * declaring keyword otherwise, `const countHeader: …` — so both are read.
  */
+/** The words hover states a kind with; anything else is prose, not a kind. */
+const knownKinds = new Set([
+  "const",
+  "let",
+  "var",
+  "function",
+  "local function",
+  "method",
+  "class",
+  "interface",
+  "type",
+  "type parameter",
+  "enum",
+  "enum member",
+  "namespace",
+  "module",
+  "property",
+  "parameter",
+  "alias",
+  "getter",
+  "setter",
+  "accessor",
+]);
+
 const kindAt = (input: {
   readonly intelligence: ReturnType<typeof createTypeAtlas>;
   readonly file: string;
@@ -184,14 +229,17 @@ const kindAt = (input: {
         typeof contents === "object" && contents && "value" in contents
           ? String(contents.value)
           : "";
+      // Anchored to the hover's opening, and bounded to the words TypeScript
+      // actually uses: the unanchored form matched "(or refinement" inside a
+      // hover's documentation prose and answered "[or refinement]" as a kind.
       const kind =
-        /\((?<kind>[a-z ]+)\)/.exec(text)?.groups?.kind ??
+        /^(?:```\w*\s*)?\((?<kind>[a-z ]+)\)\s/.exec(text)?.groups?.kind ??
         /^(?:```\w*\s*)?(?<kind>const|let|var|function|class|interface|type|enum|namespace|module)\b/m.exec(
           text,
         )?.groups?.kind;
       // The bare kind. Which article belongs in front of it is English grammar,
       // and grammar is the document's to state.
-      return kind;
+      return kind !== undefined && knownKinds.has(kind) ? kind : undefined;
     })
     .catch(() => undefined);
 
@@ -445,27 +493,37 @@ export const registerNavigationTools = (
               () => undefined,
             )
           : undefined;
+      // What the position RESOLVES TO is this answer's subject — the
+      // target's own identifier. The hover-derived noun misread a call
+      // site as its enclosing assignment ("targets" for a question about
+      // navigationTargets), so it is only the fallback for answers whose
+      // targets carry no name.
+      const subject =
+        targets.items.find(({ name }) => name)?.name ||
+        (
+          await navigationNoun({
+            base: "definitions",
+            workspace,
+            uri: textDocument.uri,
+            position,
+            signal,
+          })
+        ).subject;
       const rendered = await renderDocument({
         document: "definitions.tool.mdoc",
         variables: {
-          subject: (
-            await navigationNoun({
-              base: "definitions",
-              workspace,
-              uri: textDocument.uri,
-              position,
-              signal,
-            })
-          ).subject,
+          subject,
           kind: await kindAt({ intelligence: createTypeAtlas(workspace), file, position, signal }),
           root,
           landedIn: landedIn?.name,
           landedAt: landedIn?.selectionRange.start,
           ...targets,
-          // A definition's target is the subject itself, so naming it on the row
-          // repeats the sentence above. A type definition's is not, which is why
-          // the name is dropped here rather than in the component.
-          items: targets.items.map((item) => ({ ...item, name: undefined })),
+          // A row naming the subject repeats the line above it; a row naming
+          // anything else is information. Overloads made the difference real:
+          // two targets of one ask are not interchangeably "the subject".
+          items: targets.items.map((item) =>
+            item.name === subject ? { ...item, name: undefined } : item,
+          ),
         },
       });
       return appendDiagnosticContext(textResult(rendered.text), await diagnosticContext);

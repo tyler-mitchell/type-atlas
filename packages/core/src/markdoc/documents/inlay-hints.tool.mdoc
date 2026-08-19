@@ -6,7 +6,7 @@ tool: inlay_hints
 Nothing in {% $at %} of {% $file %} has an inferred detail to show. Inlay hints name what the source leaves implicit — a parameter's name at a call, an inferred type — so a range with neither reports none.
 {% /if %}
 {% if not(equals($total, 0)) %}
-{% $total %} {% plural count=$total forms={"one": "hint", "other": "hints"} /%} in {% $at %} of {% $file %}.
+{% $file %}:{% $at %} · {% $total %} {% plural count=$total forms={"one": "hint", "other": "hints"} /%}
 
 {% tree entries=$hints /%}
 {% /if %}

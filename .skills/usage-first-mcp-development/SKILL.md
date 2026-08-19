@@ -102,6 +102,26 @@ did. Every located row names what stands there; a tool answer that shows a
 position without its owner has broken the surface's own location grammar, and
 noticing that is not the asker's job.
 
+**Multiplicity pressure.** One clean call proves almost nothing — it is a
+smoke case, and calling it a witness is how deficits survive to be caught by
+someone else. A tool whose surface naturally carries collections, plural
+inputs, heterogeneous kinds, or windows must be exercised where those
+multiply, because the defects live exactly there: the empty-subject hole
+appeared only at an import specifier, the shredded labels only on a
+multi-line type, the out-of-range row only where the range cut before a
+hint, the double consumption only on a *second* crossing, the reach segment
+only mattered once two projects were loaded. For each surface, credible
+usage includes: more than one entry where more than one is supported
+(plural files, several positions, chained asks, a page past its first
+window); qualitatively different entries, not duplicates (a class and a
+spread member, an error and a hint, a link and a bare location, a local and
+a cross-package target); at least one boundary state (empty, anonymous,
+unresolvable, cold, over-the-window); and at least one relationship between
+entries when coordination is the contract (a chain reading an earlier bind,
+two clocks in one step, a batch sharing a budget). A single-entry slice may
+open an iteration — label it a smoke case and let the next call add the
+pressure, never the claim.
+
 Three kinds of coherence fail independently, and passing one tells you nothing
 about the others:
 

@@ -5,7 +5,15 @@ import {
   SignatureHelpRequest,
 } from "@volar/language-server/protocol.js";
 import { createTypeAtlas, listModuleExports, renderDocument } from "@type-atlas/core";
-import { markupText, positionText, rangeText, displayPath } from "atlascii";
+import {
+  containsPosition,
+  defaultDimensions,
+  displayPath,
+  markupText,
+  positionText,
+  rangeText,
+  truncate,
+} from "atlascii";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { type } from "arktype";
 import { requestDiagnosticContext } from "./ambient-diagnostics.ts";
@@ -315,13 +323,28 @@ export const registerAssistanceTools = (
           // The range asked about. A count with no extent could describe any
           // part of the file, and this tool is always asked about a part.
           at: rangeText(range),
-          total: hints.length,
-          hints: hints.map((hint) => ({
+          // Only the asked range, counted after the cut: the provider answers
+          // past it — a hint at 32:2 arrived for a range ending at 30:1 — and
+          // a header counting rows the filter then dropped said "2 hints"
+          // over one row.
+          total: hints.filter((hint) => containsPosition(range, hint.position)).length,
+          // One line per hint, whatever the provider printed: a label carrying
+          // newlines — a multi-line object type — wrapped under the tree's
+          // guides and interleaved guide marks into its own words, shredding
+          // "workspace-edit.ts" into "./wo | space-edi | ts". A hint is an
+          // annotation, not a listing; the full type is one hover away.
+          hints: hints
+            .filter((hint) => containsPosition(range, hint.position))
+            .map((hint) => ({
             name: positionText(hint.position),
             notes: [
-              typeof hint.label === "string"
-                ? hint.label
-                : hint.label.map((part) => part.value).join(""),
+              truncate({
+                value: (typeof hint.label === "string"
+                  ? hint.label
+                  : hint.label.map((part) => part.value).join("")
+                ).replace(/\s+/gu, " "),
+                columns: defaultDimensions.summaryColumns,
+              }),
             ],
           })),
         },
