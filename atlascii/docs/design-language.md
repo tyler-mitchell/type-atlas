@@ -89,6 +89,31 @@ Headings (`##`) remain, and mean the other thing: a named part *within* one
 subject. `## Callers` under a symbol's banner is a section of that symbol's
 report, not a new subject.
 
+## Locations: which of the three forms, by rule
+
+A located answer takes one of three forms, and the choice is the data's, not
+the tool's taste:
+
+- **Rows under a file** when the answer is a *list of places* — references,
+  highlights, occurrences. The file becomes a level when it holds more than
+  one row; flat when none does. That judgment is `referenceGroups`', made
+  once, rendered blind.
+- **A pointer per target** (`❯`-shaped, name-first) when the answer is a
+  *jump* — definitions, implementations, type definitions. A jump has few
+  targets and each is a destination, not a population.
+- **A bannered block** when the answer is a *report about one subject* — a
+  file's problems, a symbol's inspection. The banner scopes everything
+  beneath it.
+
+Inside a **structural tree** — quorl's closure, a call hierarchy, a selection
+chain — structure owns the nesting, and file grouping applies only as
+run-length collapse: consecutive siblings sharing a file fold under one file
+line, in structure order, never re-sorted into file order. Re-grouping a
+structural tree by file would trade the relationship the tree exists to show
+for a repetition saving; run-length collapse takes the saving where the
+repetition actually is (seven consecutive kek test-file rows) and costs
+nothing where it is not.
+
 ## 3. Body — the content, in one of five forms
 
 The whole vocabulary. A tool needing a sixth is a real finding; a tool inventing

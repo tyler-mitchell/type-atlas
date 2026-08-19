@@ -56,18 +56,32 @@ unless the composer takes it.
 
 A small set of value kinds. Every query operation emits only these (plus
 scalars and lists of them); every presentation primitive accepts them by
-kind. Each is seeded by a shape that already exists:
+kind. Each is seeded by a shape that already exists, and each is now given
+its contract — the exact fields, the nesting rule, and what its canonical
+rendering owes:
 
-- **location** — a place and what stands there: `LocationNode` as declared.
-  References, outlines, workspace symbols, callers, definitions are all
-  lists or trees of locations; today they differ only by accident of the
-  handler that shaped them.
-- **problem** — `Diagnostic` as declared, with the file on the value.
-- **excerpt** — source lines with the number the first line carries; the
-  `source` tag's input today.
-- **prose** — signature-and-documentation markup text; hover's value.
-- **count** — a named tally (`CountState`), for count lines that suppress
-  zeros.
+- **location** — `LocationNode` as declared in `protocol/shapes.ts`: a place
+  and what stands there. `{ file?, selection?, range?, name?, kind?, within?,
+  detail?, text?, children? }`. The one nesting relation is `children`;
+  grouping-by-file is the renderer's judgment (group when a file holds more
+  than one, flat otherwise), never the producer's. References, outlines,
+  workspace symbols, callers, definitions, occurrences are all locations —
+  today's per-op shapes (`groups`, `tree`, `paths`) are projections of this
+  kind and retire into it.
+- **problem** — `Diagnostic` as declared, with `file` on the value; severity
+  stays the protocol number, worded by the catalog at render. Canonical
+  rendering: the diagnostic partial's row, grouped by file, problems before
+  hints, counted apart.
+- **excerpt** — `{ lines, startLine, file? }`; canonical rendering is the
+  `source` tag: numbered lines, fold-aware.
+- **prose** — signature-and-documentation markup text, one value; canonical
+  rendering is the text after the inline-link repair.
+- **count** — `CountState` (`{ name, count }`) lists; canonical rendering is
+  the zero-suppressing count line.
+
+Every kinded value may carry `reach` — `{ projects }` today — and its
+canonical rendering appends the reach segment. Reach is a property of an
+answer, not of one op: this is the projects-count design generalized.
 
 The rule that makes it an ontology rather than a type list: **an operation
 may not invent a field a renderer must learn.** If an answer needs a fact no
@@ -75,25 +89,51 @@ kind carries, the kind grows — once, for every producer and consumer.
 
 ## The algebra
 
-Uniform inputs and a small set of composition primitives, each named with the
-real scenario that justifies it and the bound it must announce:
+Uniform inputs and a small set of composition primitives. The op contract
+first, because everything else composes over it:
+
+```
+operation :: (subject, options) → kinded value
+subject   :: file | file+position | name | text | list-reference
+```
+
+Every op declares which subject forms it takes and which kind it emits, in
+its description line — that pair IS the op's type, and the fulfiller
+validates it before running anything. Emitting only ontology kinds is what
+makes the primitives below op-agnostic.
 
 - **ask** — fetch: an operation, a subject, a binding. Shipped.
 - **reference** — `$bind.field` in an ask's attributes reads an earlier
-  answer. Shipped, document-order only, refusal on backward reads.
-- **fan-out** — an op over a list, one answer per item, bounded and stating
-  its bound ("checked the first 5 of 12"). Half-shipped: `diagnostics` takes
-  a file list; the primitive should belong to the language, not to one op.
-- **selection** — filter and projection on ontology fields: locations in
-  test files, problems of a severity, the first N by a stated order. Not
-  designed; every use of it must announce what it dropped.
-- **aggregation** — counts over selections, feeding `count` values. Not
-  designed.
+  answer; document order is the dependency rule and a backward read refuses
+  with the rule named. Shipped.
+- **fan-out** — `each=$bind.field` on any ask whose subject is a file: run
+  the op once per item, bind the list of answers, bounded (default 5) and
+  stating "the first N of M" when cut. Semantics: item order preserved; one
+  item's failure is that item's absence sentence, never the composition's.
+  Today's `diagnostics files=` hard-wiring retires into this.
+- **selection** — attributes on any list-kinded bind at its use site:
+  `where-kind`, `where-file` (a picomatch), `first=N by=field`. Selection
+  never re-fetches; it projects what an ask already holds, and every cut
+  announces itself ("first 5 by uses · of 23").
+- **aggregation** — `count-by=field` projects a location or problem list
+  into `count` values; the zero-suppressing count line renders it. With
+  selection this is the impact table as two primitives instead of one tool.
 
 What is deliberately absent: joins, recursion, and anything that makes a
-composition's cost unpredictable from reading it. A composition should be
-priceable by eye: one ask is one answer's cost, a fan-out is its bound times
-one.
+composition's cost unpredictable from reading it. A composition is priceable
+by eye: one ask is one answer's cost; a fan-out is its stated bound times
+one; selection and aggregation are free because they never fetch.
+
+## Kind-addressed rendering, concretely
+
+One tag per kind, each accepting exactly its kind and rendering the
+canonical form — `{% locations of=$x %}`, `{% problems of=$x %}`,
+`{% excerpt of=$x %}`, `{% counts of=$x %}` — with the grouping, guides,
+reach segment, and absence sentence owned by the tag. Partial filenames
+retire from the public language (the engine refuses partials inline anyway).
+A bare ask renders its bind through the kind tag automatically; a body that
+names the tag chooses placement; a body that wants a different shape still
+has the full document layer underneath.
 
 ## Kind-addressed rendering
 
