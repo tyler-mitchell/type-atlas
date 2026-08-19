@@ -56,7 +56,6 @@ const reading = (environment: Record<string, string>) =>
       workspace: workspaceRoot,
       file: ["packages/mcp/src/presentation.ts"],
       fold: true,
-      includeDiagnostics: "off",
     },
   });
 

@@ -24,7 +24,6 @@ test("serves workspace files through the packaged stdio entrypoint", async () =>
         workspace: workspaceRoot,
         file: ["packages/mcp/package.json"],
         fold: false,
-        includeDiagnostics: "off",
       },
     });
     const content = result.content.find((item) => item.type === "text");
@@ -94,6 +93,37 @@ test("serves workspace files through the packaged stdio entrypoint", async () =>
       type: "text",
       text: expect.stringContaining(".github/"),
     });
+  } finally {
+    await client.close();
+  }
+}, 30_000);
+
+/**
+ * An argument no schema declares is a typo or a misunderstanding, and a tool
+ * that answers anyway silently degrades it to defaults — a `file` argument
+ * once read as a per-file diagnostics mode this server does not have. This
+ * asks through the real stdio boundary, so a client stripping unknown keys
+ * before sending cannot mask what the server itself accepts.
+ */
+test("rejects an argument no schema declares", async () => {
+  const client = new Client({ name: "type-atlas-test", version: "1.0.0" });
+  const transport = new StdioClientTransport({
+    command: process.execPath,
+    args: ["bin/type-atlas.cjs"],
+    cwd: packageRoot,
+    stderr: "pipe",
+  });
+
+  await client.connect(transport);
+  try {
+    const outcome = await client
+      .callTool({
+        name: "list_files",
+        arguments: { workspace: workspaceRoot, depth: 1, bogusKey: true },
+      })
+      .then((result) => ({ rejected: result.isError === true }))
+      .catch(() => ({ rejected: true }));
+    expect(outcome).toEqual({ rejected: true });
   } finally {
     await client.close();
   }

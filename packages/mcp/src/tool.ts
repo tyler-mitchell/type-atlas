@@ -79,6 +79,17 @@ type ToolConfig<Input extends StandardSchemaWithJSON, Output extends StandardSch
  * packaged server's real `tools/list` response. See "MCP Tool Input Schemas" in
  * AGENTS.md before declaring a schema here.
  */
+/**
+ * An argument no schema declares is a typo or a misunderstanding, and a tool
+ * that answers anyway silently degrades it to defaults — a `file` argument
+ * once read as a per-file diagnostics mode this server does not have. One
+ * seam, every tool: a schema that can reject undeclared keys does.
+ */
+const rejectingUndeclared = <Schema extends StandardSchemaWithJSON>(schema: Schema): Schema => {
+  const chain = (schema as { onUndeclaredKey?: (behavior: string) => Schema }).onUndeclaredKey;
+  return typeof chain === "function" ? chain.call(schema, "reject") : schema;
+};
+
 export const registerTool = <
   Input extends StandardSchemaWithJSON,
   Output extends StandardSchemaWithJSON = StandardSchemaWithJSON,
@@ -116,5 +127,9 @@ export const registerTool = <
     );
   }) as ToolCallback<Input>;
 
-  return server.registerTool<Output, Input>(name, config, boundedCallback);
+  return server.registerTool<Output, Input>(
+    name,
+    { ...config, inputSchema: rejectingUndeclared(config.inputSchema) },
+    boundedCallback,
+  );
 };

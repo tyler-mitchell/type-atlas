@@ -142,6 +142,22 @@ test("every published property documents itself", () => {
   ).toEqual([]);
 });
 
+/**
+ * An argument no schema declares is a typo or a misunderstanding, and a schema
+ * that admits one silently degrades the call to defaults — a `file` argument
+ * once read as a per-file diagnostics mode this server does not have.
+ * `registerTool` applies `onUndeclaredKey("reject")` to every schema; this
+ * reads the published JSON to prove the rejection survived conversion, because
+ * a transform that silently no-ops is invisible from the definition site.
+ */
+test("every tool rejects arguments it does not declare", () => {
+  expect(
+    tools
+      .filter(({ inputSchema }) => (inputSchema as Schema)["additionalProperties"] !== false)
+      .map(({ name }) => name),
+  ).toEqual([]);
+});
+
 test("no default is published as an arktype marker", () => {
   expect(tools.flatMap(({ name, inputSchema }) => arktypeMarkers(inputSchema.properties, name))) //
     .toEqual([]);
