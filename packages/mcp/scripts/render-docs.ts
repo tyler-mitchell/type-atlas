@@ -55,18 +55,50 @@ const catalog = () =>
   ));
 
 /**
+ * The working-tree state a case arranged before its call, as one yaml
+ * comment. Without it, an arranged case reads as if a plain listing of a
+ * clean repository produced `R`/`A`/`C` markers — and two cases with
+ * identical arguments but different arrangements rendered as the same
+ * invocation with contradicting outputs.
+ */
+const arrangeNote = (arrange: CapturedScenario["arrange"]): string | undefined => {
+  if (arrange === undefined) return undefined;
+  const base = (file: string) => file.split("/").at(-1) ?? file;
+  const staged = new Set(arrange.stage ?? []);
+  const parts = [
+    ...Object.keys(arrange.append ?? {}).map((file) => `${base(file)} edited`),
+    ...Object.keys(arrange.create ?? {}).map(
+      (file) => `${base(file)} ${staged.has(file) ? "created and staged" : "created"}`,
+    ),
+    ...(arrange.stage ?? [])
+      .filter((file) => !(file in (arrange.create ?? {})))
+      .map((file) => `${base(file)} staged`),
+    ...(arrange.delete ?? []).map((file) => `${base(file)} deleted`),
+    ...(arrange.renames ?? []).map(({ from, to }) => `${base(from)} renamed to ${base(to)}`),
+    ...(arrange.conflict ? [`merge conflict on ${base(arrange.conflict.file)}`] : []),
+  ];
+  return parts.length === 0 ? undefined : `# working tree arranged: ${parts.join(" · ")}`;
+};
+
+/**
  * The call as an MCP client presents it: `tool: <title>`, then one
  * `key: value` line per argument — string values bare, everything else as
- * JSON. Both halves derive from captures: the title from the server's own
- * `tools/list` answer, the arguments from the scenario definition that
- * produced the shown response. `workspace` leads every call the way an
+ * JSON. Every half derives from captures: the title from the server's own
+ * `tools/list` answer, the arguments and arrangement from the `.call.json`
+ * record of what actually ran. `workspace` leads every call the way an
  * agent sends it; the fixture is that workspace, named by repository path.
  */
-const invocationBlock = async (tool: string, argument: Record<string, unknown>) => {
+const invocationBlock = async ({
+  tool,
+  arguments: argument,
+  arrange,
+}: Pick<CapturedScenario, "tool" | "arguments" | "arrange">) => {
   const title = (await catalog()).find(({ name }) => name === tool)?.title ?? tool;
+  const note = arrangeNote(arrange);
   const lines = [
     `tool: ${title}`,
     `workspace: ${relative(repositoryRoot, fixtureRoot)}`,
+    ...(note === undefined ? [] : [note]),
     ...Object.entries(argument).map(
       ([key, value]) => `${key}: ${typeof value === "string" ? value : JSON.stringify(value)}`,
     ),
@@ -120,7 +152,7 @@ export const renderAuthored = async (sourceRelative: string): Promise<string> =>
         );
       }
       const captured = await capturedResponse(id, sourceRelative);
-      const invocation = await invocationBlock(scenario.tool, scenario.arguments);
+      const invocation = await invocationBlock(scenario);
       const [from, to] = [Math.min(...node.lines), Math.max(...node.lines)];
       // The tag's parsed span swallows the blank line after it; the block
       // hands one back so following prose never leans on the code.
@@ -145,7 +177,7 @@ export const renderToolDocument = async (tool: string): Promise<string> => {
   const description = (await catalog()).find(({ name }) => name === tool)?.description;
   const cases = await Promise.all(
     own.map(async (scenario) => {
-      const invocation = await invocationBlock(scenario.tool, scenario.arguments);
+      const invocation = await invocationBlock(scenario);
       const captured = await capturedResponse(scenario.id, `${toolDocumentsRoot}/${tool}.md`);
       return `## ${caseHeading(scenario.name)}\n\n${invocation}\n\n${responseBlock(captured)}`;
     }),

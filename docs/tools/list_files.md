@@ -182,6 +182,7 @@ ledger/
 ```yaml
 tool: List files
 workspace: fixtures/ledger
+# working tree arranged: currency.ts edited · rounding.ts created · index.ts deleted
 directory: packages/money
 depth: 2
 ```
@@ -205,6 +206,7 @@ packages/money/
 ```yaml
 tool: List files
 workspace: fixtures/ledger
+# working tree arranged: ofx.ts created and staged · dedupe.ts renamed to duplicate-rows.ts
 directory: packages/importers
 depth: 2
 ```
@@ -227,6 +229,7 @@ packages/importers/
 ```yaml
 tool: List files
 workspace: fixtures/ledger
+# working tree arranged: merge conflict on currency.ts
 directory: packages/money
 depth: 2
 ```

@@ -247,6 +247,7 @@ what is here, what it costs to read, and what differs from HEAD:
 ```yaml
 tool: List files
 workspace: fixtures/ledger
+# working tree arranged: currency.ts edited · rounding.ts created · index.ts deleted
 directory: packages/money
 depth: 2
 ```
