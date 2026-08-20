@@ -76,6 +76,7 @@
     "vscode-uri": "catalog:"
   },
   "devDependencies": {
+    "@markdoc/markdoc": "catalog:",
     "@types/node": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
