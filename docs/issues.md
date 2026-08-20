@@ -366,7 +366,13 @@ maintainer. Items already in flight are marked; the rest stand alone:
   the similarity section opt-in or self-trimming when relevance is low.
 - **`investigate_code` anchors unrelated symbols on conceptual questions.**
   It should say "relationship not found" sooner instead of decorating a weak
-  retrieval with verified-looking relationships.
+  retrieval with verified-looking relationships. Now permanently reproduced
+  in `responses/investigate_code/absent-concept-stays-absent.txt`: a
+  retry-backoff question answers `defaultCurrencyCode · relevance 100%` —
+  relevance is relative to the strongest match, so a wrong answer scores
+  100% by construction — then renders "Verified relationships" over it. The
+  fix needs an absolute confidence floor from the retrieval scores, not
+  another caveat sentence.
 - **Tool idea: evaluate declared execution grammar** — expand sequence
   repeats and indirect `count` into exact command multiplicity
   (webgpu-engine's dispatch grammar).
@@ -658,16 +664,6 @@ read to serve two characters. Worth revisiting only if a consumer appears that
 genuinely needs ASCII-only output.
 
 ---
-
-### `callees` drowns the project in the standard library
-
-`callees` on `balancesAsOf` (ledger fixture) answers 12 callables of which
-eight are `lib.*.d.ts` methods — `localeCompare` three times, once per lib
-file that redeclares it. The four project calls, which are the answer, sit
-under a pile of `map`/`sort`/`get`/`set`. Standard-library callees deserve a
-one-line fold ("+ 6 standard-library calls"), not rows that outnumber the
-signal. Observed 2026-08-20 in
-`responses/callees/what-balances-as-of-invokes.txt`.
 
 ## Architecture
 

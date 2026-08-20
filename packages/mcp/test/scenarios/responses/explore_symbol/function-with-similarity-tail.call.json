@@ -1,0 +1,7 @@
+{
+  "tool": "explore_symbol",
+  "arguments": {
+    "file": "packages/reports/src/balance.ts",
+    "symbol": "balancesAsOf"
+  }
+}

@@ -72,6 +72,9 @@ file_references/who-imports-money
 document_links/json-schema-reference
 verify_edit/proposed-edit-breaks-a-consumer
 compose/settlement-dossier
+investigate_code/behavioral-question-lands
+investigate_code/absent-concept-stays-absent
+explore_symbol/function-with-similarity-tail
 occurrences/token-found-across-packages
 occurrences/honest-zero
 document_links/fixture-readme

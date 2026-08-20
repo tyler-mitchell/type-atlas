@@ -28,6 +28,8 @@ One page per tool, generated from the scenario suite's captured responses — ev
 
 | [`document_symbols`](document_symbols.md) | Document symbols | 5 |
 
+| [`explore_symbol`](explore_symbol.md) | Explore symbol | 1 |
+
 | [`file_references`](file_references.md) | File references | 1 |
 
 | [`find_successor`](find_successor.md) | Find successor | 3 |
@@ -43,6 +45,8 @@ One page per tool, generated from the scenario suite's captured responses — ev
 | [`inlay_hints`](inlay_hints.md) | Inlay hints | 1 |
 
 | [`inspect_symbol`](inspect_symbol.md) | Inspect symbol | 2 |
+
+| [`investigate_code`](investigate_code.md) | Investigate code | 2 |
 
 | [`list_files`](list_files.md) | List files | 12 |
 

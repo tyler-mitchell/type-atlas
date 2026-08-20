@@ -1,0 +1,84 @@
+<!-- Generated from the scenario captures by packages/mcp/scripts/render-docs.ts — edit the source, not this file. -->
+
+# `explore_symbol`
+
+Combine exact definitions, types, implementations, callers, calls, and references for one symbol with structurally similar code. Verified relationships and similarity are separate.
+
+## function with similarity tail
+
+```yaml
+tool: Explore symbol
+workspace: fixtures/ledger
+file: packages/reports/src/balance.ts
+symbol: balancesAsOf
+```
+
+~~~text
+balancesAsOf [function] · packages/reports/src/balance.ts:23:14-23:26 · range 23:1-51:3 · packages/reports/tsconfig.json
+
+```typescript
+const balancesAsOf: <TMeta>(journal: Journal<TMeta>, cutoff: Date, currency: Currency) => readonly BalanceLine[]
+```
+
+Every account's balance as of a cutoff, including ancestor accounts that
+were never posted to directly — `assets` earns a line because
+`assets:bank:checking` did.
+
+## Calls (3 workspace · 6 dependency/runtime)
+
+Every call site is in packages/reports/src/balance.ts; each row names where the callee is declared.
+
+lineage [function] packages/accounts/src/account.ts:27:14-27:21 · range 27:24-28:86 · calls 40:28-40:35
+signedAmount [function] packages/accounts/src/posting.ts:25:14-25:26 · range 25:29-32:2 · calls 34:57-34:69
+zero [function] packages/money/src/money.ts:14:14-14:18 · range 14:21-14:71 · calls 34:41-34:45, 41:56-41:60, 48:32-48:36
+
+Dependency/runtime: localeCompare, entries, map, sort, get, set
+
+## Mentions that are not calls (1 of 2 references · 1 project loaded)
+
+packages/reports/src/index.ts:1:28-1:40:  export { type BalanceLine, balancesAsOf, type StatementDescription } from "./balance.ts";
+
+references lists all 2, with paging.
+
+Related code · similarity is not a call or reference relationship
+Search: Related to packages/reports/src/balance.ts:23
+
+3 matches · relevance is relative to the strongest match · no identifier to anchor on, so these are ranked by meaning alone
+
+=== 1 · packages/accounts/src/journal.ts:19-38 · relevance 100% ===
+
+Structure: Journal
+Symbol: Journal [class] · selection 24:14-24:21 · range 24:1-73:2
+
+19 | /**
+20 |  * An append-only journal of balanced entries. `TMeta` carries whatever a
+21 |  * consumer attaches to each entry — an import batch id, an approval trail —
+22 |  * without the journal knowing its shape.
+23 |  */
+24 | export class Journal<TMeta = undefined> {
+
+=== 2 · packages/rules/src/rule.ts:1-16 · relevance 90% ===
+
+Structure: RuleEvents
+Symbol: RuleEvents [interface] · selection 8:18-8:28 · range 8:1-12:2
+
+1 | import type { AccountPath, Entry, Posting } from "@ledger/accounts";
+2 |
+3 | /**
+4 |  * The events a rule can react to, keyed by name. `TMeta` flows from the
+5 |  * journal: a rule book written for one meta shape cannot be attached to a
+6 |  * journal carrying another.
+
+=== 3 · packages/reconcile/src/drift.ts:1-18 · relevance 86% ===
+
+Structure: StatementLine
+Symbol: StatementLine [interface] · selection 8:18-8:31 · range 8:1-12:2
+
+1 | // DELIBERATELY BROKEN — this file exists so diagnostics scenarios capture
+2 | // real compiler errors from realistic mistakes. Do not fix; see the fixture
+3 | // README.
+4 | import { type Posting, signedAmount } from "@ledger/accounts";
+5 | import { format, money, type Money } from "@ledger/money";
+6 |
+~~~
+

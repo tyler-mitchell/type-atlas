@@ -679,6 +679,32 @@ describe("compose", () => {
   );
 });
 
+// ── investigate_code: ranked retrieval with verified relationships ──────────
+describe("investigate_code", () => {
+  // A behavioral question the fixture genuinely answers: retrieval should
+  // surface the balance roll-up and anchor its symbol with relationships.
+  scenarioTest("behavioral-question-lands", ({ capture }) =>
+    capture("investigate_code", {
+      question: "how are account balances rolled up to ancestor accounts",
+    }));
+  // A concept the fixture does not contain: the honest shape is a weak or
+  // empty answer that says so — not an unrelated symbol dressed in verified
+  // relationships.
+  scenarioTest("absent-concept-stays-absent", ({ capture }) =>
+    capture("investigate_code", {
+      question: "where is the retry backoff for failed network requests configured",
+    }));
+});
+
+// ── explore_symbol: exact relationships plus similar code ───────────────────
+describe("explore_symbol", () => {
+  scenarioTest("function-with-similarity-tail", ({ capture }) =>
+    capture("explore_symbol", {
+      file: "packages/reports/src/balance.ts",
+      symbol: "balancesAsOf",
+    }));
+});
+
 // ── occurrences: literal proof of presence and absence ──────────────────────
 describe("occurrences", () => {
   scenarioTest("token-found-across-packages", ({ capture }) =>
