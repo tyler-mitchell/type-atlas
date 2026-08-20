@@ -153,12 +153,14 @@ describe("list_files", () => {
   // A per-subtree budget: each opened package contributes its first entries
   // and closes with `… N more` — partial and priced, never folded whole.
   scenarioTest("subtree-on-a-budget", ({ capture }) =>
-    capture("list_files", { expand: { "packages/*": { depth: 2, limit: 6 } } }));
+    capture("list_files", { expand: { "packages/*": { depth: 2, limit: 6 } } }),
+  );
   // The global bound cutting mid-tree under a glob: kept files stay shown,
   // the cut directories elide or stub — a directory the bound touched can
   // never read as complete.
   scenarioTest("bounded-glob-elides", ({ capture }) =>
-    capture("list_files", { glob: ["**/*.ts"], limit: 12 }));
+    capture("list_files", { glob: ["**/*.ts"], limit: 12 }),
+  );
   // The working-tree delta as one tree: exactly what changed, at any depth,
   // without the clean rows around it — the two changed files in a large
   // monorepo without the hundreds.
@@ -179,10 +181,12 @@ describe("list_files", () => {
           delete: ["packages/money/src/index.ts"],
         },
       },
-    ));
+    ),
+  );
   // The same ask against a clean tree answers with which nothing it is.
   scenarioTest("delta-of-a-clean-tree", ({ capture }) =>
-    capture("list_files", { directory: "packages/accounts", changed: true }));
+    capture("list_files", { directory: "packages/accounts", changed: true }),
+  );
 });
 
 // ── read_file: economical reading ───────────────────────────────────────────
@@ -686,14 +690,16 @@ describe("investigate_code", () => {
   scenarioTest("behavioral-question-lands", ({ capture }) =>
     capture("investigate_code", {
       question: "how are account balances rolled up to ancestor accounts",
-    }));
+    }),
+  );
   // A concept the fixture does not contain: the honest shape is a weak or
   // empty answer that says so — not an unrelated symbol dressed in verified
   // relationships.
   scenarioTest("absent-concept-stays-absent", ({ capture }) =>
     capture("investigate_code", {
       question: "where is the retry backoff for failed network requests configured",
-    }));
+    }),
+  );
 });
 
 // ── explore_symbol: exact relationships plus similar code ───────────────────
@@ -702,7 +708,8 @@ describe("explore_symbol", () => {
     capture("explore_symbol", {
       file: "packages/reports/src/balance.ts",
       symbol: "balancesAsOf",
-    }));
+    }),
+  );
 });
 
 // ── occurrences: literal proof of presence and absence ──────────────────────

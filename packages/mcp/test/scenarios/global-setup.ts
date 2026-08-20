@@ -48,7 +48,9 @@ const ensureFixtureCleanForAccept = (): void => {
   if (updating) {
     throw new Error(`${message}\nCommit the fixture before accepting captures (vitest -u).`);
   }
-  console.warn(`${message}\nFixture-dependent captures will differ until the fixture is committed.`);
+  console.warn(
+    `${message}\nFixture-dependent captures will differ until the fixture is committed.`,
+  );
 };
 
 export default async function setup(project: TestProject) {

@@ -196,9 +196,7 @@ export const createSuccessorSearch =
       })),
       // One row per file: retrieval returns a result per matching chunk, and
       // the same document listed three times read as three findings.
-      discussing: [
-        ...new Set(fromRetrieval.map((candidate) => candidate.where ?? candidate.name)),
-      ]
+      discussing: [...new Set(fromRetrieval.map((candidate) => candidate.where ?? candidate.name))]
         .slice(0, request.limit)
         .map((name) => ({ name })),
     });

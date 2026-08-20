@@ -16,6 +16,10 @@
     // `allowImportingTsExtensions` is only legal when the config itself says
     // so; the type-aware linter reads the config raw, without the CLI flag.
     "noEmit": true,
+    // Imports name their `.ts` extension throughout the repository, and this
+    // config is the fallback owner of every file no package tsconfig includes
+    // (the root `scripts/` CLI among them).
+    "allowImportingTsExtensions": true,
     "strict": true,
     "declaration": true,
     "declarationMap": true,

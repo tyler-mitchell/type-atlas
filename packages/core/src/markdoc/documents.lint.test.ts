@@ -124,5 +124,5 @@ test("a ranked hit is composed one way", () => {
       return line.replace(/\$\w+\./g, "$.").trim();
     }),
   );
-  expect([...shapes].length, `ranked hits are written ${shapes.size} different ways`).toBe(1);
+  expect(shapes.size, `ranked hits are written ${shapes.size} different ways`).toBe(1);
 });

@@ -75,8 +75,7 @@
   "scripts": {
     "build": "vp pack src/index.ts src/node.ts src/protocol.ts",
     "check-types": "tsc --noEmit -p tsconfig.json",
-    "prepack": "vp run build",
-    "test": "vp run build && vp test run"
+    "prepack": "vp run build"
   },
   "dependencies": {
     "@volar/language-server": "catalog:",

@@ -58,7 +58,8 @@
     "check-types": "tsc --noEmit -p tsconfig.json",
     "dev": "node --conditions=development src/cli.ts",
     "prepack": "vp run build",
-    "test": "vp test run"
+    "test": "vp test run",
+    "test:scenarios": "vp test run --project=scenarios"
   },
   "dependencies": {
     "@modelcontextprotocol/client": "catalog:",

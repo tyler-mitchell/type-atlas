@@ -422,9 +422,7 @@ export const registerDocumentTools = (server: McpServer, workspaces: VolarWorksp
       ]);
       const entryCount = (entry: DocumentSymbol): number =>
         (entry.children ?? []).reduce((held, child) => held + 1 + entryCount(child), 0);
-      const foldValues = (
-        entry: DocumentSymbol,
-      ): DocumentSymbol & { readonly folded?: number } =>
+      const foldValues = (entry: DocumentSymbol): DocumentSymbol & { readonly folded?: number } =>
         valueShaped.has(entry.kind) &&
         (entry.children?.length ?? 0) > 0 &&
         (entry.children ?? []).every((child) => memberShaped.has(child.kind))
