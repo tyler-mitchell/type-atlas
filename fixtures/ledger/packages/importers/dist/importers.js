@@ -1,0 +1,1 @@
+function d(e,t){return{account:e.account,amount:t}}var g=(e,t)=>e.reduce((n,r)=>n+signedAmount(r,t),0);function signedAmount(e,t){return e.side==="debit"?e.amount:-e.amount}export{d as posting,g as total,signedAmount};

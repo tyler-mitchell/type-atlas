@@ -1,0 +1,7 @@
+{
+  "tool": "occurrences",
+  "arguments": {
+    "text": "signedAmount",
+    "directory": "packages/importers/dist"
+  }
+}

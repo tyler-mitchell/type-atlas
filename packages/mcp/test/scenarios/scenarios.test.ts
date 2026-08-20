@@ -686,6 +686,12 @@ describe("occurrences", () => {
     capture("occurrences", { text: "signedAmount" }),
   );
   scenarioTest("honest-zero", ({ capture }) => capture("occurrences", { text: "quantumFlux" }));
+  // The committed importers bundle sits in vite's default outDir, so the
+  // workspace scan above excludes it and says so; naming the directory is
+  // the deliberate opt-in that scans generated output anyway.
+  scenarioTest("scanning-generated-output-on-purpose", ({ capture }) =>
+    capture("occurrences", { text: "signedAmount", directory: "packages/importers/dist" }),
+  );
 });
 
 // ── the hazard corner, deliberately last ────────────────────────────────────

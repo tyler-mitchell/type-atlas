@@ -13,7 +13,7 @@
 // string-id search in minified noise.
 
 import { existsSync } from "node:fs";
-import { dirname, relative, resolve } from "pathe";
+import { dirname, join, relative, resolve } from "pathe";
 import ts from "typescript";
 
 export type ProjectGraph = {
@@ -44,6 +44,21 @@ const discover = (root: string): ProjectGraph => {
       const resolved = relative(root, resolve(dirname(path), outDir));
       if (!resolved.startsWith("..")) outDirs.add(resolved);
     }
+  }
+  // Bundler output. A bundler's config is a TypeScript module — nothing here
+  // evaluates one — but its presence declares its documented default output
+  // directory, and that is exactly where committed bundles drown literal
+  // scans (kek's vite `dist/assets` bundles, 2026-08-20). Every bundler
+  // below defaults to `dist` beside its config; a repo that redirects output
+  // elsewhere simply gets no exclusion, which errs toward scanning more.
+  const bundlerConfigs = ts.sys.readDirectory(
+    root,
+    undefined,
+    ["**/node_modules/**", "**/.git/**", "**/.*/**"],
+    ["**/vite.config.*", "**/rolldown.config.*", "**/tsdown.config.*", "**/webpack.config.*"],
+  );
+  for (const path of bundlerConfigs) {
+    outDirs.add(relative(root, join(dirname(path), "dist")));
   }
   return { configs: configs.sort(), outDirs: [...outDirs].sort() };
 };
