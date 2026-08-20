@@ -56,16 +56,11 @@ export const codeFrame = (input: {
           (lines[j] ?? "").replace(/\t/g, " "),
           columns - dimensions.gutterWidth - 2 - indent,
         ).trimEnd();
-        res.push(
-          lineNo(j + 1) + (truncatedLine ? " " + truncatedLine : truncatedLine),
-        );
+        res.push(lineNo(j + 1) + (truncatedLine ? " " + truncatedLine : truncatedLine));
 
         if (j === i) {
           const pad = start - (count - lineLength) + (nl - 1);
-          const length = Math.max(
-            1,
-            end > count ? lineLength - pad : end - start,
-          );
+          const length = Math.max(1, end > count ? lineLength - pad : end - start);
           // Columns, not code units. A position is reported in units and the
           // frame is read in columns, and the two only agree while the line is
           // narrow: `const 名前 = "太郎"; const wideProbe` puts `wideProbe` at

@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { createTwoFilesPatch } from "diff";
-import { expect, test as baseTest } from "vitest";
+import { expect, test as baseTest } from "vite-plus/test";
 import {
   type Arrange,
   arrangeFixture,
@@ -88,7 +88,11 @@ export const scenarioTest = baseTest
         }
         await expect(
           `${JSON.stringify(
-            { tool, arguments: argument, ...(options?.arrange ? { arrange: options.arrange } : {}) },
+            {
+              tool,
+              arguments: argument,
+              ...(options?.arrange ? { arrange: options.arrange } : {}),
+            },
             null,
             2,
           )}\n`,

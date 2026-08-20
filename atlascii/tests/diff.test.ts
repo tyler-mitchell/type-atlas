@@ -1,5 +1,5 @@
 import Markdoc from "@markdoc/markdoc";
-import { expect, test } from "vitest";
+import { expect, test } from "vite-plus/test";
 import { defaultMarks } from "../src/config/marks.ts";
 import { functions, render, tags } from "../src/document/index.ts";
 
@@ -48,16 +48,16 @@ test("lets a document name both sides and both markers", () => {
   // The markers are conventions and the annotations are words; neither belongs
   // to the library.
   expect(
-    compose(
-      `{% diff chunks=$chunks config=$config /%}`,
-      {
-        chunks: [{ kind: "removed", lines: ["alt"] }, { kind: "added", lines: ["neu"] }],
-        config: {
-          marks: { ...defaultMarks, diffRemoved: "<", diffAdded: ">" },
-          messages: { "diff.expected": "Erwartet", "diff.received": "Erhalten" },
-        },
+    compose(`{% diff chunks=$chunks config=$config /%}`, {
+      chunks: [
+        { kind: "removed", lines: ["alt"] },
+        { kind: "added", lines: ["neu"] },
+      ],
+      config: {
+        marks: { ...defaultMarks, diffRemoved: "<", diffAdded: ">" },
+        messages: { "diff.expected": "Erwartet", "diff.received": "Erhalten" },
       },
-    ),
+    }),
   ).toMatchInlineSnapshot(`
     "< Erwartet
     > Erhalten
@@ -73,10 +73,12 @@ test("renders nothing when there is no difference", () => {
 
 test("sits inside a section like any other component", () => {
   expect(
-    compose(
-      `{% section title="Changed" %}\n{% diff chunks=$chunks /%}\n{% /section %}`,
-      { chunks: [{ kind: "removed", lines: ["a"] }, { kind: "added", lines: ["b"] }] },
-    ),
+    compose(`{% section title="Changed" %}\n{% diff chunks=$chunks /%}\n{% /section %}`, {
+      chunks: [
+        { kind: "removed", lines: ["a"] },
+        { kind: "added", lines: ["b"] },
+      ],
+    }),
   ).toMatchInlineSnapshot(`
     "## Changed
 
@@ -93,9 +95,24 @@ test("groups problems under the file holding them", () => {
   expect(
     compose(`{% diagnostics problems=$problems /%}`, {
       problems: [
-        { file: "src/a.ts", severity: 1, range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } }, message: "first" },
-        { file: "src/a.ts", severity: 2, range: { start: { line: 4, character: 2 }, end: { line: 4, character: 3 } }, message: "second" },
-        { file: "src/b.ts", severity: 1, range: { start: { line: 9, character: 0 }, end: { line: 9, character: 1 } }, message: "third" },
+        {
+          file: "src/a.ts",
+          severity: 1,
+          range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
+          message: "first",
+        },
+        {
+          file: "src/a.ts",
+          severity: 2,
+          range: { start: { line: 4, character: 2 }, end: { line: 4, character: 3 } },
+          message: "second",
+        },
+        {
+          file: "src/b.ts",
+          severity: 1,
+          range: { start: { line: 9, character: 0 }, end: { line: 9, character: 1 } },
+          message: "third",
+        },
       ],
     }),
   ).toMatchInlineSnapshot(`""`);

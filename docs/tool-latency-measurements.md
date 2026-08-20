@@ -23,8 +23,8 @@ first time and 8 ms on immediate repeat. Only novel queries measure anything.
 
 **The language server is single-threaded, so a cheap call queued behind an
 expensive one reports the expensive one's latency as its own.**
-`language-server-process.ts` states it directly: *"the server holds its only
-thread and stops reading its socket, so every later call waits behind it."* Two
+`language-server-process.ts` states it directly: _"the server holds its only
+thread and stops reading its socket, so every later call waits behind it."_ Two
 tools issued in one parallel batch will both report the slower one's time. Issue
 timing probes alone.
 
@@ -33,13 +33,13 @@ timing probes alone.
 Measured immediately after `reload`, which kills and re-forks the language server.
 Each call is the first of its kind against a server with nothing loaded.
 
-| call | what it needs | elapsed |
-| --- | --- | --- |
-| `list_files` | filesystem only | 18 ms |
-| `read_file` | filesystem only | 12 ms |
-| `project_config` | LSP handshake, tsconfig walk | 2 ms |
-| `document_symbols` | syntactic parse of one file | 24 ms |
-| `references` | the type checker | 118 ms |
+| call               | what it needs                | elapsed |
+| ------------------ | ---------------------------- | ------- |
+| `list_files`       | filesystem only              | 18 ms   |
+| `read_file`        | filesystem only              | 12 ms   |
+| `project_config`   | LSP handshake, tsconfig walk | 2 ms    |
+| `document_symbols` | syntactic parse of one file  | 24 ms   |
+| `references`       | the type checker             | 118 ms  |
 
 The first type-checker query against a 1,146-file project on a newly forked
 server cost 118 ms. There is no expensive "cold start" to plan around.
@@ -58,19 +58,19 @@ edits, then ask. Alternating edit → ask → edit → ask pays the rebuild ever
 
 Distinct symbols, each asked exactly once, on a warm project.
 
-| call | scope | results | elapsed |
-| --- | --- | --- | --- |
-| `references` `openTimeline` | crossProject | 208 | 240 ms |
-| `references` `Engine` | crossProject | 80 | 1,073 ms |
-| `references` `defineCommand` | crossProject, raw | 155 | 245 ms |
-| `references` `makeTimelineFrameLoop` | crossProject | 3 | 46 ms |
-| `references` `frameLease` | project | 4 | 13 ms |
-| `references` `reconcileMotionProgram` | project | 3 | 4,137 ms |
-| `inspect_symbol` `defineCommand` | crossProject, limit 100 | 155 | 405 ms |
-| `inspect_symbol` `makeStageRun` | source, type defs, uncompacted calls | 868-line body | 391 ms |
-| `explore_symbol` `openEngine` | limit 100, related 20 | 87 refs + 20 similar | 1,706 ms |
-| `callees` `openMotionRuntime` | 917-line body | 30 targets | 43 ms |
-| `document_symbols` `render-runtime.ts` | raw | ~400 nested | 35 ms |
+| call                                   | scope                                | results              | elapsed  |
+| -------------------------------------- | ------------------------------------ | -------------------- | -------- |
+| `references` `openTimeline`            | crossProject                         | 208                  | 240 ms   |
+| `references` `Engine`                  | crossProject                         | 80                   | 1,073 ms |
+| `references` `defineCommand`           | crossProject, raw                    | 155                  | 245 ms   |
+| `references` `makeTimelineFrameLoop`   | crossProject                         | 3                    | 46 ms    |
+| `references` `frameLease`              | project                              | 4                    | 13 ms    |
+| `references` `reconcileMotionProgram`  | project                              | 3                    | 4,137 ms |
+| `inspect_symbol` `defineCommand`       | crossProject, limit 100              | 155                  | 405 ms   |
+| `inspect_symbol` `makeStageRun`        | source, type defs, uncompacted calls | 868-line body        | 391 ms   |
+| `explore_symbol` `openEngine`          | limit 100, related 20                | 87 refs + 20 similar | 1,706 ms |
+| `callees` `openMotionRuntime`          | 917-line body                        | 30 targets           | 43 ms    |
+| `document_symbols` `render-runtime.ts` | raw                                  | ~400 nested          | 35 ms    |
 
 Result count does not predict cost: 208 references took 240 ms while 80 took
 1,073 ms, and a 3-result query took 4,137 ms.
@@ -80,11 +80,11 @@ Result count does not predict cost: 208 references took 240 ms while 80 took
 `hover` on a deeply-inferred generic — an arktype schema — is the only subtool
 with a cost that is not explained by invalidation or queueing.
 
-| call | elapsed |
-| --- | --- |
-| `hover` `MotionAgentNode` (arktype, first instantiation) | 3,512 ms |
-| `hover` `MotionAgentNode` (repeat) | 11 ms |
-| `hover` `MOTION_SCENARIOS` (different file, immediately after) | 9 ms |
+| call                                                           | elapsed  |
+| -------------------------------------------------------------- | -------- |
+| `hover` `MotionAgentNode` (arktype, first instantiation)       | 3,512 ms |
+| `hover` `MotionAgentNode` (repeat)                             | 11 ms    |
+| `hover` `MOTION_SCENARIOS` (different file, immediately after) | 9 ms     |
 
 The third row is the mechanism: instantiating the first schema warmed the shared
 type the second depends on. This is a distinct cache from the program — it was

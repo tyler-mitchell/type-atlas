@@ -1,5 +1,5 @@
 import { resolve } from "node:path";
-import { expect, test } from "vitest";
+import { expect, test } from "vite-plus/test";
 import { generatedFiles, staleToolDocuments } from "../../scripts/render-docs.ts";
 import { orphanedCaptures, packageRoot } from "./runner.ts";
 

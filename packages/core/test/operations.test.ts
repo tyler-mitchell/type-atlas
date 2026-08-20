@@ -5,7 +5,7 @@ import {
   GetMatchTsConfigRequest,
   SymbolKind,
 } from "@volar/language-server/protocol.js";
-import { expect, test, vi } from "vitest";
+import { expect, test, vi } from "vite-plus/test";
 import { createTypeAtlas } from "../src/operations.ts";
 import type { VolarWorkspace } from "../src/volar-workspace.ts";
 

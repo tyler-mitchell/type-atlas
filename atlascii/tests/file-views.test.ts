@@ -1,5 +1,5 @@
 import Markdoc from "@markdoc/markdoc";
-import { expect, test } from "vitest";
+import { expect, test } from "vite-plus/test";
 import { functions, render, tags } from "../src/document/index.ts";
 
 // Composing a file view — its heading, its extent, whether it is one file or
@@ -9,8 +9,7 @@ import { functions, render, tags } from "../src/document/index.ts";
 const compose = (source: string, variables: Record<string, unknown> = {}) =>
   render(Markdoc.transform(Markdoc.parse(source), { tags, functions, variables }));
 
-const lines = (count: number) =>
-  Array.from({ length: count }, (_, index) => `line ${index + 1}`);
+const lines = (count: number) => Array.from({ length: count }, (_, index) => `line ${index + 1}`);
 
 test("numbers lines from one, since a reader counts from one", () => {
   expect(compose(`{% source lines=$lines /%}`, { lines: ["a", "b"] })).toBe("1 | a\n2 | b");

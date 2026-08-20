@@ -11,7 +11,7 @@ invalidates it whenever the diagnostics change, so a client holding a
 subscription is told without the agent spending a call.
 
 The trigger is any change in the workspace rather than a change to the watched
-file, because a file's diagnostics most often change when a *different* file is
+file, because a file's diagnostics most often change when a _different_ file is
 edited — the case a file-bound watcher stays silent through, and the one an agent
 most needs to hear about. Each settled change re-reads the file through the
 language server, so what is published is the language server's own answer.

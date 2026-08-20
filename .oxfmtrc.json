@@ -1,4 +1,0 @@
-{
-  "$schema": "./node_modules/oxfmt/configuration_schema.json",
-  "ignorePatterns": ["AGENTS.md", "docs/semble-affordances.md", "docs/volar-affordance-evidence.md"]
-}

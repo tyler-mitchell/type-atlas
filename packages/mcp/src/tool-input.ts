@@ -24,9 +24,7 @@ export const positionsInput = sourcePositionInput
   .array()
   .atLeastLength(1)
   .pipe((positions) => positions.map(toLspPosition))
-  .describe(
-    "Source positions to inspect together, each a one-based { line, character }.",
-  );
+  .describe("Source positions to inspect together, each a one-based { line, character }.");
 
 export const rangeInput = type({
   start: positionInput,

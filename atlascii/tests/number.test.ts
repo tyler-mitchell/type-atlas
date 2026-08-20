@@ -1,4 +1,4 @@
-import { expect, test } from "vitest";
+import { expect, test } from "vite-plus/test";
 import { formatNumber } from "../src/text/number.ts";
 
 test("separates thousands, with precision that follows magnitude", () => {

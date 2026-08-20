@@ -1,23 +1,15 @@
 import { Client } from "@modelcontextprotocol/client";
 import { InMemoryTransport, McpServer } from "@modelcontextprotocol/server";
 import { type } from "arktype";
-import { expect, test, vi } from "vitest";
+import { expect, test, vi } from "vite-plus/test";
 import { registerTool } from "../src/tool.ts";
 
 test("ends tool calls at the server deadline without closing the session", async () => {
   const server = new McpServer({ name: "type-atlas-test", version: "1.0.0" });
-  registerTool(
-    server,
-    "wait",
-    { inputSchema: type({}) },
-    () => new Promise<never>(() => {}),
-  );
-  registerTool(
-    server,
-    "echo",
-    { inputSchema: type({ text: "string" }) },
-    ({ text }) => ({ content: [{ type: "text", text }] }),
-  );
+  registerTool(server, "wait", { inputSchema: type({}) }, () => new Promise<never>(() => {}));
+  registerTool(server, "echo", { inputSchema: type({ text: "string" }) }, ({ text }) => ({
+    content: [{ type: "text", text }],
+  }));
 
   const client = new Client({ name: "type-atlas-test", version: "1.0.0" });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
@@ -35,7 +27,10 @@ test("ends tool calls at the server deadline without closing the session", async
     expect(result).toMatchObject({
       isError: true,
       content: [
-        { type: "text", text: expect.stringMatching(/^wait did not answer within .*still working/s) },
+        {
+          type: "text",
+          text: expect.stringMatching(/^wait did not answer within .*still working/s),
+        },
       ],
     });
     // Every answer carries what the call cost on its last line, so the text is

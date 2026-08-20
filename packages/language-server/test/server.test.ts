@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { ExitNotification } from "@volar/language-server";
 import { startLanguageServer } from "@volar/test-utils";
 import ts from "typescript";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vite-plus/test";
 import { URI } from "vscode-uri";
 import { withEffectLanguageService } from "../src/effect-language-service.ts";
 
@@ -107,10 +107,10 @@ describe("language server", () => {
     try {
       await handle.initialize(URI.file(root).toString(), undefined, { textDocument: {} });
       const document = await handle.openTextDocument(opened, "typescript");
-      const declarations = await handle.connection.sendRequest(
-        "type-atlas/workspaceDeclarations",
-        { textDocument: { uri: document.uri }, query: "computeTotal" },
-      );
+      const declarations = await handle.connection.sendRequest("type-atlas/workspaceDeclarations", {
+        textDocument: { uri: document.uri },
+        query: "computeTotal",
+      });
       expect(declarations).toEqual({
         declarations: [
           expect.objectContaining({

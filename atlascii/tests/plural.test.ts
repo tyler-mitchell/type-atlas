@@ -1,4 +1,4 @@
-import { expect, test } from "vitest";
+import { expect, test } from "vite-plus/test";
 import { plural } from "../src/text/plural.ts";
 
 const english = { one: "{count} reference", other: "{count} references" };
@@ -41,9 +41,8 @@ test("falls back to the required form when a category is not supplied", () => {
 
 test("selects ordinals by the same rules with a different type", () => {
   const forms = { one: "{count}st", two: "{count}nd", few: "{count}rd", other: "{count}th" };
-  expect(
-    [1, 2, 3, 4, 11, 21].map((count) => plural({ count, forms, type: "ordinal" })),
-  ).toMatchInlineSnapshot(`
+  expect([1, 2, 3, 4, 11, 21].map((count) => plural({ count, forms, type: "ordinal" })))
+    .toMatchInlineSnapshot(`
     [
       "1st",
       "2nd",

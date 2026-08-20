@@ -11,6 +11,11 @@
     "text"
   ],
   "license": "Apache-2.0",
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
   "type": "module",
   "sideEffects": false,
   "exports": {
@@ -38,6 +43,22 @@
     },
     "access": "public"
   },
+  "scripts": {
+    "build": "vp pack src/index.ts src/document/index.ts",
+    "check-types": "tsc --noEmit -p tsconfig.json",
+    "test": "vp test run"
+  },
+  "dependencies": {
+    "messageformat": "catalog:",
+    "pathe": "catalog:"
+  },
+  "devDependencies": {
+    "@markdoc/markdoc": "catalog:",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  },
   "peerDependencies": {
     "@markdoc/markdoc": "*"
   },
@@ -46,28 +67,7 @@
       "optional": true
     }
   },
-  "files": [
-    "dist",
-    "LICENSE",
-    "README.md"
-  ],
-  "scripts": {
-    "build": "tsdown src/index.ts src/document/index.ts",
-    "check-types": "tsc --noEmit -p tsconfig.json",
-    "test": "vitest run"
-  },
-  "devDependencies": {
-    "@markdoc/markdoc": "catalog:",
-    "@types/node": "catalog:",
-    "tsdown": "catalog:",
-    "typescript": "catalog:",
-    "vitest": "catalog:"
-  },
   "engines": {
     "node": ">=22.20"
-  },
-  "dependencies": {
-    "messageformat": "catalog:",
-    "pathe": "catalog:"
   }
 }

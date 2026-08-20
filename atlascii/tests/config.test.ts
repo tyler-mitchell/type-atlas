@@ -1,4 +1,4 @@
-import { expect, test } from "vitest";
+import { expect, test } from "vite-plus/test";
 import { breadcrumb } from "../src/layout/breadcrumb.ts";
 import { codeFrame } from "../src/source/frame.ts";
 import { divider } from "../src/layout/divider.ts";
@@ -32,7 +32,10 @@ test("carries one config through every component that renders words", () => {
   };
 
   expect(
-    rows([{ name: "openRuntime", kind: "function", fields: ["src/a.ts"], detail: "runtime" }], config),
+    rows(
+      [{ name: "openRuntime", kind: "function", fields: ["src/a.ts"], detail: "runtime" }],
+      config,
+    ),
   ).toEqual(["openRuntime (function) - src/a.ts -- runtime"]);
 
   expect(diff({ chunks: [{ kind: "removed", lines: ["alt"] }], config })).toEqual([
@@ -82,4 +85,3 @@ test("reaches the margin a config names, counting columns not code units", () =>
   expect(width(divider({ text: " 東京 ", config: { dimensions: narrowDimensions } }))).toBe(40);
   expect(width(divider())).toBe(80);
 });
-

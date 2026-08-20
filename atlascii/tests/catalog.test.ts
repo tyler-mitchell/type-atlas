@@ -1,6 +1,6 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { expect, test } from "vitest";
+import { expect, test } from "vite-plus/test";
 import { defaultMessages } from "../src/config/messages.ts";
 
 /**
@@ -33,7 +33,12 @@ const callers = async () => {
 
 /** Keys built at runtime, and every value each can produce. */
 const families: Readonly<Record<string, readonly string[]>> = {
-  "`diagnostic.severity.${": ["diagnostic.severity.1", "diagnostic.severity.2", "diagnostic.severity.3", "diagnostic.severity.4"],
+  "`diagnostic.severity.${": [
+    "diagnostic.severity.1",
+    "diagnostic.severity.2",
+    "diagnostic.severity.3",
+    "diagnostic.severity.4",
+  ],
   "`symbol.kind.${": Array.from({ length: 26 }, (_, index) => `symbol.kind.${index + 1}`),
 };
 

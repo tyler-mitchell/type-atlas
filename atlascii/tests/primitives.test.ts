@@ -1,5 +1,5 @@
 import Markdoc from "@markdoc/markdoc";
-import { expect, test } from "vitest";
+import { expect, test } from "vite-plus/test";
 import { narrowDimensions } from "../src/config/dimensions.ts";
 import { functions } from "../src/document/functions.ts";
 import { labelPrinter } from "../src/layout/label.ts";
@@ -11,7 +11,9 @@ const compose = (source: string, variables: Record<string, unknown> = {}) =>
   render(Markdoc.transform(Markdoc.parse(source), { tags, functions, variables }));
 
 test("sets a name apart from what follows it", () => {
-  expect(compose(`{% label name="node" message="works on macos" /%}`)).toMatchInlineSnapshot(`"|node| works on macos"`);
+  expect(compose(`{% label name="node" message="works on macos" /%}`)).toMatchInlineSnapshot(
+    `"|node| works on macos"`,
+  );
 });
 
 test("brackets a bare name when there is no message", () => {
@@ -46,7 +48,12 @@ test("gives the ordinal form of a number, by the locale's rules", () => {
 test("counts in a language with more than two plural forms", () => {
   expect(
     compose(`{% plural count=5 forms=$polish locale="pl" /%}`, {
-      polish: { one: "{count} odwołanie", few: "{count} odwołania", many: "{count} odwołań", other: "{count} odwołania" },
+      polish: {
+        one: "{count} odwołanie",
+        few: "{count} odwołania",
+        many: "{count} odwołań",
+        other: "{count} odwołania",
+      },
     }),
   ).toBe("5 odwołań");
 });

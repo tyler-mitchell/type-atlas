@@ -224,10 +224,7 @@ export const createDependencySearch =
           // package resolves next to the implementation it wraps — so source
           // attributed to this package must come from it. Results from
           // elsewhere are counted rather than shown under the wrong name.
-          const withinPackage = displayPath(
-            URI.file(packageRoot).toString(),
-            request.workspace,
-          );
+          const withinPackage = displayPath(URI.file(packageRoot).toString(), request.workspace);
           const matches = found.filter((match) => match.displayFile.startsWith(withinPackage));
           const outside = found.filter((match) => !match.displayFile.startsWith(withinPackage));
           const api = (resolvedExports?.items ?? []).flatMap((item) => {
@@ -301,8 +298,7 @@ export const createDependencySearch =
                 (match, index, all) =>
                   all.findIndex(
                     (seen) =>
-                      seen.file === match.file &&
-                      seen.contentStartLine === match.contentStartLine,
+                      seen.file === match.file && seen.contentStartLine === match.contentStartLine,
                   ) === index,
               )
               .map((match, index) => {

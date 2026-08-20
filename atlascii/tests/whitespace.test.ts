@@ -1,4 +1,4 @@
-import { expect, test } from "vitest";
+import { expect, test } from "vite-plus/test";
 import { visibleTrailingSpace } from "../src/text/whitespace.ts";
 
 test("makes trailing whitespace visible, one dot per character", () => {

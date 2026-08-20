@@ -1,4 +1,4 @@
-import { expect, test } from "vitest";
+import { expect, test } from "vite-plus/test";
 import { changes } from "../src/components/changes.ts";
 import { frames, locationLinks } from "../src/components/location-links.ts";
 import { asciiFigures, figures } from "../src/config/figures.ts";

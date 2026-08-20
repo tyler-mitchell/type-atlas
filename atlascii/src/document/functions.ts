@@ -65,7 +65,9 @@ export const functions: Config["functions"] = {
    * in front of them.
    */
   breadcrumb: of((value: readonly string[] | Parameters<typeof breadcrumb>[0]) =>
-    breadcrumb(Array.isArray(value) ? { path: value } : (value as Parameters<typeof breadcrumb>[0])),
+    breadcrumb(
+      Array.isArray(value) ? { path: value } : (value as Parameters<typeof breadcrumb>[0]),
+    ),
   ),
   /** A protocol range as `line:column-line:column`, counted from one. */
   range: of((value: Range) => rangeText(value)),

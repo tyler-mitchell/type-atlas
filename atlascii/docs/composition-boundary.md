@@ -28,7 +28,7 @@ segments of a symbol line. Neither has a composition component behind it.
 ### Iteration needs a partial, not children
 
 `Markdoc.transform` deep-resolves the whole tree against one set of variables
-*before* any tag's `transform` runs, so a tag's inline children arrive already
+_before_ any tag's `transform` runs, so a tag's inline children arrive already
 flattened — there is nothing left to bind a per-item name to. A partial is held
 as raw source, so it can be resolved and transformed again per item.
 
@@ -47,7 +47,7 @@ document cannot say "two spaces here" and be obeyed.
 Anything whose meaning is carried by nesting — a location grouped under its
 file, a call hierarchy, an outline — is therefore drawn by `hierarchy` with a
 guide, and stays a component. That is layout, not composition: the component
-decides *how deep* reads, never *what is said*.
+decides _how deep_ reads, never _what is said_.
 
 > `cannot carry leading indentation through markup`
 
@@ -58,7 +58,7 @@ counts from zero and a reader counts from one. Markdoc cannot add. Nor can it
 choose between CLDR plural categories, or map a numeric `SymbolKind` to a word.
 
 These are value functions (`rangeText`, `plural`, `symbolKind`, `breadcrumb`)
-and they are invoked *from* markup, as functions and tags. A document still
+and they are invoked _from_ markup, as functions and tags. A document still
 decides where the value goes and what surrounds it.
 
 ### Absence is not the same as a missing key

@@ -39,7 +39,9 @@ export const enclosingDeclaration = (
         entry.selectionRange.start.line !== range.start.line ||
         entry.selectionRange.start.character !== range.start.character,
     );
-  return others.find((entry) => entry.kind !== undefined && holdingKinds.has(entry.kind)) ?? others[0];
+  return (
+    others.find((entry) => entry.kind !== undefined && holdingKinds.has(entry.kind)) ?? others[0]
+  );
 };
 
 export type ReferenceSite = {

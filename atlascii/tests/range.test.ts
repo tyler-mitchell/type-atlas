@@ -1,4 +1,4 @@
-import { expect, test } from "vitest";
+import { expect, test } from "vite-plus/test";
 import { positionText, rangeText, sameRange } from "../src/protocol/range.ts";
 
 const at = (line: number, character: number) => ({ line, character });

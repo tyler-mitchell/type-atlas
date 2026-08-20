@@ -1,4 +1,4 @@
-import { expect, test } from "vitest";
+import { expect, test } from "vite-plus/test";
 import { referenceGroups } from "../src/reference-groups.ts";
 
 const site = (file: string, line: number, character: number, within?: string) => ({
@@ -12,9 +12,7 @@ test("puts the path on the line when no file holds more than one use", () => {
   // Grouping costs a header line and a connector per file. A file holding one
   // use spends both to say what fits on one line, and a list of single hits
   // across many files is all header and no content.
-  expect(
-    referenceGroups([site("src/app.ts", 10, 3, "open"), site("src/index.ts", 4, 1)]),
-  ).toEqual([
+  expect(referenceGroups([site("src/app.ts", 10, 3, "open"), site("src/index.ts", 4, 1)])).toEqual([
     { file: "src/app.ts", at: "10:3", within: "open" },
     { file: "src/index.ts", at: "4:1", within: undefined },
   ]);

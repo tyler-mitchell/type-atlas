@@ -1,5 +1,5 @@
 import Markdoc from "@markdoc/markdoc";
-import { expect, test } from "vitest";
+import { expect, test } from "vite-plus/test";
 import { functions, render, tags } from "../src/document/index.ts";
 
 const compose = (source: string, variables: Record<string, unknown> = {}) =>
@@ -30,9 +30,9 @@ test("returns a breadcrumb as a value, because it is one", () => {
 });
 
 test("drops the kind when a document names none", () => {
-  expect(compose(`{% breadcrumb($crumb) %}`, { crumb: { file: "src/a.ts", path: ["outer"] } })).toBe(
-    "src/a.ts > outer",
-  );
+  expect(
+    compose(`{% breadcrumb($crumb) %}`, { crumb: { file: "src/a.ts", path: ["outer"] } }),
+  ).toBe("src/a.ts > outer");
 });
 
 test("indents rows by depth and carries only facts that apply", () => {

@@ -1,4 +1,4 @@
-import { expect, test } from "vitest";
+import { expect, test } from "vite-plus/test";
 import { height, width } from "../src/text/width.ts";
 
 test("counts one row per line that fits", () => {

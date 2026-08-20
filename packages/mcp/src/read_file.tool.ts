@@ -73,13 +73,15 @@ const servedEnd = (
   characterBudget: number,
 ) => {
   const end = Math.min(requestedEnd, lines.length, from + answerLines - 1);
-  const counted = lines.slice(from - 1, end).reduce(
-    (walk, line) =>
-      walk.characters > characterBudget
-        ? walk
-        : { at: walk.at + 1, characters: walk.characters + line.length + 1 },
-    { at: from - 1, characters: 0 },
-  );
+  const counted = lines
+    .slice(from - 1, end)
+    .reduce(
+      (walk, line) =>
+        walk.characters > characterBudget
+          ? walk
+          : { at: walk.at + 1, characters: walk.characters + line.length + 1 },
+      { at: from - 1, characters: 0 },
+    );
   return Math.max(counted.at, from);
 };
 

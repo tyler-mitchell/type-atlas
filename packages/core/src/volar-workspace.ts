@@ -73,7 +73,9 @@ const startVolarWorkspace = async (workspaceRoot: string, languageServerEntry: U
       const relativePath = path.relative(workspaceRoot, file);
       const first = relativePath.split(path.sep)[0];
       if (first === ".git" || relativePath.includes("node_modules")) return true;
-      return containingGitSubmodule(path.resolve(workspaceRoot, file), submoduleRoots) !== undefined;
+      return (
+        containingGitSubmodule(path.resolve(workspaceRoot, file), submoduleRoots) !== undefined
+      );
     },
     ignoreInitial: true,
     followSymlinks: false,
@@ -303,9 +305,7 @@ const startVolarWorkspace = async (workspaceRoot: string, languageServerEntry: U
       // turned a swallowed failure into a dead call.
       await Promise.all(
         [...changedFiles].map((relativePath) =>
-          server
-            .notifyFileChanges(relativePath, [FileChangeType.Changed])
-            .catch(() => undefined),
+          server.notifyFileChanges(relativePath, [FileChangeType.Changed]).catch(() => undefined),
         ),
       );
     },

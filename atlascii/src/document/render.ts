@@ -27,7 +27,14 @@ const isTag = (node: RenderableTreeNode): node is Tag => Markdoc.Tag.isTag(node)
  */
 const containers = new Set(["article", "blockquote"]);
 
-const headingLevels: Readonly<Record<string, number>> = { h1: 1, h2: 2, h3: 3, h4: 4, h5: 5, h6: 6 };
+const headingLevels: Readonly<Record<string, number>> = {
+  h1: 1,
+  h2: 2,
+  h3: 3,
+  h4: 4,
+  h5: 5,
+  h6: 6,
+};
 
 const indentBy = (value: string, columns: number) =>
   value

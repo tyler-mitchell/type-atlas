@@ -1,5 +1,5 @@
 import Markdoc from "@markdoc/markdoc";
-import { expect, test } from "vitest";
+import { expect, test } from "vite-plus/test";
 import { functions, render, renderDocument, tags } from "../src/document/index.ts";
 
 const compose = (source: string, variables: Record<string, unknown> = {}) =>
@@ -36,9 +36,7 @@ test("nests components without any of them deciding spacing", () => {
   expect(
     compose(document, {
       problem: { severity: 2, range: span(11, 6, 11, 17) },
-      references: [
-        { name: "src/app.tsx", children: [{ name: "10:3-10:7:  openMotionRuntime," }] },
-      ],
+      references: [{ name: "src/app.tsx", children: [{ name: "10:3-10:7:  openMotionRuntime," }] }],
     }),
   ).toMatchInlineSnapshot(`
     "## Problems
@@ -71,9 +69,9 @@ test("lets a document read how many of something it was given", () => {
   // Whether a section can title itself `Implementations (3)` from the data it
   // renders decides where counted headings live: in the document, or in a
   // component the document can only call.
-  expect(compose(`{% $items.length %} of {% $all.length %}`, { items: [1, 2, 3], all: [1, 2] })).toBe(
-    "3 of 2",
-  );
+  expect(
+    compose(`{% $items.length %} of {% $all.length %}`, { items: [1, 2, 3], all: [1, 2] }),
+  ).toBe("3 of 2");
 });
 
 test("repeats a partial once per item, binding each to a name", () => {
@@ -102,13 +100,16 @@ test("repeats a partial once per item, binding each to a name", () => {
 
 test("expresses nesting as a tag, since markup cannot carry the spaces itself", () => {
   expect(
-    compose(`{% tight %}
+    compose(
+      `{% tight %}
 {% $file %}
 {% indent %}
 {% $first %}\\
 {% $second %}
 {% /indent %}
-{% /tight %}`, { file: "src/app.ts", first: "10:3 — inside open", second: "14:7 — inside close" }),
+{% /tight %}`,
+      { file: "src/app.ts", first: "10:3 — inside open", second: "14:7 — inside close" },
+    ),
   ).toMatchInlineSnapshot(`
     "src/app.ts
       10:3 — inside open

@@ -73,10 +73,10 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown src/index.ts src/node.ts src/protocol.ts",
+    "build": "vp pack src/index.ts src/node.ts src/protocol.ts",
     "check-types": "tsc --noEmit -p tsconfig.json",
-    "prepack": "pnpm run build",
-    "test": "pnpm run build && vitest run"
+    "prepack": "vp run build",
+    "test": "vp run build && vp test run"
   },
   "dependencies": {
     "@volar/language-server": "catalog:",
@@ -92,8 +92,8 @@
     "@types/node": "catalog:",
     "@volar/test-utils": "catalog:",
     "effect": "catalog:",
-    "tsdown": "catalog:",
-    "vitest": "catalog:"
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
   },
   "engines": {
     "node": ">=22.20"

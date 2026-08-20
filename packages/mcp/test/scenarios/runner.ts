@@ -71,7 +71,6 @@ export const orphanedCaptures = async (): Promise<readonly string[]> => {
     .sort();
 };
 
-
 /**
  * Loads every fixture project deterministically, so the session's answers do
  * not depend on scenario order: one cheap request into each tsconfig's
@@ -112,8 +111,7 @@ export const arrangeFixture = async ({
   const originals = new Map(
     await Promise.all(
       touched.map(
-        async (relative) =>
-          [relative, await readFile(resolve(fixtureRoot, relative))] as const,
+        async (relative) => [relative, await readFile(resolve(fixtureRoot, relative))] as const,
       ),
     ),
   );
@@ -123,8 +121,10 @@ export const arrangeFixture = async ({
     await appendFile(resolve(fixtureRoot, relative), content);
   for (const relative of removed) await rm(resolve(fixtureRoot, relative));
   return async () => {
-    for (const [relative, bytes] of originals) await writeFile(resolve(fixtureRoot, relative), bytes);
-    for (const relative of Object.keys(create)) rmSync(resolve(fixtureRoot, relative), { force: true });
+    for (const [relative, bytes] of originals)
+      await writeFile(resolve(fixtureRoot, relative), bytes);
+    for (const relative of Object.keys(create))
+      rmSync(resolve(fixtureRoot, relative), { force: true });
   };
 };
 

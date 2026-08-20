@@ -59,12 +59,7 @@ export {
   sourceLines,
   type SourceWindow,
 } from "./source/folded.ts";
-export {
-  lineStartOffset,
-  newlineWidth,
-  offsetToLine,
-  positionToOffset,
-} from "./source/offsets.ts";
+export { lineStartOffset, newlineWidth, offsetToLine, positionToOffset } from "./source/offsets.ts";
 
 /** Arranging lines in space, with no domain in them. */
 export { breadcrumb } from "./layout/breadcrumb.ts";
@@ -89,14 +84,7 @@ export { groupBy, nestByDepth, walk } from "./text/group.ts";
 export { formatNumber } from "./text/number.ts";
 export { withArticle } from "./text/article.ts";
 export { noun, plural, type PluralForms } from "./text/plural.ts";
-export {
-  breakdown,
-  formatTime,
-  percent,
-  shares,
-  type TimedPart,
-  timeOfDay,
-} from "./text/time.ts";
+export { breakdown, formatTime, percent, shares, type TimedPart, timeOfDay } from "./text/time.ts";
 export { visibleTrailingSpace } from "./text/whitespace.ts";
 export { height, padEnd, padStart, truncate, width } from "./text/width.ts";
 

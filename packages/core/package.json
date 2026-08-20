@@ -45,16 +45,16 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown src/index.ts",
+    "build": "vp pack src/index.ts",
     "check-types": "tsc --noEmit -p tsconfig.json",
-    "prepack": "pnpm run build",
-    "test": "vitest run"
+    "prepack": "vp run build",
+    "test": "vp test run"
   },
   "dependencies": {
     "@markdoc/markdoc": "catalog:",
-    "atlascii": "workspace:*",
     "@type-atlas/language-server": "workspace:*",
     "@volar/language-server": "catalog:",
+    "atlascii": "workspace:*",
     "chokidar": "catalog:",
     "pathe": "catalog:",
     "pkg-types": "catalog:",
@@ -66,8 +66,8 @@
   },
   "devDependencies": {
     "@types/node": "catalog:",
-    "tsdown": "catalog:",
-    "vitest": "catalog:"
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
   },
   "engines": {
     "node": ">=22.20"

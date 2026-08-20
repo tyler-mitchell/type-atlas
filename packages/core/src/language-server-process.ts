@@ -51,7 +51,8 @@ export const takeRequestTraces = (): readonly RequestTrace[] => {
  * bounds how many projects a session loads, and Volar's `project.reload()` is
  * the affordance for reclaiming them if that becomes the failure again.
  */
-const heapMegabytes = () => Math.max(2048, Math.min(8192, Math.floor(totalmem() / 1024 / 1024 / 2)));
+const heapMegabytes = () =>
+  Math.max(2048, Math.min(8192, Math.floor(totalmem() / 1024 / 1024 / 2)));
 
 /**
  * How long one request may hold the language server before it is ended.

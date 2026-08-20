@@ -1,5 +1,4 @@
-import { defineConfig } from "tsdown";
-import shared from "../../tsdown.config.ts";
+import { defineConfig } from "vite-plus";
 
 /**
  * The authored documents are assets, and a bundle does not carry them.
@@ -15,13 +14,27 @@ import shared from "../../tsdown.config.ts";
  * files, read once and cached, that a consumer can open and read. Inlining them
  * into the bundle would make the design artifact invisible in the thing that
  * ships.
+ *
+ * The other pack options restate the workspace defaults in the root
+ * vite.config.ts — a package config replaces rather than extends the root's,
+ * so this block must carry the full publish contract itself.
  */
 export default defineConfig({
-  ...shared,
-  // `to` names the parent the directory lands in, not the directory itself:
-  // `to: "dist/documents"` produced `dist/documents/documents`.
-  copy: [
-    { from: "src/markdoc/documents", to: "dist" },
-    { from: "src/markdoc/partials", to: "dist" },
-  ],
+  pack: {
+    attw: {
+      level: "error",
+      profile: "esm-only",
+    },
+    dts: true,
+    fixedExtension: false,
+    format: "esm",
+    publint: true,
+    sourcemap: true,
+    // `to` names the parent the directory lands in, not the directory itself:
+    // `to: "dist/documents"` produced `dist/documents/documents`.
+    copy: [
+      { from: "src/markdoc/documents", to: "dist" },
+      { from: "src/markdoc/partials", to: "dist" },
+    ],
+  },
 });

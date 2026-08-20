@@ -75,34 +75,31 @@ const callGroups = (calls: readonly CallSite[], root: string, sharedSiteUri?: st
   // The same judgement every other located answer makes: a file heading one
   // callable spends two lines and a connector saying what fits on one.
   const facts = ({ item, siteUri, sites }: CallSite) => ({
-        name: item.name,
-        kind: item.kind,
-        selection: item.selectionRange,
-        extent:
-          item.kind === SymbolKind.Module || sameRange(item.range, item.selectionRange)
-            ? undefined
-            : item.range,
-        // The language server returns sites in whatever order its search
-        // produced, which came out descending — `calls 99:16, 98:16, 97:16` —
-        // and every other located answer here reads down the file.
-        // One position per site, in reading order. A call hierarchy reports the
-        // same range once per overload it resolved through, and returns them in
-        // whatever order its search produced — which came out descending.
-        sites: [
-          ...new Set(
-            [...sites]
-              .sort(
-                (left, right) =>
-                  left.start.line - right.start.line ||
-                  left.start.character - right.start.character,
-              )
-              .map((site) => rangeText(site)),
-          ),
-        ],
-        siteFile:
-          siteUri === sharedSiteUri || siteUri === item.uri
-            ? undefined
-            : displayPath(siteUri, root),
+    name: item.name,
+    kind: item.kind,
+    selection: item.selectionRange,
+    extent:
+      item.kind === SymbolKind.Module || sameRange(item.range, item.selectionRange)
+        ? undefined
+        : item.range,
+    // The language server returns sites in whatever order its search
+    // produced, which came out descending — `calls 99:16, 98:16, 97:16` —
+    // and every other located answer here reads down the file.
+    // One position per site, in reading order. A call hierarchy reports the
+    // same range once per overload it resolved through, and returns them in
+    // whatever order its search produced — which came out descending.
+    sites: [
+      ...new Set(
+        [...sites]
+          .sort(
+            (left, right) =>
+              left.start.line - right.start.line || left.start.character - right.start.character,
+          )
+          .map((site) => rangeText(site)),
+      ),
+    ],
+    siteFile:
+      siteUri === sharedSiteUri || siteUri === item.uri ? undefined : displayPath(siteUri, root),
     detail: item.detail && item.kind !== SymbolKind.Module ? item.detail : undefined,
   });
   const inReadingOrder = (held: readonly CallSite[]) =>
@@ -153,9 +150,7 @@ const relatedCalls = (input: {
     dependencies: names.slice(0, input.limit),
     dependencyTotal: names.length,
     sharedSite:
-      input.sharedSiteUri === undefined
-        ? undefined
-        : displayPath(input.sharedSiteUri, input.root),
+      input.sharedSiteUri === undefined ? undefined : displayPath(input.sharedSiteUri, input.root),
   };
 };
 

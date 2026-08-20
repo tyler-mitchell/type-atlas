@@ -204,9 +204,8 @@ const locate = (item: Location | LocationLink): Located =>
 const key = ({ uri, selectionRange }: Located) => `${uri}\0${rangeText(selectionRange)}`;
 
 /** First occurrence of each key, in order, computing every key once. */
-const unique = <Item>(items: readonly Item[], itemKey: (item: Item) => string) => [
-  ...new Map(items.map((item) => [itemKey(item), item] as const).reverse()).values(),
-].reverse();
+const unique = <Item>(items: readonly Item[], itemKey: (item: Item) => string) =>
+  [...new Map(items.map((item) => [itemKey(item), item] as const).reverse()).values()].reverse();
 
 /** Grouped by file in first-seen order, in one pass rather than a filter per uri. */
 const groups = <Item extends { readonly uri: string }>(items: readonly Item[]) =>
@@ -388,7 +387,11 @@ export const subjectAtPosition = async (input: {
           .catch(() => undefined)
       : undefined;
   if (uri && selection && sliced && /^[$A-Za-z_][\w$]*$/u.test(sliced)) {
-    return { name: sliced, ...(kind === undefined ? {} : { kind }), declaredAt: { uri, selection } };
+    return {
+      name: sliced,
+      ...(kind === undefined ? {} : { kind }),
+      declaredAt: { uri, selection },
+    };
   }
   // A plain Location's range spans the whole declaration — slicing it
   // yields nothing — and no definition at all leaves only the asked file.
@@ -473,7 +476,13 @@ export const incomingCalls = async (input: {
       // A reference standing exactly where its enclosing declaration is named is
       // that declaration, not a use inside one — the symbol's own definition, or
       // a shorthand property that is its own identifier.
-      if (declaredAt({ uri: location.uri, selectionRange: location.range }, location.uri, declaration.selectionRange)) {
+      if (
+        declaredAt(
+          { uri: location.uri, selectionRange: location.range },
+          location.uri,
+          declaration.selectionRange,
+        )
+      ) {
         return callers;
       }
       if (input.subject && declaredAt(input.subject, location.uri, declaration.selectionRange)) {
@@ -660,8 +669,7 @@ export const inspectSymbol = async (input: {
           document: textDocument,
           symbols: fileSymbols,
           definition: definitions[0],
-        })) ??
-        enclosing({ symbols: fileSymbols, position, uri: textDocument.uri }));
+        })) ?? enclosing({ symbols: fileSymbols, position, uri: textDocument.uri }));
   const base: Located =
     selected ??
     unnamed ??
@@ -793,4 +801,3 @@ export const inspectSymbol = async (input: {
     source,
   };
 };
-

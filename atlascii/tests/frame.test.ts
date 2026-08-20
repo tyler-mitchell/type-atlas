@@ -1,4 +1,4 @@
-import { expect, test } from "vitest";
+import { expect, test } from "vite-plus/test";
 import { codeFrame } from "../src/source/frame.ts";
 
 const source = `

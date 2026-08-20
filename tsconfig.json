@@ -12,6 +12,10 @@
     // when source has changed, which is always, during development.
     "customConditions": ["development"],
     "resolveJsonModule": true,
+    // tsc never emits in this repository — builds are `vp pack`'s — and
+    // `allowImportingTsExtensions` is only legal when the config itself says
+    // so; the type-aware linter reads the config raw, without the CLI flag.
+    "noEmit": true,
     "strict": true,
     "declaration": true,
     "declarationMap": true,

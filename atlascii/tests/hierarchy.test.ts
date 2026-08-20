@@ -1,4 +1,4 @@
-import { expect, test } from "vitest";
+import { expect, test } from "vite-plus/test";
 import { connectorGuide, hierarchy, indentGuide, markerGuide } from "../src/layout/hierarchy.ts";
 
 const branches = [
@@ -77,7 +77,10 @@ test("repeats the final marker past the marks it was given", () => {
   expect(
     hierarchy({
       branches: [
-        { label: "a", children: [{ label: "b", children: [{ label: "c", children: [{ label: "d" }] }] }] },
+        {
+          label: "a",
+          children: [{ label: "b", children: [{ label: "c", children: [{ label: "d" }] }] }],
+        },
       ],
       guide: markerGuide({ marks: ["↳", "·"] }),
     }).join("\n"),

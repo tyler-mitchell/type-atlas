@@ -39,10 +39,10 @@ An answer that is correct and leaves them stuck has failed. Every reformulation
 they are forced into is a defect you caused.
 
 Everywhere else you have worked, your tools were trustworthy and the code was
-suspect. Here the tool *is* the code, and a malformed answer does not announce
+suspect. Here the tool _is_ the code, and a malformed answer does not announce
 itself — it arrives looking like an answer and you act on it. Which is why:
-source, types, and tests say what the code *says*; only a call says what an agent
-*receives*. Claims about behaviour need a call behind them.
+source, types, and tests say what the code _says_; only a call says what an agent
+_receives_. Claims about behaviour need a call behind them.
 
 One boundary on that rule, learned the hard way. It governs the MCP surface —
 what an agent receives. For the substrate beneath it — Volar, TypeScript, the
@@ -86,7 +86,7 @@ it through a scratch client.
 the rest.** A heading contradicting its own rows, a count that does not match its
 list, a value that identifies nothing — all of it sits in plain sight while you
 extract the one field you wanted. The defects that survive longest are the ones
-obvious to anyone reading *without* your intent.
+obvious to anyone reading _without_ your intent.
 
 So read the whole result as if you had not asked the question. "I was looking for
 something else" is not a defence.
@@ -109,7 +109,7 @@ inputs, heterogeneous kinds, or windows must be exercised where those
 multiply, because the defects live exactly there: the empty-subject hole
 appeared only at an import specifier, the shredded labels only on a
 multi-line type, the out-of-range row only where the range cut before a
-hint, the double consumption only on a *second* crossing, the reach segment
+hint, the double consumption only on a _second_ crossing, the reach segment
 only mattered once two projects were loaded. For each surface, credible
 usage includes: more than one entry where more than one is supported
 (plural files, several positions, chained asks, a page past its first
@@ -129,8 +129,8 @@ about the others:
 against detail, a claimed scope against what is shown.
 
 **Lateral** — does it agree with its siblings? A tool answering in prose with
-named owners while its neighbours answer in bare coordinates is a defect *even
-when its own output is flawless*. Reading one answer carefully will never reveal
+named owners while its neighbours answer in bare coordinates is a defect _even
+when its own output is flawless_. Reading one answer carefully will never reveal
 this. It only gets caught if you deliberately look across.
 
 **Ground** — does it match reality? When a position or a count is about to carry
@@ -139,7 +139,7 @@ matters.
 
 And whatever else a result contains: damage you caused is yours, and it is fixed
 before the work you were doing — never filed as a note, never mentioned to the
-user *instead of* being fixed.
+user _instead of_ being fixed.
 
 ### Gates, not checklists
 
@@ -164,7 +164,7 @@ the work you have already done and the belief you formed an hour ago.
 Gates are procedural in the sense that matters: there is a floor that runs every
 single time, on every response, whether or not you expect a problem. Skipping it
 because a response "looks fine" is how a wrong value survives in every call for
-half an hour. What is forbidden is *narrating* it, and stopping at it.
+half an hour. What is forbidden is _narrating_ it, and stopping at it.
 
 **These questions are the procedure.** They replace step-lists entirely — there is
 nothing else to tick.
@@ -172,11 +172,11 @@ nothing else to tick.
 But a gate posed on every trivial read is noise, and noise is how a gate stops
 being answered honestly. They fire where the answer can still change what you do:
 
-- *A result you are about to act on* — correctness, coherence, what is missing.
-- *A result that came back empty* — the absence question, before you believe it.
-- *Before an edit* — is this useful or is it motion; is there a simpler way; does
+- _A result you are about to act on_ — correctness, coherence, what is missing.
+- _A result that came back empty_ — the absence question, before you believe it.
+- _Before an edit_ — is this useful or is it motion; is there a simpler way; does
   the framework already provide this.
-- *After changing a tool* — have you seen its other branches, not just the one you
+- _After changing a tool_ — have you seen its other branches, not just the one you
   built for.
 
 Elsewhere, read and move on.
@@ -259,7 +259,7 @@ Nothing ends an agent's search faster than being told there is nothing. `(0)`,
 failure, and they render identically. An agent that cannot tell them apart
 deletes live code, rebuilds what exists, or concludes a capability is gone.
 
-Every empty result is a suspect until it says *which* nothing it is. A labelled
+Every empty result is a suspect until it says _which_ nothing it is. A labelled
 approximate answer beats a correct dead end.
 
 ---
@@ -274,7 +274,7 @@ perform** → that workaround is the specification.
 
 Guessing a position. Retrying with different arguments. Opening a file to
 interpret an answer. Giving up on a question. Each is a defect wearing a coping
-strategy, and each one you *notice* is worth more than an hour of speculation.
+strategy, and each one you _notice_ is worth more than an hour of speculation.
 
 This is also where the design space actually is. A checklist cannot tell you that
 a tool should name the declaration it landed in, or that a fold should say what
@@ -314,7 +314,7 @@ replace thought — never on the guard itself.
   will show the change worked, chosen while the edit is still a plan. If you
   cannot name it, the change is not ready to make.
 - **Reload immediately after editing.** The next tool call, nothing between — not
-  a read, not a search, not a reply describing what the edit *will* do. Then run
+  a read, not a search, not a reply describing what the edit _will_ do. Then run
   the call that proves it, then the neighbours that share the changed code,
   enumerated by call rather than from memory. A turn never ends, and no
   unrelated work begins, while an edit sits unproven. This is MDD —
@@ -375,28 +375,28 @@ replace thought — never on the guard itself.
 
 The examples are local; the patterns are not.
 
-| Failure | The lapse |
-| --- | --- |
-| Edited source, then kept reading and replying without reloading | reload rail |
-| A wrong value printed in every call for half an hour, unnoticed | read the whole result |
-| A heading naming one thing above rows all listing another | internal coherence |
-| Formatters edited that the tool being fixed never calls | path-proof |
-| An edit attempted on a file that does not exist | confirm what exists |
-| Symbols used without imports; one stopped the server booting | confirm what exists |
-| A derived answer used where an exact request existed | ask the authority |
-| A constraint "fixed" by producing its opposite | restate the constraint |
-| A live entrypoint called dead from one zero-reference result | one observation |
-| A type assumed equivalent to another from shape resemblance | ask the authority |
-| One tool in bare coordinates while every sibling answered in prose | lateral coherence |
-| A short-circuit shipped and benchmarked; the skipped path never worked | exercise the skipped case |
-| A cache added for speed that reported broken code as clean | you now own coherence |
-| Source edited by regex across 21 files, no diff, four classes of breakage | Edit or Write only |
-| A file read that never said which file, or that it had hidden the bodies | absence and bounds |
-| Completion reported with parts silently untested | say what you did not verify |
-| Told the user what happened from memory; it was false | from a call, or from memory? |
-| ~90 lines of AST walking written beside a one-parameter affordance | affordances before machinery |
-| A substrate bug diagnosed by live probe against unread recorded evidence | ledger first, probe second |
-| `11 symbols match` above ten rows, no page line; the hidden row was the answer | read the whole result |
+| Failure                                                                        | The lapse                    |
+| ------------------------------------------------------------------------------ | ---------------------------- |
+| Edited source, then kept reading and replying without reloading                | reload rail                  |
+| A wrong value printed in every call for half an hour, unnoticed                | read the whole result        |
+| A heading naming one thing above rows all listing another                      | internal coherence           |
+| Formatters edited that the tool being fixed never calls                        | path-proof                   |
+| An edit attempted on a file that does not exist                                | confirm what exists          |
+| Symbols used without imports; one stopped the server booting                   | confirm what exists          |
+| A derived answer used where an exact request existed                           | ask the authority            |
+| A constraint "fixed" by producing its opposite                                 | restate the constraint       |
+| A live entrypoint called dead from one zero-reference result                   | one observation              |
+| A type assumed equivalent to another from shape resemblance                    | ask the authority            |
+| One tool in bare coordinates while every sibling answered in prose             | lateral coherence            |
+| A short-circuit shipped and benchmarked; the skipped path never worked         | exercise the skipped case    |
+| A cache added for speed that reported broken code as clean                     | you now own coherence        |
+| Source edited by regex across 21 files, no diff, four classes of breakage      | Edit or Write only           |
+| A file read that never said which file, or that it had hidden the bodies       | absence and bounds           |
+| Completion reported with parts silently untested                               | say what you did not verify  |
+| Told the user what happened from memory; it was false                          | from a call, or from memory? |
+| ~90 lines of AST walking written beside a one-parameter affordance             | affordances before machinery |
+| A substrate bug diagnosed by live probe against unread recorded evidence       | ledger first, probe second   |
+| `11 symbols match` above ten rows, no page line; the hidden row was the answer | read the whole result        |
 
 ---
 

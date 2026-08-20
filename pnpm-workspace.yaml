@@ -12,6 +12,8 @@ overrides:
   typescript: npm:typescript-native-bridge@6.0.3-bridge.13.tsgo.7.0.2
   # Volar's range also admits alpha.13 and 0.5.0, whose vscode-uri import fails in Node.
   vscode-markdown-languageservice: 0.5.0-alpha.12
+  vite: "catalog:"
+  vitest: "catalog:"
 catalog:
   "@arethetypeswrong/core": ^0.18.5
   "@changesets/cli": ^2.31.1
@@ -20,7 +22,7 @@ catalog:
   "@modelcontextprotocol/client": 2.0.0
   "@modelcontextprotocol/server": 2.0.0
   "@types/node": ^22.20.1
-  '@typescript/native-preview': 7.0.0-dev.20260707.2
+  "@typescript/native-preview": 7.0.0-dev.20260707.2
   "@volar/language-server": 2.4.28
   "@volar/test-utils": 2.4.28
   arktype: ^2.2.3
@@ -32,15 +34,12 @@ catalog:
   fdir: ^6.5.0
   globby: ^16.2.2
   messageformat: ^4.0.0
-  oxfmt: ^0.60.0
-  oxlint: ^1.75.0
   pathe: ^2.0.3
   picomatch: ^4.0.5
   pkg-types: ^2.3.1
   publint: ^0.3.22
-  tsdown: ^0.22.14
   typescript: npm:typescript-native-bridge@6.0.3-bridge.13.tsgo.7.0.2
-  vitest: ^4.1.10
+  vitest: 4.1.10
   volar-service-json: 0.0.71
   volar-service-markdown: 0.0.71
   volar-service-typescript: 0.0.71
@@ -48,3 +47,12 @@ catalog:
   vscode-languageserver-textdocument: ^1.0.12
   vscode-markdown-languageservice: 0.5.0-alpha.12
   vscode-uri: ^3.0.8
+  vite: npm:@voidzero-dev/vite-plus-core@0.2.9
+  vite-plus: 0.2.9
+peerDependencyRules:
+  allowAny:
+    - vite
+    - vitest
+  allowedVersions:
+    vite: "*"
+    vitest: "*"

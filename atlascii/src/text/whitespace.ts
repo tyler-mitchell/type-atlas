@@ -7,10 +7,5 @@ import { type Config, resolve } from "../config/index.ts";
  * identical-looking lines, and a reader concludes the tool is broken. Applied
  * per line, so it catches the ends of a multi-line value too.
  */
-export const visibleTrailingSpace = (input: {
-  readonly text: string;
-  readonly config?: Config;
-}) =>
-  input.text.replace(/\s+$/gm, (spaces) =>
-    resolve(input.config).figures.dot.repeat(spaces.length),
-  );
+export const visibleTrailingSpace = (input: { readonly text: string; readonly config?: Config }) =>
+  input.text.replace(/\s+$/gm, (spaces) => resolve(input.config).figures.dot.repeat(spaces.length));

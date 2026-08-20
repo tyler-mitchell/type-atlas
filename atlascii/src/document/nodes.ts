@@ -16,12 +16,10 @@ const { Tag } = Markdoc;
 export const paragraph = (children: readonly unknown[]) => new Tag("p", {}, children as never[]);
 
 /** A container whose children are separated by a blank line. */
-export const blocks = (children: readonly unknown[]) =>
-  new Tag("article", {}, children as never[]);
+export const blocks = (children: readonly unknown[]) => new Tag("article", {}, children as never[]);
 
 /** A heading at a level. */
-export const heading = (level: number, text: string) =>
-  new Tag(`h${level}`, {}, [text] as never[]);
+export const heading = (level: number, text: string) => new Tag(`h${level}`, {}, [text] as never[]);
 
 /**
  * Lines stacked inside one block, joined by Markdoc's own line break.

@@ -2,15 +2,13 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vite-plus/test";
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const temporaryRoots = new Set<string>();
 
 afterEach(async () => {
-  await Promise.all(
-    [...temporaryRoots].map((root) => rm(root, { recursive: true, force: true })),
-  );
+  await Promise.all([...temporaryRoots].map((root) => rm(root, { recursive: true, force: true })));
   temporaryRoots.clear();
 });
 
@@ -47,7 +45,11 @@ describe(`reference paths on typescript ${ts.version}`, () => {
         module: "ESNext",
         moduleResolution: "Bundler",
       },
-      files: [declaring, path.join(root, "src", "using.ts"), path.join(root, "src", "also-using.ts")],
+      files: [
+        declaring,
+        path.join(root, "src", "using.ts"),
+        path.join(root, "src", "also-using.ts"),
+      ],
     };
     const configFile = path.join(root, "tsconfig.json");
     await writeFile(configFile, JSON.stringify(config));

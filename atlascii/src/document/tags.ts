@@ -139,12 +139,12 @@ export const tags: Config["tags"] = {
         items.flatMap((item) => [
           ...(item.title === undefined
             ? []
-            // Two, because a section is a named part *within* one subject and
-            // that is what every other section in this surface is. Defaulting
-            // to three made the one tool that passes no level title its parts
-            // a level deeper than its neighbours, for no reason a reader could
-            // see.
-            : [new Tag(`h${node.attributes.level ?? 2}`, {}, [item.title] as never[])]),
+            : // Two, because a section is a named part *within* one subject and
+              // that is what every other section in this surface is. Defaulting
+              // to three made the one tool that passes no level title its parts
+              // a level deeper than its neighbours, for no reason a reader could
+              // see.
+              [new Tag(`h${node.attributes.level ?? 2}`, {}, [item.title] as never[])]),
           stack(item.text.split("\n")),
         ]),
       );
@@ -450,8 +450,7 @@ export const tags: Config["tags"] = {
   label: {
     selfClosing: true,
     attributes: { name: { type: String, required: true }, message: { type: String } },
-    transform: (node) =>
-      label({ name: node.attributes.name, message: node.attributes.message }),
+    transform: (node) => label({ name: node.attributes.name, message: node.attributes.message }),
   },
 
   truncate: {
@@ -556,7 +555,9 @@ export const tags: Config["tags"] = {
     selfClosing: true,
     attributes: { stack: { type: Array, required: true } },
     transform: (node) =>
-      stack(frames({ stack: node.attributes.stack as StackFrame[], config: node.attributes.config })),
+      stack(
+        frames({ stack: node.attributes.stack as StackFrame[], config: node.attributes.config }),
+      ),
   },
 
   /**
@@ -600,5 +601,4 @@ export const tags: Config["tags"] = {
       return rendered.text === "" ? "" : stack(rendered.text.split("\n"));
     },
   },
-
 };

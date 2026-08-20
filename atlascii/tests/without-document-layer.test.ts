@@ -1,4 +1,4 @@
-import { expect, test } from "vitest";
+import { expect, test } from "vite-plus/test";
 import {
   codeFrame,
   connectorGuide,
@@ -25,10 +25,7 @@ test("renders located rows under their file without a document layer", () => {
     rows([
       {
         name: "src/app.tsx",
-        children: [
-          { name: "10:3-10:7", fields: ["openMotionRuntime,"] },
-          { name: "12:7-12:11" },
-        ],
+        children: [{ name: "10:3-10:7", fields: ["openMotionRuntime,"] }, { name: "12:7-12:11" }],
       },
     ]).join("\n"),
   ).toMatchInlineSnapshot(`
@@ -99,15 +96,13 @@ test("draws a call hierarchy's connectors without a document layer", () => {
 test("draws depth for a caller that passes no guide of its own", () => {
   // The guide comes from config, so a consumer with no opinion still gets the
   // one every tool uses, and one setting changes all of them together.
-  expect(
-    rows([{ name: "outer", children: [{ name: "inner" }] }]).join("\n"),
-  ).toMatchInlineSnapshot(`
+  expect(rows([{ name: "outer", children: [{ name: "inner" }] }]).join("\n"))
+    .toMatchInlineSnapshot(`
     "outer
     └  inner"
   `);
-  expect(
-    rows([{ name: "outer", children: [{ name: "inner" }] }], { guide: "indent" }).join("\n"),
-  ).toMatchInlineSnapshot(`
+  expect(rows([{ name: "outer", children: [{ name: "inner" }] }], { guide: "indent" }).join("\n"))
+    .toMatchInlineSnapshot(`
     "outer
       inner"
   `);

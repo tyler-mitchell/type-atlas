@@ -2,7 +2,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
-import { expect, test } from "vitest";
+import { expect, test } from "vite-plus/test";
 
 const packageRoot = fileURLToPath(new URL("..", import.meta.url));
 const workspaceRoot = resolve(packageRoot, "../..");
@@ -46,7 +46,9 @@ test("occurrences finds exact text and proves absence with a scan count", async 
       },
     });
     const absentText = absent.content.find((item) => item.type === "text")?.text ?? "";
-    expect(absentText).toContain('Nothing under packages/core/src contains "zzThisTokenOccursNowhereAtAll"');
+    expect(absentText).toContain(
+      'Nothing under packages/core/src contains "zzThisTokenOccursNowhereAtAll"',
+    );
     expect(absentText).toMatch(/\d+ files scanned/u);
     expect(absentText).toContain("proof a semantic search cannot give");
   } finally {

@@ -1,7 +1,7 @@
 import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
-import { beforeAll, expect, test } from "vitest";
+import { beforeAll, expect, test } from "vite-plus/test";
 
 const packageRoot = fileURLToPath(new URL("..", import.meta.url));
 

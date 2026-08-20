@@ -120,16 +120,6 @@ const resolveSearchRoot = async (root: string, directory: string | undefined): P
 };
 
 /**
- * Renders a range the way every position in this MCP is written and read.
- *
- * LSP counts lines and characters from zero. Every tool here takes and returns
- * them from one, so a retrieval result feeds a navigation call directly; the
- * zero-based form landed an agent one line above the code it searched for.
- */
-const sourceRange = (range: Range): string =>
-  `${range.start.line + 1}:${range.start.character + 1}-${range.end.line + 1}:${range.end.character + 1}`;
-
-/**
  * Whether a range is only import/export statements — names, not behavior.
  *
  * A barrel names every concept a package exports, so it outranks the code
@@ -344,10 +334,7 @@ const searchPage = (input: {
   };
 };
 
-const renderInspection = async (
-  result: InspectSymbolResult,
-  root: string,
-): Promise<string> =>
+const renderInspection = async (result: InspectSymbolResult, root: string): Promise<string> =>
   (
     await renderDocument({
       document: "inspect-symbol.tool.mdoc",

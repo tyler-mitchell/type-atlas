@@ -76,10 +76,7 @@ const declarationUris = async ({
             const target = location && ("uri" in location ? location.uri : location.targetUri);
             return target && target !== uri ? [target] : [];
           });
-          return [
-            name,
-            found[0] && relative(workspace.root, URI.parse(found[0]).fsPath),
-          ] as const;
+          return [name, found[0] && relative(workspace.root, URI.parse(found[0]).fsPath)] as const;
         }),
       );
       return new Map(
@@ -190,9 +187,7 @@ export const listModuleExports = async ({
   // The marker is shared with the server, which uses it to keep these out of a
   // whole-project check: they are this tool's scaffolding, and their unfinished
   // lines were being reported as problems in the caller's own project.
-  const probeUri = parsedUri
-    .with({ path: `${parsedUri.path}${probeMarker}probe.ts` })
-    .toString();
+  const probeUri = parsedUri.with({ path: `${parsedUri.path}${probeMarker}probe.ts` }).toString();
   const locationUri = parsedUri
     .with({ path: `${parsedUri.path}${probeMarker}locations.ts` })
     .toString();
@@ -247,10 +242,7 @@ export const listModuleExports = async ({
         surface === "all"
           ? items.filter((item) => item.kind !== CompletionItemKind.Keyword)
           : items;
-      const terms = query
-        .toLocaleLowerCase()
-        .split(/\s+/u)
-        .filter(Boolean);
+      const terms = query.toLocaleLowerCase().split(/\s+/u).filter(Boolean);
       const named = (item: CompletionItem) => (item.filterText ?? item.label).toLocaleLowerCase();
       const everyTerm = terms.length
         ? exportItems.filter((item) => terms.every((term) => named(item).includes(term)))

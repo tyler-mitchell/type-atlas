@@ -1,4 +1,4 @@
-import { expect, test } from "vitest";
+import { expect, test } from "vite-plus/test";
 import { renderDocument as renderSource } from "atlascii/document";
 import { renderDocument } from "./render.ts";
 
@@ -49,7 +49,7 @@ test("completions state the count and the incomplete fact", async () => {
     },
   });
   expect(text).toMatchInlineSnapshot(`
-    "Completions at 88:14 in src/app.ts · the list is incomplete, so typing more narrows it.
+    "src/app.ts:88:14 · 2 completions · incomplete — typing more narrows it
 
     openRuntime () => Runtime
     openWindow"
@@ -73,7 +73,7 @@ test("signature help names the active overload", async () => {
   });
   expect(undefinedVariables).toEqual([]);
   expect(text).toMatchInlineSnapshot(`
-    "1 signature at 88:14 in src/app.ts · number 1 is the one in use.
+    "src/app.ts:88:14 · 1 signature · number 1 in use
 
     openRuntime(frames: number): Runtime
     └  frames"
@@ -94,7 +94,7 @@ test("inlay hints group under the file", async () => {
   });
   expect(undefinedVariables).toEqual([]);
   expect(text).toMatchInlineSnapshot(`
-    "1 hint in 80:1-90:1 of src/app.ts.
+    "src/app.ts:80:1-90:1 · 1 hint
 
     88:14 : Runtime"
   `);
@@ -154,6 +154,7 @@ test("references reads as prose with owners named", async () => {
     variables: {
       subject: "down",
       kind: "property",
+      found: true,
       container: "Figures",
       declaredAt: { file: "src/config/figures.ts", at: { line: 13, character: 11 } },
       everyProject: false,
@@ -231,7 +232,14 @@ test("every document says which nothing it is when it has nothing to show", asyn
     ["document-links.tool.mdoc", { total: 0, file: "src/app.ts" }],
     [
       "module-exports.tool.mdoc",
-      { total: 0, module: "react", surface: "runtime", query: "", from: "src/app.ts", root: "/repo" },
+      {
+        total: 0,
+        module: "react",
+        surface: "runtime",
+        query: "",
+        from: "src/app.ts",
+        root: "/repo",
+      },
     ],
   ] as const;
   for (const [document, variables] of empty) {

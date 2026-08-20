@@ -2,7 +2,10 @@ import type { DocumentSymbol, FoldingRange } from "@volar/language-server/protoc
 import ts from "typescript";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import { getLanguageServiceByDocument } from "volar-service-typescript/lib/plugins/syntactic.js";
-import { convertNavTree, convertOutliningSpan } from "volar-service-typescript/lib/utils/lspConverters.js";
+import {
+  convertNavTree,
+  convertOutliningSpan,
+} from "volar-service-typescript/lib/utils/lspConverters.js";
 import { foldingAffectsView, sourceLines, truncate } from "atlascii";
 
 /**
@@ -82,8 +85,7 @@ export const readSourceView = async (input: {
   }
   const lines = sourceLines(source);
   const window = input.window ?? {};
-  const viewLineCount =
-    (window.endLine ?? lines.length) - (window.startLine ?? 1) + 1;
+  const viewLineCount = (window.endLine ?? lines.length) - (window.startLine ?? 1) + 1;
   return {
     uri,
     lines,

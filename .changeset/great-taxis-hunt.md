@@ -8,7 +8,7 @@ A project check asked the program for every file's diagnostics at once. That
 reads as the cheap way to do it, and it silently dropped every diagnostic a
 project's configured TypeScript language-service plugin contributes: the Effect
 adapter this repository ships routes through the decorated language service only
-when `getSemanticDiagnostics` is called *with* a source file, and falls back to
+when `getSemanticDiagnostics` is called _with_ a source file, and falls back to
 the raw program when called with none. A project configuring
 `@effect/language-service` therefore saw its own diagnostics in `tsc` and not
 here.

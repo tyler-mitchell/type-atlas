@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
 import { CompletionItemKind } from "vscode-languageserver-protocol";
-import { expect, test, vi } from "vitest";
+import { expect, test, vi } from "vite-plus/test";
 import type { VolarWorkspacePool } from "@type-atlas/core";
 import { createDependencySearch } from "../src/dependency-search.ts";
 import type { Semble } from "../src/semble.ts";
@@ -292,7 +292,6 @@ test("does not serialize independent dependency searches", async () => {
             resolvedFileName,
           }
         : [],
-
     ),
     withTextDocument: vi.fn(
       async ({ task }: { task: (document: { uri: string }) => Promise<unknown> }) =>

@@ -1,5 +1,5 @@
 import Markdoc from "@markdoc/markdoc";
-import { expect, test } from "vitest";
+import { expect, test } from "vite-plus/test";
 import { codeFrame } from "../src/source/frame.ts";
 import { functions, render, tags } from "../src/document/index.ts";
 import { summary } from "../src/layout/summary.ts";

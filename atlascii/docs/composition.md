@@ -15,7 +15,7 @@ the same kind of artifact.
 
 This is exactly the target stated for it: not TypeScript composition, not a
 spec layer in front of markup, and not presentation authoring as the point —
-the markup is the *query* language, and presentation is the surface's job
+the markup is the _query_ language, and presentation is the surface's job
 unless the composer takes it.
 
 ## What exists, verified
@@ -62,7 +62,7 @@ rendering owes:
 
 - **location** — `LocationNode` as declared in `protocol/shapes.ts`: a place
   and what stands there. `{ file?, selection?, range?, name?, kind?, within?,
-  detail?, text?, children? }`. The one nesting relation is `children`;
+detail?, text?, children? }`. The one nesting relation is `children`;
   grouping-by-file is the renderer's judgment (group when a file holds more
   than one, flat otherwise), never the producer's. References, outlines,
   workspace symbols, callers, definitions, occurrences are all locations —

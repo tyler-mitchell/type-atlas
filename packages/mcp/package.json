@@ -51,23 +51,23 @@
     "access": "public"
   },
   "scripts": {
-    "accept": "vitest run -u --project=scenarios -t",
-    "build": "tsdown src/index.ts src/cli.ts",
-    "capture": "vitest run -u",
-    "case": "vitest --project=scenarios -t",
+    "accept": "vp test run -u --project=scenarios -t",
+    "build": "vp pack src/index.ts src/cli.ts",
+    "capture": "vp test run -u",
+    "case": "vp test --project=scenarios -t",
     "check-types": "tsc --noEmit -p tsconfig.json",
     "dev": "node --conditions=development src/cli.ts",
-    "prepack": "pnpm run build",
-    "test": "vitest run"
+    "prepack": "vp run build",
+    "test": "vp test run"
   },
   "dependencies": {
     "@modelcontextprotocol/client": "catalog:",
     "@modelcontextprotocol/server": "catalog:",
     "@type-atlas/core": "workspace:*",
-    "atlascii": "workspace:*",
     "@type-atlas/language-server": "workspace:*",
     "@volar/language-server": "catalog:",
     "arktype": "catalog:",
+    "atlascii": "workspace:*",
     "citty": "catalog:",
     "diff": "catalog:",
     "fdir": "catalog:",
@@ -81,9 +81,9 @@
   "devDependencies": {
     "@markdoc/markdoc": "catalog:",
     "@types/node": "catalog:",
-    "tsdown": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:"
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
   },
   "engines": {
     "node": ">=22.20"

@@ -177,9 +177,13 @@ const runSourceAction = async (
     return appendDiagnosticContext(textResult(empty), diagnosticContext);
   }
   return appendDiagnosticContext(
-    await formatPatchResult(resolved.title, await renderWorkspaceEdit(workspace, root, resolved.edit), {
-      note: editorCommandText(resolved.command),
-    }),
+    await formatPatchResult(
+      resolved.title,
+      await renderWorkspaceEdit(workspace, root, resolved.edit),
+      {
+        note: editorCommandText(resolved.command),
+      },
+    ),
     diagnosticContext,
   );
 };

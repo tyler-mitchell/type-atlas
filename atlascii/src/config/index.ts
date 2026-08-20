@@ -27,11 +27,7 @@ import { type Figures, figures } from "./figures.ts";
 import { type GuideName, guideFor } from "./guides.ts";
 import { defaultMarks, type Marks } from "./marks.ts";
 import { defaultMessages, type Messages } from "./messages.ts";
-import {
-  defaultVendorDirectories,
-  type PathStyle,
-  type VendorDirectories,
-} from "./paths.ts";
+import { defaultVendorDirectories, type PathStyle, type VendorDirectories } from "./paths.ts";
 
 /**
  * The four namespaces, as one thing to pass.
@@ -145,11 +141,7 @@ export const resolve = (config?: Config) => {
   };
 };
 
-export {
-  defaultDimensions,
-  type Dimensions,
-  narrowDimensions,
-} from "./dimensions.ts";
+export { defaultDimensions, type Dimensions, narrowDimensions } from "./dimensions.ts";
 export { asciiFigures, type Figures, figures } from "./figures.ts";
 export { type GuideName, guideFor, guideNames } from "./guides.ts";
 export {

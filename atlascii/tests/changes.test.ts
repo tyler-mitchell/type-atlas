@@ -1,5 +1,5 @@
 import Markdoc from "@markdoc/markdoc";
-import { expect, test } from "vitest";
+import { expect, test } from "vite-plus/test";
 import { functions, render, tags } from "../src/document/index.ts";
 
 const compose = (source: string, variables: Record<string, unknown> = {}) =>
@@ -43,7 +43,7 @@ test("leaves out a group that nothing happened to", () => {
 });
 
 test("renders nothing when nothing changed", () => {
-  expect(compose(`{% changes groups=$groups /%}`, { groups: [{ title: "Added", files: [] }] })).toBe(
-    "",
-  );
+  expect(
+    compose(`{% changes groups=$groups /%}`, { groups: [{ title: "Added", files: [] }] }),
+  ).toBe("");
 });

@@ -1,5 +1,5 @@
 import Markdoc from "@markdoc/markdoc";
-import { expect, test } from "vitest";
+import { expect, test } from "vite-plus/test";
 import { functions, render, tags } from "../src/document/index.ts";
 
 const compose = (source: string, variables: Record<string, unknown> = {}) =>

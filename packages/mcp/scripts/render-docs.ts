@@ -130,7 +130,10 @@ export const renderAuthored = async (sourceRelative: string): Promise<string> =>
   const lines = source.split("\n");
   const spliced = embeds
     .sort((left, right) => right.from - left.from)
-    .reduce((held, embed) => held.toSpliced(embed.from, embed.to - embed.from + 1, embed.block), lines);
+    .reduce(
+      (held, embed) => held.toSpliced(embed.from, embed.to - embed.from + 1, embed.block),
+      lines,
+    );
   return `${noticeFor(sourceRelative)}\n${spliced.join("\n")}`;
 };
 

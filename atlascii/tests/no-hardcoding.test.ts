@@ -1,6 +1,6 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { expect, test } from "vitest";
+import { expect, test } from "vite-plus/test";
 import { defaultMarks } from "../src/config/marks.ts";
 import { figures } from "../src/config/figures.ts";
 

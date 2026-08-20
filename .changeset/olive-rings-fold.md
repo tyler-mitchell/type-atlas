@@ -49,7 +49,7 @@ nothing can reach now that outlines are parsed here.
 
 Three more things go with it. `serving()` leaves `VolarWorkspace`: it existed to keep
 reads off a cold server, and answered the wrong question — it reported that
-*some* request had been answered, while the cost is the program for *this file's*
+_some_ request had been answered, while the cost is the program for _this file's_
 project, so the first read in each new project paid it anyway. `readSource`
 leaves `createTypeAtlas`, having had no callers since `read_file` was rewritten
 around `readSourceView`. And the "language server was still starting" notice

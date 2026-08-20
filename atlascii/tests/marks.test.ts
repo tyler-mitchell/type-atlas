@@ -1,4 +1,4 @@
-import { expect, test } from "vitest";
+import { expect, test } from "vite-plus/test";
 import { asciiMarks, defaultMarks } from "../src/config/marks.ts";
 import { rows } from "../src/layout/rows.ts";
 import { counts } from "../src/components/counts.ts";
@@ -32,17 +32,19 @@ test("keeps output ASCII when a consumer needs it", () => {
 
 test("joins a row's separately meaningful fields by a chosen separator", () => {
   expect(
-    rows(
-      [{ name: "openRuntime", fields: ["src/a.ts:10:3", "inside runtime"] }],
-      { marks: { ...defaultMarks, separator: " | " } },
-    ),
+    rows([{ name: "openRuntime", fields: ["src/a.ts:10:3", "inside runtime"] }], {
+      marks: { ...defaultMarks, separator: " | " },
+    }),
   ).toEqual(["openRuntime | src/a.ts:10:3 | inside runtime"]);
 });
 
 test("joins counted states and brackets a total by the marks", () => {
   expect(
     counts({
-      states: [{ name: "failed", count: 2 }, { name: "passed", count: 6 }],
+      states: [
+        { name: "failed", count: 2 },
+        { name: "passed", count: 6 },
+      ],
       total: 8,
       config: { marks: { ...defaultMarks, countJoin: " / ", totalOpen: " [", totalClose: "]" } },
     }),

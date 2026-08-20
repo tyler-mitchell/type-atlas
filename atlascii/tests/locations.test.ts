@@ -1,4 +1,4 @@
-import { expect, test } from "vitest";
+import { expect, test } from "vite-plus/test";
 import { renderDocument } from "../src/document/index.ts";
 
 // Located rows grouped under their file used to be a component. The grouping,

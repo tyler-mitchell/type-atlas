@@ -16,7 +16,7 @@ whether the server was cold (first semantic call after a start) or warm, because
 call additionally pays fork, LSP handshake, watcher registration, and one project build.
 
 One caveat about the instrument, since every number in this file comes from it. Request
-traces accumulate in a module-global that used to be drained only when a call *returned*,
+traces accumulate in a module-global that used to be drained only when a call _returned_,
 so a call that threw, timed out, or died with the server left its traces behind to be
 billed to whatever ran next: a 589 ms answer reported `4 language-server requests ·
 25.98s · slowest type-atlas/projectDiagnostics 8.68s`, nearly all of it belonging to three
@@ -26,13 +26,13 @@ was inflated by that leak and is worth re-taking before it is trusted.
 
 Baseline, for scale — these are already inside budget:
 
-| call | input | measured |
-| --- | --- | --- |
-| `read_file` | any path in kek | 2–5 ms |
-| `list_files` | `directory: "packages"` | 9–60 ms |
-| `document_symbols` | `apps/ardy/src/application/runtime/index.ts` | 34 ms |
-| `project_config` | `packages/core-time/src/index.ts` | 246 ms |
-| `references` | violation 1's input, second request into that file | 24 ms |
+| call               | input                                              | measured |
+| ------------------ | -------------------------------------------------- | -------- |
+| `read_file`        | any path in kek                                    | 2–5 ms   |
+| `list_files`       | `directory: "packages"`                            | 9–60 ms  |
+| `document_symbols` | `apps/ardy/src/application/runtime/index.ts`       | 34 ms    |
+| `project_config`   | `packages/core-time/src/index.ts`                  | 246 ms   |
+| `references`       | violation 1's input, second request into that file | 24 ms    |
 
 ## Correctness, found while measuring
 
@@ -44,12 +44,12 @@ with nothing to report. Every affected API is a reverse lookup. The forward
 directions — definitions, hover, outgoing calls, references, diagnostics — answer normally
 throughout.
 
-| tool | symptom | now |
-| --- | --- | --- |
-| `callers` | `no callers` in 5 ms for symbols with verified call sites | derived, 9 callers in 133 ms |
-| `document_highlights` | `0` in 14 ms for a const used twice in one file | derived, answers |
-| `file_references` | `0` in both repositories, for modules with importers | derived, 27 here / 15 in kek |
-| `workspace_symbols` | `0` in 6 ms for `createTypeAtlas`, a name that exists | still unanswered, labelled |
+| tool                  | symptom                                                   | now                          |
+| --------------------- | --------------------------------------------------------- | ---------------------------- |
+| `callers`             | `no callers` in 5 ms for symbols with verified call sites | derived, 9 callers in 133 ms |
+| `document_highlights` | `0` in 14 ms for a const used twice in one file           | derived, answers             |
+| `file_references`     | `0` in both repositories, for modules with importers      | derived, 27 here / 15 in kek |
+| `workspace_symbols`   | `0` in 6 ms for `createTypeAtlas`, a name that exists     | still unanswered, labelled   |
 
 The three repaired ones are assembled from primitives that do answer, and each deleted the
 request it replaced rather than wrapping it:
@@ -89,17 +89,17 @@ A semantic request against a non-TypeScript document exits the server with code 
 restarts on the next call and TypeScript is unaffected, so the damage is one killed request
 plus a cold program build for whatever asks next.
 
-| call | file | result |
-| --- | --- | --- |
-| `document_symbols` | `docs/kek-monorepo-latency.md` | exit 1 |
-| `document_symbols` | `docs/tool-latency-measurements.md` | exit 1 |
-| `document_links` | `docs/kek-monorepo-latency.md` | exit 1 |
-| `document_links` | `README.md`, this repo | exit 1 |
-| `document_links` | `README.md`, kek-monorepo | exit 1 |
-| `document_symbols` | `packages/core/package.json` | exit 1 |
-| `hover` | `README.md`, this repo | exit 1 |
-| `document_symbols` | `.claude/hooks/type-atlas-usage-loop.mts` | exit 1 |
-| `document_symbols` | any `.ts` file inside a tsconfig | answers normally |
+| call               | file                                      | result           |
+| ------------------ | ----------------------------------------- | ---------------- |
+| `document_symbols` | `docs/kek-monorepo-latency.md`            | exit 1           |
+| `document_symbols` | `docs/tool-latency-measurements.md`       | exit 1           |
+| `document_links`   | `docs/kek-monorepo-latency.md`            | exit 1           |
+| `document_links`   | `README.md`, this repo                    | exit 1           |
+| `document_links`   | `README.md`, kek-monorepo                 | exit 1           |
+| `document_symbols` | `packages/core/package.json`              | exit 1           |
+| `hover`            | `README.md`, this repo                    | exit 1           |
+| `document_symbols` | `.claude/hooks/type-atlas-usage-loop.mts` | exit 1           |
+| `document_symbols` | any `.ts` file inside a tsconfig          | answers normally |
 
 Three request types, so it is not one handler. And the last two rows are the decisive pair:
 a **TypeScript** file outside every tsconfig crashes exactly like the Markdown ones, while a
@@ -177,11 +177,11 @@ some other way. The decision to revisit is that every document currently goes th
 Measured with ardy's program already built through a different file, so no project build
 is inside these numbers:
 
-| request into that file | first | second |
-| --- | --- | --- |
-| `references` at 88:14, project scope | 3,231 ms | 24 ms |
-| `references` at 88:14, workspace scope (now the default) | 3,296 ms | 19 ms |
-| `hover` at 88:14 | 3,106 ms | — |
+| request into that file                                   | first    | second |
+| -------------------------------------------------------- | -------- | ------ |
+| `references` at 88:14, project scope                     | 3,231 ms | 24 ms  |
+| `references` at 88:14, workspace scope (now the default) | 3,296 ms | 19 ms  |
+| `hover` at 88:14                                         | 3,106 ms | —      |
 
 Workspace scope is the default since references became scope-aware, and it costs
 essentially nothing here: the fan-out asks each loaded service and merges, and the

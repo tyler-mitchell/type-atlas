@@ -24,13 +24,7 @@ import { type } from "arktype";
 import { requestDiagnosticContext, workspaceRelativeMessage } from "./ambient-diagnostics.ts";
 import { enclosingDeclaration } from "./reference-groups.ts";
 import { readOnlyToolAnnotations } from "./metadata.ts";
-import {
-  defaultDimensions,
-  positionText,
-  rangeText,
-  sameRange,
-  displayPath,
-} from "atlascii";
+import { defaultDimensions, positionText, rangeText, sameRange, displayPath } from "atlascii";
 import * as path from "pathe";
 import { URI } from "vscode-uri";
 import { appendDiagnosticContext, textResult } from "./mcp-result.ts";
@@ -282,25 +276,25 @@ export const registerDocumentTools = (server: McpServer, workspaces: VolarWorksp
           // The file leads its own group. Repeating a path on every row costs
           // more than it tells, and a report usually names a handful of files
           // holding many problems each.
-          groups: [
-            ...Map.groupBy(shown.items, ({ uri }) => displayPath(uri, root)),
-          ].map(([file, items]) => ({
-            file,
-            problems: items.map(({ uri, diagnostic }) => ({
-              severity: diagnostic.severity,
-              source: diagnostic.source,
-              code: diagnostic.code,
-              range: diagnostic.range,
-              within: owners.get(
-                `${uri} ${diagnostic.range.start.line}:${diagnostic.range.start.character}`,
-              ),
-              message: workspaceRelativeMessage(diagnostic.message, root),
-              frame:
-                frames.get(
-                  `${uri} ${diagnostic.range.start.line}:${diagnostic.range.start.character}:${diagnostic.range.end.character}`,
-                ) || undefined,
-            })),
-          })),
+          groups: [...Map.groupBy(shown.items, ({ uri }) => displayPath(uri, root))].map(
+            ([file, items]) => ({
+              file,
+              problems: items.map(({ uri, diagnostic }) => ({
+                severity: diagnostic.severity,
+                source: diagnostic.source,
+                code: diagnostic.code,
+                range: diagnostic.range,
+                within: owners.get(
+                  `${uri} ${diagnostic.range.start.line}:${diagnostic.range.start.character}`,
+                ),
+                message: workspaceRelativeMessage(diagnostic.message, root),
+                frame:
+                  frames.get(
+                    `${uri} ${diagnostic.range.start.line}:${diagnostic.range.start.character}:${diagnostic.range.end.character}`,
+                  ) || undefined,
+              })),
+            }),
+          ),
         },
       });
       return textResult(rendered.text);
@@ -476,9 +470,7 @@ export const registerDocumentTools = (server: McpServer, workspaces: VolarWorksp
       // a flat list carrying a `depth` field rendered every step at the same
       // indent, because `Row` has no `depth` and the tag dropped it.
       const chain = (selection: SelectionRange | undefined): Row[] =>
-        selection
-          ? [{ name: rangeText(selection.range), children: chain(selection.parent) }]
-          : [];
+        selection ? [{ name: rangeText(selection.range), children: chain(selection.parent) }] : [];
       const steps = (selection: SelectionRange | undefined): number =>
         selection ? 1 + steps(selection.parent) : 0;
       const total = (ranges ?? []).reduce((sum, selection) => sum + steps(selection), 0);

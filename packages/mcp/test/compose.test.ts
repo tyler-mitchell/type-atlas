@@ -2,7 +2,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
-import { expect, test } from "vitest";
+import { expect, test } from "vite-plus/test";
 
 const packageRoot = fileURLToPath(new URL("..", import.meta.url));
 const workspaceRoot = resolve(packageRoot, "../..");
@@ -121,7 +121,9 @@ test("compose renders a dossier from ask declarations", async () => {
       },
     });
     const chainedText = chained.content.find((item) => item.type === "text")?.text ?? "";
-    expect(chainedText).toMatch(/Health of the \d+ files using page: \d+ problems in \d+ checked\./u);
+    expect(chainedText).toMatch(
+      /Health of the \d+ files using page: \d+ problems in \d+ checked\./u,
+    );
 
     // Subject and callers primitives populate an authored card, and one ask
     // failing on a missing file is stated in feedback while the others answer.

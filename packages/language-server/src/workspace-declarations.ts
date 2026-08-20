@@ -43,62 +43,62 @@ export type Declaration = {
  * Aliases without a container are dropped, matching what the plugin does: a
  * bare re-export is the name arriving somewhere, not being declared there.
  */
-export const workspaceDeclarations = (
-  service: Service,
-  query: string,
-): readonly Declaration[] => {
-  const languageService = service.context.inject<
-    TypeScriptService,
-    "typescript/languageService"
-  >("typescript/languageService");
+export const workspaceDeclarations = (service: Service, query: string): readonly Declaration[] => {
+  const languageService = service.context.inject<TypeScriptService, "typescript/languageService">(
+    "typescript/languageService",
+  );
   if (!languageService) return [];
 
   const program = languageService.getProgram();
   if (!program) return [];
-  return program
-    .getSourceFiles()
-    .flatMap((file) =>
-      isProbeDocument(file.fileName)
-        ? []
-        : (languageService.getNavigateToItems(query, undefined, file.fileName) ?? []),
-    )
-    .filter((item) => item.containerName || item.kind !== "alias")
-    // The case the caller typed outranks TypeScript's case-insensitive
-    // buckets: a search for "Timeline" led with test-local `timeline`
-    // constants — case-insensitive "exact" — while every Timeline* type sat
-    // past the fold as mere "prefix". Then quality, then what the name IS
-    // (declarations above members and locals), then the name.
-    .sort(
-      (left, right) =>
-        caseRank(left.name, query) - caseRank(right.name, query) ||
-        matchQuality.indexOf(left.matchKind) - matchQuality.indexOf(right.matchKind) ||
-        (kindRank[left.kind] ?? 1) - (kindRank[right.kind] ?? 1) ||
-        left.name.localeCompare(right.name),
-    )
-    .flatMap((item): Declaration[] => {
-      const source = program.getSourceFile(item.fileName);
-      if (!source) return [];
-      const uri = service.context.inject<TypeScriptService, "typescript/documentUri">(
-        "typescript/documentUri",
-        item.fileName,
-      );
-      if (!uri) return [];
-      return [
-        {
-          name: item.name,
-          kind: symbolKinds[item.kind] ?? SymbolKind.Variable,
-          ...(item.kind ? { word: item.kind } : {}),
-          ...(item.containerName ? { containerName: item.containerName } : {}),
-          location: {
-            uri: uri.toString(),
-            range: {
-              start: source.getLineAndCharacterOfPosition(item.textSpan.start),
-              end: source.getLineAndCharacterOfPosition(item.textSpan.start + item.textSpan.length),
+  return (
+    program
+      .getSourceFiles()
+      .flatMap((file) =>
+        isProbeDocument(file.fileName)
+          ? []
+          : (languageService.getNavigateToItems(query, undefined, file.fileName) ?? []),
+      )
+      .filter((item) => item.containerName || item.kind !== "alias")
+      // The case the caller typed outranks TypeScript's case-insensitive
+      // buckets: a search for "Timeline" led with test-local `timeline`
+      // constants — case-insensitive "exact" — while every Timeline* type sat
+      // past the fold as mere "prefix". Then quality, then what the name IS
+      // (declarations above members and locals), then the name.
+      .sort(
+        (left, right) =>
+          caseRank(left.name, query) - caseRank(right.name, query) ||
+          matchQuality.indexOf(left.matchKind) - matchQuality.indexOf(right.matchKind) ||
+          (kindRank[left.kind] ?? 1) - (kindRank[right.kind] ?? 1) ||
+          left.name.localeCompare(right.name),
+      )
+      .flatMap((item): Declaration[] => {
+        const source = program.getSourceFile(item.fileName);
+        if (!source) return [];
+        const uri = service.context.inject<TypeScriptService, "typescript/documentUri">(
+          "typescript/documentUri",
+          item.fileName,
+        );
+        if (!uri) return [];
+        return [
+          {
+            name: item.name,
+            kind: symbolKinds[item.kind] ?? SymbolKind.Variable,
+            ...(item.kind ? { word: item.kind } : {}),
+            ...(item.containerName ? { containerName: item.containerName } : {}),
+            location: {
+              uri: uri.toString(),
+              range: {
+                start: source.getLineAndCharacterOfPosition(item.textSpan.start),
+                end: source.getLineAndCharacterOfPosition(
+                  item.textSpan.start + item.textSpan.length,
+                ),
+              },
             },
           },
-        },
-      ];
-    });
+        ];
+      })
+  );
 };
 
 /** TypeScript's own ranking vocabulary, best first. */

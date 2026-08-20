@@ -1,4 +1,4 @@
-import { expect, test } from "vitest";
+import { expect, test } from "vite-plus/test";
 import { padStart, truncate, width } from "../src/text/width.ts";
 
 test("counts an ASCII string by its characters", () => {

@@ -1,4 +1,4 @@
-import { expect, test } from "vitest";
+import { expect, test } from "vite-plus/test";
 import { defaultMessages, translate } from "../src/config/messages.ts";
 import { message } from "../src/text/message.ts";
 

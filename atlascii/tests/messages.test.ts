@@ -1,5 +1,5 @@
 import Markdoc from "@markdoc/markdoc";
-import { expect, test } from "vitest";
+import { expect, test } from "vite-plus/test";
 import { counts } from "../src/components/counts.ts";
 import { defaultMessages, translate } from "../src/config/messages.ts";
 import { functions, render, tags } from "../src/document/index.ts";

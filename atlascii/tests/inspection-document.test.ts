@@ -1,4 +1,4 @@
-import { expect, test } from "vitest";
+import { expect, test } from "vite-plus/test";
 import { renderDocument } from "../src/document/index.ts";
 
 // The whole pipeline, not just the transform: validation calls into the same

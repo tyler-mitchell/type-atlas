@@ -71,8 +71,7 @@ const input = type.module({
   Compose: type({
     workspace: fileInput.workspace,
     document: type("string >= 1").configure({
-      description:
-        "Markdoc source: ask declarations followed by a body composing what they bind.",
+      description: "Markdoc source: ask declarations followed by a body composing what they bind.",
     }),
   }),
   Occurrences: type({
@@ -164,9 +163,7 @@ const scanOccurrences = async (input: {
   let total = 0;
   const seenFiles = new Set<string>();
   for (const relative of scanned) {
-    const source = await readFile(path.resolve(scanRoot, relative), "utf8").catch(
-      () => undefined,
-    );
+    const source = await readFile(path.resolve(scanRoot, relative), "utf8").catch(() => undefined);
     // A NUL byte marks content no reader lines up; skipped, not counted.
     if (source === undefined || source.includes("\0")) continue;
     if (!source.includes(input.text)) continue;
@@ -183,7 +180,10 @@ const scanOccurrences = async (input: {
           // Windowed around the match, never the whole line: a minified
           // bundle carries one line of half a megabyte, and fifteen matched
           // rows once rendered a 600KB answer no client would deliver.
-          const window = line.trim().length <= 160 ? line.trim() : line.slice(Math.max(0, at - 60), at + input.text.length + 60).trim();
+          const window =
+            line.trim().length <= 160
+              ? line.trim()
+              : line.slice(Math.max(0, at - 60), at + input.text.length + 60).trim();
           sites.push({
             file: display,
             line: index + 1,
@@ -208,8 +208,7 @@ const scanOccurrences = async (input: {
   );
   return {
     text: input.text,
-    directory:
-      path.relative(workspaceRoot, scanRoot) === "" ? "the workspace" : input.directory,
+    directory: path.relative(workspaceRoot, scanRoot) === "" ? "the workspace" : input.directory,
     total,
     fileCount: seenFiles.size,
     scanned: scanned.length,
@@ -247,9 +246,13 @@ export const registerExperimentalTools = (
               ? ((result as { items: readonly Diagnostic[] }).items ?? [])
               : [];
           const baseline = report(
-            await workspace.sendRequest(DocumentDiagnosticRequest.type, {
-              textDocument: { uri },
-            }, signal),
+            await workspace.sendRequest(
+              DocumentDiagnosticRequest.type,
+              {
+                textDocument: { uri },
+              },
+              signal,
+            ),
           ).filter((entry) => (entry.severity ?? 1) <= 2);
           const proposed = await workspace.withTextDocument({
             uri,
@@ -258,9 +261,13 @@ export const registerExperimentalTools = (
             signal,
             task: async (textDocument) =>
               report(
-                await workspace.sendRequest(DocumentDiagnosticRequest.type, {
-                  textDocument,
-                }, signal),
+                await workspace.sendRequest(
+                  DocumentDiagnosticRequest.type,
+                  {
+                    textDocument,
+                  },
+                  signal,
+                ),
               ).filter((entry) => (entry.severity ?? 1) <= 2),
           });
           const standing = new Map<string, number>();
@@ -315,7 +322,12 @@ export const registerExperimentalTools = (
     async ({ workspace: root, document }, { mcpReq: { signal } }) => {
       const workspace = await workspaces.get(root);
       const intelligence = createTypeAtlas(workspace);
-      const askedFile = (ask: DocumentAsk) => String(ask.attributes.file ?? "");
+      // Markdoc attributes are untyped: a composition can bind an object where
+      // a path or search text belongs, and String() would stringify it into
+      // "[object Object]". Scalars pass; anything else reads as absent.
+      const attributeText = (value: unknown): string =>
+        typeof value === "string" || typeof value === "number" ? String(value) : "";
+      const askedFile = (ask: DocumentAsk) => attributeText(ask.attributes.file);
       // Ask positions are one-based, like every position this surface accepts.
       const askedPosition = (ask: DocumentAsk) => ({
         line: Number(ask.attributes.line ?? 1) - 1,
@@ -485,7 +497,7 @@ export const registerExperimentalTools = (
         occurrences: async (ask) =>
           scanOccurrences({
             root,
-            text: String(ask.attributes.text ?? ask.attributes.query ?? ""),
+            text: attributeText(ask.attributes.text) || attributeText(ask.attributes.query),
             directory: askedFile(ask) || ".",
             limit: 40,
             signal,
@@ -610,7 +622,10 @@ export const registerExperimentalTools = (
                 ...new Set(
                   results
                     .map(({ file_path }) => packageOf(file_path))
-                    .filter((name) => name !== packageOf(displayPath(workspace.getWorkspaceUri(file), root))),
+                    .filter(
+                      (name) =>
+                        name !== packageOf(displayPath(workspace.getWorkspaceUri(file), root)),
+                    ),
                 ),
               ].slice(0, consumerBudget),
             )
@@ -688,7 +703,7 @@ export const registerExperimentalTools = (
     {
       title: "Occurrences",
       description:
-        "Experimental: every place an exact text occurs under a directory, with an honest zero — the literal proof of absence a semantic search cannot give. Scans workspace files (gitignore honored, dependencies excluded); use it for teardown checks, string keys, config references, and \"is this token ever used\" questions. search_code finds meaning; this finds bytes.",
+        'Experimental: every place an exact text occurs under a directory, with an honest zero — the literal proof of absence a semantic search cannot give. Scans workspace files (gitignore honored, dependencies excluded); use it for teardown checks, string keys, config references, and "is this token ever used" questions. search_code finds meaning; this finds bytes.',
       inputSchema: input.Occurrences,
       annotations: readOnlyToolAnnotations,
     },

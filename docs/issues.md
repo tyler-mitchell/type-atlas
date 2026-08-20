@@ -55,9 +55,9 @@ page line and its positions.
    rework below.
 2. **Pressure-test the surface** against a real monorepo before release;
    defects land here as they are found.
-2. **Ground `kindAt` in `SymbolKind`.** Language-neutral, and required before a
+3. **Ground `kindAt` in `SymbolKind`.** Language-neutral, and required before a
    second language is worth attempting — not before release.
-3. **Retire the terminal-control exports**, or find the consumer that justifies
+4. **Retire the terminal-control exports**, or find the consumer that justifies
    them. Nothing here calls them and they are not code intelligence.
 
 Done under the previous objective, for context on what the entries below
@@ -93,7 +93,7 @@ ambient line may claim all need one coherent design.
 
 〈raised〉 And the rows have no referent. `hint ts(6385) 419:55-419:65 ·
 'deprecated' is deprecated` names a place and never what stands there —
-deprecated *what*, inside *which* declaration — breaking the surface's own
+deprecated _what_, inside _which_ declaration — breaking the surface's own
 location grammar (`name [kind] · path:pos`), which every reference row already
 pays for through the declaration chain (`within`). A reader must open the file
 to understand any row. The enrichment affordance exists and is in use one tool
@@ -104,7 +104,7 @@ before being caught — by the maintainer, not by the session.
 ### An absence branch asserts a conclusion the tool cannot know
 
 While the symbol index was broken (2026-08-19, since fixed),
-`workspace_symbols` still explained its empty answer: *"this is absent from what has been opened, not from the repository"*.
+`workspace_symbols` still explained its empty answer: _"this is absent from what has been opened, not from the repository"_.
 The project is loaded and `document_symbols` lists the name, so the sentence is
 false — the honest statement was that the search answered nothing, and the
 copy went further because it was written assuming the mechanism beneath it
@@ -116,7 +116,6 @@ name which nothing it is only when the tool can actually tell; otherwise the
 explanation is the part that misinforms. Observed 2026-08-19 —
 `workspace_symbols` for `indentGuide`, 32ms, empty, project demonstrably
 loaded.
-
 
 ### The surface cannot prove a literal token absent
 
@@ -591,9 +590,9 @@ mechanism other structural answers reuse. Observed 2026-08-19, kek-monorepo,
 ### Documentation mangles a `{@link}` nested in another JSDoc tag
 
 ```
-*@throws* — {  
+*@throws* — {
 
-*@link*  
+*@link*
 PolicyViolation} when clocks differ, the grid is invalid, …
 ```
 
@@ -660,7 +659,6 @@ module's plumbing, not its behavior. Observed 2026-08-19, kek-monorepo.
 
 Every other tool uses `##`. Caught by the document lint's heading rule only
 after it was written; the lint now holds it.
-
 
 ### Marks reach the components but not the partials
 

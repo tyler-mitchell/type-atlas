@@ -171,9 +171,7 @@ export const registerAssistanceTools = (
           // is more than one; naming it beside a single signature repeated the
           // signature they were about to read.
           activeIndex:
-            overloads.length > 1 && active
-              ? String((result?.activeSignature ?? 0) + 1)
-              : undefined,
+            overloads.length > 1 && active ? String((result?.activeSignature ?? 0) + 1) : undefined,
           // Parameters name themselves and nothing else. Their documentation is
           // the same sentence under every overload — `Array.filter` printed one
           // description four times across two signatures — and it abutted the
@@ -186,9 +184,9 @@ export const registerAssistanceTools = (
           signatures: overloads.map((entry, index) => {
             const activeParameter =
               index === (result?.activeSignature ?? 0)
-                ? (entry.activeParameter !== undefined
-                    ? entry.activeParameter
-                    : result?.activeParameter)
+                ? entry.activeParameter !== undefined
+                  ? entry.activeParameter
+                  : result?.activeParameter
                 : undefined;
             return {
               name: entry.label,
@@ -357,17 +355,17 @@ export const registerAssistanceTools = (
                 left.position.character - right.position.character,
             )
             .map((hint) => ({
-            name: positionText(hint.position),
-            notes: [
-              truncate({
-                value: (typeof hint.label === "string"
-                  ? hint.label
-                  : hint.label.map((part) => part.value).join("")
-                ).replace(/\s+/gu, " "),
-                columns: defaultDimensions.summaryColumns,
-              }),
-            ],
-          })),
+              name: positionText(hint.position),
+              notes: [
+                truncate({
+                  value: (typeof hint.label === "string"
+                    ? hint.label
+                    : hint.label.map((part) => part.value).join("")
+                  ).replace(/\s+/gu, " "),
+                  columns: defaultDimensions.summaryColumns,
+                }),
+              ],
+            })),
         },
       });
       return appendDiagnosticContext(textResult(rendered.text), await diagnosticContext);

@@ -1,5 +1,5 @@
 import type { VolarWorkspacePool } from "@type-atlas/core";
-import { expect, test, vi } from "vitest";
+import { expect, test, vi } from "vite-plus/test";
 import { createRetrievalIntelligence } from "../src/intelligence.ts";
 import type { Semble } from "../src/semble.ts";
 

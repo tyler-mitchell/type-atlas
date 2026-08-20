@@ -42,7 +42,10 @@ const navigationTargets = async (input: {
   readonly root: string;
   readonly workspace: VolarWorkspace;
   readonly signal: AbortSignal;
-  readonly origin?: { readonly uri: string; readonly position: { line: number; character: number } };
+  readonly origin?: {
+    readonly uri: string;
+    readonly position: { line: number; character: number };
+  };
 }) => {
   const { result, root, origin } = input;
   // A jump target answered as coordinates alone makes a reader open the file
@@ -99,8 +102,7 @@ const navigationTargets = async (input: {
           // a name — 74 characters of Effect's filter overload stood where
           // "filter" belonged.
           name:
-            (sliced && /^[$A-Za-z_][\w$]*$/u.test(sliced) ? sliced : undefined) ??
-            declared?.name,
+            (sliced && /^[$A-Za-z_][\w$]*$/u.test(sliced) ? sliced : undefined) ?? declared?.name,
         };
       }),
     ),
@@ -165,9 +167,7 @@ const callHierarchyVariables = <Call extends { readonly fromRanges: readonly Ran
           name: callable.name,
           kind: callable.kind,
           selection: callable.selectionRange,
-          extent: sameRange(callable.range, callable.selectionRange)
-            ? undefined
-            : callable.range,
+          extent: sameRange(callable.range, callable.selectionRange) ? undefined : callable.range,
           // One position per site: a call hierarchy reports the same range once
           // per overload it resolved through.
           sites: [...new Set(call.fromRanges.map((site) => siteText(site)))],
@@ -176,7 +176,6 @@ const callHierarchyVariables = <Call extends { readonly fromRanges: readonly Ran
     })),
   };
 };
-
 
 /**
  * The kind TypeScript assigned to whatever stands at a position.
@@ -686,7 +685,11 @@ export const registerNavigationTools = (
       // deliberately renders elsewhere left every total and page window off
       // by one. The rest of this surface (quorl, compose, inspection) has
       // always asked this way.
-      const { textDocument, result: references, projects } = await intelligence.references({
+      const {
+        textDocument,
+        result: references,
+        projects,
+      } = await intelligence.references({
         file,
         signal,
         params: { position, context: { includeDeclaration: false }, scope },

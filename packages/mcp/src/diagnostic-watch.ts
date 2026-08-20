@@ -35,7 +35,11 @@ export const createDiagnosticWatch = (
   const active = new Map<string, () => void>();
   const reports = new Map<string, string>();
 
-  const read = async (workspace: string, filePath: string, signal: AbortSignal): Promise<string> => {
+  const read = async (
+    workspace: string,
+    filePath: string,
+    signal: AbortSignal,
+  ): Promise<string> => {
     const held = await workspaces.get(workspace);
     const { textDocument, result } = await createTypeAtlas(held).diagnostics({
       file: filePath,
@@ -63,6 +67,9 @@ export const createDiagnosticWatch = (
     watching: (): readonly string[] => [...active.keys()],
 
     dispose: (): void => {
+      // stop() deletes from `active`; iterating live keys() while deleting
+      // skips entries, so the copy is load-bearing.
+      // oxlint-disable-next-line unicorn/no-useless-spread
       for (const key of [...active.keys()]) stop(key);
       reports.clear();
     },

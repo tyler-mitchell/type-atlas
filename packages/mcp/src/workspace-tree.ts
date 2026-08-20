@@ -255,7 +255,11 @@ const fileLinePrices = async (
 const renderRows = (
   node: Assembled,
   prefix: string,
-  label: (entry: { readonly relative: string; readonly name: string; readonly directory: boolean }) => string,
+  label: (entry: {
+    readonly relative: string;
+    readonly name: string;
+    readonly directory: boolean;
+  }) => string,
 ): readonly Row[] =>
   [...node.children.entries()]
     .sort(
@@ -289,7 +293,9 @@ export const workspaceTree = async (input: {
   readonly view: "directories" | "files";
 }): Promise<WorkspaceListing> => {
   const { root, directory, realRoot } = await resolveListingDirectory(input);
-  const changesHeld = input.git ? gitChanges(directory) : Promise.resolve(new Map<string, string>());
+  const changesHeld = input.git
+    ? gitChanges(directory)
+    : Promise.resolve(new Map<string, string>());
   const submoduleRoots = input.includeSubmodules ? [] : await findGitSubmoduleRoots(root);
   const submodule = containingGitSubmodule(directory, submoduleRoots);
   if (submodule) {
@@ -330,7 +336,7 @@ export const workspaceTree = async (input: {
     readonly excludeBuildOutput?: boolean;
   }) => {
     const hidden = scope.includeHidden ?? input.includeHidden;
-    const skip = scope.includeIgnored ?? input.includeIgnored ? () => false : ignored;
+    const skip = (scope.includeIgnored ?? input.includeIgnored) ? () => false : ignored;
     const dir = path.resolve(directory, scope.at);
     const within = (relative: string) => (scope.at === "." ? relative : `${scope.at}/${relative}`);
     const depthLimited =
@@ -368,9 +374,10 @@ export const workspaceTree = async (input: {
   };
   const crawlScope = async (scope: Parameters<typeof scoped>[0]): Promise<readonly string[]> => {
     const { dir, crawler } = scoped(scope);
-    const crawled = await (input.view === "directories"
-      ? crawler.withMaxFiles(input.limit + 2).onlyDirs()
-      : crawler.withDirs().withMaxFiles(input.limit + 2)
+    const crawled = await (
+      input.view === "directories"
+        ? crawler.withMaxFiles(input.limit + 2).onlyDirs()
+        : crawler.withDirs().withMaxFiles(input.limit + 2)
     )
       .crawl(dir)
       .withPromise();
@@ -539,8 +546,7 @@ export const workspaceTree = async (input: {
         ? []
         : [
             {
-              name:
-                input.directory === "." ? `${path.basename(realRoot)}/` : `${input.directory}/`,
+              name: input.directory === "." ? `${path.basename(realRoot)}/` : `${input.directory}/`,
               children: treeRows,
             },
           ],

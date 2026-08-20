@@ -1,5 +1,5 @@
 import { asciiFigures, configurePresentation, displayPath, resolve } from "atlascii";
-import { afterEach, expect, test } from "vitest";
+import { afterEach, expect, test } from "vite-plus/test";
 import { presentationFromEnvironment } from "../src/presentation.ts";
 
 const environment = { ...process.env };
@@ -61,7 +61,9 @@ test("names a file against the package that holds it, found on disk", () => {
   expect(displayPath(`file://${repository}/packages/mcp/src/server.ts`, repository)).toBe(
     "src/server.ts",
   );
-  expect(displayPath(`file://${repository}/atlascii/src/index.ts`, repository)).toBe("src/index.ts");
+  expect(displayPath(`file://${repository}/atlascii/src/index.ts`, repository)).toBe(
+    "src/index.ts",
+  );
 });
 
 test("lets a caller that states a style outrank what the host chose", () => {
@@ -69,5 +71,7 @@ test("lets a caller that states a style outrank what the host chose", () => {
   // being handed to something outside the answer — still gets to say so.
   process.env.TYPE_ATLAS_PATHS = "absolute";
   configurePresentation(presentationFromEnvironment());
-  expect(displayPath("file:///repo/src/app.ts", "/repo", { style: "workspace" })).toBe("src/app.ts");
+  expect(displayPath("file:///repo/src/app.ts", "/repo", { style: "workspace" })).toBe(
+    "src/app.ts",
+  );
 });

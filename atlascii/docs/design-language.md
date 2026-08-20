@@ -29,8 +29,8 @@ in one order, in every tool: what follows `inspect_symbol`'s header and the
 diagnostics summary line is the same form here.
 
 The scope segment is not decoration. "2 projects loaded" is the difference
-between *this name is unused* and *this name is unused in what has been
-opened* — and a reader that cannot tell those apart deletes working code. The
+between _this name is unused_ and _this name is unused in what has been
+opened_ — and a reader that cannot tell those apart deletes working code. The
 count is what makes the claim weighable; "every project loaded" reassured
 where "1 project loaded" warns.
 
@@ -69,7 +69,7 @@ the decision, never re-makes it. The residual: the protocol's numbers cannot
 say "type alias" — carrying TypeScript's own strings end to end is the
 follow-up that removes the projection entirely.
 
-## 2. Banner — the subject a reader reads *through*
+## 2. Banner — the subject a reader reads _through_
 
 ```
 === src/config/marks.ts · 108 lines ===
@@ -85,7 +85,7 @@ name is composed — a path, a count, a windowed range, each under its own
 condition. What encloses it is a mark, so a consumer that cannot render `===`
 changes one setting and every banner follows.
 
-Headings (`##`) remain, and mean the other thing: a named part *within* one
+Headings (`##`) remain, and mean the other thing: a named part _within_ one
 subject. `## Callers` under a symbol's banner is a section of that symbol's
 report, not a new subject.
 
@@ -94,14 +94,14 @@ report, not a new subject.
 A located answer takes one of three forms, and the choice is the data's, not
 the tool's taste:
 
-- **Rows under a file** when the answer is a *list of places* — references,
+- **Rows under a file** when the answer is a _list of places_ — references,
   highlights, occurrences. The file becomes a level when it holds more than
   one row; flat when none does. That judgment is `referenceGroups`', made
   once, rendered blind.
 - **A pointer per target** (`❯`-shaped, name-first) when the answer is a
-  *jump* — definitions, implementations, type definitions. A jump has few
+  _jump_ — definitions, implementations, type definitions. A jump has few
   targets and each is a destination, not a population.
-- **A bannered block** when the answer is a *report about one subject* — a
+- **A bannered block** when the answer is a _report about one subject_ — a
   file's problems, a symbol's inspection. The banner scopes everything
   beneath it.
 
@@ -121,11 +121,11 @@ one privately is the failure this document exists to prevent.
 
 | form      | what it shows                                   |
 | --------- | ----------------------------------------------- |
-| `tree`    | entries with things beneath them                 |
-| `source`  | verbatim lines behind a numbered gutter          |
-| `frame`   | source around a position, carets under the span  |
-| `table`   | columns, when every row has the same fields      |
-| `summary` | labelled values aligned to one column            |
+| `tree`    | entries with things beneath them                |
+| `source`  | verbatim lines behind a numbered gutter         |
+| `frame`   | source around a position, carets under the span |
+| `table`   | columns, when every row has the same fields     |
+| `summary` | labelled values aligned to one column           |
 
 `tree` dominates because most of what a language server answers is one shape: a
 label with things beneath it. A file with the sites in it, a call with what it
@@ -133,7 +133,7 @@ reaches, an outline with its declarations, a package with its exports.
 
 ### A location, and when its file becomes a level
 
-Most of what this surface answers is *a place, and what stands there*. It is
+Most of what this surface answers is _a place, and what stands there_. It is
 written one way:
 
 ```
@@ -161,10 +161,10 @@ chosen per tool rather than by any rule, which is what a decoration is when
 nothing decides it.
 
 `diagnostics` keeps its banner, and that is not an exception. Its contents are
-*blocks* — a message, sometimes a framed excerpt — not rows, and a banner is
+_blocks_ — a message, sometimes a framed excerpt — not rows, and a banner is
 what marks a subject a reader reads through. The rule is about rows.
 
-Anything that is a *line* rather than a form is composed by markup, in the
+Anything that is a _line_ rather than a form is composed by markup, in the
 document, out of `tight`, `indent`, and conditionals. A module export
 (`kind name [deprecated]: signature`) and a signature with its documentation
 beneath were both components once; each decided a line's shape for every
@@ -237,7 +237,7 @@ what invokes a function or method, and the call hierarchy prepared none here.
 ```
 
 This is the strongest part of the language and the least negotiable. A reader
-that cannot distinguish *absent*, *unanswered*, and *not loaded* will conclude
+that cannot distinguish _absent_, _unanswered_, and _not loaded_ will conclude
 the wrong thing every time, and the three are indistinguishable from an empty
 body.
 
@@ -261,7 +261,7 @@ A path is the same split. Which file it names is identity; whether it reads as
 holds it is style — `{ paths: "workspace" | "absolute" | "project" }`, workspace
 by default because the root is stated once in the preamble and repeating it on
 every row costs more than it tells. Naming a file by its package rather than by
-where a package manager installed it is *not* a style: `chokidar/index.js` is
+where a package manager installed it is _not_ a style: `chokidar/index.js` is
 what that file is, and the directories that mean "installed here" are a list so
 that adding a language adds a name rather than editing a renderer.
 
@@ -350,7 +350,7 @@ the documents say, so it cannot drift from them:
 Each of those exists because the surface diverged that way. On its first run it
 found a dead partial and a tool that reported a count with nothing after it.
 
-What no static rule can judge is whether a line *reads*. That is answered by
+What no static rule can judge is whether a line _reads_. That is answered by
 calling the tool and looking at the answer — which costs one request and is the
 real output rather than a reconstruction of it. Hand-written fixtures were tried
 and abandoned: within minutes one of them depicted a shape no handler produces,
@@ -361,8 +361,8 @@ and a gallery that lies confidently is worse than none.
 Two tools state conclusions their evidence does not support, and both are worse
 than saying less.
 
-`search_code` ranks by meaning, and its relevance is *relative to the strongest
-match*. A query of pure nonsense returns results at 100% and 92%, because the
+`search_code` ranks by meaning, and its relevance is _relative to the strongest
+match_. A query of pure nonsense returns results at 100% and 92%, because the
 best of a bad set is still the best. Nothing in the answer distinguishes "this
 is what you asked for" from "this is the least unlike it", and an absent
 result — the honest answer — is one the tool cannot produce.
@@ -385,7 +385,7 @@ settled and what is still drifting.
   `##`. Authored as `{% sections %}`, which takes a level, so a lint reading the
   document source cannot see it — only the rendered answer shows it.
 - **`workspace_symbols` omits the position**, reporting `Guide [interface]
-  src/layout/hierarchy.ts` with no line to jump to, while `document_symbols`
+src/layout/hierarchy.ts` with no line to jump to, while `document_symbols`
   gives one.
 - **A query is echoed as a label, and everything else is a statement.** That is
   correct — arbitrary user text of unbounded length breaks any sentence it is

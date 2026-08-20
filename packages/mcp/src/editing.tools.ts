@@ -2,7 +2,6 @@ import type { McpServer } from "@modelcontextprotocol/server";
 import {
   DocumentFormattingRequest,
   GetMatchTsConfigRequest,
-  type Range,
   RenameRequest,
   WillRenameFilesRequest,
   WorkspaceChange,
@@ -125,9 +124,7 @@ const missedSpecifierEdits = async (input: {
           ];
         }),
       );
-      return edits.length
-        ? [{ textDocument: { uri, version: null }, edits }]
-        : [];
+      return edits.length ? [{ textDocument: { uri, version: null }, edits }] : [];
     }),
   );
   const flat = changes.flat();
@@ -240,11 +237,8 @@ export const registerEditingTools = (server: McpServer, workspaces: VolarWorkspa
           newUri: workspace.getWorkspaceUri(to),
         })),
       );
-      const edit = (await workspace.sendRequest(
-        WillRenameFilesRequest.type,
-        { files: moves },
-        signal,
-      )) ?? {};
+      const edit =
+        (await workspace.sendRequest(WillRenameFilesRequest.type, { files: moves }, signal)) ?? {};
       const edited = new Set(
         (edit.documentChanges ?? []).flatMap((change) =>
           "textDocument" in change ? [change.textDocument.uri] : [],
@@ -265,7 +259,9 @@ export const registerEditingTools = (server: McpServer, workspaces: VolarWorkspa
           ? {
               note: `References in ${missed
                 .map((uri) => displayPath(uri, root))
-                .join(", ")} were not updated — the platform's rename walk missed them and a cross-directory specifier is not assembled here. Update them before applying, or use references to find every site.`,
+                .join(
+                  ", ",
+                )} were not updated — the platform's rename walk missed them and a cross-directory specifier is not assembled here. Update them before applying, or use references to find every site.`,
             }
           : undefined,
       );

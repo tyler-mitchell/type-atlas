@@ -1,4 +1,4 @@
-import { expect, test } from "vitest";
+import { expect, test } from "vite-plus/test";
 import { diff } from "../src/components/diff.ts";
 import type { DiffChunk } from "../src/protocol/shapes.ts";
 
@@ -90,9 +90,7 @@ test("says one line, not one lines", () => {
 });
 
 test("a diff of only unchanged lines is a gap, not a wall of text", () => {
-  expect(body([{ kind: "common", lines: numbered("same", 40) }])).toBe(
-    "@@ 40 unchanged lines",
-  );
+  expect(body([{ kind: "common", lines: numbered("same", 40) }])).toBe("@@ 40 unchanged lines");
 });
 
 test("shows everything when the caller asks for unbounded context", () => {

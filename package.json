@@ -4,29 +4,28 @@
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {
-    "build": "pnpm --recursive --if-present run build",
+    "build": "vp run -r build",
     "changeset": "changeset",
-    "check": "pnpm lint && pnpm check-types && pnpm test",
-    "check-types": "pnpm build && pnpm --recursive --if-present run check-types",
+    "check": "vp run lint && vp run check-types && vp run test",
+    "check-types": "vp run build && vp run -r check-types",
     "check:changeset": "changeset status --since=origin/main",
-    "check:distribution": "pnpm build && node packages/mcp/scripts/verify-distribution.ts",
-    "dev": "pnpm --filter @type-atlas/mcp run dev",
-    "format": "oxlint --fix . && oxfmt .",
-    "lint": "oxlint . && oxfmt --check .",
-    "release": "pnpm release:preflight && changeset publish",
-    "release:preflight": "pnpm check && node packages/mcp/scripts/verify-distribution.ts && changeset status",
-    "release:status": "node scripts/release-status.ts",
-    "release:version": "changeset version && node scripts/sync-server-manifest.ts && pnpm install --lockfile-only --no-frozen-lockfile",
-    "test": "pnpm --recursive --if-present run test"
+    "check:distribution": "vp run build && vp node packages/mcp/scripts/verify-distribution.ts",
+    "dev": "vp run @type-atlas/mcp#dev",
+    "format": "vp lint --fix . && vp fmt .",
+    "lint": "vp lint . && vp fmt --check .",
+    "release": "vp run release:preflight && changeset publish",
+    "release:preflight": "vp run check && vp node packages/mcp/scripts/verify-distribution.ts && changeset status",
+    "release:status": "vp node scripts/release-status.ts",
+    "release:version": "changeset version && vp node scripts/sync-server-manifest.ts && vp pm install --lockfile-only --no-frozen-lockfile",
+    "test": "vp run -r test"
   },
   "devDependencies": {
-    "@arethetypeswrong/core": "catalog:",
     "@changesets/cli": "catalog:",
+    "@types/node": "catalog:",
     "execa": "catalog:",
-    "oxfmt": "catalog:",
-    "oxlint": "catalog:",
-    "publint": "catalog:",
-    "tsdown": "catalog:"
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
   },
   "engines": {
     "node": ">=22.20"

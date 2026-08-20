@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
-import { expect, test } from "vitest";
+import { expect, test } from "vite-plus/test";
 
 const packageRoot = fileURLToPath(new URL("..", import.meta.url));
 const workspaceRoot = resolve(packageRoot, "../..");
@@ -38,9 +38,7 @@ test("verify_edit reports what a proposal would introduce, without writing", asy
       name: "verify_edit",
       arguments: {
         workspace: workspaceRoot,
-        files: [
-          { path: subject, content: `${source}\nexport const broken: number = "no";\n` },
-        ],
+        files: [{ path: subject, content: `${source}\nexport const broken: number = "no";\n` }],
       },
     });
     const brokenText = broken.content.find((item) => item.type === "text")?.text ?? "";

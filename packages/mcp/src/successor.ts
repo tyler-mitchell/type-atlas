@@ -160,7 +160,8 @@ export const createSuccessorSearch =
       .filter((candidate) => candidate.overlap.length > 0 && candidate.name !== request.name)
       .sort((left, right) => right.overlap.length - left.overlap.length)
       .filter(
-        (candidate, index, all) => all.findIndex((other) => other.name === candidate.name) === index,
+        (candidate, index, all) =>
+          all.findIndex((other) => other.name === candidate.name) === index,
       )
       .slice(0, request.limit);
 
@@ -179,11 +180,7 @@ export const createSuccessorSearch =
       searched,
       candidates: ranked.map((candidate) => ({
         name: candidate.name,
-        fields: [
-          candidate.evidence,
-          `shares ${candidate.overlap.join(", ")}`,
-          candidate.where,
-        ],
+        fields: [candidate.evidence, `shares ${candidate.overlap.join(", ")}`, candidate.where],
       })),
       discussing: fromRetrieval
         .slice(0, request.limit)
