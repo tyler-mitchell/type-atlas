@@ -9,13 +9,13 @@ test("ends tool calls at the server deadline without closing the session", async
   registerTool(
     server,
     "wait",
-    { inputSchema: type({}).onUndeclaredKey("reject") },
+    { inputSchema: type({}) },
     () => new Promise<never>(() => {}),
   );
   registerTool(
     server,
     "echo",
-    { inputSchema: type({ text: "string" }).onUndeclaredKey("reject") },
+    { inputSchema: type({ text: "string" }) },
     ({ text }) => ({ content: [{ type: "text", text }] }),
   );
 

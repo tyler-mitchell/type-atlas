@@ -177,11 +177,15 @@ const scanOccurrences = async (input: {
         total += 1;
         seenFiles.add(display);
         if (sites.length < input.limit) {
+          // Windowed around the match, never the whole line: a minified
+          // bundle carries one line of half a megabyte, and fifteen matched
+          // rows once rendered a 600KB answer no client would deliver.
+          const window = line.trim().length <= 160 ? line.trim() : line.slice(Math.max(0, at - 60), at + input.text.length + 60).trim();
           sites.push({
             file: display,
             line: index + 1,
             character: at + 1,
-            text: line.trim(),
+            text: line.trim().length <= 160 ? window : `… ${window} …`,
           });
         }
       }

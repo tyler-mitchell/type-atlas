@@ -143,17 +143,16 @@ test("every published property documents itself", () => {
 });
 
 /**
- * An argument no schema declares is a typo or a misunderstanding, and a schema
- * that admits one silently degrades the call to defaults — a `file` argument
- * once read as a per-file diagnostics mode this server does not have.
- * `registerTool` applies `onUndeclaredKey("reject")` to every schema; this
- * reads the published JSON to prove the rejection survived conversion, because
- * a transform that silently no-ops is invisible from the definition site.
+ * Undeclared keys pass, by standing order: rejection was built to catch
+ * typos, caught none, and instructed clients — via additionalProperties:
+ * false in every advertised schema — to silently delete each legitimately
+ * new argument a stale session sent. The published schemas may never carry
+ * that instruction again.
  */
-test("every tool rejects arguments it does not declare", () => {
+test("no tool tells clients to delete arguments it does not declare", () => {
   expect(
     tools
-      .filter(({ inputSchema }) => (inputSchema as Schema)["additionalProperties"] !== false)
+      .filter(({ inputSchema }) => (inputSchema as Schema)["additionalProperties"] === false)
       .map(({ name }) => name),
   ).toEqual([]);
 });
