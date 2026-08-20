@@ -236,29 +236,42 @@ export const workspaceTree = async (input: {
         return relative.split("/").length > input.depth ? [] : [`${relative}/`];
       });
   const submodules = new Set(submodulePaths.map((entry) => entry.slice(0, -1)));
-  // A capped crawl stops mid-traversal, and fdir walks depth-first, so the
-  // cut lands inside exactly one subtree of the base crawl — which then
-  // renders as complete with a fraction of its contents (`core-time/` showed
-  // one README and read as containing only that). Every entry of the
-  // interrupted subtree is dropped, so it folds and its count states the
-  // truth instead.
-  const interrupted =
-    baseCrawl.length > input.limit
-      ? `${baseCrawl[baseCrawl.length - 1]?.split("/")[0] ?? ""}/`
-      : undefined;
-  const relatives = [...crawled, ...submodulePaths]
-    .filter(
-      (entry) =>
-        interrupted === undefined || entry === interrupted || !entry.startsWith(interrupted),
-    )
-    .sort();
+  const relatives = [...crawled, ...submodulePaths].sort();
   // One tree, rooted at the asked directory — the shape `tree` and every
   // file explorer have always drawn. The previous form grouped files under
   // per-directory section headers, which read as disconnected fragments:
   // nothing said how `documents/` related to `./`, or what `./` even was.
   type Assembled = { directory: boolean; readonly children: Map<string, Assembled> };
   const assembled: Assembled = { directory: true, children: new Map() };
-  for (const entry of relatives.slice(0, input.limit)) {
+  const kept = relatives.slice(0, input.limit);
+  // One completeness rule for every way the bound can cut: no directory may
+  // render as complete while the limit dropped any of its contents. It wore
+  // three costumes before one rule replaced them — core-time/ as a lone
+  // README (base crawl truncated mid-subtree), packages/ as 14 of 25
+  // packages (an expansion sliced away wholesale), graph-grammar/ as two
+  // files (an expansion sliced mid-record). A dropped directory stubs
+  // itself as a fold; a dropped file folds its whole parent; either way the
+  // fold's count then prices what the bound could not show.
+  const keptDirs = new Set(kept.filter((entry) => entry.endsWith("/")));
+  const stubs = new Set<string>();
+  const foldedParents = new Set<string>();
+  for (const entry of relatives.slice(input.limit)) {
+    const segments = (entry.endsWith("/") ? entry.slice(0, -1) : entry).split("/");
+    if (entry.endsWith("/")) {
+      const spine = segments.map((_, held) => `${segments.slice(0, held + 1).join("/")}/`);
+      const nearest = spine.find((ancestor) => !keptDirs.has(ancestor));
+      if (nearest !== undefined) stubs.add(nearest);
+    } else if (segments.length > 1) {
+      foldedParents.add(`${segments.slice(0, -1).join("/")}/`);
+    }
+  }
+  const insideFoldedParent = (entry: string) =>
+    [...foldedParents].some((parent) => entry !== parent && entry.startsWith(parent));
+  for (const entry of [
+    ...kept.filter((entry) => !insideFoldedParent(entry)),
+    ...[...stubs].filter((entry) => !insideFoldedParent(entry)),
+    ...foldedParents,
+  ]) {
     const isDirectory = entry.endsWith("/");
     (isDirectory ? entry.slice(0, -1) : entry).split("/").reduce((node, segment, index, all) => {
       const held =
@@ -285,17 +298,21 @@ export const workspaceTree = async (input: {
     }
   };
   collectFolded(assembled, "");
+  // Shallowest folds price first when there are more than the counting
+  // budget: the map's top levels are what a reader weighs, and an
+  // all-or-nothing bound once erased every price the moment stubs pushed
+  // the fold count past it.
   const counted = new Map(
-    folded.length > 60
-      ? []
-      : await Promise.all(
-          folded
-            .filter((relative) => !buildOutput.has(relative.split("/").pop() ?? ""))
-            .map(async (relative) => {
-              const { dir, crawler } = scoped({ at: relative, excludeBuildOutput: true });
-              return [relative, await crawler.onlyCounts().crawl(dir).withPromise()] as const;
-            }),
-        ),
+    await Promise.all(
+      [...folded]
+        .filter((relative) => !buildOutput.has(relative.split("/").pop() ?? ""))
+        .sort((left, right) => left.split("/").length - right.split("/").length)
+        .slice(0, 60)
+        .map(async (relative) => {
+          const { dir, crawler } = scoped({ at: relative, excludeBuildOutput: true });
+          return [relative, await crawler.onlyCounts().crawl(dir).withPromise()] as const;
+        }),
+    ),
   );
   const holdings = (relative: string): string => {
     const counts = counted.get(relative);

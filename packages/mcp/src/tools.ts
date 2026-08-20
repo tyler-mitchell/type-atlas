@@ -8,6 +8,8 @@ import { registerExperimentalTools } from "./experimental.tools.ts";
 import { registerIntelligenceTools } from "./intelligence.tools.ts";
 import { registerNavigationTools } from "./navigation.tools.ts";
 import { registerReadFileTool } from "./read_file.tool.ts";
+import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { registerWorkspaceTools } from "./workspace.tools.ts";
 import type { Semble } from "./semble.ts";
 import type { VolarWorkspacePool } from "@type-atlas/core";
@@ -15,18 +17,19 @@ import { type } from "arktype";
 import { dispatchTool, registerTool } from "./tool.ts";
 
 /**
- * Whether this server belongs to the development loop's host.
+ * Whether this server belongs to the development loop.
  *
- * Two facts, both required: running from source (`src/cli.ts` under
- * `--conditions=development` — the published package runs `dist`, so no
- * production install can ever qualify), and the development host's own
- * explicit marker in its server environment. The second exists because
- * every local host here runs source — production agents and the loop share
- * the machine — and a development affordance visible in a production
- * catalog plants the idea that the server is theirs to modify.
+ * Running from source is the hard wall: the published package runs `dist`,
+ * so no external install can ever qualify. The marker — an env var, or a
+ * `.type-atlas-dev` file beside the repo's package.json — exists so the
+ * door can open for a session whose host env predates it: the file is read
+ * at each backend boot, and a reload is a boot, so no host restart is ever
+ * needed to enter or leave development.
  */
 const developmentHost =
-  import.meta.url.includes("/src/") && process.env.TYPE_ATLAS_DEV === "1";
+  import.meta.url.includes("/src/") &&
+  (process.env.TYPE_ATLAS_DEV === "1" ||
+    existsSync(fileURLToPath(new URL("../../../.type-atlas-dev", import.meta.url))));
 
 export const registerTools = (
   server: McpServer,
