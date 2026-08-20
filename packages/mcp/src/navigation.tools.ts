@@ -13,6 +13,7 @@ import {
   declarationChainAtPosition,
   inspectSymbol,
   page,
+  projectGraph,
   renderDocument,
   subjectAtPosition,
   type VolarWorkspace,
@@ -798,6 +799,14 @@ export const registerNavigationTools = (
           // How many projects the fan-out asked — the observation that says
           // how far "found N references" actually reaches.
           projects,
+          // Searched count against the workspace's discovered config count:
+          // "N loaded" over an unknown denominator taught nothing (an agent
+          // on a 30-config monorepo read "1 project loaded" as the whole
+          // answer, 2026-08-20). Discovery can miss inferred projects, so a
+          // searched count at or past it reads as complete rather than odd.
+          ...(projects < projectGraph(root).configs.length
+            ? { workspaceProjects: projectGraph(root).configs.length }
+            : { allProjects: true }),
           // The project, or nothing. What to say when a file belongs to no
           // configured project is a sentence, and sentences are the document's
           // — this decided between two English phrases here, in a package that

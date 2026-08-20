@@ -25,6 +25,7 @@ export { renderComposition, renderDocument } from "./markdoc/render.ts";
 export { codeFrame, divider, formatTime, noun, summaryRow, truncate } from "atlascii";
 export type { Row } from "atlascii";
 export { containingGitSubmodule, findGitSubmoduleRoots } from "./git-submodules.ts";
+export { projectGraph, type ProjectGraph } from "./project-graph.ts";
 export {
   documentSymbols,
   foldingRanges,

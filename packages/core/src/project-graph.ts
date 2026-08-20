@@ -1,0 +1,66 @@
+// The workspace's project graph, discovered from configuration rather than
+// from what a session happened to load.
+//
+// Every scope-disclosing answer needs a denominator: "1 project loaded" tells
+// a reader nothing about how much of the workspace that is, and the loaded
+// set is an accident of call history. Config discovery is cheap — files, not
+// programs — and static for the life of a process, so answers can say
+// "searched N of M projects" with M being a property of the repository.
+//
+// The same discovery yields the authored/generated boundary: each config's
+// `outDir` names build output, which literal scans (occurrences) must be able
+// to separate from source — a committed dist/ bundle otherwise drowns every
+// string-id search in minified noise.
+
+import { existsSync } from "node:fs";
+import { dirname, relative, resolve } from "pathe";
+import ts from "typescript";
+
+export type ProjectGraph = {
+  /** Workspace-relative tsconfig paths, sorted. */
+  readonly configs: readonly string[];
+  /** Workspace-relative build-output directories declared by those configs, sorted, deduplicated. */
+  readonly outDirs: readonly string[];
+};
+
+const graphs = new Map<string, ProjectGraph>();
+
+const discover = (root: string): ProjectGraph => {
+  // TypeScript's own directory walk: glob include/exclude, no crawl
+  // dependency, and the same file-system view the compiler itself uses.
+  const found = ts.sys.readDirectory(
+    root,
+    [".json"],
+    ["**/node_modules/**", "**/.git/**", "**/.*/**"],
+    ["**/tsconfig*.json"],
+  );
+  const configs: string[] = [];
+  const outDirs = new Set<string>();
+  for (const path of found) {
+    configs.push(relative(root, path));
+    const parsed = ts.readConfigFile(path, ts.sys.readFile);
+    const outDir = (parsed.config?.compilerOptions as { outDir?: string } | undefined)?.outDir;
+    if (typeof outDir === "string") {
+      const resolved = relative(root, resolve(dirname(path), outDir));
+      if (!resolved.startsWith("..")) outDirs.add(resolved);
+    }
+  }
+  return { configs: configs.sort(), outDirs: [...outDirs].sort() };
+};
+
+/**
+ * The project graph for a workspace root, discovered once per process.
+ *
+ * Configs change rarely and a stale count misleads mildly where a wrong count
+ * misleads badly; per-process is the deliberate freshness. A root that is not
+ * a directory answers an empty graph rather than throwing — callers use this
+ * for disclosure, and disclosure must never break the answer it decorates.
+ */
+export const projectGraph = (root: string): ProjectGraph => {
+  const key = resolve(root);
+  const held = graphs.get(key);
+  if (held) return held;
+  const graph = existsSync(key) ? discover(key) : { configs: [], outDirs: [] };
+  graphs.set(key, graph);
+  return graph;
+};

@@ -9,7 +9,7 @@ Nothing was found at this position, so there is no symbol to report references f
 {% tight %}
 {% if any($subject) %}{% $subject %}{% if $kind %} [{% $kind %}]{% /if %}{% if $container %} · inside {% $container %}{% /if %}{% if $declaredAt %} · {% $declaredAt.file %}:{% position($declaredAt.at) %}{% /if %}{% /if %}{% if not(any($subject)) %}the symbol at this position{% if $declaredAt %} · {% $declaredAt.file %}:{% position($declaredAt.at) %}{% /if %}{% /if %}
 
-{% $total %} {% plural count=$total forms={"one": "reference", "other": "references"} /%} · {% if $everyProject %}{% $projects %} {% plural count=$projects forms={"one": "project", "other": "projects"} /%} loaded{% /if %}{% if not($everyProject) %}project scope{% /if %}{% if any($anchor) %} · {% $anchor %}{% /if %}
+{% $total %} {% plural count=$total forms={"one": "reference", "other": "references"} /%} · {% if $everyProject %}{% if $allProjects %}all {% $projects %} {% plural count=$projects forms={"one": "project", "other": "projects"} /%} searched{% /if %}{% if not($allProjects) %}{% $projects %} of {% $workspaceProjects %} projects searched — reading a file of an unsearched project loads it{% /if %}{% /if %}{% if not($everyProject) %}project scope{% /if %}{% if any($anchor) %} · {% $anchor %}{% /if %}
 {% /tight %}
 {% partial file="page.mdoc" /%}
 

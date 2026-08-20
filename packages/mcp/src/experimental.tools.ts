@@ -15,6 +15,7 @@ import {
   createTypeAtlas,
   declarationChainAtPosition,
   documentSymbols,
+  projectGraph,
   renderComposition,
   renderDocument,
   subjectAtPosition,
@@ -154,11 +155,27 @@ const scanOccurrences = async (input: {
     .exclude((name) => name === ".git" || name === "node_modules" || name.startsWith("."))
     .crawl(scanRoot)
     .withPromise();
-  const over = files.length > fileBudget;
+  // Generated output is not source: a committed dist/ drowned a string-id
+  // search in minified bundle hits (kek-monorepo, 2026-08-20). The tsconfig
+  // outDirs discovered from the workspace's own configuration are excluded —
+  // and disclosed, because an absence claim is only as strong as its scan
+  // set. Scanning inside an outDir on purpose still works: the exclusion
+  // applies only when the scan root is outside them all.
+  const outDirs = projectGraph(workspaceRoot).outDirs.map((dir) =>
+    path.resolve(workspaceRoot, dir),
+  );
+  const insideGenerated = outDirs.some((dir) => scanRoot === dir || isFileInDir(scanRoot, dir));
+  const generatedFile = (relative: string): boolean => {
+    const absolute = path.resolve(scanRoot, relative);
+    return outDirs.some((dir) => isFileInDir(absolute, dir));
+  };
+  const authored = insideGenerated ? files : files.filter((file) => !generatedFile(file));
+  const generatedExcluded = files.length - authored.length;
+  const over = authored.length > fileBudget;
   // Lexicographic, not crawl order: the filesystem's traversal order is not
   // deterministic, and an answer that reorders between identical runs cannot
   // be compared across changes — the same file set must read the same way.
-  const scanned = [...files].sort().slice(0, fileBudget);
+  const scanned = [...authored].sort().slice(0, fileBudget);
   const sites: { file: string; line: number; character: number; text: string }[] = [];
   let total = 0;
   const seenFiles = new Set<string>();
@@ -213,6 +230,7 @@ const scanOccurrences = async (input: {
     fileCount: seenFiles.size,
     scanned: scanned.length,
     over,
+    generatedExcluded: generatedExcluded > 0 ? generatedExcluded : undefined,
     groups,
     page:
       total > sites.length ? { from: 1, to: sites.length, total, unit: "occurrences" } : undefined,

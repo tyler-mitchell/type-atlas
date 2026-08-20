@@ -1,5 +1,5 @@
 HalfEven [enum member] · inside RoundingMode · packages/money/src/rounding-mode.ts:4:3
-2 references · 9 projects loaded · packages/money/tsconfig.json
+2 references · all 9 projects searched · packages/money/tsconfig.json
 
 packages/money/src/rounding-mode.ts
 ├  10:34 — inside "first-national"

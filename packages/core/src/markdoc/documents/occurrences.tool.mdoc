@@ -6,10 +6,10 @@
 No files were scanned under {% $directory %} — it holds nothing this scan reads, so this answer is not evidence of absence. Check the directory, or scan its parent.
 {% /if %}
 {% if and(equals($total, 0), not(equals($scanned, 0))) %}
-Nothing under {% $directory %} contains "{% $text %}" · {% $scanned %} {% plural count=$scanned forms={"one": "file", "other": "files"} /%} scanned{% if $over %} — the first {% $scanned %}; narrow the directory to scan the rest{% /if %}. This is a literal answer: the exact text does not occur in what was scanned, which is the proof a semantic search cannot give.
+Nothing under {% $directory %} contains "{% $text %}" · {% $scanned %} {% plural count=$scanned forms={"one": "file", "other": "files"} /%} scanned{% if $over %} — the first {% $scanned %}; narrow the directory to scan the rest{% /if %}{% if $generatedExcluded %} · {% $generatedExcluded %} generated {% plural count=$generatedExcluded forms={"one": "file", "other": "files"} /%} (tsconfig outDir) not scanned — scan that directory directly to include them{% /if %}. This is a literal answer: the exact text does not occur in what was scanned, which is the proof a semantic search cannot give.
 {% /if %}
 {% if not(equals($total, 0)) %}
-"{% $text %}" occurs {% $total %} {% plural count=$total forms={"one": "time", "other": "times"} /%} in {% $fileCount %} {% plural count=$fileCount forms={"one": "file", "other": "files"} /%} · {% $scanned %} {% plural count=$scanned forms={"one": "file", "other": "files"} /%} scanned under {% $directory %}{% if $over %} — the first {% $scanned %}; narrow the directory to scan the rest{% /if %}.
+"{% $text %}" occurs {% $total %} {% plural count=$total forms={"one": "time", "other": "times"} /%} in {% $fileCount %} {% plural count=$fileCount forms={"one": "file", "other": "files"} /%} · {% $scanned %} {% plural count=$scanned forms={"one": "file", "other": "files"} /%} scanned under {% $directory %}{% if $over %} — the first {% $scanned %}; narrow the directory to scan the rest{% /if %}{% if $generatedExcluded %} · {% $generatedExcluded %} generated {% plural count=$generatedExcluded forms={"one": "file", "other": "files"} /%} (tsconfig outDir) not scanned{% /if %}.
 {% partial file="page.mdoc" /%}
 
 {% tree entries=$groups partial="occurrence-node.mdoc" /%}
