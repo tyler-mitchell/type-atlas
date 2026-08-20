@@ -60,6 +60,11 @@ const input = type({
     default: true,
     description: "Suffix each file with its line count (`· 244 loc`).",
   }),
+  "git?": type("boolean").configure({
+    default: true,
+    description:
+      "Mark git changes: `· M`/`A`/`D`/`U`/`R`/`!` on files (deleted files appear as ghost rows), `· N changed` on directories holding changes. Silent outside a repository.",
+  }),
   "view?": type.enumerated("directories", "files").configure(
     {
       description:
@@ -92,6 +97,7 @@ export const registerWorkspaceTools = (server: McpServer): void => {
         includeSubmodules,
         limit,
         loc,
+        git,
         view,
       },
       { mcpReq: { signal } },
@@ -107,6 +113,7 @@ export const registerWorkspaceTools = (server: McpServer): void => {
         includeSubmodules: includeSubmodules ?? false,
         limit: limit ?? 500,
         loc: loc ?? true,
+        git: git ?? true,
         signal,
         view: view ?? "files",
       });

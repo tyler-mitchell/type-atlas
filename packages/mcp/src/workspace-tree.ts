@@ -1,4 +1,6 @@
+import { execFile } from "node:child_process";
 import { readFile, realpath, stat } from "node:fs/promises";
+import { promisify } from "node:util";
 import { containingGitSubmodule, findGitSubmoduleRoots } from "@type-atlas/core";
 import type { Row } from "atlascii";
 import { isFileInDir } from "@volar/language-server/node.js";
@@ -77,6 +79,55 @@ const resolveListingDirectory = async (input: {
     );
   }
   return { root, directory, realRoot };
+};
+
+const run = promisify(execFile);
+
+/**
+ * VS Code's own change letter for one porcelain entry — the vocabulary every
+ * model has read a million times: `M` modified, `A` added, `D` deleted, `U`
+ * untracked, `R` renamed, `!` conflicted.
+ */
+const changeLetter = (index: string, worktree: string): string => {
+  if (index === "?") return "U";
+  const both = `${index}${worktree}`;
+  if (index === "U" || worktree === "U" || both === "AA" || both === "DD") return "!";
+  if (index === "R" || worktree === "R") return "R";
+  if (index === "D" || worktree === "D") return "D";
+  if (index === "A") return "A";
+  return "M";
+};
+
+/**
+ * What differs from HEAD, keyed by path relative to the listed directory —
+ * `git status` fused into the one tree agents orient with, instead of a
+ * second flat answer they must join by hand. Outside a repository, or when
+ * git itself is unavailable, the map is empty and no row changes.
+ */
+const gitChanges = async (directory: string): Promise<ReadonlyMap<string, string>> => {
+  const toplevel = await run("git", ["-C", directory, "rev-parse", "--show-toplevel"])
+    .then(({ stdout }) => path.normalize(stdout.trim()))
+    .catch(() => undefined);
+  if (toplevel === undefined) return new Map();
+  const { stdout } = await run(
+    "git",
+    ["-C", directory, "status", "--porcelain=v1", "-z", "--untracked-files=all"],
+    { maxBuffer: 64 * 1024 * 1024 },
+  ).catch(() => ({ stdout: "" }));
+  const fields = stdout.split("\0");
+  const changes = new Map<string, string>();
+  for (let at = 0; at < fields.length; at += 1) {
+    const field = fields[at] ?? "";
+    if (field.length < 4) continue;
+    const [index, worktree] = [field[0] ?? " ", field[1] ?? " "];
+    // A rename carries its origin as the next NUL field; the letter belongs
+    // to the path the file lives at now, the way VS Code shows it.
+    if (index === "R" || index === "C" || worktree === "R" || worktree === "C") at += 1;
+    const absolute = path.join(toplevel, field.slice(3));
+    if (absolute !== directory && !isFileInDir(absolute, directory)) continue;
+    changes.set(path.relative(directory, absolute), changeLetter(index, worktree));
+  }
+  return changes;
 };
 
 /** One node per path segment; a fold renders where children were not kept. */
@@ -232,10 +283,13 @@ export const workspaceTree = async (input: {
   readonly limit: number;
   /** Suffix each rendered file with its line count — `· 244 loc`. */
   readonly loc: boolean;
+  /** Mark git changes — porcelain letters on files, `· N changed` on directories. */
+  readonly git: boolean;
   readonly signal: AbortSignal;
   readonly view: "directories" | "files";
 }): Promise<WorkspaceListing> => {
   const { root, directory, realRoot } = await resolveListingDirectory(input);
+  const changesHeld = input.git ? gitChanges(directory) : Promise.resolve(new Map<string, string>());
   const submoduleRoots = input.includeSubmodules ? [] : await findGitSubmoduleRoots(root);
   const submodule = containingGitSubmodule(directory, submoduleRoots);
   if (submodule) {
@@ -376,6 +430,21 @@ export const workspaceTree = async (input: {
     ),
   ]);
   const crawled = [...new Set([...baseCrawl, ...expansionCrawls.flat()])];
+  const changed = await changesHeld;
+  const fileMark = (relative: string): string => {
+    const letter = changed.get(relative);
+    return letter === undefined ? "" : ` · ${letter}`;
+  };
+  // Plain words, not a glyph: an editor's change-dot is pixels a model has
+  // rarely read as text, while "3 changed" is self-describing on first
+  // contact and says how much dirt a fold hides.
+  const directoryMark = (relative: string): string => {
+    const prefix = `${relative}/`;
+    const count = [...changed.keys()].filter(
+      (key) => key === relative || key.startsWith(prefix),
+    ).length;
+    return count === 0 ? "" : ` · ${count} changed`;
+  };
 
   if (input.view === "directories") {
     const submodules = input.glob
@@ -387,7 +456,9 @@ export const workspaceTree = async (input: {
         });
     const directories = [...crawled, ...submodules].sort();
     return {
-      entries: directories.slice(0, input.limit).map((name) => ({ name })),
+      entries: directories.slice(0, input.limit).map((name) => ({
+        name: `${name}${directoryMark(name.replace(/ \[submodule\]$/u, "").replace(/\/$/u, ""))}`,
+      })),
       over: directories.length > input.limit,
       limit: input.limit,
       filtered: input.glob !== undefined,
@@ -401,11 +472,27 @@ export const workspaceTree = async (input: {
         return relative.split("/").length > input.depth ? [] : [`${relative}/`];
       });
   const submodules = new Set(submodulePaths.map((entry) => entry.slice(0, -1)));
+  // A deleted file exists in git's answer and nowhere on disk. It renders as
+  // a ghost row carrying its `D`, the way VS Code keeps deletions visible —
+  // omitting it would make the tree claim a file count the repository
+  // disputes. Ghosts follow the base depth and stay out of filtered views.
+  const crawledSet = new Set(crawled);
+  const ghosts =
+    input.glob === undefined
+      ? [...changed]
+          .filter(
+            ([relative, letter]) =>
+              letter === "D" &&
+              relative.split("/").length <= input.depth &&
+              !crawledSet.has(relative),
+          )
+          .map(([relative]) => relative)
+      : [];
   // One tree, rooted at the asked directory — the shape `tree` and every
   // file explorer have always drawn. The previous form grouped files under
   // per-directory section headers, which read as disconnected fragments:
   // nothing said how `documents/` related to `./`, or what `./` even was.
-  const relatives = [...crawled, ...submodulePaths].sort();
+  const relatives = [...crawled, ...ghosts, ...submodulePaths].sort();
   const { assembled, renderedFiles } = assembleTree(relatives, input.limit);
   // A folded directory states what it holds — `documents/ · 34 files` — so a
   // reader prices expanding it without a second call. fdir's own counter
@@ -443,8 +530,8 @@ export const workspaceTree = async (input: {
   };
   const treeRows = renderRows(assembled, "", ({ relative, name, directory: isDirectory }) =>
     isDirectory
-      ? `${name}/${submodules.has(relative) ? " [submodule]" : holdings(relative)}`
-      : `${name}${price(relative)}`,
+      ? `${name}/${submodules.has(relative) ? " [submodule]" : holdings(relative)}${directoryMark(relative)}`
+      : `${name}${price(relative)}${fileMark(relative)}`,
   );
   return {
     entries:
