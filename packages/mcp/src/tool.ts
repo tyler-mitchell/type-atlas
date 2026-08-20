@@ -84,10 +84,28 @@ type ToolConfig<Input extends StandardSchemaWithJSON, Output extends StandardSch
  * that answers anyway silently degrades it to defaults — a `file` argument
  * once read as a per-file diagnostics mode this server does not have. One
  * seam, every tool: a schema that can reject undeclared keys does.
+ *
+ * Validated strict, published permissive. The client conforms every call to
+ * the schema it cached at connect, so advertising `additionalProperties:
+ * false` made it silently delete any parameter added after the session began
+ * — the development loop's own hardening was what stripped its new
+ * arguments. The advertised JSON schema therefore comes from the original
+ * (which leaves unknown keys alone), while the server validates with the
+ * strict form and rejects a true typo with a sentence. The client still
+ * enforces its cached constraints on known keys, so changing an existing
+ * parameter's type mid-session stays snapshot-blocked — evolve by adding
+ * keys, and reach anything else through `call` until the next connect.
  */
 const rejectingUndeclared = <Schema extends StandardSchemaWithJSON>(schema: Schema): Schema => {
   const chain = (schema as { onUndeclaredKey?: (behavior: string) => Schema }).onUndeclaredKey;
-  return typeof chain === "function" ? chain.call(schema, "reject") : schema;
+  if (typeof chain !== "function") return schema;
+  const strict = chain.call(schema, "reject");
+  return {
+    "~standard": {
+      ...strict["~standard"],
+      jsonSchema: schema["~standard"].jsonSchema,
+    },
+  } as Schema;
 };
 
 /**
