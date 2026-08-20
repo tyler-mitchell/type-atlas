@@ -78,18 +78,120 @@ test("list_files expands a subtree in place inside one tree", async () => {
       ),
     ).toMatchInlineSnapshot(`
       "featuretype/
-      ├  atlascii/
-      ├  docs/
+      ├  atlascii/ · 82 files
+      ├  docs/ · 7 files
       ├  packages/
       │  └  core/
       │     └  src/
       │        └  markdoc/
-      │           ├  documents/
-      │           ├  partials/
+      │           ├  documents/ · 34 files
+      │           ├  partials/ · 15 files
       │           ├  documents.lint.test.ts
       │           ├  documents.test.ts
       │           └  render.ts
-      ├  scripts/
+      ├  scripts/ · 2 files
+      ├  AGENTS.md
+      ├  CONTRIBUTING.md
+      ├  LICENSE
+      ├  package.json
+      ├  pnpm-lock.yaml
+      ├  pnpm-workspace.yaml
+      ├  README.md
+      ├  server.json
+      ├  tsconfig.json
+      └  tsdown.config.ts"
+    `);
+    // The glob record's namesake: a pattern key opens every directory it
+    // matches — the monorepo-map call.
+    const globKey = await client.callTool({
+      name: "list_files",
+      arguments: { workspace: workspaceRoot, expand: { "packages/*": 1 } },
+    });
+    expect(
+      (globKey.content.find((item) => item.type === "text")?.text ?? "").replace(
+        /\n\n· .+$/u,
+        "",
+      ),
+    ).toMatchInlineSnapshot(`
+      "featuretype/
+      ├  atlascii/ · 82 files
+      ├  docs/ · 7 files
+      ├  packages/
+      │  ├  core/
+      │  │  ├  src/ · 63 files
+      │  │  ├  test/ · 1 file
+      │  │  ├  CHANGELOG.md
+      │  │  ├  LICENSE
+      │  │  ├  package.json
+      │  │  ├  README.md
+      │  │  ├  tsconfig.json
+      │  │  └  tsdown.config.ts
+      │  ├  language-server/
+      │  │  ├  bin/ · 1 file
+      │  │  ├  src/ · 8 files
+      │  │  ├  test/ · 3 files
+      │  │  ├  CHANGELOG.md
+      │  │  ├  LICENSE
+      │  │  ├  package.json
+      │  │  ├  README.md
+      │  │  └  tsconfig.json
+      │  └  mcp/
+      │     ├  assets/ · 1 file
+      │     ├  bin/ · 1 file
+      │     ├  scripts/ · 1 file
+      │     ├  src/ · 31 files
+      │     ├  test/ · 13 files
+      │     ├  CHANGELOG.md
+      │     ├  LICENSE
+      │     ├  package.json
+      │     ├  README.md
+      │     └  tsconfig.json
+      ├  scripts/ · 2 files
+      ├  AGENTS.md
+      ├  CONTRIBUTING.md
+      ├  LICENSE
+      ├  package.json
+      ├  pnpm-lock.yaml
+      ├  pnpm-workspace.yaml
+      ├  README.md
+      ├  server.json
+      ├  tsconfig.json
+      └  tsdown.config.ts"
+    `);
+
+    // Mixed values in one record: sugar, options object, glob key together.
+    const mixed = await client.callTool({
+      name: "list_files",
+      arguments: {
+        workspace: workspaceRoot,
+        expand: {
+          docs: 2,
+          "packages/core/src/markdoc": { depth: 1, glob: ["*.ts"] },
+        },
+      },
+    });
+    expect(
+      (mixed.content.find((item) => item.type === "text")?.text ?? "").replace(/\n\n· .+$/u, ""),
+    ).toMatchInlineSnapshot(`
+      "featuretype/
+      ├  atlascii/ · 82 files
+      ├  docs/
+      │  ├  case-studies/
+      │  │  └  webgpu-engine-p0.md
+      │  ├  code-intelligence-mcp-comparison.md
+      │  ├  distribution-reference-research.md
+      │  ├  issues.md
+      │  ├  kek-monorepo-latency.md
+      │  ├  tool-latency-measurements.md
+      │  └  typescript-code-intelligence-comparison.md
+      ├  packages/
+      │  └  core/
+      │     └  src/
+      │        └  markdoc/
+      │           ├  documents.lint.test.ts
+      │           ├  documents.test.ts
+      │           └  render.ts
+      ├  scripts/ · 2 files
       ├  AGENTS.md
       ├  CONTRIBUTING.md
       ├  LICENSE
