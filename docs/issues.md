@@ -441,7 +441,11 @@ plain run reproduced the flat form byte-for-byte (85/85 green), so the two
 shapes are each stable — the discriminator is what the session did before the
 call. Suspicion: an earlier case's fixture arrangement leaves the language
 server holding a superseded document state that the inspection's call walk then
-reads. Until diagnosed, any accept run for this case records whichever shape
+reads. First discriminating run (2026-08-20): `only-the-delta` immediately
+before the explore case — an arrangement that edits and restores fixture files
+— still rendered the grouped/current form, so that arrangement class alone
+does NOT flip it; the discriminator sits earlier in the full run's prefix.
+Until diagnosed, any accept run for this case records whichever shape
 its run breadth produces, and the corpus gate will flip when the other breadth
 runs it.
 
