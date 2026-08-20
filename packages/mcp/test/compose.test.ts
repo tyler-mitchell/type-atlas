@@ -90,9 +90,8 @@ test("compose renders a dossier from ask declarations", async () => {
     expect(holedText).toContain("Undefined in this composition: shpae");
     expect(holedText).toContain("the asks bind shape");
 
-    // The markup is the query language: a document of bare asks is a complete
-    // composition, and each answer renders in its canonical block without any
-    // authored body.
+    // The agent is the author: a document with no body renders nothing —
+    // the tool never writes markup on the composer's behalf.
     const bare = await client.callTool({
       name: "compose",
       arguments: {
@@ -103,16 +102,12 @@ test("compose renders a dossier from ask declarations", async () => {
         ].join("\n"),
       },
     });
-    const bareText = bare.content.find((item) => item.type === "text")?.text ?? "";
-    expect(bareText).toContain("const page");
-    expect(bareText).toContain("## References — packages/core/src/projection.ts:28:14");
-    expect(bareText).toMatch(/\d+ uses in \d+ files, across \d+ projects\./u);
-    expect(bareText).not.toContain("Undefined in this composition");
+    expect(bare.content.find((item) => item.type === "text")?.text ?? "").toBe("");
 
     // Asks chain: the second query reads the first answer's file list, so one
-    // composition expresses "find the uses, then check the health of every
-    // file holding one" — and the reversed order is an error a composer can
-    // act on, not a hole.
+    // authored composition expresses "find the uses, then check the health of
+    // every file holding one" — and the reversed order is an error a composer
+    // can act on, not a hole.
     const chained = await client.callTool({
       name: "compose",
       arguments: {
@@ -120,15 +115,16 @@ test("compose renders a dossier from ask declarations", async () => {
         document: [
           '{% ask "references" as="uses" file="packages/core/src/projection.ts" line=28 character=14 /%}',
           '{% ask "diagnostics" as="health" files=$uses.paths /%}',
+          "",
+          "Health of the {% $uses.files %} files using page: {% $health.total %} problems in {% $health.checked %} checked.",
         ].join("\n"),
       },
     });
     const chainedText = chained.content.find((item) => item.type === "text")?.text ?? "";
-    expect(chainedText).toContain("## Problems — $uses.paths");
-    expect(chainedText).toMatch(/No problem in \d+ files? checked\./u);
+    expect(chainedText).toMatch(/Health of the \d+ files using page: \d+ problems in \d+ checked\./u);
 
-    // The fleshed surface: subject and callers ops, and one ask failing on a
-    // missing file renders its own sentence while the others still answer.
+    // Subject and callers primitives populate an authored card, and one ask
+    // failing on a missing file is stated in feedback while the others answer.
     const fleshed = await client.callTool({
       name: "compose",
       arguments: {
@@ -137,14 +133,21 @@ test("compose renders a dossier from ask declarations", async () => {
           '{% ask "subject" as="what" file="packages/core/src/projection.ts" line=28 character=14 /%}',
           '{% ask "callers" as="calledBy" file="packages/core/src/markdoc/render.ts" line=69 character=14 /%}',
           '{% ask "outline" as="broken" file="packages/core/src/does-not-exist.ts" /%}',
+          "",
+          "## {% $what.name %}",
+          "",
+          "{% $what.name %} [{% $what.kind %}] · {% $what.file %}:{% position($what.at) %}",
+          "",
+          "renderDocument is called from {% $calledBy.total %} places.",
         ].join("\n"),
       },
     });
     const fleshedText = fleshed.content.find((item) => item.type === "text")?.text ?? "";
+    expect(fleshedText).toContain("## page");
     expect(fleshedText).toContain("page [");
     expect(fleshedText).toContain("packages/core/src/projection.ts:28:14");
-    expect(fleshedText).toMatch(/renderDocument · called from \d+ places · \d+ projects? loaded/u);
-    expect(fleshedText).toContain("This ask failed:");
+    expect(fleshedText).toMatch(/renderDocument is called from \d+ places\./u);
+    expect(fleshedText).toContain("The outline ask binding broken failed:");
     const reversed = await client.callTool({
       name: "compose",
       arguments: {

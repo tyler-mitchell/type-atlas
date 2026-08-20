@@ -47,8 +47,15 @@ synthesis has not yet navigated. Order is dependency order.
   measured case for `defineScheduledCommand`.
 - `device.lost` occurs nowhere in webgpu-engine/src (literal scan); the
   `uncapturederror` listener is engine.ts:280.
-- `SystemDispatch`'s thunk form exists (system.ts:296). **Unverified**: that
-  no active source uses it — the literal check queues on `occurrences`.
+- `SystemDispatch`'s thunk form exists (system.ts:296) and no active source
+  uses it — verified 2026-08-20: the engine's 883 files hold only the type's
+  declaration and annotations (capability.ts:25/502/504, system.ts:312/578);
+  the value shape `dispatch: () =>` occurs nowhere in the engine, and its
+  only workspace hits are webgpu-pipeline's own contract tests against its
+  own separately-declared `SystemDispatch` (proven by the reference fan-out
+  with both projects loaded) plus prose in two docs. Caveats stated: the
+  packages-wide shape scan cut at 4000 files, and an exact-text pattern can
+  miss formatting variants — the engine-scoped scans had no cut.
 - The new open world (examples/src/aaa-open-world/system.ts) already composes
   purely through `definePipelineSystem` — no world-engine import at its entry.
 
@@ -140,8 +147,12 @@ bump a checkpoint must record (443–464), and `read` is the readback
 capture/restore with the manifest refusing incompatibility before the first
 write; then the generalized continuation request on the frame-loop boundary,
 whose CoreTime half (`snapshotPlan`, digest records, replay suffix) is
-verified present and tested. Storage stays host-supplied; the write order is
-payload-verified-before-digest-recorded.
+verified present and tested. The record door is
+`recordSnapshot(TimeSnapshotInput)` at runtime.types.ts:386, and its input —
+`{ at?, digest }` — enforces the write order by contract: it identifies a
+snapshot "already materialized" and captures no domain state, so
+payload-verified-before-digest-recorded is the type's own semantics, not a
+convention to police. Storage stays host-supplied.
 
 ## Task 6 — device requirements, then device loss
 

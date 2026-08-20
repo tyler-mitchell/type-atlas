@@ -479,7 +479,24 @@ top-level ones. Observed 2026-08-19, kek-monorepo, `explore_symbol` on
 `quantizeTimelineCoordinate`; the same rendering path serves `hover` and
 `inspect_symbol`.
 
-### `explore_symbol`'s related section declares "Related" a name nobody asked for
+### `find_successor` cannot see a successor that changed vocabulary, and lists a file twice
+
+```
+find_successor { name: "navigationNoun" }
+→ Candidates (3): navigationItems, navigationTargets, registerNavigationTools
+  Files discussing it (5): packages/mcp/src/navigation.tools.ts,
+  packages/mcp/src/navigation.tools.ts, …
+```
+
+A real deletion from the same session: `navigationNoun`'s actual successor
+is `subjectAtPosition`, and it is absent from the candidates because
+candidacy is lexical — "shares navigation" — so any succession that renames
+the concept (the common case in a real refactor) is invisible. The
+files-discussing list does point at the right files, and the caveats are
+honest, but the tool's own contract ("what currently occupies its role")
+goes unmet exactly when the role was renamed. Also: the files list prints
+`navigation.tools.ts` twice — no dedup — under a count that includes the
+duplicate. Observed 2026-08-20, featuretype, after deleting navigationNoun.
 
 ```
 Search: Related to packages/core-time/src/clock/offset.ts:75
