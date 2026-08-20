@@ -239,10 +239,10 @@ file: ["packages/accounts/src/journal.ts"]
 ### `list_files` — structure, reading cost, and what changed
 
 One bounded tree: folded directories say what they hold, every file carries
-its line count, and `git status` is fused in as plain words — including a
-ghost row for a deleted file, which exists in git's answer and nowhere on
-disk. One orientation call answers what is here, what it costs to read, and
-what differs from HEAD:
+its line count, and `git status` is fused in with the editor-standard badge
+letters and change sizes — including a ghost row for a deleted file, which
+exists in git's answer and nowhere on disk. One orientation call answers
+what is here, what it costs to read, and what differs from HEAD:
 
 ```yaml
 tool: List files
@@ -254,11 +254,11 @@ depth: 2
 ~~~text
 packages/money/
 ├  src/ · 3 changed
-│  ├  currency.ts · 21 loc · modified +2
-│  ├  index.ts · deleted -12
+│  ├  currency.ts · 21 loc · M +2
+│  ├  index.ts · D -12
 │  ├  money.ts · 52 loc
 │  ├  rounding-mode.ts · 15 loc
-│  └  rounding.ts · 11 loc · untracked
+│  └  rounding.ts · 11 loc · U
 ├  tests/
 │  └  money.test.ts · 15 loc
 ├  package.json · 19 loc

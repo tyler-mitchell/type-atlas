@@ -63,7 +63,7 @@ const input = type({
   "git?": type("boolean").configure({
     default: true,
     description:
-      "Mark git changes in plain words: `· modified +2 -1`/`added +8`/`deleted -12`/`untracked`/`renamed from old.ts`/`conflicted` on files (deleted files appear as ghost rows), `· N changed` on directories holding changes. Silent outside a repository.",
+      "Mark git changes with the editor-standard badge letters: `· M +2 -1` modified, `· A +8` added (staged), `· U` untracked, `· R old.ts →` renamed, `· C` conflicted, `· D -12` deleted (ghost rows for deletions), `· N changed` on directories holding changes. Silent outside a repository.",
   }),
   "view?": type.enumerated("directories", "files").configure(
     {
@@ -81,7 +81,7 @@ export const registerWorkspaceTools = (server: McpServer): void => {
     {
       title: "List files",
       description:
-        'Show a bounded workspace-relative project structure. `view: "files"` (the default) is the file tree rooted at the directory, directories first; `view: "directories"` is a compact directory list for architecture orientation. Rows carry `git status` inline — `· modified +2 -1`, `· renamed from old.ts`, `· 2 changed` on directories — so one call answers structure, reading cost, and working-tree state together; no separate git call is needed to see what changed. Results honor .gitignore, omit dependency and VCS internals, and treat Git submodules as separate workspaces by default.',
+        'Show a bounded workspace-relative project structure. `view: "files"` (the default) is the file tree rooted at the directory, directories first; `view: "directories"` is a compact directory list for architecture orientation. Rows carry `git status` inline with editor-standard letters — `· M +2 -1`, `· R old.ts →`, `· U`, `· 2 changed` on directories — so one call answers structure, reading cost, and working-tree state together; no separate git call is needed to see what changed. Results honor .gitignore, omit dependency and VCS internals, and treat Git submodules as separate workspaces by default.',
       inputSchema: input,
       annotations: readOnlyToolAnnotations,
     },

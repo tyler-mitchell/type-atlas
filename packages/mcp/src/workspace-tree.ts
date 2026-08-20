@@ -84,18 +84,25 @@ const resolveListingDirectory = async (input: {
 const run = promisify(execFile);
 
 /**
- * One porcelain entry as a plain word. A single letter next to `1.1k loc`
- * reads as magnitude notation — `M` is a million there, not modified — and a
- * bare letter needs a legend where a word needs nothing.
+ * One porcelain entry as VS Code's file-explorer badge letter: `M` modified,
+ * `A` added, `D` deleted, `R` renamed, `U` untracked, `C` conflicted.
+ *
+ * Two letter alphabets exist. Git's own short format (git-status(1)) writes
+ * `??` for untracked and `U` for unmerged; VS Code's explorer writes `U` for
+ * untracked and `C` for conflicted, and that variant is the one agents have
+ * met beside tree rows — in the most-used editor, its forks, and the tools
+ * that copy its badges. This surface is an explorer-shaped tree, so it
+ * speaks the explorer's alphabet; the porcelain XY pair collapses to the one
+ * letter an orienting reader acts on.
  */
-const changeWord = (index: string, worktree: string): string => {
-  if (index === "?") return "untracked";
+const changeCode = (index: string, worktree: string): string => {
+  if (index === "?") return "U";
   const both = `${index}${worktree}`;
-  if (index === "U" || worktree === "U" || both === "AA" || both === "DD") return "conflicted";
-  if (index === "R" || worktree === "R") return "renamed";
-  if (index === "D" || worktree === "D") return "deleted";
-  if (index === "A") return "added";
-  return "modified";
+  if (index === "U" || worktree === "U" || both === "AA" || both === "DD") return "C";
+  if (index === "R" || worktree === "R") return "R";
+  if (index === "D" || worktree === "D") return "D";
+  if (index === "A") return "A";
+  return "M";
 };
 
 /** One file's change state: the word, and what makes it actionable. */
@@ -161,21 +168,23 @@ const gitChanges = async (directory: string): Promise<ReadonlyMap<string, GitCha
     const absolute = path.join(toplevel, field.slice(3));
     if (absolute !== directory && !isFileInDir(absolute, directory)) continue;
     const relative = path.relative(directory, absolute);
-    const word = changeWord(index, worktree);
+    const word = changeCode(index, worktree);
     const size = magnitudes.get(field.slice(3));
     // A same-directory rename names its origin by basename — the row's own
     // position already says the directory; a move across directories keeps
-    // the listing-relative path, because the directory IS the change.
+    // the listing-relative path, because the directory IS the change. The
+    // arrow is git's own rename grammar (`orig -> path`), pointed at the row
+    // that carries it: `R dedupe.ts →`.
     const originListed =
       origin === undefined ? undefined : path.relative(directory, path.join(toplevel, origin));
     const detail =
-      word === "renamed" && originListed !== undefined
-        ? `from ${
+      word === "R" && originListed !== undefined
+        ? `${
             path.dirname(originListed) === path.dirname(relative)
               ? path.basename(originListed)
               : originListed
-          }`
-        : (word === "modified" || word === "added" || word === "deleted") && size
+          } →`
+        : (word === "M" || word === "A" || word === "D") && size
           ? size
           : undefined;
     changes.set(relative, { word, detail });
@@ -340,7 +349,7 @@ export const workspaceTree = async (input: {
   readonly limit: number;
   /** Suffix each rendered file with its line count — `· 244 loc`. */
   readonly loc: boolean;
-  /** Mark git changes in plain words — `· modified` on files, `· N changed` on directories. */
+  /** Mark git changes — badge letters (`· M +2 -1`) on files, `· N changed` on directories. */
   readonly git: boolean;
   readonly signal: AbortSignal;
   readonly view: "directories" | "files";
@@ -543,7 +552,7 @@ export const workspaceTree = async (input: {
       ? [...changed]
           .filter(
             ([relative, change]) =>
-              change.word === "deleted" &&
+              change.word === "D" &&
               relative.split("/").length <= input.depth &&
               !crawledSet.has(relative),
           )

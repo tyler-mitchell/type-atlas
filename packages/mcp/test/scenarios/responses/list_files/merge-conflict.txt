@@ -1,6 +1,6 @@
 packages/money/
 ├  src/ · 1 changed
-│  ├  currency.ts · 25 loc · conflicted
+│  ├  currency.ts · 25 loc · C
 │  ├  index.ts · 12 loc
 │  ├  money.ts · 52 loc
 │  └  rounding-mode.ts · 15 loc
