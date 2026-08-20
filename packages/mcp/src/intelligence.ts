@@ -301,6 +301,13 @@ const searchPage = (input: {
     query: input.retrieval.page.query,
     count: ranked.length,
     explainRelevance: ranked.length > 0 && input.explainRelevance !== false,
+    // Deliberately NOT exposed: the absolute score behind the percentages.
+    // Witnessed 2026-08-20 — a question the index answers well scored 0.03
+    // and one it cannot answer 0.02, while code-to-code similarity reached
+    // 0.57: the scale is modality-dependent and nearly flat for natural
+    // language, so printing it would smear good answers as garbage and no
+    // confidence floor can stand on it. The weak-anchor defect needs a
+    // different signal (docs/issues.md, Codex field report).
     anchoredCount,
     anchors,
     unanchored: anchoredCount === 0 && anchors.length > 0,

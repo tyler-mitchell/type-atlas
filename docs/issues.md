@@ -372,7 +372,15 @@ maintainer. Items already in flight are marked; the rest stand alone:
   relevance is relative to the strongest match, so a wrong answer scores
   100% by construction — then renders "Verified relationships" over it. The
   fix needs an absolute confidence floor from the retrieval scores, not
-  another caveat sentence.
+  another caveat sentence. Printing the absolute top score in the preamble
+  was tried and rejected on evidence (2026-08-20): the question the index
+  answers well scored 0.03, the absent one 0.02, while code-to-code
+  similarity (`related_code`'s tail) reached 0.57 — the scale is
+  modality-dependent and nearly flat for natural-language queries, so a
+  printed divisor smears good answers as garbage and no static floor can
+  stand on it either. The signal has to come from somewhere else — anchor
+  presence, or calibration inside the retrieval layer. The reasoning is kept
+  at `searchPage` in `packages/mcp/src/intelligence.ts`.
 - **Tool idea: evaluate declared execution grammar** — expand sequence
   repeats and indirect `count` into exact command multiplicity
   (webgpu-engine's dispatch grammar).
@@ -419,6 +427,23 @@ unchanged. A section that silently disappears reads as "there are none," which
 is the absence-honesty failure in section form. Which upstream request goes
 empty on a cold project, and whether the section should say "unanswered"
 rather than vanish, is undiagnosed. Observed 2026-08-19.
+
+Now deterministically reproducible in-repo through `explore_symbol`
+(2026-08-20), and worse than a vanishing section — the call section changes
+shape and content with run breadth. The committed
+`responses/explore_symbol/function-with-similarity-tail.txt` baseline, written
+by a full-suite `capture` run, shows `## Calls (3 workspace …)` as flat rows
+with `zero` at a position money.ts has not had for days (`14:14`); every
+filtered run of the same case (`vp run "@type-atlas/mcp#case"
+function-with-similarity-tail`) renders `## Calls (4 workspace …)` grouped by
+declaring file, `add` included, `zero` at its current `30:14`. A second full
+plain run reproduced the flat form byte-for-byte (85/85 green), so the two
+shapes are each stable — the discriminator is what the session did before the
+call. Suspicion: an earlier case's fixture arrangement leaves the language
+server holding a superseded document state that the inspection's call walk then
+reads. Until diagnosed, any accept run for this case records whichever shape
+its run breadth produces, and the corpus gate will flip when the other breadth
+runs it.
 
 ### The bridge prints a type containing torn source text
 
