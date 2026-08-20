@@ -1,0 +1,7 @@
+{
+  "tool": "workspace_symbols",
+  "arguments": {
+    "file": "packages/accounts/src/account.ts",
+    "query": "store"
+  }
+}

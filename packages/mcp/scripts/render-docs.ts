@@ -11,11 +11,11 @@
  *   description, then every practical case with its invocation and response.
  *   Nothing in them is written by hand.
  *
- * Both derive from the same files the regression suite maintains:
- * scenario definitions (`test/scenarios/cases.ts`), captured responses
- * (`test/scenarios/responses/`), and the captured `tools/list` catalog.
- * Changing a tool's behavior changes its documentation in the same commit,
- * or the gate says so.
+ * Both derive from the captured corpus the regression suite maintains under
+ * `test/scenarios/responses/` — the manifest naming every case in execution
+ * order, each case's `.call.json` invocation record, its response, and the
+ * captured `tools/list` catalog. Changing a tool's behavior changes its
+ * documentation in the same commit, or the gate says so.
  *
  * The scenario suite renders these as vitest file snapshots: `vitest -u`
  * writes them, a plain run fails on drift. There is no separate command.
@@ -24,12 +24,18 @@ import { readdir, readFile } from "node:fs/promises";
 import { relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import Markdoc from "@markdoc/markdoc";
-import { scenarios } from "../test/scenarios/cases.ts";
-import { fixtureRoot } from "../test/scenarios/runner.ts";
+import {
+  type CapturedScenario,
+  capturedScenarios,
+  fixtureRoot,
+  responsesRoot,
+} from "../test/scenarios/runner.ts";
 
 const repositoryRoot = resolve(fileURLToPath(new URL("../../..", import.meta.url)));
-const responsesRoot = resolve(repositoryRoot, "packages/mcp/test/scenarios/responses");
 const toolDocumentsRoot = "docs/tools";
+
+let corpusHeld: Promise<readonly CapturedScenario[]> | undefined;
+const corpus = () => (corpusHeld ??= capturedScenarios());
 
 /** Authored documents: repository front page and the npm landing page. */
 export const generatedDocuments = [
@@ -107,10 +113,10 @@ export const renderAuthored = async (sourceRelative: string): Promise<string> =>
   const embeds = await Promise.all(
     tags.map(async (node) => {
       const id = String(node.attributes.primary ?? "");
-      const scenario = scenarios.find((held) => `${held.tool}/${held.name}` === id);
+      const scenario = (await corpus()).find((held) => held.id === id);
       if (scenario === undefined) {
         throw new Error(
-          `${sourceRelative} embeds scenario "${id}" (line ${node.lines[0] ?? "?"}) but no such scenario is defined in test/scenarios/cases.ts`,
+          `${sourceRelative} embeds scenario "${id}" (line ${node.lines[0] ?? "?"}) but no such case is in the captured corpus (test/scenarios/responses/manifest.txt)`,
         );
       }
       const captured = await capturedResponse(id, sourceRelative);
@@ -132,13 +138,12 @@ const caseHeading = (name: string): string => name.replaceAll("-", " ");
 
 /** One tool's page: its advertised description, then every case it has. */
 export const renderToolDocument = async (tool: string): Promise<string> => {
-  const own = scenarios.filter((scenario) => scenario.tool === tool);
+  const own = (await corpus()).filter((scenario) => scenario.tool === tool);
   const description = (await catalog()).find(({ name }) => name === tool)?.description;
   const cases = await Promise.all(
     own.map(async (scenario) => {
-      const id = `${scenario.tool}/${scenario.name}`;
       const invocation = await invocationBlock(scenario.tool, scenario.arguments);
-      const captured = await capturedResponse(id, `${toolDocumentsRoot}/${tool}.md`);
+      const captured = await capturedResponse(scenario.id, `${toolDocumentsRoot}/${tool}.md`);
       return `## ${caseHeading(scenario.name)}\n\n${invocation}\n\n${responseBlock(captured)}`;
     }),
   );
@@ -154,7 +159,7 @@ export const renderToolDocument = async (tool: string): Promise<string> => {
 /** The directory's index: every documented tool with its case count. */
 export const renderToolIndex = async (): Promise<string> => {
   const held = await catalog();
-  const counts = Map.groupBy(scenarios, ({ tool }) => tool);
+  const counts = Map.groupBy(await corpus(), ({ tool }) => tool);
   const rows = [...counts]
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([tool, cases]) => {
@@ -176,7 +181,7 @@ export const renderToolIndex = async (): Promise<string> => {
 export const generatedFiles = async (): Promise<
   ReadonlyArray<{ target: string; render: () => Promise<string> }>
 > => {
-  const tools = [...new Set(scenarios.map(({ tool }) => tool))].sort();
+  const tools = [...new Set((await corpus()).map(({ tool }) => tool))].sort();
   return [
     ...generatedDocuments.map(({ source, target }) => ({
       target,

@@ -1,6 +1,7 @@
-Changing Money touches 31 uses in 7 files across 4 packages, in the projects loaded this session. No use sits in a test file.
+Changing Money touches 34 uses in 8 files across 5 packages, in the projects loaded this session. No use sits in a test file.
 
 packages/money      12  2
 packages/accounts   10  2
 packages/reports     7  2
+packages/rules       3  1
 packages/reconcile   2  1

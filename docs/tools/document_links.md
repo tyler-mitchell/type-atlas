@@ -4,6 +4,18 @@
 
 Return resolved links discovered by the active language service in a Markdown or JSON document.
 
+## json schema reference
+
+```yaml
+tool: Document links
+workspace: fixtures/ledger
+file: ledger.config.json
+```
+
+~~~text
+Nothing in ledger.config.json links anywhere. A link is a target an editor can follow — a Markdown link, a JSON $schema — and a TypeScript import is not one of them, so a module full of imports reports none here. For what a module imports, read it; for what imports it, use file_references.
+~~~
+
 ## fixture readme
 
 ```yaml
@@ -13,10 +25,9 @@ file: README.md
 ```
 
 ~~~text
-README.md names 2 links.
+README.md names 1 link.
 
 README.md
-├  5:25-5:76:  ../../packages/mcp/test/scenarios/scenarios.test.ts
-└  6:33-6:75:  ../../packages/mcp/test/scenarios/cases.ts
+└  5:22-5:73:  ../../packages/mcp/test/scenarios/scenarios.test.ts
 ~~~
 

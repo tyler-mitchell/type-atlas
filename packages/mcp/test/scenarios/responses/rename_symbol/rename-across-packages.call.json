@@ -1,0 +1,11 @@
+{
+  "tool": "rename_symbol",
+  "arguments": {
+    "file": "packages/accounts/src/account.ts",
+    "position": {
+      "line": 18,
+      "character": 14
+    },
+    "newName": "balanceSide"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "tool": "list_files",
+  "arguments": {
+    "glob": [
+      "**/*.test.ts"
+    ]
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "tool": "workspace_symbols",
+  "arguments": {
+    "file": "packages/reports/src/balance.ts",
+    "query": "Balance"
+  }
+}

@@ -16,7 +16,7 @@ module: @ledger/money
 ~~~text
 Seen from packages/reports/src/balance.ts · runtime surface.
 
-=== @ledger/money · 9 exports ===
+=== @ledger/money · 11 exports ===
 
 add: (alias) const add: (left: __module.Money, right: __module.Money) => __module.Money
    export add
@@ -34,6 +34,10 @@ money: (alias) const money: (minorUnits: bigint | number, currency: __module.Cur
    export money
 negate: (alias) const negate: (value: __module.Money) => __module.Money
    export negate
+RoundingMode: (alias) enum RoundingMode
+   export RoundingMode
+roundingModeOf: (alias) const roundingModeOf: (bank: string) => __module.RoundingMode
+   export roundingModeOf
 zero: (alias) const zero: (currency: __module.Currency) => __module.Money
    export zero
 ~~~

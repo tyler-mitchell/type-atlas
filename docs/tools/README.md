@@ -10,7 +10,7 @@ One page per tool, generated from the scenario suite's captured responses — ev
 
 | [`add_missing_imports`](add_missing_imports.md) | Add missing imports | 1 |
 
-| [`callees`](callees.md) | Callees | 2 |
+| [`callees`](callees.md) | Callees | 3 |
 
 | [`callers`](callers.md) | Callers | 2 |
 
@@ -24,9 +24,9 @@ One page per tool, generated from the scenario suite's captured responses — ev
 
 | [`document_highlights`](document_highlights.md) | Document highlights | 1 |
 
-| [`document_links`](document_links.md) | Document links | 1 |
+| [`document_links`](document_links.md) | Document links | 2 |
 
-| [`document_symbols`](document_symbols.md) | Document symbols | 3 |
+| [`document_symbols`](document_symbols.md) | Document symbols | 4 |
 
 | [`file_references`](file_references.md) | File references | 1 |
 
@@ -34,11 +34,11 @@ One page per tool, generated from the scenario suite's captured responses — ev
 
 | [`format_document`](format_document.md) | Format document | 1 |
 
-| [`hover`](hover.md) | Hover | 3 |
+| [`hover`](hover.md) | Hover | 5 |
 
 | [`impact`](impact.md) | Impact | 2 |
 
-| [`implementations`](implementations.md) | Implementations | 1 |
+| [`implementations`](implementations.md) | Implementations | 2 |
 
 | [`inlay_hints`](inlay_hints.md) | Inlay hints | 1 |
 
@@ -54,11 +54,11 @@ One page per tool, generated from the scenario suite's captured responses — ev
 
 | [`project_config`](project_config.md) | Project configuration | 1 |
 
-| [`quorl`](quorl.md) | Quorl | 2 |
+| [`quorl`](quorl.md) | Quorl | 3 |
 
-| [`read_file`](read_file.md) | Read files | 2 |
+| [`read_file`](read_file.md) | Read files | 3 |
 
-| [`references`](references.md) | References | 2 |
+| [`references`](references.md) | References | 3 |
 
 | [`remove_unused_code`](remove_unused_code.md) | Remove unused code | 1 |
 
@@ -68,11 +68,11 @@ One page per tool, generated from the scenario suite's captured responses — ev
 
 | [`selection_ranges`](selection_ranges.md) | Selection ranges | 1 |
 
-| [`signature_help`](signature_help.md) | Signature help | 1 |
+| [`signature_help`](signature_help.md) | Signature help | 2 |
 
-| [`type_definitions`](type_definitions.md) | Type definitions | 2 |
+| [`type_definitions`](type_definitions.md) | Type definitions | 3 |
 
 | [`verify_edit`](verify_edit.md) | Verify edit | 1 |
 
-| [`workspace_symbols`](workspace_symbols.md) | Workspace symbols | 2 |
+| [`workspace_symbols`](workspace_symbols.md) | Workspace symbols | 3 |
 

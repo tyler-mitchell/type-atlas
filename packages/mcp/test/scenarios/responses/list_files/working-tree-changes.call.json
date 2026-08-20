@@ -1,0 +1,18 @@
+{
+  "tool": "list_files",
+  "arguments": {
+    "directory": "packages/money",
+    "depth": 2
+  },
+  "arrange": {
+    "append": {
+      "packages/money/src/currency.ts": "\n// TODO: JPY carries no minor units — audit format() before adding currencies.\n"
+    },
+    "create": {
+      "packages/money/src/rounding.ts": "import { type Currency, currencyProfiles } from \"./currency.ts\";\n\n/** Banker's rounding for statement subtotals — draft, not yet wired in. */\nexport const roundToMinor = (value: number, currency: Currency): bigint => {\n  const scaled = value * currencyProfiles[currency].minorUnitsPerMajor;\n  const floor = Math.floor(scaled);\n  const fraction = scaled - floor;\n  if (fraction > 0.5) return BigInt(floor + 1);\n  if (fraction < 0.5) return BigInt(floor);\n  return BigInt(floor % 2 === 0 ? floor : floor + 1);\n};\n"
+    },
+    "delete": [
+      "packages/money/src/index.ts"
+    ]
+  }
+}

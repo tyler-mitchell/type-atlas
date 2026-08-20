@@ -32,3 +32,18 @@ position: {"line":33,"character":20}
 Nothing at this position has a type declared elsewhere. A primitive, a literal, or an inferred anonymous shape has no type definition to jump to.
 ~~~
 
+## parameter to mapped type
+
+```yaml
+tool: Type definitions
+workspace: fixtures/ledger
+file: packages/rules/src/rule.ts
+position: {"line":47,"character":3}
+```
+
+~~~text
+book [parameter] · type declared at 1 target
+
+RuleBook · packages/rules/src/rule.ts:41:31-43:2
+~~~
+

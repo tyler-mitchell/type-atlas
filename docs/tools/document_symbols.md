@@ -57,3 +57,25 @@ StatementRow [interface] 6:18-6:30 · range 6:1-11:2
 3 hints in packages/importers/src/csv.ts
 ~~~
 
+## generic module outline
+
+```yaml
+tool: Document symbols
+workspace: fixtures/ledger
+file: packages/rules/src/rule.ts
+```
+
+~~~text
+=== packages/rules/src/rule.ts · 9 top-level symbols ===
+
+AccountPattern [interface] 35:13-35:27 · range 35:1-35:58
+evaluate [variable] 46:14-46:22 · range 46:14-56:2
+matches [variable] 37:14-37:21 · range 37:14-38:90
+PayloadOf [interface] 27:13-27:22 · range 27:1-29:11
+RuleBook [interface] 41:13-41:21 · range 41:1-43:3
+RuleEvent [interface] 14:13-14:22 · range 14:1-14:56
+RuleEvents [interface] 8:18-8:28 · range 8:1-12:2
+RuleHandler [interface] 19:13-19:24 · range 19:1-21:14
+Verdict [interface] 17:13-17:20 · range 17:1-17:101
+~~~
+

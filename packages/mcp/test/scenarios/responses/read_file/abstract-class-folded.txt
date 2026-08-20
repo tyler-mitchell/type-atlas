@@ -1,0 +1,38 @@
+1 file · 34 lines · 33 folded to signatures, pass fold: false for the bodies
+
+=== packages/importers/src/statement-parser.ts · 64 lines ===
+
+ 1 | import { parseStatement, type StatementRow } from "./csv.ts";
+ 2 |
+ 3 | /**
+ 4 |  * One bank format, parsed. Concrete parsers own the format quirks; consumers
+ 5 |  * hold the abstraction and pick a parser by the file they were handed.
+ 6 |  */
+ 7 | export abstract class StatementParser {
+   |   ... 8-22 folded
+23 | }
+24 |
+25 | export class CsvStatementParser extends StatementParser {
+   |   ... 26-34 folded
+35 | }
+36 |
+37 | /**
+38 |  * The fixed-width export some banks still produce: columns at fixed offsets,
+39 |  * no header, one currency for the whole file.
+40 |  */
+41 | export class FixedWidthStatementParser extends StatementParser {
+42 |   readonly format = "fixed-width";
+43 |
+44 |   constructor(private readonly currency: StatementRow["currency"]) {
+45 |     super();
+46 |   }
+47 |
+48 |   recognises(source: string): boolean {
+49 |     const [first] = source.split("\n");
+50 |     return first !== undefined && first.length === 42 && !first.includes(",");
+51 |   }
+52 |
+53 |   parse(source: string): readonly StatementRow[] {
+   |     ... 54-62 folded
+63 |   }
+64 | }

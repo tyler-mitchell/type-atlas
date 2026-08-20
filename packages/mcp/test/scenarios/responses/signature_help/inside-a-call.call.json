@@ -1,0 +1,10 @@
+{
+  "tool": "signature_help",
+  "arguments": {
+    "file": "packages/reports/src/balance.ts",
+    "position": {
+      "line": 34,
+      "character": 13
+    }
+  }
+}

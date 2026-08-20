@@ -15,9 +15,9 @@ position: {"line":12,"character":13}
 
 ~~~text
 Money [type] · packages/money/src/money.ts:12:13
-30 references · 7 projects loaded · packages/money/tsconfig.json
+33 references · 8 projects loaded · packages/money/tsconfig.json
 
-1-20 of 30 references · pass offset: 20 for the rest
+1-20 of 33 references · pass offset: 20 for the rest
 
 packages/accounts/src/journal.ts
 ├  1:28  — at module level
@@ -56,12 +56,30 @@ position: {"line":18,"character":14}
 
 ~~~text
 normalBalance [function] · packages/accounts/src/account.ts:18:14
-3 references · 7 projects loaded · packages/accounts/tsconfig.json
+3 references · 8 projects loaded · packages/accounts/tsconfig.json
 
 packages/accounts/src/index.ts
 └  8:3 — at module level
 packages/reports/src/statement.ts
 ├  1:24 — at module level
 └  9:17 — inside shown
+~~~
+
+## enum member
+
+```yaml
+tool: References
+workspace: fixtures/ledger
+file: packages/money/src/rounding-mode.ts
+position: {"line":4,"character":3}
+```
+
+~~~text
+HalfEven [enum member] · inside RoundingMode · packages/money/src/rounding-mode.ts:4:3
+2 references · 8 projects loaded · packages/money/tsconfig.json
+
+packages/money/src/rounding-mode.ts
+├  10:34 — inside "first-national"
+└  15:38 — inside roundingModeOf
 ~~~
 

@@ -1,0 +1,1 @@
+Nothing in ledger.config.json links anywhere. A link is a target an editor can follow — a Markdown link, a JSON $schema — and a TypeScript import is not one of them, so a module full of imports reports none here. For what a module imports, read it; for what imports it, use file_references.

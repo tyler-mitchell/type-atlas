@@ -1,0 +1,7 @@
+Closure of matches · 2 declarations · 6 sites · depth 2
+
+matches · packages/rules/src/rule.ts:37:14
+└  noDirectBranchPostings · packages/rules/src/builtin.ts:14:14
+   └  17:5 · matches(branch, posting.account) && !posting.account.includes(":")
+
+0 marked … were not expanded · raise depth or limit to follow them

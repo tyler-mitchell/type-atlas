@@ -1,0 +1,11 @@
+{
+  "tool": "quorl",
+  "arguments": {
+    "file": "packages/rules/src/rule.ts",
+    "position": {
+      "line": 37,
+      "character": 14
+    },
+    "depth": 2
+  }
+}

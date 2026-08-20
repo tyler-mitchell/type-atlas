@@ -1,0 +1,10 @@
+{
+  "tool": "type_definitions",
+  "arguments": {
+    "file": "packages/reports/src/balance.ts",
+    "position": {
+      "line": 33,
+      "character": 20
+    }
+  }
+}

@@ -17,7 +17,27 @@ position: {"line":34,"character":13}
 packages/reports/src/balance.ts:34:13 · 1 signature
 
 add(left: Money, right: Money): Money
-├  left: Money
+├  left: Money · active
 └  right: Money
+~~~
+
+## overload and second argument
+
+```yaml
+tool: Signature help
+workspace: fixtures/ledger
+file: packages/accounts/tests/journal.test.ts
+position: {"line":9,"character":5}
+```
+
+~~~text
+packages/accounts/tests/journal.test.ts:9:5 · 2 signatures · number 2 in use
+
+post(entry: Entry<undefined>): Entry<undefined>
+└  entry: Entry<undefined>
+post(description: string, transfer: { from: AccountPath; to: AccountPath; amount: Money; }, meta: undefined): Entry<undefined>
+├  description: string
+├  transfer: { from: AccountPath; to: AccountPath; amount: Money; } · active
+└  meta: undefined
 ~~~
 

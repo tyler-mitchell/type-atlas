@@ -1,0 +1,8 @@
+{
+  "tool": "read_file",
+  "arguments": {
+    "file": [
+      "packages/importers/src/statement-parser.ts"
+    ]
+  }
+}

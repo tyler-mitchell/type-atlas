@@ -14,7 +14,7 @@ position: {"line":25,"character":14}
 ```
 
 ~~~text
-signedAmount · called from 3 places · 7 projects loaded
+signedAmount · called from 4 places · 8 projects loaded
 
 packages/accounts/src/journal.ts
 └  post [method] 34:3-57:4 · calls 52:12-52:24
@@ -22,6 +22,8 @@ packages/reports/src/balance.ts
 └  balancesAsOf [variable] 23:14-23:26 · range 23:14-51:2 · calls 34:57-34:69
 packages/reconcile/src/drift.ts
 └  journalTotal [variable] 20:9-20:21 · range 20:9-20:92 · calls 20:37-20:49
+packages/rules/src/builtin.ts
+└  closedPeriodsBalance [variable] 22:14-22:34 · range 22:14-35:2 · calls 26:12-26:24
 ~~~
 
 ## who calls an overloaded method
@@ -34,7 +36,7 @@ position: {"line":28,"character":3}
 ```
 
 ~~~text
-post · called from 3 places · 7 projects loaded
+post · called from 3 places · 8 projects loaded
 
 packages/accounts/tests/journal.test.ts
 ├  expect() callback [function] 18:10-27:7 · calls 19:13-19:17

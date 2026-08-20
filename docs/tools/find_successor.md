@@ -18,19 +18,20 @@ Not found · postEntry · no declaration of this name is in the symbol index
 
 Searched symbols declared in loaded projects, the semantic index. Only projects opened this session are searched, so a name declared in a project nothing has touched reports nothing here — ask something semantic about a file in that project, then ask this again. This states what the index holds, not what the repository contains: an absent declaration is evidence, and references or document_symbols on a file you suspect will confirm or contradict it.
 
-Candidates (3)
+Candidates (4)
 
 entry · declared in a loaded project · shares entry · packages/accounts/src/journal.ts
 Entry · declared in a loaded project · shares entry · packages/accounts/src/journal.ts
 UnbalancedEntryError · declared in a loaded project · shares entry · packages/accounts/src/journal.ts
+entry:recorded · declared in a loaded project · shares entry · packages/rules/src/rule.ts
 
 Files discussing it (5)
 
 packages/accounts/src/posting.ts
 packages/accounts/src/journal.ts
+packages/rules/src/builtin.ts
 packages/reports/src/balance.ts
-packages/importers/src/csv.ts
-packages/accounts/src/index.ts
+packages/rules/src/rule.ts
 
 A file naming something the index does not declare is either discussing it from outside — a comment, a document, an import of someone else's — or declaring it in a project the index has not read. Read one before concluding which.
 
@@ -51,20 +52,21 @@ Not found · balanceOf · no declaration of this name is in the symbol index
 
 Searched symbols declared in loaded projects, the semantic index. Only projects opened this session are searched, so a name declared in a project nothing has touched reports nothing here — ask something semantic about a file in that project, then ask this again. This states what the index holds, not what the repository contains: an absent declaration is evidence, and references or document_symbols on a file you suspect will confirm or contradict it.
 
-Candidates (4)
+Candidates (5)
 
 balance · declared in a loaded project · shares balance · packages/reports/src/balance.ts
 balancesAsOf · declared in a loaded project · shares of · packages/reports/src/balance.ts
 BalanceLine · declared in a loaded project · shares balance · packages/reports/src/balance.ts
 normalBalance · declared in a loaded project · shares balance · packages/accounts/src/account.ts
+closedPeriodsBalance · declared in a loaded project · shares balance · packages/rules/src/builtin.ts
 
 Files discussing it (5)
 
 packages/reports/src/balance.ts
-packages/reports/src/balance.ts
 packages/accounts/src/account.ts
-packages/accounts/src/journal.ts
+packages/reports/src/balance.ts
 packages/reports/src/index.ts
+packages/accounts/src/journal.ts
 
 A file naming something the index does not declare is either discussing it from outside — a comment, a document, an import of someone else's — or declaring it in a project the index has not read. Read one before concluding which.
 

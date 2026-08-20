@@ -1,0 +1,10 @@
+{
+  "$schema": "./ledger.config.schema.json",
+  "defaultCurrency": "USD",
+  "suspenseAccount": "suspense",
+  "rounding": "half-even",
+  "banks": {
+    "first-national": { "format": "csv" },
+    "harbor-credit": { "format": "fixed-width" }
+  }
+}

@@ -4,10 +4,11 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createTwoFilesPatch } from "diff";
 import { execa } from "execa";
-import { scenarios } from "../test/scenarios/cases.ts";
 import {
   arrangeFixture,
+  capturedScenarios,
   connectScenarioSession,
+  responsesRoot,
   warmFixtureProjects,
 } from "../test/scenarios/runner.ts";
 
@@ -164,7 +165,6 @@ try {
     // The same deterministic warm-up the capture suite runs: several answers
     // embed loaded-project state, and a cold replay diverges on exactly that.
     await warmFixtureProjects(session);
-    const responsesRoot = join(repositoryRoot, "packages/mcp/test/scenarios/responses");
     const capturedCatalog = await readFile(join(responsesRoot, "tool-catalog.json"), "utf8");
     const installedCatalog = `${JSON.stringify(await session.catalog(), null, 2)}\n`;
     if (installedCatalog !== capturedCatalog) {
@@ -172,23 +172,21 @@ try {
         "The installed MCP's tools/list differs from the captured catalog (test/scenarios/responses/tool-catalog.json). Regenerate captures if the surface changed deliberately.",
       );
     }
+    const corpus = await capturedScenarios();
     const mismatched: string[] = [];
-    for (const scenario of scenarios) {
+    for (const scenario of corpus) {
       // The same working-tree arrangement the capture ran under — a scenario
       // about uncommitted state cannot reproduce against a clean fixture.
       const restore = scenario.arrange ? await arrangeFixture(scenario.arrange) : undefined;
       const answer = await session
         .invoke(scenario.tool, scenario.arguments)
-        .finally(() => restore?.());
-      const committed = await readFile(
-        join(responsesRoot, `${scenario.tool}/${scenario.name}.txt`),
-        "utf8",
-      );
+        .finally(async () => await restore?.());
+      const committed = await readFile(join(responsesRoot, `${scenario.id}.txt`), "utf8");
       if (answer.trimEnd() !== committed.trimEnd()) {
-        mismatched.push(`${scenario.tool}/${scenario.name}`);
+        mismatched.push(scenario.id);
         console.error(
           createTwoFilesPatch(
-            `captured ${scenario.tool}/${scenario.name}`,
+            `captured ${scenario.id}`,
             "installed answer",
             `${committed.trimEnd()}\n`,
             `${answer.trimEnd()}\n`,
@@ -202,7 +200,7 @@ try {
       );
     }
     console.log(
-      `Packed packages install cleanly; the installed MCP reproduces the tool catalog and all ${scenarios.length} captured scenarios.`,
+      `Packed packages install cleanly; the installed MCP reproduces the tool catalog and all ${corpus.length} captured scenarios.`,
     );
   } finally {
     await session.close();

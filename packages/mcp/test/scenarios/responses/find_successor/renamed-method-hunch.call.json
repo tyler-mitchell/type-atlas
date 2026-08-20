@@ -1,0 +1,7 @@
+{
+  "tool": "find_successor",
+  "arguments": {
+    "file": "packages/accounts/src/journal.ts",
+    "name": "postEntry"
+  }
+}

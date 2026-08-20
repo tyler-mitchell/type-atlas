@@ -1,6 +1,6 @@
 ledger/
 ├  apps/ · 11 files
-├  packages/
+├  packages/ · 11 changed
 │  ├  accounts/
 │  │  ├  src/ · 4 files
 │  │  ├  tests/ · 1 file
@@ -11,9 +11,11 @@ ledger/
 │        ├  balance.ts · 58 loc
 │        ├  index.ts · 2 loc
 │        └  statement.ts · 11 loc
+├  ledger.config.json · 10 loc · untracked
+├  ledger.config.schema.json · 21 loc · untracked
 ├  package.json · 24 loc
-├  pnpm-lock.yaml · 2.3k loc
+├  pnpm-lock.yaml · 2.3k loc · modified
 ├  pnpm-workspace.yaml · 19 loc
-├  README.md · 33 loc
+├  README.md · 32 loc · modified
 ├  tsconfig.json · 9 loc
 └  vite.config.ts · 13 loc

@@ -1,0 +1,7 @@
+{
+  "tool": "inspect_symbol",
+  "arguments": {
+    "file": "packages/accounts/src/journal.ts",
+    "symbol": "Journal"
+  }
+}

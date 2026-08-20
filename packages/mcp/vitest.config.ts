@@ -13,6 +13,13 @@ import { defineConfig } from "vitest/config";
  */
 export default defineConfig({
   test: {
+    // The default reporter surfaces a test's console output only when the
+    // test fails — which silenced the capture echo on exactly the runs that
+    // matter, the passing `-u` regenerations. Verbose is the terminal
+    // reporter that reports passing tests' output (and annotations), so the
+    // changed-capture echoes land in the run stream the developing agent is
+    // already reading.
+    reporters: ["verbose"],
     // The scenario suite exercises the fixture and the tool source through a
     // spawned stdio server, which Vite's module graph cannot see — without
     // these triggers, watch mode would never rerun captures after the edits
@@ -43,6 +50,9 @@ export default defineConfig({
           include: ["test/scenarios/scenarios.test.ts"],
           globalSetup: ["test/scenarios/global-setup.ts"],
           sequence: { groupOrder: 0 },
+          // Real language-service work over a spawned server; the first case
+          // also absorbs the session fixture's whole-fixture warm-up.
+          testTimeout: 120_000,
         },
       },
       {

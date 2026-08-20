@@ -1,0 +1,10 @@
+{
+  "tool": "callees",
+  "arguments": {
+    "file": "packages/reports/src/balance.ts",
+    "position": {
+      "line": 23,
+      "character": 14
+    }
+  }
+}

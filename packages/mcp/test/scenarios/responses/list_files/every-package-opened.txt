@@ -1,6 +1,6 @@
 ledger/
 ├  apps/ · 11 files
-├  packages/
+├  packages/ · 11 changed
 │  ├  accounts/
 │  │  ├  src/
 │  │  │  ├  account.ts · 56 loc
@@ -11,26 +11,29 @@ ledger/
 │  │  │  └  journal.test.ts · 29 loc
 │  │  ├  package.json · 22 loc
 │  │  └  tsconfig.json · 20 loc
-│  ├  importers/
-│  │  ├  src/
+│  ├  importers/ · 3 changed
+│  │  ├  src/ · 3 changed
+│  │  │  ├  config.ts · 7 loc · untracked
 │  │  │  ├  csv.ts · 47 loc
 │  │  │  ├  dedupe.ts · 18 loc
-│  │  │  └  index.ts · 2 loc
+│  │  │  ├  index.ts · 7 loc · modified
+│  │  │  └  statement-parser.ts · 64 loc · untracked
 │  │  ├  package.json · 23 loc
 │  │  └  tsconfig.json · 19 loc
-│  ├  money/
-│  │  ├  src/
+│  ├  money/ · 2 changed
+│  │  ├  src/ · 2 changed
 │  │  │  ├  currency.ts · 19 loc
-│  │  │  ├  index.ts · 11 loc
-│  │  │  └  money.ts · 52 loc
+│  │  │  ├  index.ts · 12 loc · modified
+│  │  │  ├  money.ts · 52 loc
+│  │  │  └  rounding-mode.ts · 15 loc · untracked
 │  │  ├  tests/
 │  │  │  └  money.test.ts · 15 loc
 │  │  ├  package.json · 19 loc
 │  │  └  tsconfig.json · 20 loc
-│  ├  reconcile/
-│  │  ├  src/
+│  ├  reconcile/ · 1 changed
+│  │  ├  src/ · 1 changed
 │  │  │  ├  drift.ts · 22 loc
-│  │  │  ├  index.ts · 1 loc
+│  │  │  ├  index.ts · 4 loc · modified
 │  │  │  └  matching.ts · 24 loc
 │  │  ├  package.json · 19 loc
 │  │  └  tsconfig.json · 20 loc
@@ -41,6 +44,13 @@ ledger/
 │  │  │  └  statement.ts · 11 loc
 │  │  ├  package.json · 23 loc
 │  │  └  tsconfig.json · 20 loc
+│  ├  rules/ · 5 changed
+│  │  ├  src/ · 3 changed
+│  │  │  ├  builtin.ts · 49 loc · untracked
+│  │  │  ├  index.ts · 17 loc · untracked
+│  │  │  └  rule.ts · 56 loc · untracked
+│  │  ├  package.json · 23 loc · untracked
+│  │  └  tsconfig.json · 19 loc · untracked
 │  └  utils/
 │     ├  src/
 │     │  └  index.ts · 3 loc
@@ -50,9 +60,11 @@ ledger/
 │     ├  README.md · 23 loc
 │     ├  tsconfig.json · 20 loc
 │     └  vite.config.ts · 17 loc
+├  ledger.config.json · 10 loc · untracked
+├  ledger.config.schema.json · 21 loc · untracked
 ├  package.json · 24 loc
-├  pnpm-lock.yaml · 2.3k loc
+├  pnpm-lock.yaml · 2.3k loc · modified
 ├  pnpm-workspace.yaml · 19 loc
-├  README.md · 33 loc
+├  README.md · 32 loc · modified
 ├  tsconfig.json · 9 loc
 └  vite.config.ts · 13 loc

@@ -1,0 +1,10 @@
+{
+  "tool": "type_definitions",
+  "arguments": {
+    "file": "packages/rules/src/rule.ts",
+    "position": {
+      "line": 47,
+      "character": 3
+    }
+  }
+}

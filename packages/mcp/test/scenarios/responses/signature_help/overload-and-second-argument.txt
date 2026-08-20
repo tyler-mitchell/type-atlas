@@ -1,0 +1,8 @@
+packages/accounts/tests/journal.test.ts:9:5 · 2 signatures · number 2 in use
+
+post(entry: Entry<undefined>): Entry<undefined>
+└  entry: Entry<undefined>
+post(description: string, transfer: { from: AccountPath; to: AccountPath; amount: Money; }, meta: undefined): Entry<undefined>
+├  description: string
+├  transfer: { from: AccountPath; to: AccountPath; amount: Money; } · active
+└  meta: undefined

@@ -1,0 +1,8 @@
+packages/rules/src/rule.ts:35:13
+
+```typescript
+type AccountPattern = string
+```
+
+An account matcher: a literal path, or a template-literal prefix pattern —
+`"assets:bank:*"` matches every account under that branch.

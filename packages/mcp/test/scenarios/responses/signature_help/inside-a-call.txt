@@ -1,5 +1,5 @@
 packages/reports/src/balance.ts:34:13 · 1 signature
 
 add(left: Money, right: Money): Money
-├  left: Money
+├  left: Money · active
 └  right: Money

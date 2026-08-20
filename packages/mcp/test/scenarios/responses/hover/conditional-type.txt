@@ -1,0 +1,8 @@
+packages/rules/src/rule.ts:27:13
+
+```typescript
+type PayloadOf<TMeta, TEvent> = TEvent extends keyof RuleEvents<TMeta> ? RuleEvents<TMeta>[TEvent] : never
+```
+
+The payload a given event name carries — conditional extraction, so a
+consumer can name the payload of one event without writing the map out.

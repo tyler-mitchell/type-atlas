@@ -13,7 +13,7 @@ text: signedAmount
 ```
 
 ~~~text
-"signedAmount" occurs 10 times in 6 files · 54 files scanned under the workspace.
+"signedAmount" occurs 12 times in 7 files · 64 files scanned under the workspace.
 
 packages/accounts/src/index.ts:12:39 · export { credit, debit, type Posting, signedAmount } from "./posting.ts";
 packages/accounts/src/journal.ts
@@ -29,6 +29,9 @@ packages/reconcile/src/matching.ts
 packages/reports/src/balance.ts
 ├  6:3   · signedAmount,
 └  34:57 · add(own.get(posting.account) ?? zero(currency), signedAmount(posting)),
+packages/rules/src/builtin.ts
+├  1:10  · import { signedAmount } from "@ledger/accounts";
+└  26:12 · .map(signedAmount)
 ~~~
 
 ## honest zero
@@ -40,6 +43,6 @@ text: quantumFlux
 ```
 
 ~~~text
-Nothing under the workspace contains "quantumFlux" · 54 files scanned. This is a literal answer: the exact text does not occur in what was scanned, which is the proof a semantic search cannot give.
+Nothing under the workspace contains "quantumFlux" · 64 files scanned. This is a literal answer: the exact text does not occur in what was scanned, which is the proof a semantic search cannot give.
 ~~~
 

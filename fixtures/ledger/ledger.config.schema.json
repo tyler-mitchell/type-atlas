@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "Ledger configuration",
+  "type": "object",
+  "required": ["defaultCurrency", "suspenseAccount"],
+  "properties": {
+    "defaultCurrency": { "type": "string", "enum": ["USD", "EUR", "GBP", "JPY"] },
+    "suspenseAccount": { "type": "string", "minLength": 1 },
+    "rounding": { "type": "string", "enum": ["half-up", "half-even", "truncate"] },
+    "banks": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["format"],
+        "properties": {
+          "format": { "type": "string", "enum": ["csv", "fixed-width"] }
+        }
+      }
+    }
+  }
+}

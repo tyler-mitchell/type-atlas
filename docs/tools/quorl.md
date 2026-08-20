@@ -15,7 +15,7 @@ depth: 2
 ```
 
 ~~~text
-Closure of signedAmount · 6 declarations · 15 sites · depth 2
+Closure of signedAmount · 7 declarations · 19 sites · depth 2
 
 signedAmount · packages/accounts/src/posting.ts:25:14
 ├  imbalance · packages/accounts/src/journal.ts:51:11
@@ -25,10 +25,12 @@ signedAmount · packages/accounts/src/posting.ts:25:14
 │     └  54:17 · if (!isZero(imbalance)) throw new UnbalancedEntryError(imbalance);
 ├  balancesAsOf · packages/reports/src/balance.ts:23:14
 │  └  34:57 · add(own.get(posting.account) ?? zero(currency), signedAmount(posting)),
-└  journalTotal · packages/reconcile/src/drift.ts:20:9
-   ├  20:37 · const journalTotal = postings.map(signedAmount).reduce((total, amount) => total + amount);
-   └  drift · packages/reconcile/src/drift.ts:19:14 · …
-      └  21:23 · return format(money(journalTotal - statementTotal(statement), "usd"));
+├  journalTotal · packages/reconcile/src/drift.ts:20:9
+│  ├  20:37 · const journalTotal = postings.map(signedAmount).reduce((total, amount) => total + amount);
+│  └  drift · packages/reconcile/src/drift.ts:19:14 · …
+│     └  21:23 · return format(money(journalTotal - statementTotal(statement), "usd"));
+└  closedPeriodsBalance · packages/rules/src/builtin.ts:22:14
+   └  26:12 · .map(signedAmount)
 
 2 marked … were not expanded · raise depth or limit to follow them
 ~~~
@@ -45,7 +47,7 @@ limit: 20
 ```
 
 ~~~text
-Closure of money · 21 declarations · 56 sites · depth 3
+Closure of money · 21 declarations · 57 sites · depth 3
 
 money · packages/money/src/money.ts:27:14
 ├  packages/money/tests/money.test.ts
@@ -75,11 +77,13 @@ money · packages/money/src/money.ts:27:14
 │  │  │  ├  53:20 · .reduce(add, zero(entry.postings[0]?.amount.currency ?? "USD"));
 │  │  │  ├  53:31 · .reduce(add, zero(entry.postings[0]?.amount.currency ?? "USD"));
 │  │  │  └  51:29 · const imbalance = entry.postings
-│  │  └  balancesAsOf · packages/reports/src/balance.ts:23:14 · …
-│  │     ├  41:28 · rolled.set(ancestor, add(rolled.get(ancestor) ?? zero(currency), amount));
-│  │     ├  34:9 · add(own.get(posting.account) ?? zero(currency), signedAmount(posting)),
-│  │     ├  41:56 · rolled.set(ancestor, add(rolled.get(ancestor) ?? zero(currency), amount));
-│  │     └  34:41 · add(own.get(posting.account) ?? zero(currency), signedAmount(posting)),
+│  │  ├  balancesAsOf · packages/reports/src/balance.ts:23:14 · …
+│  │  │  ├  41:28 · rolled.set(ancestor, add(rolled.get(ancestor) ?? zero(currency), amount));
+│  │  │  ├  34:9 · add(own.get(posting.account) ?? zero(currency), signedAmount(posting)),
+│  │  │  ├  41:56 · rolled.set(ancestor, add(rolled.get(ancestor) ?? zero(currency), amount));
+│  │  │  └  34:41 · add(own.get(posting.account) ?? zero(currency), signedAmount(posting)),
+│  │  └  closedPeriodsBalance · packages/rules/src/builtin.ts:22:14 · …
+│  │     └  28:58 · (held, amount) => (held === undefined ? amount : add(held, amount)),
 │  └  zero · :30:14
 │     ├  30:52 · export const zero = (currency: Currency): Money => money(0n, currency);
 │     └  own · packages/reports/src/balance.ts:48:7 · …
@@ -95,15 +99,33 @@ money · packages/money/src/money.ts:27:14
 │  │     │  └  62:13 · entry.postings.some((posting) => posting.account === account),
 │  │     ├  postings · :44:13 · …
 │  │     └  postings · :9:12 · …
-│  └  amount · :9:63
-│     ├  9:71 · { from: "assets:bank:checking", to: "expenses:furniture", amount: money(24900, "USD") },
-│     └  post · packages/accounts/src/journal.ts:29:3 · …
-│        └  31:53 · transfer: { from: AccountPath; to: AccountPath; amount: Money },
+│  └  amount · :9:63 · …
+│     └  9:71 · { from: "assets:bank:checking", to: "expenses:furniture", amount: money(24900, "USD") },
 ├  drift · packages/reconcile/src/drift.ts:19:14 · …
 │  └  21:17 · return format(money(journalTotal - statementTotal(statement), "usd"));
 └  amount · packages/importers/src/csv.ts:34:11 · …
    └  34:20 · const amount = money(Math.abs(row.amountMinor), row.currency);
 
-12 marked … were not expanded · raise depth or limit to follow them
+13 marked … were not expanded · raise depth or limit to follow them
+~~~
+
+## pattern matcher closure
+
+```yaml
+tool: Quorl
+workspace: fixtures/ledger
+file: packages/rules/src/rule.ts
+position: {"line":37,"character":14}
+depth: 2
+```
+
+~~~text
+Closure of matches · 2 declarations · 6 sites · depth 2
+
+matches · packages/rules/src/rule.ts:37:14
+└  noDirectBranchPostings · packages/rules/src/builtin.ts:14:14
+   └  17:5 · matches(branch, posting.account) && !posting.account.includes(":")
+
+0 marked … were not expanded · raise depth or limit to follow them
 ~~~
 

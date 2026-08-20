@@ -1,0 +1,10 @@
+{
+  "tool": "impact",
+  "arguments": {
+    "file": "packages/money/src/money.ts",
+    "position": {
+      "line": 12,
+      "character": 13
+    }
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "tool": "find_successor",
+  "arguments": {
+    "file": "packages/reports/src/balance.ts",
+    "name": "balanceOf"
+  }
+}

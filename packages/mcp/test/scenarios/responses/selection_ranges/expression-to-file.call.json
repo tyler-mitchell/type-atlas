@@ -1,0 +1,10 @@
+{
+  "tool": "selection_ranges",
+  "arguments": {
+    "file": "packages/reports/src/balance.ts",
+    "position": {
+      "line": 34,
+      "character": 20
+    }
+  }
+}

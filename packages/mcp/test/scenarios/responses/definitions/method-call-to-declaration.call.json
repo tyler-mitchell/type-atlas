@@ -1,0 +1,10 @@
+{
+  "tool": "definitions",
+  "arguments": {
+    "file": "packages/accounts/tests/journal.test.ts",
+    "position": {
+      "line": 7,
+      "character": 25
+    }
+  }
+}

@@ -14,11 +14,14 @@ position: {"line":25,"character":14}
 ```
 
 ~~~text
-Changing signedAmount touches 8 uses in 5 files across 3 packages, in the projects loaded this session. No use sits in a test file.
+Changing signedAmount touches 10 uses in 6 files across 4 packages, in the projects loaded this session. No use sits in a test file.
 
 packages/accounts   4  3
 packages/reports    2  1
 packages/reconcile  2  1
+packages/rules      2  1
+
+Retrieval also names packages/importers — not loaded and not confirmed as uses, so they are outside this count. Reading a file in one loads its project, and asking again weighs it.
 ~~~
 
 ## weigh a change to a shared type
@@ -31,11 +34,12 @@ position: {"line":12,"character":13}
 ```
 
 ~~~text
-Changing Money touches 31 uses in 7 files across 4 packages, in the projects loaded this session. No use sits in a test file.
+Changing Money touches 34 uses in 8 files across 5 packages, in the projects loaded this session. No use sits in a test file.
 
 packages/money      12  2
 packages/accounts   10  2
 packages/reports     7  2
+packages/rules       3  1
 packages/reconcile   2  1
 ~~~
 

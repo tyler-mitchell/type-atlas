@@ -1,0 +1,12 @@
+{
+  "tool": "quorl",
+  "arguments": {
+    "file": "packages/money/src/money.ts",
+    "position": {
+      "line": 27,
+      "character": 14
+    },
+    "depth": 3,
+    "limit": 20
+  }
+}

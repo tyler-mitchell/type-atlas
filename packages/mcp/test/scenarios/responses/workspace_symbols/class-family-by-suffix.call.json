@@ -1,0 +1,7 @@
+{
+  "tool": "workspace_symbols",
+  "arguments": {
+    "file": "packages/importers/src/statement-parser.ts",
+    "query": "Parser"
+  }
+}

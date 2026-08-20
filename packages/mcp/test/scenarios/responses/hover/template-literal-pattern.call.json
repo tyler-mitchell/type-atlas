@@ -1,0 +1,10 @@
+{
+  "tool": "hover",
+  "arguments": {
+    "file": "packages/rules/src/rule.ts",
+    "position": {
+      "line": 35,
+      "character": 13
+    }
+  }
+}

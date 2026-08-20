@@ -1,0 +1,10 @@
+{
+  "tool": "hover",
+  "arguments": {
+    "file": "packages/money/src/currency.ts",
+    "position": {
+      "line": 12,
+      "character": 14
+    }
+  }
+}

@@ -40,3 +40,16 @@ position: {"line":28,"character":3}
 post invokes nothing the owning project resolves. A call to something the project cannot resolve is not reported here — diagnostics say why a name does not resolve.
 ~~~
 
+## what evaluate invokes
+
+```yaml
+tool: Callees
+workspace: fixtures/ledger
+file: packages/rules/src/rule.ts
+position: {"line":46,"character":14}
+```
+
+~~~text
+evaluate invokes nothing the owning project resolves. A call to something the project cannot resolve is not reported here — diagnostics say why a name does not resolve.
+~~~
+

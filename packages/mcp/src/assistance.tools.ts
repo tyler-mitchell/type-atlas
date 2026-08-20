@@ -179,16 +179,30 @@ export const registerAssistanceTools = (
           // description four times across two signatures — and it abutted the
           // type with no separator, so `=> value is S A function that accepts…`
           // read as one expression. The signature above already carries the
-          // types; hover is where prose about a symbol lives.
-          signatures: overloads.map((entry) => ({
-            name: entry.label,
-            children: (entry.parameters ?? []).map((parameter) => ({
-              name:
-                typeof parameter.label === "string"
-                  ? parameter.label
-                  : entry.label.slice(parameter.label[0], parameter.label[1]),
-            })),
-          })),
+          // types; hover is where prose about a symbol lives. The one fact the
+          // rows add is which parameter the position sits in — the question an
+          // agent mid-call is actually asking. A signature-level
+          // activeParameter overrides the help-level one; null means none.
+          signatures: overloads.map((entry, index) => {
+            const activeParameter =
+              index === (result?.activeSignature ?? 0)
+                ? (entry.activeParameter !== undefined
+                    ? entry.activeParameter
+                    : result?.activeParameter)
+                : undefined;
+            return {
+              name: entry.label,
+              children: (entry.parameters ?? []).map((parameter, parameterIndex) => {
+                const label =
+                  typeof parameter.label === "string"
+                    ? parameter.label
+                    : entry.label.slice(parameter.label[0], parameter.label[1]);
+                return {
+                  name: parameterIndex === activeParameter ? `${label} · active` : label,
+                };
+              }),
+            };
+          }),
         },
       });
       return appendDiagnosticContext(textResult(rendered.text), await diagnosticContext);

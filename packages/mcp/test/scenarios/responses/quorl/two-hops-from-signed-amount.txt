@@ -1,4 +1,4 @@
-Closure of signedAmount · 6 declarations · 15 sites · depth 2
+Closure of signedAmount · 7 declarations · 19 sites · depth 2
 
 signedAmount · packages/accounts/src/posting.ts:25:14
 ├  imbalance · packages/accounts/src/journal.ts:51:11
@@ -8,9 +8,11 @@ signedAmount · packages/accounts/src/posting.ts:25:14
 │     └  54:17 · if (!isZero(imbalance)) throw new UnbalancedEntryError(imbalance);
 ├  balancesAsOf · packages/reports/src/balance.ts:23:14
 │  └  34:57 · add(own.get(posting.account) ?? zero(currency), signedAmount(posting)),
-└  journalTotal · packages/reconcile/src/drift.ts:20:9
-   ├  20:37 · const journalTotal = postings.map(signedAmount).reduce((total, amount) => total + amount);
-   └  drift · packages/reconcile/src/drift.ts:19:14 · …
-      └  21:23 · return format(money(journalTotal - statementTotal(statement), "usd"));
+├  journalTotal · packages/reconcile/src/drift.ts:20:9
+│  ├  20:37 · const journalTotal = postings.map(signedAmount).reduce((total, amount) => total + amount);
+│  └  drift · packages/reconcile/src/drift.ts:19:14 · …
+│     └  21:23 · return format(money(journalTotal - statementTotal(statement), "usd"));
+└  closedPeriodsBalance · packages/rules/src/builtin.ts:22:14
+   └  26:12 · .map(signedAmount)
 
 2 marked … were not expanded · raise depth or limit to follow them

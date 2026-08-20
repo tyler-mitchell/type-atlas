@@ -1,0 +1,6 @@
+{
+  "tool": "document_symbols",
+  "arguments": {
+    "file": "packages/accounts/src/journal.ts"
+  }
+}

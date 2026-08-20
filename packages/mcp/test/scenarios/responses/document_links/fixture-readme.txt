@@ -1,5 +1,4 @@
-README.md names 2 links.
+README.md names 1 link.
 
 README.md
-├  5:25-5:76:  ../../packages/mcp/test/scenarios/scenarios.test.ts
-└  6:33-6:75:  ../../packages/mcp/test/scenarios/cases.ts
+└  5:22-5:73:  ../../packages/mcp/test/scenarios/scenarios.test.ts

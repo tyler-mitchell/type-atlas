@@ -35,7 +35,7 @@ document: {% ask "subject" as="what" file="packages/accounts/src/posting.ts" lin
 ~~~text
 ## signedAmount · packages/accounts/src/posting.ts:
 
-8 uses across 5 files · 0 problems in the declaring file
+10 uses across 6 files · 0 problems in the declaring file
 
 packages/accounts/src/index.ts
 └  12:39 — at module level
@@ -50,5 +50,8 @@ packages/reconcile/src/drift.ts
 packages/reports/src/balance.ts
 ├  6:3   — at module level
 └  34:57 — inside balancesAsOf
+packages/rules/src/builtin.ts
+├  1:10  — at module level
+└  26:12 — inside closedPeriodsBalance
 ~~~
 

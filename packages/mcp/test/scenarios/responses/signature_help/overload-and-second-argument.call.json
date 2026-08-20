@@ -1,0 +1,10 @@
+{
+  "tool": "signature_help",
+  "arguments": {
+    "file": "packages/accounts/tests/journal.test.ts",
+    "position": {
+      "line": 9,
+      "character": 5
+    }
+  }
+}

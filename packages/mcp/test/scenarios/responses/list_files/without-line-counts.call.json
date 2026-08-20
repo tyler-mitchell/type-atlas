@@ -1,0 +1,7 @@
+{
+  "tool": "list_files",
+  "arguments": {
+    "directory": "packages/accounts",
+    "loc": false
+  }
+}

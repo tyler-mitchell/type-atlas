@@ -14,12 +14,13 @@ query: Balance
 ```
 
 ~~~text
-4 symbols matching Balance · 7 projects loaded · packages/reports/tsconfig.json
+5 symbols matching Balance · 8 projects loaded · packages/reports/tsconfig.json
 
 BalanceLine [interface] · packages/reports/src/balance.ts:11:1-16:2
 balance [property] · packages/reports/src/balance.ts:13:3-13:27 — BalanceLine
 balancesAsOf [const] · packages/reports/src/balance.ts:23:14-51:2
 normalBalance [const] · packages/accounts/src/account.ts:18:14-19:62
+closedPeriodsBalance [const] · packages/rules/src/builtin.ts:22:14-35:2
 ~~~
 
 ## case insensitive partial name
@@ -32,9 +33,26 @@ query: store
 ```
 
 ~~~text
-2 symbols matching store · 7 projects loaded · packages/accounts/tsconfig.json
+2 symbols matching store · 8 projects loaded · packages/accounts/tsconfig.json
 
 AccountStore [interface] · packages/accounts/src/account.ts:31:1-35:2
 MemoryAccountStore [class] · packages/accounts/src/account.ts:37:1-56:2
+~~~
+
+## class family by suffix
+
+```yaml
+tool: Workspace symbols
+workspace: fixtures/ledger
+file: packages/importers/src/statement-parser.ts
+query: Parser
+```
+
+~~~text
+3 symbols matching Parser · 8 projects loaded · packages/importers/tsconfig.json
+
+CsvStatementParser [class] · packages/importers/src/statement-parser.ts:25:1-35:2
+FixedWidthStatementParser [class] · packages/importers/src/statement-parser.ts:41:1-64:2
+StatementParser [class] · packages/importers/src/statement-parser.ts:7:1-23:2
 ~~~
 

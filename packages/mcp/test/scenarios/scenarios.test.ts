@@ -1,13 +1,20 @@
-import { expect, test } from "vitest";
-import { scenarios } from "./cases.ts";
-import { arrangeFixture } from "./runner.ts";
-import { scenarioTest } from "./scenario-test.ts";
+import { describe, expect, test } from "vitest";
+import { capturedIds, scenarioTest } from "./scenario-test.ts";
 
 /**
- * Every predefined scenario, through one real server, in declaration order.
- * `vitest -u` regenerates the committed responses after a deliberate change;
- * the diff under `responses/` is then reviewed like code, because it is what
- * both regression comparison and the generated documentation read.
+ * The practical scenarios — each one a real agent question against the
+ * ledger fixture, executed through the real stdio boundary. A case is one
+ * `it(...)`: its test name is the case name, `capture` snapshots the
+ * invocation as `responses/<tool>/<name>.call.json` and the response as
+ * `responses/<tool>/<name>.txt`, and the final test snapshots the manifest
+ * every downstream consumer enumerates. `vitest -u` regenerates all of it
+ * after a deliberate change; the diff under `responses/` is then reviewed
+ * like code — and read, capture by capture — because it is what both
+ * regression comparison and the generated documentation say to agents.
+ *
+ * Positions are one-based and point at the symbol's name, the way an agent
+ * sends them. They are load-bearing: editing a fixture file shifts them, so
+ * fixture edits and case edits travel together.
  */
 
 /**
@@ -16,34 +23,521 @@ import { scenarioTest } from "./scenario-test.ts";
  * this capture, so a renamed tool changes the docs in the same commit or
  * fails the gate.
  */
-scenarioTest("tool catalog", { timeout: 120_000 }, async ({ session, expect }) => {
+scenarioTest("tool catalog", async ({ session, expect }) => {
   const catalog = await session.catalog();
   await expect(`${JSON.stringify(catalog, null, 2)}\n`).toMatchFileSnapshot(
     "responses/tool-catalog.json",
   );
 });
 
-scenarioTest.for(scenarios)(
-  "$tool · $name",
-  { timeout: 120_000 },
-  async (scenario, { session, expect }) => {
-    const restore = scenario.arrange ? await arrangeFixture(scenario.arrange) : undefined;
-    try {
-      const response = await session.invoke(scenario.tool, scenario.arguments);
-      await expect(response).toMatchFileSnapshot(
-        `responses/${scenario.tool}/${scenario.name}.txt`,
-      );
-    } finally {
-      restore?.();
-    }
-  },
-);
+// ── list_files: the first call an agent makes in an unknown repo ────────────
+describe("list_files", () => {
+  scenarioTest("monorepo-first-contact", ({ capture }) => capture("list_files", {}));
+  scenarioTest("every-package-opened", ({ capture }) =>
+    capture("list_files", { expand: { "packages/*": 2 } }));
+  // The record's two value forms together: a bare number as depth sugar, and
+  // the options object scoping a glob to its own subtree — one tree, each
+  // corner under its own rules.
+  scenarioTest("one-corner-opened-deeper", ({ capture }) =>
+    capture("list_files", {
+      expand: {
+        "packages/accounts": 1,
+        "packages/reports": { depth: 2, glob: ["**/*.ts"] },
+      },
+    }));
+  scenarioTest("without-line-counts", ({ capture }) =>
+    capture("list_files", { directory: "packages/accounts", loc: false }));
+  scenarioTest("test-files-only", ({ capture }) =>
+    capture("list_files", { glob: ["**/*.test.ts"] }));
+  // A mid-refactor moment: one file edited, one drafted, the barrel gone.
+  // The tree must answer with plain-word change states, a ghost row for the
+  // deletion, and per-directory changed counts.
+  scenarioTest("working-tree-changes", ({ capture }) =>
+    capture("list_files", { directory: "packages/money", depth: 2 }, {
+      arrange: {
+        append: {
+          "packages/money/src/currency.ts":
+            "\n// TODO: JPY carries no minor units — audit format() before adding currencies.\n",
+        },
+        create: {
+          "packages/money/src/rounding.ts": [
+            'import { type Currency, currencyProfiles } from "./currency.ts";',
+            "",
+            "/** Banker's rounding for statement subtotals — draft, not yet wired in. */",
+            "export const roundToMinor = (value: number, currency: Currency): bigint => {",
+            "  const scaled = value * currencyProfiles[currency].minorUnitsPerMajor;",
+            "  const floor = Math.floor(scaled);",
+            "  const fraction = scaled - floor;",
+            "  if (fraction > 0.5) return BigInt(floor + 1);",
+            "  if (fraction < 0.5) return BigInt(floor);",
+            "  return BigInt(floor % 2 === 0 ? floor : floor + 1);",
+            "};",
+            "",
+          ].join("\n"),
+        },
+        delete: ["packages/money/src/index.ts"],
+      },
+    }));
+});
+
+// ── read_file: economical reading ───────────────────────────────────────────
+describe("read_file", () => {
+  scenarioTest("class-folded-to-signatures", ({ capture }) =>
+    capture("read_file", { file: ["packages/accounts/src/journal.ts"] }));
+  scenarioTest("two-files-one-call", ({ capture }) =>
+    capture("read_file", {
+      file: [
+        "packages/accounts/src/posting.ts",
+        { path: "packages/money/src/money.ts", startLine: 26, endLine: 41, fold: false },
+      ],
+    }));
+  scenarioTest("abstract-class-folded", ({ capture }) =>
+    capture("read_file", { file: ["packages/importers/src/statement-parser.ts"] }));
+});
+
+// ── document_symbols: what is in this file ──────────────────────────────────
+describe("document_symbols", () => {
+  scenarioTest("journal-outline", ({ capture }) =>
+    capture("document_symbols", { file: "packages/accounts/src/journal.ts" }));
+  scenarioTest("broken-file-answers-with-diagnostics", ({ capture }) =>
+    capture("document_symbols", { file: "packages/reconcile/src/drift.ts" }));
+  scenarioTest("importer-module-outline", ({ capture }) =>
+    capture("document_symbols", { file: "packages/importers/src/csv.ts" }));
+  scenarioTest("generic-module-outline", ({ capture }) =>
+    capture("document_symbols", { file: "packages/rules/src/rule.ts" }));
+});
+
+// ── hover: type and documentation at a position ─────────────────────────────
+describe("hover", () => {
+  scenarioTest("overloaded-method", ({ capture }) =>
+    capture("hover", {
+      file: "packages/accounts/src/journal.ts",
+      position: { line: 28, character: 3 },
+    }));
+  scenarioTest("branded-type", ({ capture }) =>
+    capture("hover", {
+      file: "packages/money/src/money.ts",
+      position: { line: 12, character: 13 },
+    }));
+  scenarioTest("constant-with-documentation", ({ capture }) =>
+    capture("hover", {
+      file: "packages/money/src/currency.ts",
+      position: { line: 12, character: 14 },
+    }));
+  // The rules engine: generics the way production code writes them.
+  scenarioTest("conditional-type", ({ capture }) =>
+    capture("hover", {
+      file: "packages/rules/src/rule.ts",
+      position: { line: 27, character: 13 },
+    }));
+  scenarioTest("template-literal-pattern", ({ capture }) =>
+    capture("hover", {
+      file: "packages/rules/src/rule.ts",
+      position: { line: 35, character: 13 },
+    }));
+});
+
+// ── definitions: from a use to the declaration ──────────────────────────────
+describe("definitions", () => {
+  scenarioTest("through-a-package-import", ({ capture }) =>
+    capture("definitions", {
+      file: "packages/reports/src/balance.ts",
+      position: { line: 6, character: 3 },
+    }));
+  scenarioTest("method-call-to-declaration", ({ capture }) =>
+    capture("definitions", {
+      file: "packages/accounts/tests/journal.test.ts",
+      position: { line: 7, character: 25 },
+    }));
+});
+
+// ── references: who uses this, and from where ───────────────────────────────
+describe("references", () => {
+  scenarioTest("type-used-across-packages", ({ capture }) =>
+    capture("references", {
+      file: "packages/money/src/money.ts",
+      position: { line: 12, character: 13 },
+    }));
+  scenarioTest("function-with-scoped-answer", ({ capture }) =>
+    capture("references", {
+      file: "packages/accounts/src/account.ts",
+      position: { line: 18, character: 14 },
+    }));
+  scenarioTest("enum-member", ({ capture }) =>
+    capture("references", {
+      file: "packages/money/src/rounding-mode.ts",
+      position: { line: 4, character: 3 },
+    }));
+});
+
+// ── callers / callees: execution flow ───────────────────────────────────────
+describe("callers", () => {
+  scenarioTest("who-calls-signed-amount", ({ capture }) =>
+    capture("callers", {
+      file: "packages/accounts/src/posting.ts",
+      position: { line: 25, character: 14 },
+    }));
+  scenarioTest("who-calls-an-overloaded-method", ({ capture }) =>
+    capture("callers", {
+      file: "packages/accounts/src/journal.ts",
+      position: { line: 28, character: 3 },
+    }));
+});
+
+describe("callees", () => {
+  scenarioTest("what-balances-as-of-invokes", ({ capture }) =>
+    capture("callees", {
+      file: "packages/reports/src/balance.ts",
+      position: { line: 23, character: 14 },
+    }));
+  scenarioTest("what-a-method-invokes", ({ capture }) =>
+    capture("callees", {
+      file: "packages/accounts/src/journal.ts",
+      position: { line: 28, character: 3 },
+    }));
+  scenarioTest("what-evaluate-invokes", ({ capture }) =>
+    capture("callees", {
+      file: "packages/rules/src/rule.ts",
+      position: { line: 46, character: 14 },
+    }));
+});
+
+// ── diagnostics: the errors an agent forgot to ask about ────────────────────
+describe("diagnostics", () => {
+  scenarioTest("deliberately-broken-reconcile", ({ capture }) =>
+    capture("diagnostics", { file: "packages/reconcile/src/drift.ts" }));
+  scenarioTest("clean-file", ({ capture }) =>
+    capture("diagnostics", { file: "packages/money/src/money.ts" }));
+  scenarioTest("missing-imports-diagnosed", ({ capture }) =>
+    capture("diagnostics", { file: "packages/reconcile/src/matching.ts" }));
+});
+
+// ── inspect_symbol: the whole picture in one call ───────────────────────────
+describe("inspect_symbol", () => {
+  scenarioTest("journal-class", ({ capture }) =>
+    capture("inspect_symbol", {
+      file: "packages/accounts/src/journal.ts",
+      symbol: "Journal",
+    }));
+  scenarioTest("money-type", ({ capture }) =>
+    capture("inspect_symbol", { file: "packages/money/src/money.ts", symbol: "Money" }));
+});
+
+// ── workspace_symbols: find by name across the project ──────────────────────
+describe("workspace_symbols", () => {
+  scenarioTest("balance-across-packages", ({ capture }) =>
+    capture("workspace_symbols", {
+      file: "packages/reports/src/balance.ts",
+      query: "Balance",
+    }));
+  scenarioTest("case-insensitive-partial-name", ({ capture }) =>
+    capture("workspace_symbols", {
+      file: "packages/accounts/src/account.ts",
+      query: "store",
+    }));
+  scenarioTest("class-family-by-suffix", ({ capture }) =>
+    capture("workspace_symbols", {
+      file: "packages/importers/src/statement-parser.ts",
+      query: "Parser",
+    }));
+});
+
+// ── list_module_exports: a workspace dependency's usable surface ────────────
+describe("list_module_exports", () => {
+  scenarioTest("workspace-package-surface", ({ capture }) =>
+    capture("list_module_exports", {
+      fromFile: "packages/reports/src/balance.ts",
+      module: "@ledger/money",
+    }));
+  scenarioTest("surface-filtered-by-query", ({ capture }) =>
+    capture("list_module_exports", {
+      fromFile: "packages/reports/src/balance.ts",
+      module: "@ledger/accounts",
+      query: "balance",
+    }));
+});
+
+// ── type_definitions: from a value to the type behind it ────────────────────
+describe("type_definitions", () => {
+  scenarioTest("parameter-to-branded-type", ({ capture }) =>
+    capture("type_definitions", {
+      file: "packages/reports/src/statement.ts",
+      position: { line: 8, character: 49 },
+    }));
+  scenarioTest("call-result-to-alias", ({ capture }) =>
+    capture("type_definitions", {
+      file: "packages/reports/src/balance.ts",
+      position: { line: 33, character: 20 },
+    }));
+  scenarioTest("parameter-to-mapped-type", ({ capture }) =>
+    capture("type_definitions", {
+      file: "packages/rules/src/rule.ts",
+      position: { line: 47, character: 3 },
+    }));
+});
+
+// ── implementations: who realises this interface ────────────────────────────
+describe("implementations", () => {
+  scenarioTest("store-interface", ({ capture }) =>
+    capture("implementations", {
+      file: "packages/accounts/src/account.ts",
+      position: { line: 31, character: 18 },
+    }));
+  scenarioTest("abstract-parser", ({ capture }) =>
+    capture("implementations", {
+      file: "packages/importers/src/statement-parser.ts",
+      position: { line: 7, character: 23 },
+    }));
+});
+
+// ── document_highlights: every same-file use of one symbol ──────────────────
+describe("document_highlights", () => {
+  scenarioTest("private-field-within-class", ({ capture }) =>
+    capture("document_highlights", {
+      file: "packages/accounts/src/journal.ts",
+      position: { line: 25, character: 20 },
+    }));
+});
+
+// ── quorl: the transitive blast radius, breadth-first ───────────────────────
+describe("quorl", () => {
+  scenarioTest("two-hops-from-signed-amount", ({ capture }) =>
+    capture("quorl", {
+      file: "packages/accounts/src/posting.ts",
+      position: { line: 25, character: 14 },
+      depth: 2,
+    }));
+  scenarioTest("three-hops-from-money", ({ capture }) =>
+    capture("quorl", {
+      file: "packages/money/src/money.ts",
+      position: { line: 27, character: 14 },
+      depth: 3,
+      limit: 20,
+    }));
+  scenarioTest("pattern-matcher-closure", ({ capture }) =>
+    capture("quorl", {
+      file: "packages/rules/src/rule.ts",
+      position: { line: 37, character: 14 },
+      depth: 2,
+    }));
+});
+
+// ── signature_help: mid-call, which overload and which parameter ────────────
+describe("signature_help", () => {
+  scenarioTest("inside-a-call", ({ capture }) =>
+    capture("signature_help", {
+      file: "packages/reports/src/balance.ts",
+      position: { line: 34, character: 13 },
+    }));
+  // An overloaded call, cursor in the second argument: the answer must say
+  // which overload is in use and mark the parameter being written.
+  scenarioTest("overload-and-second-argument", ({ capture }) =>
+    capture("signature_help", {
+      file: "packages/accounts/tests/journal.test.ts",
+      position: { line: 9, character: 5 },
+    }));
+});
+
+// ── inlay_hints: the types the source does not write ────────────────────────
+describe("inlay_hints", () => {
+  scenarioTest("inferred-types-in-a-loop", ({ capture }) =>
+    capture("inlay_hints", {
+      file: "packages/reports/src/balance.ts",
+      range: { start: { line: 28, character: 1 }, end: { line: 37, character: 1 } },
+    }));
+});
+
+// ── selection_ranges: the structural nest an editor expands through ─────────
+describe("selection_ranges", () => {
+  scenarioTest("expression-to-file", ({ capture }) =>
+    capture("selection_ranges", {
+      file: "packages/reports/src/balance.ts",
+      position: { line: 34, character: 20 },
+    }));
+});
+
+// ── project_config: which tsconfig owns this file ───────────────────────────
+describe("project_config", () => {
+  scenarioTest("package-ownership", ({ capture }) =>
+    capture("project_config", { file: "packages/reports/src/balance.ts" }));
+});
+
+// ── organize_imports: sort, merge, and drop what is unused ──────────────────
+describe("organize_imports", () => {
+  scenarioTest("messy-import-block", ({ capture }) =>
+    capture("organize_imports", { file: "packages/importers/src/csv.ts" }));
+});
+
+// ── remove_unused_code: the dead weight, as a patch ─────────────────────────
+describe("remove_unused_code", () => {
+  scenarioTest("dead-helpers", ({ capture }) =>
+    capture("remove_unused_code", { file: "packages/importers/src/dedupe.ts" }));
+});
+
+// ── format_document: mangled source, normalized ─────────────────────────────
+describe("format_document", () => {
+  scenarioTest("mangled-file", ({ capture }) =>
+    capture("format_document", { file: "packages/importers/src/dedupe.ts" }));
+});
+
+// ── add_missing_imports: the names a file forgot to import ──────────────────
+describe("add_missing_imports", () => {
+  scenarioTest("forgotten-imports", ({ capture }) =>
+    capture("add_missing_imports", { file: "packages/reconcile/src/matching.ts" }));
+});
+
+// ── code_actions: what the language service offers at a problem ─────────────
+describe("code_actions", () => {
+  scenarioTest("at-a-type-error", ({ capture }) =>
+    capture("code_actions", {
+      file: "packages/reconcile/src/drift.ts",
+      range: { start: { line: 21, character: 65 }, end: { line: 21, character: 70 } },
+    }));
+});
+
+// ── rename_files: a move, with every import updated ─────────────────────────
+describe("rename_files", () => {
+  scenarioTest("module-move-updates-importers", ({ capture }) =>
+    capture("rename_files", {
+      files: [
+        {
+          from: "packages/accounts/src/posting.ts",
+          to: "packages/accounts/src/entry-side.ts",
+        },
+      ],
+    }));
+});
+
+// ── rename_symbol: a reviewable patch, never a silent write ─────────────────
+describe("rename_symbol", () => {
+  scenarioTest("rename-across-packages", ({ capture }) =>
+    capture("rename_symbol", {
+      file: "packages/accounts/src/account.ts",
+      position: { line: 18, character: 14 },
+      newName: "balanceSide",
+    }));
+  scenarioTest("class-rename-within-project", ({ capture }) =>
+    capture("rename_symbol", {
+      file: "packages/accounts/src/account.ts",
+      position: { line: 37, character: 14 },
+      newName: "InMemoryAccountStore",
+    }));
+});
+
+// ── impact: weigh a change before making it ─────────────────────────────────
+describe("impact", () => {
+  scenarioTest("weigh-a-change-to-signed-amount", ({ capture }) =>
+    capture("impact", {
+      file: "packages/accounts/src/posting.ts",
+      position: { line: 25, character: 14 },
+    }));
+  scenarioTest("weigh-a-change-to-a-shared-type", ({ capture }) =>
+    capture("impact", {
+      file: "packages/money/src/money.ts",
+      position: { line: 12, character: 13 },
+    }));
+});
+
+// ── file_references: who imports this module ────────────────────────────────
+describe("file_references", () => {
+  scenarioTest("who-imports-money", ({ capture }) =>
+    capture("file_references", { file: "packages/money/src/money.ts" }));
+});
+
+// ── document_links: what this document points at ────────────────────────────
+describe("document_links", () => {
+  scenarioTest("json-schema-reference", ({ capture }) =>
+    capture("document_links", { file: "ledger.config.json" }));
+});
+
+// ── verify_edit: the diagnostics a change would cause, before it lands ──────
+describe("verify_edit", () => {
+  scenarioTest("proposed-edit-breaks-a-consumer", ({ capture }) =>
+    capture("verify_edit", {
+      files: [
+        {
+          path: "packages/money/src/money.ts",
+          content: [
+            'import { type Currency, currencyProfiles } from "./currency.ts";',
+            "",
+            "declare const brand: unique symbol;",
+            "",
+            "export type Money = {",
+            "  readonly minorUnits: bigint;",
+            "  readonly currency: Currency;",
+            '  readonly [brand]: "Money";',
+            "};",
+            "",
+            "export const money = (minorUnits: bigint, currency: Currency): Money =>",
+            "  ({ minorUnits, currency }) as Money;",
+            "",
+            "export const zero = (currency: Currency): Money => money(0n, currency);",
+            "",
+            "export const profileOf = (currency: Currency) => currencyProfiles[currency];",
+            "",
+          ].join("\n"),
+        },
+      ],
+    }));
+});
+
+// ── compose: one authored document, several questions, one answer ───────────
+describe("compose", () => {
+  scenarioTest("settlement-dossier", ({ capture }) =>
+    capture("compose", {
+      document: [
+        '{% ask "subject" as="what" file="packages/accounts/src/posting.ts" line=25 character=14 /%}',
+        '{% ask "references" as="uses" file="packages/accounts/src/posting.ts" line=25 character=14 /%}',
+        '{% ask "diagnostics" as="health" file="packages/accounts/src/posting.ts" /%}',
+        "",
+        "## {% $what.name %} · {% $what.file %}:{% $what.at %}",
+        "",
+        "{% $uses.total %} uses across {% $uses.files %} files · {% $health.total %} problems in the declaring file",
+        "",
+        '{% tree entries=$uses.groups partial="reference-node.mdoc" /%}',
+      ].join("\n"),
+    }));
+});
+
+// ── occurrences: literal proof of presence and absence ──────────────────────
+describe("occurrences", () => {
+  scenarioTest("token-found-across-packages", ({ capture }) =>
+    capture("occurrences", { text: "signedAmount" }));
+  scenarioTest("honest-zero", ({ capture }) => capture("occurrences", { text: "quantumFlux" }));
+});
+
+// ── the hazard corner, deliberately last ────────────────────────────────────
+// document_links on the unowned README plus find_successor put the bridge's
+// host data into a state the next program rebuild does not survive
+// (`createTsgoProgram` exits; docs/issues.md carries the minimal reproducer).
+// Until that upstream defect falls, these run after every scenario that
+// would otherwise die downstream of them — their own captures are sound.
+describe("the hazard corner", () => {
+  scenarioTest("fixture-readme", ({ capture }) =>
+    capture("document_links", { file: "README.md" }));
+  scenarioTest("renamed-method-hunch", ({ capture }) =>
+    capture("find_successor", {
+      file: "packages/accounts/src/journal.ts",
+      name: "postEntry",
+    }));
+  scenarioTest("close-miss-finds-the-successor", ({ capture }) =>
+    capture("find_successor", {
+      file: "packages/reports/src/balance.ts",
+      name: "balanceOf",
+    }));
+});
 
 /**
- * A scenario id names one case exactly once; a duplicate would silently
- * overwrite another case's capture.
+ * The corpus's table of contents, in execution order — what documentation
+ * and distribution replay enumerate. Registered last so every capture has
+ * run; on a name-filtered (`-t`) run it either skips or would shrink the
+ * manifest, so regeneration is only truthful on a full run.
  */
-test("scenario ids are unique", () => {
-  const ids = scenarios.map(({ tool, name }) => `${tool}/${name}`);
-  expect(new Set(ids).size).toBe(ids.length);
+test("capture manifest", async () => {
+  if (capturedIds.size === 0) {
+    throw new Error("No captures ran — refusing to snapshot an empty manifest.");
+  }
+  await expect(`${[...capturedIds].join("\n")}\n`).toMatchFileSnapshot(
+    "responses/manifest.txt",
+  );
 });

@@ -63,3 +63,43 @@ const currencyProfiles: Record<Currency, CurrencyProfile>
 ```
 ~~~
 
+## conditional type
+
+```yaml
+tool: Hover
+workspace: fixtures/ledger
+file: packages/rules/src/rule.ts
+position: {"line":27,"character":13}
+```
+
+~~~text
+packages/rules/src/rule.ts:27:13
+
+```typescript
+type PayloadOf<TMeta, TEvent> = TEvent extends keyof RuleEvents<TMeta> ? RuleEvents<TMeta>[TEvent] : never
+```
+
+The payload a given event name carries — conditional extraction, so a
+consumer can name the payload of one event without writing the map out.
+~~~
+
+## template literal pattern
+
+```yaml
+tool: Hover
+workspace: fixtures/ledger
+file: packages/rules/src/rule.ts
+position: {"line":35,"character":13}
+```
+
+~~~text
+packages/rules/src/rule.ts:35:13
+
+```typescript
+type AccountPattern = string
+```
+
+An account matcher: a literal path, or a template-literal prefix pattern —
+`"assets:bank:*"` matches every account under that branch.
+~~~
+

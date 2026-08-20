@@ -325,6 +325,13 @@ replace thought — never on the guard itself.
 - **Know the code you are editing is the code that runs.** A path-proof is a
   call, not a resemblance. Editing a formatter the tool never invokes looks
   exactly like progress.
+- **A capture written is a capture unread until you read it.** `vitest -u`
+  reports every snapshot it wrote; that list is the mandatory read list, and
+  each file under `responses/` gets read cold — the whole response, as the
+  bytes an agent will receive — before the run counts as witnessed. A green
+  update run with unread captures is the file-snapshot failure mode: the
+  suite passed, the docs regenerated, and nobody ever looked at what the
+  tool actually said.
 - **Confirm what you newly reference exists.** A symbol used at module scope
   without its import does not fail gracefully.
 - **Every file modification goes through Edit or Write.** Never a shell command —

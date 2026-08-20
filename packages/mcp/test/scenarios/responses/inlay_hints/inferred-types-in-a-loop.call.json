@@ -1,0 +1,16 @@
+{
+  "tool": "inlay_hints",
+  "arguments": {
+    "file": "packages/reports/src/balance.ts",
+    "range": {
+      "start": {
+        "line": 28,
+        "character": 1
+      },
+      "end": {
+        "line": 37,
+        "character": 1
+      }
+    }
+  }
+}

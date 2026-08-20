@@ -1,0 +1,10 @@
+{
+  "tool": "references",
+  "arguments": {
+    "file": "packages/money/src/rounding-mode.ts",
+    "position": {
+      "line": 4,
+      "character": 3
+    }
+  }
+}

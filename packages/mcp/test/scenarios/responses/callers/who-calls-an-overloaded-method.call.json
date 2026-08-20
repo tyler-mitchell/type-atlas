@@ -1,0 +1,10 @@
+{
+  "tool": "callers",
+  "arguments": {
+    "file": "packages/accounts/src/journal.ts",
+    "position": {
+      "line": 28,
+      "character": 3
+    }
+  }
+}

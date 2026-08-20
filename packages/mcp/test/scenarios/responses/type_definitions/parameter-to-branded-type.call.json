@@ -1,0 +1,10 @@
+{
+  "tool": "type_definitions",
+  "arguments": {
+    "file": "packages/reports/src/statement.ts",
+    "position": {
+      "line": 8,
+      "character": 49
+    }
+  }
+}

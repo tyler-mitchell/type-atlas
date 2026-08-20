@@ -1,0 +1,10 @@
+{
+  "tool": "implementations",
+  "arguments": {
+    "file": "packages/importers/src/statement-parser.ts",
+    "position": {
+      "line": 7,
+      "character": 23
+    }
+  }
+}

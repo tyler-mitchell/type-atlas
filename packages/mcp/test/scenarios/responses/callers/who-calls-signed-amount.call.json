@@ -1,0 +1,10 @@
+{
+  "tool": "callers",
+  "arguments": {
+    "file": "packages/accounts/src/posting.ts",
+    "position": {
+      "line": 25,
+      "character": 14
+    }
+  }
+}

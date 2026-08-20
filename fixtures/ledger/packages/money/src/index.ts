@@ -9,3 +9,4 @@ export {
   negate,
   zero,
 } from "./money.ts";
+export { RoundingMode, roundingModeOf } from "./rounding-mode.ts";

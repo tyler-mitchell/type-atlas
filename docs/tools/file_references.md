@@ -13,9 +13,9 @@ file: packages/money/src/money.ts
 ```
 
 ~~~text
-packages/money/src/money.ts · referenced from 75 places · 7 projects loaded · packages/money/tsconfig.json
+packages/money/src/money.ts · referenced from 83 places · 8 projects loaded · packages/money/tsconfig.json
 
-1-20 of 75 places · pass offset: 20 for the rest
+1-20 of 83 places · pass offset: 20 for the rest
 
 packages/accounts/src/journal.ts
 ├  1:10  — at module level
@@ -33,9 +33,6 @@ packages/money/tests/money.test.ts
 ├  9:67  — inside test("refuses to combine currencies") callback
 ├  13:10 — inside test("formats major and minor units per currency") callback
 └  14:10 — inside test("formats major and minor units per currency") callback
-packages/reconcile/src/drift.ts
-├  5:10  — at module level
-└  21:10 — inside drift
 packages/reports/src/balance.ts
 ├  8:10  — at module level
 ├  34:9  — inside balancesAsOf
@@ -43,5 +40,8 @@ packages/reports/src/balance.ts
 packages/reports/src/statement.ts
 ├  2:10  — at module level
 └  10:40 — inside statementLine
+packages/rules/src/builtin.ts
+├  2:10  — at module level
+└  28:58 — inside closedPeriodsBalance
 ~~~
 

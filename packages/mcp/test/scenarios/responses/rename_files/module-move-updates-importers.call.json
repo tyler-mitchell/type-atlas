@@ -1,0 +1,11 @@
+{
+  "tool": "rename_files",
+  "arguments": {
+    "files": [
+      {
+        "from": "packages/accounts/src/posting.ts",
+        "to": "packages/accounts/src/entry-side.ts"
+      }
+    ]
+  }
+}

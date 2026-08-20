@@ -1,0 +1,3 @@
+book [parameter] · type declared at 1 target
+
+RuleBook · packages/rules/src/rule.ts:41:31-43:2

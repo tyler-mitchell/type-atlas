@@ -1,0 +1,14 @@
+{
+  "tool": "read_file",
+  "arguments": {
+    "file": [
+      "packages/accounts/src/posting.ts",
+      {
+        "path": "packages/money/src/money.ts",
+        "startLine": 26,
+        "endLine": 41,
+        "fold": false
+      }
+    ]
+  }
+}

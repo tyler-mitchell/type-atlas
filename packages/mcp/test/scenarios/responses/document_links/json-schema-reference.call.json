@@ -1,0 +1,6 @@
+{
+  "tool": "document_links",
+  "arguments": {
+    "file": "ledger.config.json"
+  }
+}

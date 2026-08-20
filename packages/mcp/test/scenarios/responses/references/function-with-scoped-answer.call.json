@@ -1,0 +1,10 @@
+{
+  "tool": "references",
+  "arguments": {
+    "file": "packages/accounts/src/account.ts",
+    "position": {
+      "line": 18,
+      "character": 14
+    }
+  }
+}

@@ -1,10 +1,9 @@
 # ledger
 
 A deliberately realistic TypeScript monorepo that Type Atlas tools are
-exercised against. It is the workspace behind every captured scenario response
-in [the scenario suite](../../packages/mcp/test/scenarios/scenarios.test.ts) —
-fixture, [scenario definitions](../../packages/mcp/test/scenarios/cases.ts),
-and committed responses form one pipeline:
+exercised against. It is the workspace behind every captured response in
+[the scenario suite](../../packages/mcp/test/scenarios/scenarios.test.ts) —
+fixture, scenario cases, and committed responses form one pipeline:
 
 ```text
 realistic fixture scenario
