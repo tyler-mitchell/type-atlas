@@ -16,6 +16,24 @@ const input = type({
   "depth?": type("1 <= number.integer <= 10").configure({
     description: "Directory levels to include. Defaults to 10 with glob and 1 otherwise.",
   }),
+  "expand?": type({
+    "[string]": type("1 <= number.integer <= 10").or(
+      type({
+        "depth?": type("1 <= number.integer <= 10").describe("Levels below this subtree."),
+        "glob?": type("(string >= 1)[]")
+          .atLeastLength(1)
+          .describe("Picomatch patterns relative to this subtree."),
+        "includeHidden?": "boolean",
+        "includeIgnored?": "boolean",
+      }),
+    ),
+  }).configure(
+    {
+      description:
+        'Subtrees to open deeper than the shared depth, in place, within the one tree — like expanding folders in a file explorer. Keys are paths relative to `directory`; values are a depth or an options object: `{ "packages/core": 3 }` or `{ "packages/core": { "depth": 3, "glob": ["**/*.ts"] } }` lists the root at `depth` with that corner opened three levels.',
+    },
+    "self",
+  ),
   "glob?": type("(string >= 1)[]").atLeastLength(1).configure(
     {
       description: "One or more OR-combined Picomatch patterns relative to the selected directory.",
@@ -64,6 +82,7 @@ export const registerWorkspaceTools = (server: McpServer): void => {
         directory,
         depth,
         glob,
+        expand,
         includeHidden,
         includeIgnored,
         includeSubmodules,
@@ -77,6 +96,7 @@ export const registerWorkspaceTools = (server: McpServer): void => {
         directory: directory ?? ".",
         depth: depth ?? (glob ? 10 : 1),
         glob,
+        expand,
         includeHidden: includeHidden ?? false,
         includeIgnored: includeIgnored ?? false,
         includeSubmodules: includeSubmodules ?? false,

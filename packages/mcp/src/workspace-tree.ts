@@ -22,11 +22,22 @@ export type WorkspaceListing = {
   readonly filtered: boolean;
 };
 
+/** Per-subtree overrides for an expanded directory, each an existing option scoped down. */
+export type WorkspaceExpansion = {
+  readonly depth?: number;
+  readonly glob?: readonly string[];
+  readonly includeHidden?: boolean;
+  readonly includeIgnored?: boolean;
+};
+
 export const workspaceTree = async (input: {
   readonly workspace: string;
   readonly directory: string;
   readonly depth: number;
   readonly glob?: readonly string[];
+  /** Subtrees to open deeper than the shared depth, keyed by path relative to
+   * `directory` — a number is shorthand for `{ depth }`. */
+  readonly expand?: Readonly<Record<string, number | WorkspaceExpansion>>;
   readonly includeIgnored: boolean;
   readonly includeHidden: boolean;
   readonly includeSubmodules: boolean;
@@ -73,49 +84,102 @@ export const workspaceTree = async (input: {
     );
   }
 
-  const isIgnored = input.includeIgnored
-    ? () => false
-    : await isGitIgnored({
-        cwd: directory,
-        deep: input.depth,
-        followSymbolicLinks: false,
-        ignore: ["**/.git/**", "**/node_modules/**"],
+  // Depth counts levels below the named directory. A file sits at the depth
+  // of the directory holding it, so files stop one level earlier than the
+  // directories do — asking for depth 1 means the files here, and the
+  // directories immediately inside.
+  //
+  // fdir crawls exactly one root with one option set — its documentation has
+  // no multi-root, per-subtree, or merge affordance — so an expansion is one
+  // fully-fdir-configured crawl per named subtree, unioned by prefix before
+  // the one tree folds. Every crawl carries the same file cap, and the union
+  // is sliced at the same limit a plain listing has, so an expanded answer
+  // can never outgrow an unexpanded one.
+  const crawlScope = async (scope: {
+    readonly dir: string;
+    readonly depth: number;
+    readonly glob?: readonly string[] | undefined;
+    readonly includeHidden: boolean;
+    readonly includeIgnored: boolean;
+  }): Promise<readonly string[]> => {
+    const ignored = scope.includeIgnored
+      ? () => false
+      : await isGitIgnored({
+          cwd: scope.dir,
+          deep: scope.depth,
+          followSymbolicLinks: false,
+          ignore: ["**/.git/**", "**/node_modules/**"],
+        });
+    const crawler = new fdir()
+      .withPathSeparator("/")
+      .withRelativePaths()
+      .withMaxDepth(input.view === "directories" ? scope.depth : scope.depth - 1)
+      .withErrors()
+      .withAbortSignal(input.signal)
+      // A directory is matched against the path it is reported under, which
+      // ends in a separator, so a caller's `pkg-*` matches nothing until it
+      // becomes `pkg-*/` — an empty answer that reads as "no such package".
+      .globWithOptions(
+        (scope.glob ?? ["**/*"]).map((pattern) =>
+          input.view === "directories" && !pattern.endsWith("/") ? `${pattern}/` : pattern,
+        ),
+        { dot: scope.includeHidden },
+      )
+      .filter((file) => file === "." || file.length === 0 || !ignored(file))
+      .exclude((name, absolute) => {
+        const relative = path.relative(scope.dir, absolute);
+        return (
+          collapsedDirectories.has(name) ||
+          (!scope.includeHidden && name.startsWith(".")) ||
+          containingGitSubmodule(path.resolve(absolute), submoduleRoots) !== undefined ||
+          (relative !== "." && relative.length > 0 && ignored(`${relative}/`))
+        );
       });
-  const crawler = new fdir()
-    .withPathSeparator("/")
-    .withRelativePaths()
-    // Depth counts levels below the named directory. A file sits at the depth of
-    // the directory holding it, so files stop one level earlier than the
-    // directories do — asking for depth 1 means the files here, and the
-    // directories immediately inside.
-    .withMaxDepth(input.view === "directories" ? input.depth : input.depth - 1)
-    .withErrors()
-    .withAbortSignal(input.signal)
-    // A directory is matched against the path it is reported under, which ends
-    // in a separator, so a caller's `pkg-*` matches nothing until it becomes
-    // `pkg-*/` — an empty answer that reads as "no such package".
-    .globWithOptions(
-      (input.glob ?? ["**/*"]).map((pattern) =>
-        input.view === "directories" && !pattern.endsWith("/") ? `${pattern}/` : pattern,
-      ),
-      { dot: input.includeHidden },
+    const crawled = await (input.view === "directories"
+      ? crawler.withMaxFiles(input.limit + 2).onlyDirs()
+      : crawler.withDirs().withMaxFiles(input.limit + 2)
     )
-    .filter((file) => file === "." || file.length === 0 || !isIgnored(file))
-    .exclude((name, absolute) => {
-      const relative = path.relative(directory, absolute);
-      return (
-        collapsedDirectories.has(name) ||
-        (!input.includeHidden && name.startsWith(".")) ||
-        containingGitSubmodule(path.resolve(absolute), submoduleRoots) !== undefined ||
-        (relative !== "." && relative.length > 0 && isIgnored(`${relative}/`))
-      );
-    });
-  if (input.view === "directories") {
-    const crawled = await crawler
-      .withMaxFiles(input.limit + 2)
-      .onlyDirs()
-      .crawl(directory)
+      .crawl(scope.dir)
       .withPromise();
+    return crawled.filter((entry) => entry !== "." && entry.length > 0);
+  };
+
+  // Keys are agent-written paths: pathe normalizes separators (a Windows
+  // agent's `packages\core` would otherwise silently match nothing) and
+  // trailing slashes fall away so `docs/` and `docs` are one key.
+  const expansions = Object.entries(input.expand ?? {}).map(([key, held]) => ({
+    key: path.normalize(key).replace(/\/$/u, ""),
+    ...(typeof held === "number" ? { depth: held } : held),
+  }));
+  for (const expansion of expansions) {
+    const target = path.resolve(directory, expansion.key);
+    if (target === directory || !isFileInDir(target, directory)) {
+      throw new Error(
+        `expand keys are directories inside ${input.directory}; "${expansion.key}" is not.`,
+      );
+    }
+  }
+  const [baseCrawl, ...expansionCrawls] = await Promise.all([
+    crawlScope({
+      dir: directory,
+      depth: input.depth,
+      glob: input.glob,
+      includeHidden: input.includeHidden,
+      includeIgnored: input.includeIgnored,
+    }),
+    ...expansions.map((expansion) =>
+      crawlScope({
+        dir: path.resolve(directory, expansion.key),
+        depth: expansion.depth ?? (expansion.glob ? 10 : 1),
+        glob: expansion.glob,
+        includeHidden: expansion.includeHidden ?? input.includeHidden,
+        includeIgnored: expansion.includeIgnored ?? input.includeIgnored,
+      }).then((entries) => entries.map((entry) => `${expansion.key}/${entry}`)),
+    ),
+  ]);
+  const crawled = [...new Set([...baseCrawl, ...expansionCrawls.flat()])];
+
+  if (input.view === "directories") {
     const submodules = input.glob
       ? []
       : submoduleRoots.flatMap((submoduleRoot) => {
@@ -123,7 +187,7 @@ export const workspaceTree = async (input: {
           const relative = path.relative(directory, submoduleRoot);
           return relative.split("/").length <= input.depth ? [`${relative}/ [submodule]`] : [];
         });
-    const directories = [...crawled.filter((entry) => entry !== "."), ...submodules].sort();
+    const directories = [...crawled, ...submodules].sort();
     return {
       entries: directories.slice(0, input.limit).map((name) => ({ name })),
       over: directories.length > input.limit,
@@ -131,12 +195,6 @@ export const workspaceTree = async (input: {
       filtered: input.glob !== undefined,
     };
   }
-
-  const crawled = await crawler
-    .withDirs()
-    .withMaxFiles(input.limit + 2)
-    .crawl(directory)
-    .withPromise();
   const submodulePaths = input.glob
     ? []
     : submoduleRoots.flatMap((submoduleRoot) => {
@@ -145,10 +203,7 @@ export const workspaceTree = async (input: {
         return relative.split("/").length > input.depth ? [] : [`${relative}/`];
       });
   const submodules = new Set(submodulePaths.map((entry) => entry.slice(0, -1)));
-  const relatives = [
-    ...crawled.filter((entry) => entry !== "." && entry.length > 0),
-    ...submodulePaths,
-  ].sort();
+  const relatives = [...crawled, ...submodulePaths].sort();
   // One tree, rooted at the asked directory — the shape `tree` and every
   // file explorer have always drawn. The previous form grouped files under
   // per-directory section headers, which read as disconnected fragments:
