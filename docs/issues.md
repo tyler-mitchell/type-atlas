@@ -216,6 +216,32 @@ all-or-nothing "there is no text" is an absence lie; the honest answer reads
 the text and names the anomaly ("contains a NUL at byte N"). Observed
 2026-08-20.
 
+### The bridge dies rebuilding a program after an unowned document was opened
+
+DIAGNOSED 2026-08-20 to the frame, via the scenario suite's minimal
+reproducer (kept as the sentinel):
+
+```
+pnpm exec vitest run --project=scenarios -t "fixture-readme|renamed-method-hunch|surface-filtered-by-query"
+```
+
+`document_links` on the unowned fixture README plus `find_successor`, then
+any call whose probe reopens a document: the language server exits (code 1)
+inside typescript-native-bridge's `createTsgoProgram` during
+`synchronizeHostData` — the same frame family as the auto-import-cache
+crash, which was therefore a TRIGGER of this defect, not its root. Root:
+host data containing a document no tsconfig owns kills the bridge's next
+program rebuild. Candidate own-layer mitigation to investigate: keep unowned
+documents out of the TypeScript host entirely. Until then the corpus runs
+the two trigger scenarios last, and their own captures are sound.
+
+Found beneath it and FIXED: `withTextDocument`'s close notification threw
+"Connection is disposed" from its `finally` when the server died mid-task,
+replacing the informative exit report — every such crash surfaced as a bare
+transport sentence. The close is now owed to a live connection only, and
+unexpected tool errors log their stack to stderr (the README's operational
+contract), which is what named this frame. Observed 2026-08-20.
+
 ### FIXED · the unowned-document crash was the auto-import cache
 
 `document_links { file: "README.md" }` against `fixtures/ledger` exited the
@@ -261,19 +287,20 @@ that need nothing. The list should contain only files whose import specifier
 actually names the moved module. Observed 2026-08-20 in
 `responses/rename_files/module-move-updates-importers.txt`.
 
-### The engine offers no missing-import fixes
+### Missing-import fixes exist but depend on session history
 
-`add_missing_imports` on `packages/reconcile/src/matching.ts` (ledger
-fixture; two unresolved names with obvious workspace exports) returns no
-edit, and `code_actions` at the unresolved name offers "Add missing function
-declaration" but nothing from the fixMissingImport family — so the codefix
-machinery works and specifically auto-import does not, which points at the
-typescript-native-bridge/tsgo preview rather than this relay. The empty
-answer now states the situation honestly instead of "No missing imports."
-The committed capture
-(`responses/add_missing_imports/forgotten-imports.txt`) is the sentinel:
-when the bridge gains auto-import, the scenario suite flags the change.
-Observed 2026-08-20.
+CORRECTED 2026-08-20 (the earlier version claimed the engine offers no
+import fixes — that was cold-state absence read as an engine gap). The
+truth, witnessed both ways in scenario subset runs: `add_missing_imports` on
+`matching.ts` produced a real 4-edit patch in a session where
+`organize_imports` had run first, and produces nothing in the full suite's
+order even with every project warm — availability of the fixMissingImport
+family depends on what the session did before, which is itself the defect.
+The one witnessed patch carried its own wart: it imported a sibling
+workspace package as `../../money/src/money.ts` instead of the
+`@ledger/money` specifier the package boundary calls for. The honest-empty
+sentence covers the misses; the committed capture is the sentinel for
+whichever behavior stabilizes. Observed 2026-08-20.
 
 ## Language grounding
 
@@ -323,6 +350,13 @@ form means parsing hover text, which is the same grounding problem as above.
 ---
 
 ## Presentation
+
+### 〈raised〉 `read_file` wants a way to drop the line-number column
+
+Raised 2026-08-20: reading long documents for read-only purposes — no edit
+intent — the line-number gutter spends tokens on numbers nothing will use.
+An optional argument should let a reader ask for the bare text. Deferred on
+arrival per the standing rule.
 
 ### The scope clause has two phrasings
 

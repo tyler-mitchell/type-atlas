@@ -1,0 +1,5 @@
+packages/money/src/currency.ts:12:14
+
+```typescript
+const currencyProfiles: Record<Currency, CurrencyProfile>
+```

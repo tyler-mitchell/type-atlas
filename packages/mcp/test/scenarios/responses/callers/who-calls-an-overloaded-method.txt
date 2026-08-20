@@ -1,0 +1,7 @@
+post · called from 3 places · 7 projects loaded
+
+packages/accounts/tests/journal.test.ts
+├  expect() callback [function] 18:10-27:7 · calls 19:13-19:17
+└  test("posts a balanced transfer through the overload") callback [function] 5:56-14:2 · calls 7:25-7:29
+packages/importers/src/csv.ts
+└  importStatement [variable] 28:14-28:29 · range 28:14-47:2 · calls 39:13-39:17

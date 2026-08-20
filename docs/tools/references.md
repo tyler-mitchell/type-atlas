@@ -15,7 +15,7 @@ position: {"line":12,"character":13}
 
 ~~~text
 Money [type] · packages/money/src/money.ts:12:13
-30 references · 4 projects loaded · packages/money/tsconfig.json
+30 references · 7 projects loaded · packages/money/tsconfig.json
 
 1-20 of 30 references · pass offset: 20 for the rest
 
@@ -56,7 +56,7 @@ position: {"line":18,"character":14}
 
 ~~~text
 normalBalance [function] · packages/accounts/src/account.ts:18:14
-3 references · 4 projects loaded · packages/accounts/tsconfig.json
+3 references · 7 projects loaded · packages/accounts/tsconfig.json
 
 packages/accounts/src/index.ts
 └  8:3 — at module level

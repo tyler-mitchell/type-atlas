@@ -14,11 +14,27 @@ query: Balance
 ```
 
 ~~~text
-4 symbols matching Balance · 4 projects loaded · packages/reports/tsconfig.json
+4 symbols matching Balance · 7 projects loaded · packages/reports/tsconfig.json
 
 BalanceLine [interface] · packages/reports/src/balance.ts:11:1-16:2
 balance [property] · packages/reports/src/balance.ts:13:3-13:27 — BalanceLine
 balancesAsOf [const] · packages/reports/src/balance.ts:23:14-51:2
 normalBalance [const] · packages/accounts/src/account.ts:18:14-19:62
+~~~
+
+## case insensitive partial name
+
+```yaml
+tool: Workspace symbols
+workspace: fixtures/ledger
+file: packages/accounts/src/account.ts
+query: store
+```
+
+~~~text
+2 symbols matching store · 7 projects loaded · packages/accounts/tsconfig.json
+
+AccountStore [interface] · packages/accounts/src/account.ts:31:1-35:2
+MemoryAccountStore [class] · packages/accounts/src/account.ts:37:1-56:2
 ~~~
 

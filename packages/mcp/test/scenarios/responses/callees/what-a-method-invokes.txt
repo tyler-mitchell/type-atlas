@@ -1,0 +1,1 @@
+post invokes nothing the owning project resolves. A call to something the project cannot resolve is not reported here — diagnostics say why a name does not resolve.

@@ -19,3 +19,16 @@ balance [parameter] · type declared at 1 target
 Money · packages/money/src/money.ts:12:21-16:2
 ~~~
 
+## call result to alias
+
+```yaml
+tool: Type definitions
+workspace: fixtures/ledger
+file: packages/reports/src/balance.ts
+position: {"line":33,"character":20}
+```
+
+~~~text
+Nothing at this position has a type declared elsewhere. A primitive, a literal, or an inferred anonymous shape has no type definition to jump to.
+~~~
+

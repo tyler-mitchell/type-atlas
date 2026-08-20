@@ -27,3 +27,16 @@ packages/money/src/money.ts
 and 8 standard-library calls · entries, get, localeCompare, map, set, sort
 ~~~
 
+## what a method invokes
+
+```yaml
+tool: Callees
+workspace: fixtures/ledger
+file: packages/accounts/src/journal.ts
+position: {"line":28,"character":3}
+```
+
+~~~text
+post invokes nothing the owning project resolves. A call to something the project cannot resolve is not reported here — diagnostics say why a name does not resolve.
+~~~
+

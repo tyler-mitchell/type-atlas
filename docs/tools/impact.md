@@ -21,3 +21,21 @@ packages/reports    2  1
 packages/reconcile  2  1
 ~~~
 
+## weigh a change to a shared type
+
+```yaml
+tool: Impact
+workspace: fixtures/ledger
+file: packages/money/src/money.ts
+position: {"line":12,"character":13}
+```
+
+~~~text
+Changing Money touches 31 uses in 7 files across 4 packages, in the projects loaded this session. No use sits in a test file.
+
+packages/money      12  2
+packages/accounts   10  2
+packages/reports     7  2
+packages/reconcile   2  1
+~~~
+

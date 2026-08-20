@@ -248,9 +248,17 @@ const startVolarWorkspace = async (workspaceRoot: string, languageServerEntry: U
         try {
           return await task({ uri });
         } finally {
-          await server.sendNotification(DidCloseTextDocumentNotification.type, {
-            textDocument: { uri },
-          });
+          // Closing on a dead connection is moot, and a throw here replaces
+          // the task's own error: a language-server death mid-task surfaced
+          // as a bare "Connection is disposed" from this close, masking the
+          // exit report that named the crash, for as long as it could throw.
+          try {
+            await server.sendNotification(DidCloseTextDocumentNotification.type, {
+              textDocument: { uri },
+            });
+          } catch {
+            // The close is owed to a live connection only.
+          }
         }
       });
       openDocuments.set(

@@ -81,19 +81,22 @@ An append-only journal of balanced entries. `TMeta` carries whatever a
 consumer attaches to each entry — an import batch id, an approval trail —
 without the journal knowing its shape.
 
-## Callers (3)
+## Callers (4)
 
 packages/accounts/tests/journal.test.ts
 ├  test("posts a balanced transfer through the overload") callback [function] 5:56-14:2 · calls 6:23-6:30
 └  test("refuses an unbalanced entry") callback [function] 16:37-29:2 · calls 17:23-17:30
 packages/reports/src/balance.ts
 └  balancesAsOf [variable] 23:14-23:26 · range 23:14-51:2 · calls 24:12-24:19
+packages/importers/src/csv.ts
+└  importStatement [variable] 28:14-28:29 · range 28:14-47:2 · calls 29:12-29:19
 
-## Mentions that are not calls (3 of 7 references · 4 projects loaded)
+## Mentions that are not calls (4 of 9 references · 7 projects loaded)
 
 packages/accounts/tests/journal.test.ts:3:25-3:32:  import { credit, debit, Journal, UnbalancedEntryError } from "../src/index.ts";
 packages/accounts/src/index.ts:11:22-11:29:  export { type Entry, Journal, UnbalancedEntryError } from "./journal.ts";
 packages/reports/src/balance.ts:4:8-4:15:  type Journal,
+packages/importers/src/csv.ts:1:10-1:17:  import { Journal, type Entry, credit, debit, type AccountPath } from "@ledger/accounts";
 ~~~
 
 ### `document_symbols` — errors arrive unasked
@@ -136,7 +139,30 @@ newName: balanceSide
 ```
 
 ~~~text
+Rename to balanceSide · resolved normalBalance · packages/accounts/src/account.ts:18:14 · Scope: project only · packages/accounts/tsconfig.json · 2 files · 2 edits
 
+*** Begin Patch
+*** Update File: packages/accounts/src/account.ts
+@@
+   readonly closedAt?: Date;
+ }
+ 
+-export const normalBalance = (kind: AccountKind): "debit" | "credit" =>
++export const balanceSide = (kind: AccountKind): "debit" | "credit" =>
+   kind === "asset" || kind === "expense" ? "debit" : "credit";
+ 
+ export const parentPath = (path: AccountPath): AccountPath | undefined => {
+*** Update File: packages/accounts/src/index.ts
+@@
+   type AccountStore,
+   lineage,
+   MemoryAccountStore,
+-  normalBalance,
++  balanceSide as normalBalance,
+   parentPath,
+ } from "./account.ts";
+ export { type Entry, Journal, UnbalancedEntryError } from "./journal.ts";
+*** End Patch
 ~~~
 
 ### `read_file` — bodies fold to signatures

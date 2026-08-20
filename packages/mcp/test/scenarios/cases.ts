@@ -305,22 +305,6 @@ export const scenarios: readonly Scenario[] = [
     arguments: { file: "packages/reports/src/balance.ts" },
   },
 
-  // ── document_links: what a document points at ────────────────────────────
-  // This exact call once killed the language server — the auto-import
-  // cache's initProject died against the bridge. Disabling that cache
-  // (language-server/src/server.ts) fixed it; this capture stands witness.
-  {
-    tool: "document_links",
-    name: "fixture-readme",
-    arguments: { file: "README.md" },
-  },
-
-  // ── find_successor: what happened to a name that no longer resolves ──────
-  {
-    tool: "find_successor",
-    name: "renamed-method-hunch",
-    arguments: { file: "packages/accounts/src/journal.ts", name: "postEntry" },
-  },
 
   // ── organize_imports: sort, merge, and drop what is unused ───────────────
   {
@@ -409,6 +393,145 @@ export const scenarios: readonly Scenario[] = [
     arguments: { file: "packages/money/src/money.ts" },
   },
 
+  // ── second cases: the corpus owes every core tool more than one ──────────
+  {
+    tool: "definitions",
+    name: "method-call-to-declaration",
+    arguments: {
+      file: "packages/accounts/tests/journal.test.ts",
+      position: { line: 7, character: 25 },
+    },
+  },
+  {
+    tool: "callers",
+    name: "who-calls-an-overloaded-method",
+    arguments: {
+      file: "packages/accounts/src/journal.ts",
+      position: { line: 28, character: 3 },
+    },
+  },
+  {
+    tool: "callees",
+    name: "what-a-method-invokes",
+    arguments: {
+      file: "packages/accounts/src/journal.ts",
+      position: { line: 28, character: 3 },
+    },
+  },
+  {
+    tool: "hover",
+    name: "constant-with-documentation",
+    arguments: {
+      file: "packages/money/src/currency.ts",
+      position: { line: 12, character: 14 },
+    },
+  },
+  {
+    tool: "workspace_symbols",
+    name: "case-insensitive-partial-name",
+    arguments: { file: "packages/accounts/src/account.ts", query: "store" },
+  },
+  {
+    tool: "list_module_exports",
+    name: "surface-filtered-by-query",
+    arguments: {
+      fromFile: "packages/reports/src/balance.ts",
+      module: "@ledger/accounts",
+      query: "balance",
+    },
+  },
+  {
+    tool: "impact",
+    name: "weigh-a-change-to-a-shared-type",
+    arguments: {
+      file: "packages/money/src/money.ts",
+      position: { line: 12, character: 13 },
+    },
+  },
+  {
+    tool: "rename_symbol",
+    name: "class-rename-within-project",
+    arguments: {
+      file: "packages/accounts/src/account.ts",
+      position: { line: 37, character: 14 },
+      newName: "InMemoryAccountStore",
+    },
+  },
+  {
+    tool: "type_definitions",
+    name: "call-result-to-alias",
+    arguments: {
+      file: "packages/reports/src/balance.ts",
+      position: { line: 33, character: 20 },
+    },
+  },
+  {
+    tool: "document_symbols",
+    name: "importer-module-outline",
+    arguments: { file: "packages/importers/src/csv.ts" },
+  },
+  {
+    tool: "quorl",
+    name: "three-hops-from-money",
+    arguments: {
+      file: "packages/money/src/money.ts",
+      position: { line: 27, character: 14 },
+      depth: 3,
+      limit: 20,
+    },
+  },
+
+  // ── verify_edit: the diagnostics a change would cause, before it lands ───
+  {
+    tool: "verify_edit",
+    name: "proposed-edit-breaks-a-consumer",
+    arguments: {
+      files: [
+        {
+          path: "packages/money/src/money.ts",
+          content: [
+            'import { type Currency, currencyProfiles } from "./currency.ts";',
+            "",
+            "declare const brand: unique symbol;",
+            "",
+            "export type Money = {",
+            "  readonly minorUnits: bigint;",
+            "  readonly currency: Currency;",
+            "  readonly [brand]: \"Money\";",
+            "};",
+            "",
+            "export const money = (minorUnits: bigint, currency: Currency): Money =>",
+            "  ({ minorUnits, currency }) as Money;",
+            "",
+            "export const zero = (currency: Currency): Money => money(0n, currency);",
+            "",
+            "export const profileOf = (currency: Currency) => currencyProfiles[currency];",
+            "",
+          ].join("\n"),
+        },
+      ],
+    },
+  },
+
+  // ── compose: one authored document, several questions, one answer ────────
+  {
+    tool: "compose",
+    name: "settlement-dossier",
+    arguments: {
+      document: [
+        '{% ask "subject" as="what" file="packages/accounts/src/posting.ts" line=25 character=14 /%}',
+        '{% ask "references" as="uses" file="packages/accounts/src/posting.ts" line=25 character=14 /%}',
+        '{% ask "diagnostics" as="health" file="packages/accounts/src/posting.ts" /%}',
+        "",
+        "## {% $what.name %} · {% $what.file %}:{% $what.at %}",
+        "",
+        "{% $uses.total %} uses across {% $uses.files %} files · {% $health.total %} problems in the declaring file",
+        "",
+        '{% tree entries=$uses.groups partial="reference-node.mdoc" /%}',
+      ].join("\n"),
+    },
+  },
+
   // ── occurrences: literal proof of presence and absence ───────────────────
   {
     tool: "occurrences",
@@ -419,5 +542,28 @@ export const scenarios: readonly Scenario[] = [
     tool: "occurrences",
     name: "honest-zero",
     arguments: { text: "quantumFlux" },
+  },
+
+  // ── the hazard corner, deliberately last ─────────────────────────────────
+  // document_links on the unowned README plus find_successor put the
+  // bridge's host data into a state the next program rebuild does not
+  // survive (`createTsgoProgram` exits, docs/issues.md carries the minimal
+  // reproducer). Until that upstream defect falls, these run after every
+  // scenario that would otherwise die downstream of them — their own
+  // captures are sound.
+  {
+    tool: "document_links",
+    name: "fixture-readme",
+    arguments: { file: "README.md" },
+  },
+  {
+    tool: "find_successor",
+    name: "renamed-method-hunch",
+    arguments: { file: "packages/accounts/src/journal.ts", name: "postEntry" },
+  },
+  {
+    tool: "find_successor",
+    name: "close-miss-finds-the-successor",
+    arguments: { file: "packages/reports/src/balance.ts", name: "balanceOf" },
   },
 ];

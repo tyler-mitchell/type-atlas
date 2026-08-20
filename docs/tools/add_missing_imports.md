@@ -13,22 +13,7 @@ file: packages/reconcile/src/matching.ts
 ```
 
 ~~~text
-Add all missing imports · 1 file · 4 edits
-
-*** Begin Patch
-*** Update File: packages/reconcile/src/matching.ts
-@@
- // DELIBERATELY BROKEN — the imports for `money` and `signedAmount` are
- // missing, so `add_missing_imports` scenarios have real work to do. Do not
- // fix; see the fixture README.
--import type { Posting } from "@ledger/accounts";
-+import { signedAmount, type Posting } from "@ledger/accounts";
- import type { StatementLine } from "./drift.ts";
-+import { money } from "../../money/src/money.ts";
- 
- /** Pair journal postings with the statement lines they explain. */
- export const matchPostings = (
-*** End Patch
+The language service offered no import fixes, although 2 names in this file do not resolve. If an import should exist for them, write it by hand — the engine proposed none.
 
 2 problems in packages/reconcile/src/matching.ts
 ~~~

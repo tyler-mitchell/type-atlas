@@ -46,3 +46,20 @@ every `Money` passed through the system was constructed by `money()` and is
 therefore integral and currency-tagged.
 ~~~
 
+## constant with documentation
+
+```yaml
+tool: Hover
+workspace: fixtures/ledger
+file: packages/money/src/currency.ts
+position: {"line":12,"character":14}
+```
+
+~~~text
+packages/money/src/currency.ts:12:14
+
+```typescript
+const currencyProfiles: Record<Currency, CurrencyProfile>
+```
+~~~
+

@@ -150,13 +150,23 @@ export const registerTool = <
       });
     });
 
-    return withElapsed(
-      await Promise.race([
-        callback(arguments_, { ...context, mcpReq: { ...context.mcpReq, signal } }),
-        aborted,
-      ]),
-      started,
-    );
+    try {
+      return withElapsed(
+        await Promise.race([
+          callback(arguments_, { ...context, mcpReq: { ...context.mcpReq, signal } }),
+          aborted,
+        ]),
+        started,
+      );
+    } catch (error) {
+      // Operational errors go to stderr — the README's stated contract. The
+      // client receives only the message; without this, a defect's throw
+      // site vanishes with the stack that named it.
+      if (error instanceof Error && error.stack) {
+        console.error(`[type-atlas] ${name} failed:\n${error.stack}`);
+      }
+      throw error;
+    }
   }) as ToolCallback<Input>;
 
   // The raw callback, not the bounded one: the gateway wraps its own call in

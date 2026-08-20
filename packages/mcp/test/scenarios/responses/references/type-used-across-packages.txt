@@ -1,5 +1,5 @@
 Money [type] · packages/money/src/money.ts:12:13
-30 references · 4 projects loaded · packages/money/tsconfig.json
+30 references · 7 projects loaded · packages/money/tsconfig.json
 
 1-20 of 30 references · pass offset: 20 for the rest
 

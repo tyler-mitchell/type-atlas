@@ -11,6 +11,29 @@ import { fixtureRoot, packageRoot } from "./fixture.ts";
 
 
 /**
+ * Loads every fixture project deterministically, so the session's answers do
+ * not depend on scenario order: one cheap request into each tsconfig's
+ * territory. Sequential on purpose — parallel first-touches raced project
+ * construction.
+ */
+export const warmFixtureProjects = async (session: {
+  invoke: (tool: string, argument: Record<string, unknown>) => Promise<string>;
+}): Promise<void> => {
+  const doorways = [
+    "packages/money/src/money.ts",
+    "packages/accounts/src/account.ts",
+    "packages/reports/src/balance.ts",
+    "packages/reconcile/src/drift.ts",
+    "packages/importers/src/csv.ts",
+    "packages/utils/src/index.ts",
+    "apps/website/src/counter.ts",
+  ];
+  for (const file of doorways) {
+    await session.invoke("project_config", { file });
+  }
+};
+
+/**
  * Dirties the fixture per the scenario and returns the restore — run in a
  * `finally`. Tracked bytes come back via `git checkout`; creations are
  * removed. No scenario outcome may leave the fixture dirty.
@@ -58,14 +81,20 @@ export const connectScenarioSession = async (
   close: () => Promise<void>;
 }> => {
   const client = new Client({ name: "type-atlas-scenarios", version: "1.0.0" });
-  await client.connect(
-    new StdioClientTransport({
-      command: process.execPath,
-      args: [...entrypoint],
-      cwd,
-      stderr: "pipe",
-    }),
-  );
+  const transport = new StdioClientTransport({
+    command: process.execPath,
+    args: [...entrypoint],
+    cwd,
+    stderr: "pipe",
+  });
+  await client.connect(transport);
+  // The server's stderr is where a dying backend writes its stack. Kept, so
+  // a tool error can name its cause instead of just "Connection is disposed".
+  const stderrHeld: string[] = [];
+  transport.stderr?.on("data", (chunk: Buffer) => {
+    stderrHeld.push(chunk.toString("utf8"));
+    if (stderrHeld.length > 200) stderrHeld.shift();
+  });
   return {
     invoke: async (tool, argument) => {
       const result = await client.callTool({
@@ -74,7 +103,16 @@ export const connectScenarioSession = async (
       });
       const content = result.content as ReadonlyArray<{ type: string; text?: string }>;
       const text = content.find((item) => item.type === "text")?.text ?? "";
-      return result.isError === true ? `⚠ tool error\n${normalizeResponse(text)}` : normalizeResponse(text);
+      // A tool error must fail the scenario, never become its capture: an
+      // error snapshot poisons the baseline and the docs, then self-confirms
+      // on every later run. One mid-suite server death did exactly that —
+      // "Connection is disposed." was committed as a tool's documentation.
+      if (result.isError === true) {
+        throw new Error(
+          `${tool} answered with a tool error:\n${text}\n\nServer stderr tail:\n${stderrHeld.slice(-40).join("")}`,
+        );
+      }
+      return normalizeResponse(text);
     },
     catalog: async () => {
       const { tools } = await client.listTools();

@@ -1,0 +1,8 @@
+Seen from packages/reports/src/balance.ts · runtime surface · matching balance.
+
+=== @ledger/accounts · 2 exports ===
+
+normalBalance: (alias) const normalBalance: (kind: __module.AccountKind) => "debit" | "credit"
+   export normalBalance
+UnbalancedEntryError: (alias) class UnbalancedEntryError
+   export UnbalancedEntryError

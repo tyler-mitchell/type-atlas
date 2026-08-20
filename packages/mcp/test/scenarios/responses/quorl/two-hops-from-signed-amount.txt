@@ -6,11 +6,11 @@ signedAmount · packages/accounts/src/posting.ts:25:14
 │  └  post · packages/accounts/src/journal.ts:34:3 · …
 │     ├  54:60 · if (!isZero(imbalance)) throw new UnbalancedEntryError(imbalance);
 │     └  54:17 · if (!isZero(imbalance)) throw new UnbalancedEntryError(imbalance);
-├  journalTotal · packages/reconcile/src/drift.ts:20:9
-│  ├  20:37 · const journalTotal = postings.map(signedAmount).reduce((total, amount) => total + amount);
-│  └  drift · packages/reconcile/src/drift.ts:19:14 · …
-│     └  21:23 · return format(money(journalTotal - statementTotal(statement), "usd"));
-└  balancesAsOf · packages/reports/src/balance.ts:23:14
-   └  34:57 · add(own.get(posting.account) ?? zero(currency), signedAmount(posting)),
+├  balancesAsOf · packages/reports/src/balance.ts:23:14
+│  └  34:57 · add(own.get(posting.account) ?? zero(currency), signedAmount(posting)),
+└  journalTotal · packages/reconcile/src/drift.ts:20:9
+   ├  20:37 · const journalTotal = postings.map(signedAmount).reduce((total, amount) => total + amount);
+   └  drift · packages/reconcile/src/drift.ts:19:14 · …
+      └  21:23 · return format(money(journalTotal - statementTotal(statement), "usd"));
 
 2 marked … were not expanded · raise depth or limit to follow them

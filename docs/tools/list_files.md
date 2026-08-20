@@ -18,7 +18,7 @@ ledger/
 ├  package.json · 24 loc
 ├  pnpm-lock.yaml · 2.3k loc
 ├  pnpm-workspace.yaml · 19 loc
-├  README.md · 33 loc · modified
+├  README.md · 33 loc
 ├  tsconfig.json · 9 loc
 └  vite.config.ts · 13 loc
 ~~~
@@ -87,7 +87,7 @@ ledger/
 ├  package.json · 24 loc
 ├  pnpm-lock.yaml · 2.3k loc
 ├  pnpm-workspace.yaml · 19 loc
-├  README.md · 33 loc · modified
+├  README.md · 33 loc
 ├  tsconfig.json · 9 loc
 └  vite.config.ts · 13 loc
 ~~~
@@ -117,7 +117,7 @@ ledger/
 ├  package.json · 24 loc
 ├  pnpm-lock.yaml · 2.3k loc
 ├  pnpm-workspace.yaml · 19 loc
-├  README.md · 33 loc · modified
+├  README.md · 33 loc
 ├  tsconfig.json · 9 loc
 └  vite.config.ts · 13 loc
 ~~~

@@ -38,3 +38,22 @@ statementTotal [variable] 15:14-15:28 · range 15:14-16:56
 4 problems in packages/reconcile/src/drift.ts
 ~~~
 
+## importer module outline
+
+```yaml
+tool: Document symbols
+workspace: fixtures/ledger
+file: packages/importers/src/csv.ts
+```
+
+~~~text
+=== packages/importers/src/csv.ts · 4 top-level symbols ===
+
+HEADER [variable] 13:7-13:13 · range 13:7-13:50
+importStatement [variable] 28:14-28:29 · range 28:14-47:2
+parseStatement [variable] 15:14-15:28 · range 15:14-25:2
+StatementRow [interface] 6:18-6:30 · range 6:1-11:2
+
+3 hints in packages/importers/src/csv.ts
+~~~
+

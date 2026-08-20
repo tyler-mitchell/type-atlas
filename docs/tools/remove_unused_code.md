@@ -13,6 +13,21 @@ file: packages/importers/src/dedupe.ts
 ```
 
 ~~~text
-No unused code.
+Remove all unused code · 1 file · 2 edits
+
+*** Begin Patch
+*** Update File: packages/importers/src/dedupe.ts
+@@
+     return twice
+ }
+ 
+-const unusedBatchLimit = 500;
+ 
+-function legacyKeyOf(row: StatementRow): string {
+-  return [row.postedOn, row.description].join("::");
+-}
+*** End Patch
+
+2 hints in packages/importers/src/dedupe.ts
 ~~~
 

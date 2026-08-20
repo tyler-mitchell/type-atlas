@@ -5,7 +5,11 @@ import { fileURLToPath } from "node:url";
 import { createTwoFilesPatch } from "diff";
 import { execa } from "execa";
 import { scenarios } from "../test/scenarios/cases.ts";
-import { arrangeFixture, connectScenarioSession } from "../test/scenarios/runner.ts";
+import {
+  arrangeFixture,
+  connectScenarioSession,
+  warmFixtureProjects,
+} from "../test/scenarios/runner.ts";
 
 type PackedPackage = {
   name: string;
@@ -157,6 +161,9 @@ try {
     temporaryDirectory,
   );
   try {
+    // The same deterministic warm-up the capture suite runs: several answers
+    // embed loaded-project state, and a cold replay diverges on exactly that.
+    await warmFixtureProjects(session);
     const responsesRoot = join(repositoryRoot, "packages/mcp/test/scenarios/responses");
     const capturedCatalog = await readFile(join(responsesRoot, "tool-catalog.json"), "utf8");
     const installedCatalog = `${JSON.stringify(await session.catalog(), null, 2)}\n`;

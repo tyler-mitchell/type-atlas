@@ -1,0 +1,24 @@
+Rename to InMemoryAccountStore · resolved MemoryAccountStore · packages/accounts/src/account.ts:37:14 · Scope: project only · packages/accounts/tsconfig.json · 2 files · 2 edits
+
+*** Begin Patch
+*** Update File: packages/accounts/src/account.ts
+@@
+   open(account: Account): void;
+ }
+ 
+-export class MemoryAccountStore implements AccountStore {
++export class InMemoryAccountStore implements AccountStore {
+   private readonly accounts = new Map<AccountPath, Account>();
+ 
+   get(path: AccountPath): Account | undefined {
+*** Update File: packages/accounts/src/index.ts
+@@
+   type AccountPath,
+   type AccountStore,
+   lineage,
+-  MemoryAccountStore,
++  InMemoryAccountStore as MemoryAccountStore,
+   normalBalance,
+   parentPath,
+ } from "./account.ts";
+*** End Patch

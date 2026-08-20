@@ -1,0 +1,1 @@
+Nothing at this position has a type declared elsewhere. A primitive, a literal, or an inferred anonymous shape has no type definition to jump to.

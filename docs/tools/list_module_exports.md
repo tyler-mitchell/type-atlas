@@ -38,3 +38,24 @@ zero: (alias) const zero: (currency: __module.Currency) => __module.Money
    export zero
 ~~~
 
+## surface filtered by query
+
+```yaml
+tool: Inspect module
+workspace: fixtures/ledger
+fromFile: packages/reports/src/balance.ts
+module: @ledger/accounts
+query: balance
+```
+
+~~~text
+Seen from packages/reports/src/balance.ts · runtime surface · matching balance.
+
+=== @ledger/accounts · 2 exports ===
+
+normalBalance: (alias) const normalBalance: (kind: __module.AccountKind) => "debit" | "credit"
+   export normalBalance
+UnbalancedEntryError: (alias) class UnbalancedEntryError
+   export UnbalancedEntryError
+~~~
+
