@@ -17,6 +17,7 @@ document_symbols/journal-outline
 document_symbols/broken-file-answers-with-diagnostics
 document_symbols/importer-module-outline
 document_symbols/generic-module-outline
+document_symbols/config-values-fold-to-a-count
 hover/overloaded-method
 hover/branded-type
 hover/constant-with-documentation

@@ -1,0 +1,7 @@
+{
+  "tool": "document_symbols",
+  "arguments": {
+    "file": "packages/importers/src/bank-profiles.ts",
+    "depth": 3
+  }
+}

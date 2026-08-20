@@ -13,7 +13,7 @@ text: signedAmount
 ```
 
 ~~~text
-"signedAmount" occurs 12 times in 7 files · 65 files scanned under the workspace.
+"signedAmount" occurs 12 times in 7 files · 66 files scanned under the workspace.
 
 packages/accounts/src/index.ts:12:39 · export { credit, debit, type Posting, signedAmount } from "./posting.ts";
 packages/accounts/src/journal.ts
@@ -43,6 +43,6 @@ text: quantumFlux
 ```
 
 ~~~text
-Nothing under the workspace contains "quantumFlux" · 65 files scanned. This is a literal answer: the exact text does not occur in what was scanned, which is the proof a semantic search cannot give.
+Nothing under the workspace contains "quantumFlux" · 66 files scanned. This is a literal answer: the exact text does not occur in what was scanned, which is the proof a semantic search cannot give.
 ~~~
 

@@ -217,6 +217,12 @@ describe("document_symbols", () => {
   scenarioTest("generic-module-outline", ({ capture }) =>
     capture("document_symbols", { file: "packages/rules/src/rule.ts" }),
   );
+  // A config file is three declarations and dozens of nested literals; the
+  // outline prices the values (`· N entries`) instead of dumping them —
+  // `raw` remains the complete hierarchy.
+  scenarioTest("config-values-fold-to-a-count", ({ capture }) =>
+    capture("document_symbols", { file: "packages/importers/src/bank-profiles.ts", depth: 3 }),
+  );
 });
 
 // ── hover: type and documentation at a position ─────────────────────────────

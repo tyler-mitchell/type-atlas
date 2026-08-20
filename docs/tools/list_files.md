@@ -14,7 +14,7 @@ workspace: fixtures/ledger
 ~~~text
 ledger/
 ├  apps/ · 11 files
-├  packages/ · 43 files
+├  packages/ · 44 files
 ├  ledger.config.json · 10 loc
 ├  ledger.config.schema.json · 21 loc
 ├  package.json · 24 loc
@@ -49,6 +49,7 @@ ledger/
 │  │  └  tsconfig.json · 20 loc
 │  ├  importers/
 │  │  ├  src/
+│  │  │  ├  bank-profiles.ts · 42 loc
 │  │  │  ├  config.ts · 7 loc
 │  │  │  ├  csv.ts · 47 loc
 │  │  │  ├  dedupe.ts · 18 loc
@@ -216,6 +217,7 @@ depth: 2
 ~~~text
 packages/importers/
 ├  src/ · 2 changed
+│  ├  bank-profiles.ts · 42 loc
 │  ├  config.ts · 7 loc
 │  ├  csv.ts · 47 loc
 │  ├  duplicate-rows.ts · 18 loc · R dedupe.ts →
@@ -273,11 +275,11 @@ ledger/
 │  │  └  … 1 more
 │  ├  importers/
 │  │  ├  src/
+│  │  │  ├  bank-profiles.ts · 42 loc
 │  │  │  ├  config.ts · 7 loc
 │  │  │  ├  csv.ts · 47 loc
 │  │  │  ├  dedupe.ts · 18 loc
-│  │  │  ├  index.ts · 7 loc
-│  │  │  └  … 1 more
+│  │  │  └  … 2 more
 │  │  ├  package.json · 23 loc
 │  │  └  … 1 more
 │  ├  money/
@@ -355,11 +357,12 @@ ledger/
 │  │     └  journal.test.ts · 29 loc
 │  ├  importers/
 │  │  └  src/
+│  │     ├  bank-profiles.ts · 42 loc
 │  │     ├  config.ts · 7 loc
 │  │     ├  csv.ts · 47 loc
 │  │     ├  dedupe.ts · 18 loc
 │  │     ├  index.ts · 7 loc
-│  │     └  statement-parser.ts · 64 loc
+│  │     └  … 1 more
 │  ├  money/ · 6 files
 │  ├  reconcile/ · 3 files
 │  ├  reports/ · 3 files

@@ -26,7 +26,7 @@ One page per tool, generated from the scenario suite's captured responses — ev
 
 | [`document_links`](document_links.md) | Document links | 2 |
 
-| [`document_symbols`](document_symbols.md) | Document symbols | 4 |
+| [`document_symbols`](document_symbols.md) | Document symbols | 5 |
 
 | [`file_references`](file_references.md) | File references | 1 |
 

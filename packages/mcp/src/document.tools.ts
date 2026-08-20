@@ -21,6 +21,7 @@ import {
 } from "@type-atlas/core";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { type } from "arktype";
+import { SymbolKind } from "vscode-languageserver-protocol";
 import { requestDiagnosticContext, workspaceRelativeMessage } from "./ambient-diagnostics.ts";
 import { enclosingDeclaration } from "./reference-groups.ts";
 import { readOnlyToolAnnotations } from "./metadata.ts";
@@ -393,12 +394,51 @@ export const registerDocumentTools = (server: McpServer, workspaces: VolarWorksp
         signal,
       );
       const parsed = symbols ?? [];
-      const output = raw ? parsed : projectDocumentSymbols([...parsed], depth);
+      // A value's insides are data, not declarations: an object literal's
+      // properties flooded a config file's outline with 136 rows for 3 real
+      // declarations. A literal-valued symbol keeps its row and prices what
+      // it holds — `· N entries` — and `raw` remains the complete hierarchy.
+      // The kind alone cannot decide (a const arrow function is a Variable
+      // too), so a symbol folds only when every child is member-shaped:
+      // properties and literals fold, a body holding locals or callbacks
+      // stays a declaration tree.
+      const valueShaped = new Set<SymbolKind>([
+        SymbolKind.Property,
+        SymbolKind.Field,
+        SymbolKind.Variable,
+        SymbolKind.Constant,
+        SymbolKind.Array,
+        SymbolKind.Object,
+      ]);
+      const memberShaped = new Set<SymbolKind>([
+        SymbolKind.Property,
+        SymbolKind.Field,
+        SymbolKind.Object,
+        SymbolKind.Array,
+        SymbolKind.String,
+        SymbolKind.Number,
+        SymbolKind.Boolean,
+        SymbolKind.Key,
+      ]);
+      const entryCount = (entry: DocumentSymbol): number =>
+        (entry.children ?? []).reduce((held, child) => held + 1 + entryCount(child), 0);
+      const foldValues = (
+        entry: DocumentSymbol,
+      ): DocumentSymbol & { readonly folded?: number } =>
+        valueShaped.has(entry.kind) &&
+        (entry.children?.length ?? 0) > 0 &&
+        (entry.children ?? []).every((child) => memberShaped.has(child.kind))
+          ? { ...entry, children: [], folded: entryCount(entry) }
+          : { ...entry, children: (entry.children ?? []).map(foldValues) };
+      const folded = raw
+        ? parsed
+        : parsed.map((entry) => ("range" in entry ? foldValues(entry) : entry));
+      const output = raw ? folded : projectDocumentSymbols([...folded], depth);
       // An outline is already a tree, so it is handed over as one: a document
       // states what a row says and the guide draws how deep it sits, and
       // neither needs a depth counted onto every entry to get there.
       const outline = (function nestOutline(
-        entries: readonly (DocumentSymbol | SymbolInformation)[],
+        entries: readonly ((DocumentSymbol & { readonly folded?: number }) | SymbolInformation)[],
       ): readonly Record<string, unknown>[] {
         return entries.map((entry) => {
           const selection = "range" in entry ? entry.selectionRange : entry.location.range;
@@ -412,6 +452,7 @@ export const registerDocumentTools = (server: McpServer, workspaces: VolarWorksp
             selection,
             extent: sameRange(extent, selection) ? undefined : extent,
             detail: "detail" in entry ? entry.detail : undefined,
+            folded: "folded" in entry ? entry.folded : undefined,
             children: "range" in entry ? nestOutline(entry.children ?? []) : [],
           };
         });

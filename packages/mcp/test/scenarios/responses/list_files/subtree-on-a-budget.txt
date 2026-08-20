@@ -12,11 +12,11 @@ ledger/
 │  │  └  … 1 more
 │  ├  importers/
 │  │  ├  src/
+│  │  │  ├  bank-profiles.ts · 42 loc
 │  │  │  ├  config.ts · 7 loc
 │  │  │  ├  csv.ts · 47 loc
 │  │  │  ├  dedupe.ts · 18 loc
-│  │  │  ├  index.ts · 7 loc
-│  │  │  └  … 1 more
+│  │  │  └  … 2 more
 │  │  ├  package.json · 23 loc
 │  │  └  … 1 more
 │  ├  money/

@@ -279,7 +279,7 @@ text: quantumFlux
 ```
 
 ~~~text
-Nothing under the workspace contains "quantumFlux" · 65 files scanned. This is a literal answer: the exact text does not occur in what was scanned, which is the proof a semantic search cannot give.
+Nothing under the workspace contains "quantumFlux" · 66 files scanned. This is a literal answer: the exact text does not occur in what was scanned, which is the proof a semantic search cannot give.
 ~~~
 
 ### `impact` — a change weighed before it is made

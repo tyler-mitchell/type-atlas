@@ -79,3 +79,25 @@ RuleHandler [interface] 19:13-19:24 · range 19:1-21:14
 Verdict [interface] 17:13-17:20 · range 17:1-17:101
 ~~~
 
+## config values fold to a count
+
+```yaml
+tool: Document symbols
+workspace: fixtures/ledger
+file: packages/importers/src/bank-profiles.ts
+depth: 3
+```
+
+~~~text
+=== packages/importers/src/bank-profiles.ts · 3 top-level symbols ===
+
+BankProfile [interface] 4:18-4:29 · range 4:1-10:2
+├  columns [property] 8:12-8:19 · range 8:3-8:102
+├  currency [property] 7:12-7:20 · range 7:3-7:31
+├  dateFormat [property] 6:12-6:22 · range 6:3-6:31
+├  delimiter [property] 5:12-5:21 · range 5:3-5:30
+└  quirks [property] 9:12-9:18 · range 9:3-9:83
+bankProfiles [variable] 17:14-17:26 · range 17:14-39:40 · 33 entries
+profileFor [variable] 41:14-41:24 · range 41:14-42:82
+~~~
+

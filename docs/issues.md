@@ -362,10 +362,6 @@ arrival per the standing rule.
 From a Codex agent's real usage (webgpu-engine work), relayed by the
 maintainer. Items already in flight are marked; the rest stand alone:
 
-- **`document_symbols` dumps every nested property of large config objects.**
-  Needs symbol-kind/property suppression for compact orientation — the same
-  139-symbols-for-3-declarations disease the README leads with, resurfacing
-  through config-literal shapes.
 - **`explore_symbol`: the similar-code tail can be noise.** Consider making
   the similarity section opt-in or self-trimming when relevance is low.
 - **`investigate_code` anchors unrelated symbols on conceptual questions.**
