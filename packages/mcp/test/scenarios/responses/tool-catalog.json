@@ -1,0 +1,170 @@
+[
+  {
+    "name": "add_missing_imports",
+    "title": "Add missing imports"
+  },
+  {
+    "name": "callees",
+    "title": "Callees"
+  },
+  {
+    "name": "callers",
+    "title": "Callers"
+  },
+  {
+    "name": "code_actions",
+    "title": "Code actions"
+  },
+  {
+    "name": "completions",
+    "title": "Completions"
+  },
+  {
+    "name": "compose",
+    "title": "Compose"
+  },
+  {
+    "name": "definitions",
+    "title": "Definitions"
+  },
+  {
+    "name": "diagnostics",
+    "title": "Diagnostics"
+  },
+  {
+    "name": "document_highlights",
+    "title": "Document highlights"
+  },
+  {
+    "name": "document_links",
+    "title": "Document links"
+  },
+  {
+    "name": "document_symbols",
+    "title": "Document symbols"
+  },
+  {
+    "name": "explore_symbol",
+    "title": "Explore symbol"
+  },
+  {
+    "name": "file_references",
+    "title": "File references"
+  },
+  {
+    "name": "find_successor",
+    "title": "Find successor"
+  },
+  {
+    "name": "fix_all",
+    "title": "Fix all"
+  },
+  {
+    "name": "format_document",
+    "title": "Format document"
+  },
+  {
+    "name": "hover",
+    "title": "Hover"
+  },
+  {
+    "name": "impact",
+    "title": "Impact"
+  },
+  {
+    "name": "implementations",
+    "title": "Implementations"
+  },
+  {
+    "name": "inlay_hints",
+    "title": "Inlay hints"
+  },
+  {
+    "name": "inspect_symbol",
+    "title": "Inspect symbol"
+  },
+  {
+    "name": "investigate_code",
+    "title": "Investigate code"
+  },
+  {
+    "name": "list_files",
+    "title": "List files"
+  },
+  {
+    "name": "list_module_exports",
+    "title": "Inspect module"
+  },
+  {
+    "name": "occurrences",
+    "title": "Occurrences"
+  },
+  {
+    "name": "organize_imports",
+    "title": "Organize imports"
+  },
+  {
+    "name": "project_config",
+    "title": "Project configuration"
+  },
+  {
+    "name": "quorl",
+    "title": "Quorl"
+  },
+  {
+    "name": "read_file",
+    "title": "Read files"
+  },
+  {
+    "name": "references",
+    "title": "References"
+  },
+  {
+    "name": "related_code",
+    "title": "Related code"
+  },
+  {
+    "name": "remove_unused_code",
+    "title": "Remove unused code"
+  },
+  {
+    "name": "rename_files",
+    "title": "Rename files"
+  },
+  {
+    "name": "rename_symbol",
+    "title": "Rename symbol"
+  },
+  {
+    "name": "search_code",
+    "title": "Search code"
+  },
+  {
+    "name": "search_dependency_code",
+    "title": "Search dependency code"
+  },
+  {
+    "name": "selection_ranges",
+    "title": "Selection ranges"
+  },
+  {
+    "name": "signature_help",
+    "title": "Signature help"
+  },
+  {
+    "name": "type_definitions",
+    "title": "Type definitions"
+  },
+  {
+    "name": "verify_edit",
+    "title": "Verify edit"
+  },
+  {
+    "name": "watch_diagnostics",
+    "title": "Watch diagnostics"
+  },
+  {
+    "name": "workspace_symbols",
+    "title": "Workspace symbols"
+  }
+]

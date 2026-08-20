@@ -78,7 +78,7 @@ test("list_files expands a subtree in place inside one tree", async () => {
       ),
     ).toMatchInlineSnapshot(`
       "featuretype/
-      ├  atlascii/ · 82 files
+      ├  atlascii/ · 83 files
       ├  docs/ · 7 files
       ├  fixtures/ · 45 files
       ├  packages/
@@ -97,7 +97,8 @@ test("list_files expands a subtree in place inside one tree", async () => {
       ├  package.json · 35 loc
       ├  pnpm-lock.yaml · 3.9k loc
       ├  pnpm-workspace.yaml · 50 loc
-      ├  README.md · 268 loc
+      ├  README.md · 531 loc
+      ├  README.mdoc · 323 loc
       ├  server.json · 23 loc
       ├  tsconfig.json · 24 loc
       └  tsdown.config.ts · 13 loc"
@@ -115,7 +116,7 @@ test("list_files expands a subtree in place inside one tree", async () => {
       ),
     ).toMatchInlineSnapshot(`
       "featuretype/
-      ├  atlascii/ · 82 files
+      ├  atlascii/ · 83 files
       ├  docs/ · 7 files
       ├  fixtures/ · 45 files
       ├  packages/
@@ -142,11 +143,12 @@ test("list_files expands a subtree in place inside one tree", async () => {
       │     ├  bin/ · 1 file
       │     ├  scripts/ · 2 files
       │     ├  src/ · 31 files
-      │     ├  test/ · 43 files
+      │     ├  test/ · 44 files
       │     ├  CHANGELOG.md · 162 loc
       │     ├  LICENSE · 188 loc
-      │     ├  package.json · 88 loc
-      │     ├  README.md · 26 loc
+      │     ├  package.json · 89 loc
+      │     ├  README.md · 90 loc
+      │     ├  README.mdoc · 77 loc
       │     └  tsconfig.json · 10 loc
       ├  scripts/ · 2 files
       ├  AGENTS.md · 76 loc
@@ -155,7 +157,8 @@ test("list_files expands a subtree in place inside one tree", async () => {
       ├  package.json · 35 loc
       ├  pnpm-lock.yaml · 3.9k loc
       ├  pnpm-workspace.yaml · 50 loc
-      ├  README.md · 268 loc
+      ├  README.md · 531 loc
+      ├  README.mdoc · 323 loc
       ├  server.json · 23 loc
       ├  tsconfig.json · 24 loc
       └  tsdown.config.ts · 13 loc"
@@ -176,7 +179,7 @@ test("list_files expands a subtree in place inside one tree", async () => {
       (mixed.content.find((item) => item.type === "text")?.text ?? "").replace(/\n\n· .+$/u, ""),
     ).toMatchInlineSnapshot(`
       "featuretype/
-      ├  atlascii/ · 82 files
+      ├  atlascii/ · 83 files
       ├  docs/
       │  ├  case-studies/
       │  │  └  webgpu-engine-p0.md · 173 loc
@@ -201,7 +204,8 @@ test("list_files expands a subtree in place inside one tree", async () => {
       ├  package.json · 35 loc
       ├  pnpm-lock.yaml · 3.9k loc
       ├  pnpm-workspace.yaml · 50 loc
-      ├  README.md · 268 loc
+      ├  README.md · 531 loc
+      ├  README.mdoc · 323 loc
       ├  server.json · 23 loc
       ├  tsconfig.json · 24 loc
       └  tsdown.config.ts · 13 loc"

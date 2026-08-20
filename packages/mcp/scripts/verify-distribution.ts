@@ -2,9 +2,10 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { Client } from "@modelcontextprotocol/client";
-import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
+import { createTwoFilesPatch } from "diff";
 import { execa } from "execa";
+import { scenarios } from "../test/scenarios/cases.ts";
+import { connectScenarioSession } from "../test/scenarios/runner.ts";
 
 type PackedPackage = {
   name: string;
@@ -14,6 +15,17 @@ type PackedPackage = {
 
 const repositoryRoot = resolve(fileURLToPath(new URL("../../..", import.meta.url)));
 const packageRequirements = [
+  {
+    directory: "atlascii",
+    files: [
+      "LICENSE",
+      "README.md",
+      "dist/index.d.ts",
+      "dist/index.js",
+      "dist/document/index.d.ts",
+      "dist/document/index.js",
+    ],
+  },
   {
     directory: "packages/language-server",
     files: [
@@ -134,29 +146,55 @@ try {
     throw new Error("The installed type-atlas executable did not render its help");
   }
 
-  const client = new Client({ name: "type-atlas-distribution", version: "1.0.0" });
-  const transport = new StdioClientTransport({
-    command: process.execPath,
-    args: [join(temporaryDirectory, "node_modules", "@type-atlas", "mcp", "bin", "type-atlas.cjs")],
-    cwd: temporaryDirectory,
-    stderr: "pipe",
-  });
-
-  await client.connect(transport);
+  // The consumer path must be the product, not a sibling of it: the installed
+  // package answers the same tools/list this repository captured, and every
+  // committed scenario byte-for-byte. A dist-only regression — a bundling
+  // fault, a lost asset, an import that only resolves under development
+  // conditions — surfaces here as a named diff instead of in a consumer's
+  // session.
+  const session = await connectScenarioSession(
+    [join(temporaryDirectory, "node_modules", "@type-atlas", "mcp", "bin", "type-atlas.cjs")],
+    temporaryDirectory,
+  );
   try {
-    const { tools } = await client.listTools();
-    const names = new Set(tools.map(({ name }) => name));
-    const missing = ["read_file", "document_symbols", "inspect_symbol"].filter(
-      (name) => !names.has(name),
-    );
-    if (missing.length > 0) {
-      throw new Error(`The installed MCP omits tools: ${missing.join(", ")}`);
+    const responsesRoot = join(repositoryRoot, "packages/mcp/test/scenarios/responses");
+    const capturedCatalog = await readFile(join(responsesRoot, "tool-catalog.json"), "utf8");
+    const installedCatalog = `${JSON.stringify(await session.catalog(), null, 2)}\n`;
+    if (installedCatalog !== capturedCatalog) {
+      throw new Error(
+        "The installed MCP's tools/list differs from the captured catalog (test/scenarios/responses/tool-catalog.json). Regenerate captures if the surface changed deliberately.",
+      );
     }
+    const mismatched: string[] = [];
+    for (const scenario of scenarios) {
+      const answer = await session.invoke(scenario.tool, scenario.arguments);
+      const committed = await readFile(
+        join(responsesRoot, `${scenario.tool}/${scenario.name}.txt`),
+        "utf8",
+      );
+      if (answer.trimEnd() !== committed.trimEnd()) {
+        mismatched.push(`${scenario.tool}/${scenario.name}`);
+        console.error(
+          createTwoFilesPatch(
+            `captured ${scenario.tool}/${scenario.name}`,
+            "installed answer",
+            `${committed.trimEnd()}\n`,
+            `${answer.trimEnd()}\n`,
+          ),
+        );
+      }
+    }
+    if (mismatched.length > 0) {
+      throw new Error(
+        `The installed MCP answers ${mismatched.length} scenario(s) differently from the committed captures: ${mismatched.join(", ")}`,
+      );
+    }
+    console.log(
+      `Packed packages install cleanly; the installed MCP reproduces the tool catalog and all ${scenarios.length} captured scenarios.`,
+    );
   } finally {
-    await client.close();
+    await session.close();
   }
-
-  console.log("Packed packages install cleanly and expose the Type Atlas MCP.");
 } finally {
   await rm(temporaryDirectory, { recursive: true, force: true });
 }

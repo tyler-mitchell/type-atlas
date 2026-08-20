@@ -47,8 +47,10 @@ export const normalizeResponse = (text: string): string =>
  */
 export const connectScenarioSession = async (
   entrypoint: readonly string[] = ["--conditions=development", "src/cli.ts"],
+  cwd: string = packageRoot,
 ): Promise<{
   invoke: (tool: string, argument: Record<string, unknown>) => Promise<string>;
+  catalog: () => Promise<ReadonlyArray<{ name: string; title?: string }>>;
   close: () => Promise<void>;
 }> => {
   const client = new Client({ name: "type-atlas-scenarios", version: "1.0.0" });
@@ -56,7 +58,7 @@ export const connectScenarioSession = async (
     new StdioClientTransport({
       command: process.execPath,
       args: [...entrypoint],
-      cwd: packageRoot,
+      cwd,
       stderr: "pipe",
     }),
   );
@@ -69,6 +71,12 @@ export const connectScenarioSession = async (
       const content = result.content as ReadonlyArray<{ type: string; text?: string }>;
       const text = content.find((item) => item.type === "text")?.text ?? "";
       return result.isError === true ? `⚠ tool error\n${normalizeResponse(text)}` : normalizeResponse(text);
+    },
+    catalog: async () => {
+      const { tools } = await client.listTools();
+      return tools
+        .map(({ name, title }) => ({ name, ...(title === undefined ? {} : { title }) }))
+        .sort((left, right) => left.name.localeCompare(right.name));
     },
     close: () => client.close(),
   };

@@ -13,5 +13,9 @@ Nothing at this position is callable, so it calls nothing. Callees reports what 
 {% $name %} · calls {% $total %} {% plural count=$total forms={"one": "callable", "other": "callables"} /%}
 
 {% tree entries=$groups partial="call-node.mdoc" /%}
+
+{% if $standardLibrary %}
+and {% $standardLibrary.count %} standard-library {% plural count=$standardLibrary.count forms={"one": "call", "other": "calls"} /%} · {% $standardLibrary.names %}
+{% /if %}
 {% /if %}
 {% /if %}

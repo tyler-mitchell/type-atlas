@@ -19,6 +19,18 @@ afterAll(async () => {
   await session?.close();
 });
 
+/**
+ * The tool surface itself, as the server advertises it over `tools/list` —
+ * names and titles. Documentation derives tool titles from this capture, so
+ * a renamed tool changes the docs in the same commit or fails the gate.
+ */
+test("tool catalog", { timeout: 60_000 }, async () => {
+  const catalog = await session.catalog();
+  await expect(`${JSON.stringify(catalog, null, 2)}\n`).toMatchFileSnapshot(
+    "responses/tool-catalog.json",
+  );
+});
+
 for (const scenario of scenarios) {
   test(`${scenario.tool} · ${scenario.name}`, { timeout: 120_000 }, async () => {
     const response = await session.invoke(scenario.tool, scenario.arguments);

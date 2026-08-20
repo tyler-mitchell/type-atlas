@@ -122,13 +122,32 @@ const callHierarchyVariables = <Call extends { readonly fromRanges: readonly Ran
 }) => {
   const subject = input.items?.[0];
   const flat = (input.calls ?? []).flatMap((group) => group ?? []);
-  const grouped = flat.reduce((files, call) => {
-    const file = displayPath(input.callable(call).uri, input.root);
-    return files.set(file, [...(files.get(file) ?? []), call]);
-  }, new Map<string, Call[]>());
+  // The default TypeScript libraries are real callables and pure noise: they
+  // outnumber a function's own calls, repeat once per overload declaration,
+  // and their paths name whatever directory the compiler is installed under —
+  // which differs between this repository and a consumer install. They fold
+  // to one line of distinct names, so the answer stays about the project.
+  const standardLibrary = (call: Call) =>
+    /\/lib\/lib\.[^/]+\.d\.ts$/u.test(input.callable(call).uri);
+  const libraryCalls = flat.filter(standardLibrary);
+  const grouped = flat
+    .filter((call) => !standardLibrary(call))
+    .reduce((files, call) => {
+      const file = displayPath(input.callable(call).uri, input.root);
+      return files.set(file, [...(files.get(file) ?? []), call]);
+    }, new Map<string, Call[]>());
   return {
     name: subject?.name,
     total: flat.length,
+    standardLibrary:
+      libraryCalls.length > 0
+        ? {
+            count: libraryCalls.length,
+            names: [...new Set(libraryCalls.map((call) => input.callable(call).name))]
+              .sort()
+              .join(", "),
+          }
+        : undefined,
     origin: subject
       ? [
           {

@@ -99,13 +99,14 @@ test("serves workspace files through the packaged stdio entrypoint", async () =>
 }, 30_000);
 
 /**
- * An argument no schema declares is a typo or a misunderstanding, and a tool
- * that answers anyway silently degrades it to defaults — a `file` argument
- * once read as a per-file diagnostics mode this server does not have. This
- * asks through the real stdio boundary, so a client stripping unknown keys
- * before sending cannot mask what the server itself accepts.
+ * An argument no schema declares is tolerated, by standing order: rejection
+ * added failure modes — a client that caches an older schema than the server
+ * runs had every newer argument refused — and answering from the declared
+ * arguments is the contract. This asks through the real stdio boundary, so a
+ * client stripping unknown keys before sending cannot mask what the server
+ * itself accepts.
  */
-test("rejects an argument no schema declares", async () => {
+test("answers despite an argument no schema declares", async () => {
   const client = new Client({ name: "type-atlas-test", version: "1.0.0" });
   const transport = new StdioClientTransport({
     command: process.execPath,
@@ -123,7 +124,7 @@ test("rejects an argument no schema declares", async () => {
       })
       .then((result) => ({ rejected: result.isError === true }))
       .catch(() => ({ rejected: true }));
-    expect(outcome).toEqual({ rejected: true });
+    expect(outcome).toEqual({ rejected: false });
   } finally {
     await client.close();
   }
