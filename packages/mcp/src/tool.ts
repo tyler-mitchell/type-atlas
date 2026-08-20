@@ -79,34 +79,14 @@ type ToolConfig<Input extends StandardSchemaWithJSON, Output extends StandardSch
  * packaged server's real `tools/list` response. See "MCP Tool Input Schemas" in
  * AGENTS.md before declaring a schema here.
  */
-/**
- * An argument no schema declares is a typo or a misunderstanding, and a tool
- * that answers anyway silently degrades it to defaults — a `file` argument
- * once read as a per-file diagnostics mode this server does not have. One
- * seam, every tool: a schema that can reject undeclared keys does.
- *
- * Validated strict, published permissive. The client conforms every call to
- * the schema it cached at connect, so advertising `additionalProperties:
- * false` made it silently delete any parameter added after the session began
- * — the development loop's own hardening was what stripped its new
- * arguments. The advertised JSON schema therefore comes from the original
- * (which leaves unknown keys alone), while the server validates with the
- * strict form and rejects a true typo with a sentence. The client still
- * enforces its cached constraints on known keys, so changing an existing
- * parameter's type mid-session stays snapshot-blocked — evolve by adding
- * keys, and reach anything else through `call` until the next connect.
+/*
+ * Undeclared keys are NOT rejected, by standing order, after the mechanism
+ * intended to catch typos spent a day silently deleting every legitimately
+ * new argument instead: the client conforms calls to the schema it cached at
+ * connect, and an advertised `additionalProperties: false` told it to strip
+ * anything the snapshot did not know. Unknown keys now pass and are ignored;
+ * the declared schema still validates everything it declares.
  */
-const rejectingUndeclared = <Schema extends StandardSchemaWithJSON>(schema: Schema): Schema => {
-  const chain = (schema as { onUndeclaredKey?: (behavior: string) => Schema }).onUndeclaredKey;
-  if (typeof chain !== "function") return schema;
-  const strict = chain.call(schema, "reject");
-  return {
-    "~standard": {
-      ...strict["~standard"],
-      jsonSchema: schema["~standard"].jsonSchema,
-    },
-  } as Schema;
-};
 
 /**
  * Every registered tool, by name, for the development gateway.
@@ -179,13 +159,12 @@ export const registerTool = <
     );
   }) as ToolCallback<Input>;
 
-  const inputSchema = rejectingUndeclared(config.inputSchema);
   // The raw callback, not the bounded one: the gateway wraps its own call in
   // one timeout and one elapsed trailer, and a doubly-wrapped target would
   // print two.
   registered.set(name, {
-    schema: inputSchema,
+    schema: config.inputSchema,
     callback: callback as unknown as ErasedToolCallback,
   });
-  return server.registerTool<Output, Input>(name, { ...config, inputSchema }, boundedCallback);
+  return server.registerTool<Output, Input>(name, config, boundedCallback);
 };
