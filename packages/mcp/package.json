@@ -53,13 +53,13 @@
   "scripts": {
     "accept": "vp test run -u --project=scenarios -t",
     "build": "vp pack src/index.ts src/cli.ts",
-    "capture": "vp test run -u",
+    "capture": "vp test run -u --project=unit --project=scenarios --project=docs",
     "case": "vp test --project=scenarios -t",
     "case:run": "vp test run --project=scenarios -t",
     "check-types": "tsc --noEmit -p tsconfig.json",
     "dev": "node --conditions=development src/cli.ts",
     "prepack": "vp run build",
-    "test": "vp test run",
+    "test": "vp test run --project=unit --project=scenarios --project=docs",
     "test:determinism": "vp test run --project=determinism",
     "test:scenarios": "vp test run --project=scenarios"
   },
