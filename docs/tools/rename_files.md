@@ -38,6 +38,6 @@ Rename · 3 files · 2 edits
  import { type Money, negate } from "@ledger/money";
 *** End Patch
 
-References in packages/accounts/tests/journal.test.ts, packages/importers/src/csv.ts, packages/reconcile/src/matching.ts, packages/reconcile/src/drift.ts, packages/reports/src/balance.ts were not updated — the platform's rename walk missed them and a cross-directory specifier is not assembled here. Update them before applying, or use references to find every site.
+References in packages/importers/src/csv.ts, packages/accounts/tests/journal.test.ts, packages/reconcile/src/matching.ts, packages/reconcile/src/drift.ts, packages/reports/src/balance.ts were not updated — the platform's rename walk missed them and a cross-directory specifier is not assembled here. Update them before applying, or use references to find every site.
 ~~~
 

@@ -305,11 +305,15 @@ export const scenarios: readonly Scenario[] = [
     arguments: { file: "packages/reports/src/balance.ts" },
   },
 
-  // document_links is deliberately uncovered: asking it about the fixture's
-  // README crashes the language server in typescript-auto-import-cache's
-  // initProject (docs/issues.md, "Asking about an unowned document kills the
-  // server" and the auto-import entries). The scenario returns when the
-  // crash is fixed — its capture would today pin a machine-specific stack.
+  // ── document_links: what a document points at ────────────────────────────
+  // This exact call once killed the language server — the auto-import
+  // cache's initProject died against the bridge. Disabling that cache
+  // (language-server/src/server.ts) fixed it; this capture stands witness.
+  {
+    tool: "document_links",
+    name: "fixture-readme",
+    arguments: { file: "README.md" },
+  },
 
   // ── find_successor: what happened to a name that no longer resolves ──────
   {

@@ -216,28 +216,22 @@ all-or-nothing "there is no text" is an absence lie; the honest answer reads
 the text and names the anomaly ("contains a NUL at byte N"). Observed
 2026-08-20.
 
-### `document_links` on the fixture README kills the server — with a unifying stack
+### FIXED · the unowned-document crash was the auto-import cache
 
-`document_links { file: "README.md" }` against `fixtures/ledger` exits the
-language server (code 1), deterministically captured by the scenario suite
-before the scenario was withdrawn. The stack is the new evidence the
-existing unowned-document entry lacked:
-
-```
-at synchronizeHostDataWorker (typescript-native-bridge/lib/typescript.js:167426)
-at Object.getProgram (…:167503)
-at initProject (typescript-auto-import-cache/out/5_0/project.js:168)
-at default_1 (typescript-auto-import-cache/out/5_0/index.js:29)
-```
-
-`typescript-auto-import-cache` initializing a project against the bridge is
-the frame that dies. The same machinery being broken would explain the
-missing-import fixes the engine never offers (see below) — one suspect for
-three symptoms: the unowned-document crash, this crash, and absent
-auto-import. Diagnosing whether the cache's `initProject` is incompatible
-with the bridge's `synchronizeHostData` is the next concrete step, and it is
-a real candidate for disabling or patching the cache integration in the
-language-server package. Observed 2026-08-20.
+`document_links { file: "README.md" }` against `fixtures/ledger` exited the
+language server (code 1), and the scenario suite captured the stack the old
+unowned-document entry never had: `typescript-auto-import-cache`'s
+`initProject` dying inside the bridge's `synchronizeHostDataWorker`
+(typescript.js:167426). The fix: `volar-service-typescript` documents a
+`disableAutoImportCache` option, now set in
+`packages/language-server/src/server.ts` — on this engine the cache crashed
+the server and provided no import fixes even when it survived, so disabling
+cost nothing. Witnessed 2026-08-20: the exact killing call answers cleanly,
+warm and repeatable; the restored `document_links/fixture-readme` capture
+stands as the regression witness. One flag re-enables the cache when the
+bridge matures. The absent-auto-import entry below remains open — that is
+the engine's gap, not the cache's, and `add_missing_imports`' capture is its
+sentinel.
 
 ### `implementations` answers empty for an interface with a same-file implementor
 

@@ -22,6 +22,8 @@ One page per tool, generated from the scenario suite's captured responses — ev
 
 | [`document_highlights`](document_highlights.md) | Document highlights | 1 |
 
+| [`document_links`](document_links.md) | Document links | 1 |
+
 | [`document_symbols`](document_symbols.md) | Document symbols | 2 |
 
 | [`file_references`](file_references.md) | File references | 1 |

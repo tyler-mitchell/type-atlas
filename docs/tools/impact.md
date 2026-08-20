@@ -17,7 +17,7 @@ position: {"line":25,"character":14}
 Changing signedAmount touches 8 uses in 5 files across 3 packages, in the projects loaded this session. No use sits in a test file.
 
 packages/accounts   4  3
-packages/reconcile  2  1
 packages/reports    2  1
+packages/reconcile  2  1
 ~~~
 

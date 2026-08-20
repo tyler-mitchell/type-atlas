@@ -2,8 +2,9 @@
 
 A deliberately realistic TypeScript monorepo that Type Atlas tools are
 exercised against. It is the workspace behind every captured scenario response
-in `packages/mcp/test/scenarios/` — fixture, scenario definitions, and
-committed responses form one pipeline:
+in [the scenario suite](../../packages/mcp/test/scenarios/scenarios.test.ts) —
+fixture, [scenario definitions](../../packages/mcp/test/scenarios/cases.ts),
+and committed responses form one pipeline:
 
 ```text
 realistic fixture scenario

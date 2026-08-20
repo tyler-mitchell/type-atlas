@@ -14,11 +14,11 @@ workspace: fixtures/ledger
 ~~~text
 ledger/
 ├  apps/ · 11 files
-├  packages/ · 34 files · 6 changed
+├  packages/ · 34 files
 ├  package.json · 24 loc
-├  pnpm-lock.yaml · 2.3k loc · modified
+├  pnpm-lock.yaml · 2.3k loc
 ├  pnpm-workspace.yaml · 19 loc
-├  README.md · 32 loc
+├  README.md · 33 loc · modified
 ├  tsconfig.json · 9 loc
 └  vite.config.ts · 13 loc
 ~~~
@@ -34,7 +34,7 @@ expand: {"packages/*":2}
 ~~~text
 ledger/
 ├  apps/ · 11 files
-├  packages/ · 6 changed
+├  packages/
 │  ├  accounts/
 │  │  ├  src/
 │  │  │  ├  account.ts · 56 loc
@@ -45,13 +45,13 @@ ledger/
 │  │  │  └  journal.test.ts · 29 loc
 │  │  ├  package.json · 22 loc
 │  │  └  tsconfig.json · 20 loc
-│  ├  importers/ · 5 changed
-│  │  ├  src/ · 3 changed
-│  │  │  ├  csv.ts · 47 loc · untracked
-│  │  │  ├  dedupe.ts · 18 loc · untracked
-│  │  │  └  index.ts · 2 loc · untracked
-│  │  ├  package.json · 23 loc · untracked
-│  │  └  tsconfig.json · 19 loc · untracked
+│  ├  importers/
+│  │  ├  src/
+│  │  │  ├  csv.ts · 47 loc
+│  │  │  ├  dedupe.ts · 18 loc
+│  │  │  └  index.ts · 2 loc
+│  │  ├  package.json · 23 loc
+│  │  └  tsconfig.json · 19 loc
 │  ├  money/
 │  │  ├  src/
 │  │  │  ├  currency.ts · 19 loc
@@ -61,11 +61,11 @@ ledger/
 │  │  │  └  money.test.ts · 15 loc
 │  │  ├  package.json · 19 loc
 │  │  └  tsconfig.json · 20 loc
-│  ├  reconcile/ · 1 changed
-│  │  ├  src/ · 1 changed
+│  ├  reconcile/
+│  │  ├  src/
 │  │  │  ├  drift.ts · 22 loc
 │  │  │  ├  index.ts · 1 loc
-│  │  │  └  matching.ts · 24 loc · untracked
+│  │  │  └  matching.ts · 24 loc
 │  │  ├  package.json · 19 loc
 │  │  └  tsconfig.json · 20 loc
 │  ├  reports/
@@ -85,9 +85,9 @@ ledger/
 │     ├  tsconfig.json · 20 loc
 │     └  vite.config.ts · 17 loc
 ├  package.json · 24 loc
-├  pnpm-lock.yaml · 2.3k loc · modified
+├  pnpm-lock.yaml · 2.3k loc
 ├  pnpm-workspace.yaml · 19 loc
-├  README.md · 32 loc
+├  README.md · 33 loc · modified
 ├  tsconfig.json · 9 loc
 └  vite.config.ts · 13 loc
 ~~~
@@ -103,7 +103,7 @@ expand: {"packages/accounts":1,"packages/reports":{"depth":2,"glob":["**/*.ts"]}
 ~~~text
 ledger/
 ├  apps/ · 11 files
-├  packages/ · 6 changed
+├  packages/
 │  ├  accounts/
 │  │  ├  src/ · 4 files
 │  │  ├  tests/ · 1 file
@@ -115,9 +115,9 @@ ledger/
 │        ├  index.ts · 2 loc
 │        └  statement.ts · 11 loc
 ├  package.json · 24 loc
-├  pnpm-lock.yaml · 2.3k loc · modified
+├  pnpm-lock.yaml · 2.3k loc
 ├  pnpm-workspace.yaml · 19 loc
-├  README.md · 32 loc
+├  README.md · 33 loc · modified
 ├  tsconfig.json · 9 loc
 └  vite.config.ts · 13 loc
 ~~~
@@ -149,7 +149,7 @@ glob: ["**/*.test.ts"]
 
 ~~~text
 ledger/
-└  packages/ · 6 changed
+└  packages/
    ├  accounts/
    │  └  tests/
    │     └  journal.test.ts · 29 loc

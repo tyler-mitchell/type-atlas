@@ -1,9 +1,9 @@
 ledger/
 ├  apps/ · 11 files
-├  packages/ · 34 files · 6 changed
+├  packages/ · 34 files
 ├  package.json · 24 loc
-├  pnpm-lock.yaml · 2.3k loc · modified
+├  pnpm-lock.yaml · 2.3k loc
 ├  pnpm-workspace.yaml · 19 loc
-├  README.md · 32 loc
+├  README.md · 33 loc · modified
 ├  tsconfig.json · 9 loc
 └  vite.config.ts · 13 loc

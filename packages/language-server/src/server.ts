@@ -337,7 +337,15 @@ export const registerLanguageServer = (connection: Connection): void => {
         languagePlugins: [documentLanguagePlugin],
       })),
       withReferencesAtPosition([
-        ...createTypeScriptServices(projectTypeScript),
+        // The auto-import cache is disabled deliberately: its `initProject`
+        // dies inside typescript-native-bridge's `synchronizeHostData`,
+        // killing the server when an unowned document's request first
+        // touches it — and on this engine it yields no import fixes even
+        // when it survives (docs/issues.md, the auto-import entries). Under
+        // the bridge it costs a crash class and provides nothing; one flag
+        // re-enables it when the engine matures, and the committed
+        // `add_missing_imports` capture flags any behavior change.
+        ...createTypeScriptServices(projectTypeScript, { disableAutoImportCache: true }),
         createJsonService(),
         createMarkdownService({
           fileExtensions: [...markdownFileExtensions],

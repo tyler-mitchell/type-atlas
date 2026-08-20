@@ -13,21 +13,6 @@ file: packages/importers/src/csv.ts
 ```
 
 ~~~text
-Organize Imports · 1 file · 3 edits
-
-*** Begin Patch
-*** Update File: packages/importers/src/csv.ts
-@@
--import { Journal, type Entry, credit, debit, type AccountPath } from "@ledger/accounts";
--import { type Currency, isCurrency, money, zero, format } from "@ledger/money";
- import type { Posting } from "@ledger/accounts";
-+import { credit, debit, Journal, type AccountPath } from "@ledger/accounts";
-+import { isCurrency, money, type Currency } from "@ledger/money";
- 
- /** One parsed row of a bank's CSV export. */
- export interface StatementRow {
-*** End Patch
-
-3 hints in packages/importers/src/csv.ts
+Imports are already organized.
 ~~~
 

@@ -31,6 +31,8 @@ import {
   sameRange,
   displayPath,
 } from "atlascii";
+import * as path from "pathe";
+import { URI } from "vscode-uri";
 import { appendDiagnosticContext, textResult } from "./mcp-result.ts";
 import { registerTool } from "./tool.ts";
 import { fileInput, observedFileInput, positionInput, positionsInput } from "./tool-input.ts";
@@ -338,9 +340,25 @@ export const registerDocumentTools = (server: McpServer, workspaces: VolarWorksp
             ? [
                 {
                   file: displayPath(textDocument.uri, root),
-                  rows: found.map((link) => ({
+                  // `children`, the key the tree partial walks — `rows` was a
+                  // name nothing read, so a document "naming 2 links" rendered
+                  // a bare group header and no link ever appeared.
+                  children: found.map((link) => ({
                     selection: link.range,
-                    text: link.target ? displayPath(link.target, root) : "",
+                    // A target beyond the workspace shows the way the author
+                    // wrote it — relative to the document — never as a
+                    // machine-absolute path.
+                    text: link.target
+                      ? (() => {
+                          const shown = displayPath(link.target, root);
+                          return path.isAbsolute(shown) && link.target.startsWith("file:")
+                            ? path.relative(
+                                path.dirname(URI.parse(textDocument.uri).fsPath),
+                                URI.parse(link.target).fsPath,
+                              )
+                            : shown;
+                        })()
+                      : "unresolved",
                   })),
                 },
               ]

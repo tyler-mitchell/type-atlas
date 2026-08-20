@@ -136,30 +136,7 @@ newName: balanceSide
 ```
 
 ~~~text
-Rename to balanceSide · resolved normalBalance · packages/accounts/src/account.ts:18:14 · Scope: project only · packages/accounts/tsconfig.json · 2 files · 2 edits
 
-*** Begin Patch
-*** Update File: packages/accounts/src/account.ts
-@@
-   readonly closedAt?: Date;
- }
- 
--export const normalBalance = (kind: AccountKind): "debit" | "credit" =>
-+export const balanceSide = (kind: AccountKind): "debit" | "credit" =>
-   kind === "asset" || kind === "expense" ? "debit" : "credit";
- 
- export const parentPath = (path: AccountPath): AccountPath | undefined => {
-*** Update File: packages/accounts/src/index.ts
-@@
-   type AccountStore,
-   lineage,
-   MemoryAccountStore,
--  normalBalance,
-+  balanceSide as normalBalance,
-   parentPath,
- } from "./account.ts";
- export { type Entry, Journal, UnbalancedEntryError } from "./journal.ts";
-*** End Patch
 ~~~
 
 ### `read_file` — bodies fold to signatures
@@ -292,8 +269,8 @@ position: {"line":25,"character":14}
 Changing signedAmount touches 8 uses in 5 files across 3 packages, in the projects loaded this session. No use sits in a test file.
 
 packages/accounts   4  3
-packages/reconcile  2  1
 packages/reports    2  1
+packages/reconcile  2  1
 ~~~
 
 ## The tools

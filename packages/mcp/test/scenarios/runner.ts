@@ -1,34 +1,14 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, rmSync } from "node:fs";
+import { rmSync } from "node:fs";
 import { appendFile, rm, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import type { Scenario } from "./cases.ts";
 
-export const packageRoot = fileURLToPath(new URL("../..", import.meta.url));
+export { fixtureRoot, packageRoot } from "./fixture.ts";
+import { fixtureRoot, packageRoot } from "./fixture.ts";
 
-/** The realistic monorepo every scenario runs against. See its README. */
-export const fixtureRoot = resolve(packageRoot, "../../fixtures/ledger");
-
-/**
- * The fixture is a real pnpm workspace, so its cross-package imports resolve
- * through `node_modules` symlinks — the same substrate Type Atlas meets in
- * production repositories. Those links are not committed; a fresh clone gets
- * them here, from the committed lockfile, before the first scenario runs.
- */
-export const ensureFixtureInstalled = (): void => {
-  if (existsSync(resolve(fixtureRoot, "node_modules/@ledger/money"))) return;
-  const installed = spawnSync("pnpm", ["install", "--frozen-lockfile", "--prefer-offline"], {
-    cwd: fixtureRoot,
-    stdio: "pipe",
-    encoding: "utf8",
-  });
-  if (installed.status !== 0) {
-    throw new Error(`Fixture install failed:\n${installed.stdout}\n${installed.stderr}`);
-  }
-};
 
 /**
  * Dirties the fixture per the scenario and returns the restore — run in a
