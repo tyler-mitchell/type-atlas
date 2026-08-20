@@ -2,7 +2,8 @@ import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import type { TestProject } from "vite-plus/test/node";
-import { fixtureRoot } from "./fixture.ts";
+import { fixtureRoot, packageRoot } from "./fixture.ts";
+import { ensureFixtureRepository, removeFixtureRepository } from "./runner.ts";
 
 /**
  * The fixture is a real pnpm workspace, so its cross-package imports resolve
@@ -23,32 +24,42 @@ const ensureFixtureInstalled = (): void => {
 };
 
 /**
- * The fixture has no git identity of its own — `list_files`' change markers
- * read this repository's status. Captures accepted while fixture files sat
- * uncommitted here therefore baselined `· untracked` rows about files that
- * ship committed, and the documentation repeated the lie until the next
- * clean-tree run failed on it. Accepting is where the poison enters, so an
- * update run refuses a dirty fixture; a plain run only warns, because
- * iterating against a fixture mid-edit is legitimate.
+ * The fixture's files are versioned by THIS repository, so uncommitted edits
+ * to them change tool answers — content, line counts, positions — and a
+ * capture accepted from that state baselines a tree no clean checkout can
+ * reproduce. (Markers themselves are immune since the fixture carries its
+ * own transient repository, but content is not.) Accepting is where the
+ * poison enters, so an update run refuses a dirty fixture; a plain run only
+ * warns, because iterating against a fixture mid-edit is legitimate. The
+ * check addresses the host repository explicitly — from inside the fixture,
+ * `git` would answer for the fixture's own transient repository instead.
  */
 const ensureFixtureCleanForAccept = (): void => {
-  const status = spawnSync("git", ["status", "--porcelain", "--", fixtureRoot], {
-    cwd: fixtureRoot,
-    stdio: "pipe",
-    encoding: "utf8",
-  });
+  const repositoryRoot = resolve(packageRoot, "../..");
+  const status = spawnSync(
+    "git",
+    ["-C", repositoryRoot, "status", "--porcelain", "--", "fixtures/ledger"],
+    { stdio: "pipe", encoding: "utf8" },
+  );
   const dirty = status.status === 0 ? status.stdout.trim() : "";
   if (dirty.length === 0) return;
   const updating = process.argv.some((argument) => argument === "-u" || argument === "--update");
-  const message = `The fixture has uncommitted changes, and list_files captures embed git state:\n${dirty}`;
+  const message = `The fixture has uncommitted changes, and captures embed fixture content:\n${dirty}`;
   if (updating) {
     throw new Error(`${message}\nCommit the fixture before accepting captures (vitest -u).`);
   }
-  console.warn(`${message}\nGit-marked captures will differ until the fixture is committed.`);
+  console.warn(`${message}\nFixture-dependent captures will differ until the fixture is committed.`);
 };
 
-export default function setup(project: TestProject) {
+export default async function setup(project: TestProject) {
   ensureFixtureInstalled();
   ensureFixtureCleanForAccept();
-  project.onTestsRerun(() => ensureFixtureInstalled());
+  await ensureFixtureRepository();
+  project.onTestsRerun(async () => {
+    ensureFixtureInstalled();
+    await ensureFixtureRepository();
+  });
+  return async () => {
+    await removeFixtureRepository();
+  };
 }

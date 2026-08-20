@@ -112,7 +112,7 @@
   {
     "name": "list_files",
     "title": "List files",
-    "description": "Show a bounded workspace-relative project structure. `view: \"files\"` (the default) is the file tree rooted at the directory, directories first; `view: \"directories\"` is a compact directory list for architecture orientation. Results honor .gitignore, omit dependency and VCS internals, and treat Git submodules as separate workspaces by default."
+    "description": "Show a bounded workspace-relative project structure. `view: \"files\"` (the default) is the file tree rooted at the directory, directories first; `view: \"directories\"` is a compact directory list for architecture orientation. Rows carry `git status` inline — `· modified +2 -1`, `· renamed from old.ts`, `· 2 changed` on directories — so one call answers structure, reading cost, and working-tree state together; no separate git call is needed to see what changed. Results honor .gitignore, omit dependency and VCS internals, and treat Git submodules as separate workspaces by default."
   },
   {
     "name": "list_module_exports",

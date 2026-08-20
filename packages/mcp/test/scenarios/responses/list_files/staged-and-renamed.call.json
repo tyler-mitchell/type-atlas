@@ -1,0 +1,21 @@
+{
+  "tool": "list_files",
+  "arguments": {
+    "directory": "packages/importers",
+    "depth": 2
+  },
+  "arrange": {
+    "create": {
+      "packages/importers/src/ofx.ts": "import type { StatementRow } from \"./csv.ts\";\n\n/** OFX statements carry amounts in major units — scale before matching. */\nexport const parseOfx = (source: string): readonly StatementRow[] =>\n  source.split(\"<STMTTRN>\").slice(1).map((entry) => ({\n    postedOn: entry.match(/<DTPOSTED>(\\d{8})/)?.[1] ?? \"\",\n    description: entry.match(/<NAME>([^<\\r\\n]+)/)?.[1] ?? \"\",\n    amountMinor: Math.round(Number(entry.match(/<TRNAMT>(-?[\\d.]+)/)?.[1] ?? 0) * 100),\n  }));\n"
+    },
+    "stage": [
+      "packages/importers/src/ofx.ts"
+    ],
+    "renames": [
+      {
+        "from": "packages/importers/src/dedupe.ts",
+        "to": "packages/importers/src/duplicate-rows.ts"
+      }
+    ]
+  }
+}

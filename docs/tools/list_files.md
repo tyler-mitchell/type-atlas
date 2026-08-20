@@ -2,7 +2,7 @@
 
 # `list_files`
 
-Show a bounded workspace-relative project structure. `view: "files"` (the default) is the file tree rooted at the directory, directories first; `view: "directories"` is a compact directory list for architecture orientation. Results honor .gitignore, omit dependency and VCS internals, and treat Git submodules as separate workspaces by default.
+Show a bounded workspace-relative project structure. `view: "files"` (the default) is the file tree rooted at the directory, directories first; `view: "directories"` is a compact directory list for architecture orientation. Rows carry `git status` inline — `· modified +2 -1`, `· renamed from old.ts`, `· 2 changed` on directories — so one call answers structure, reading cost, and working-tree state together; no separate git call is needed to see what changed. Results honor .gitignore, omit dependency and VCS internals, and treat Git submodules as separate workspaces by default.
 
 ## monorepo first contact
 
@@ -189,11 +189,55 @@ depth: 2
 ~~~text
 packages/money/
 ├  src/ · 3 changed
-│  ├  currency.ts · 21 loc · modified
-│  ├  index.ts · deleted
+│  ├  currency.ts · 21 loc · modified +2
+│  ├  index.ts · deleted -12
 │  ├  money.ts · 52 loc
 │  ├  rounding-mode.ts · 15 loc
 │  └  rounding.ts · 11 loc · untracked
+├  tests/
+│  └  money.test.ts · 15 loc
+├  package.json · 19 loc
+└  tsconfig.json · 20 loc
+~~~
+
+## staged and renamed
+
+```yaml
+tool: List files
+workspace: fixtures/ledger
+directory: packages/importers
+depth: 2
+```
+
+~~~text
+packages/importers/
+├  src/ · 2 changed
+│  ├  config.ts · 7 loc
+│  ├  csv.ts · 47 loc
+│  ├  duplicate-rows.ts · 18 loc · renamed from dedupe.ts
+│  ├  index.ts · 7 loc
+│  ├  ofx.ts · 9 loc · added +9
+│  └  statement-parser.ts · 64 loc
+├  package.json · 23 loc
+└  tsconfig.json · 19 loc
+~~~
+
+## merge conflict
+
+```yaml
+tool: List files
+workspace: fixtures/ledger
+directory: packages/money
+depth: 2
+```
+
+~~~text
+packages/money/
+├  src/ · 1 changed
+│  ├  currency.ts · 25 loc · conflicted
+│  ├  index.ts · 12 loc
+│  ├  money.ts · 52 loc
+│  └  rounding-mode.ts · 15 loc
 ├  tests/
 │  └  money.test.ts · 15 loc
 ├  package.json · 19 loc

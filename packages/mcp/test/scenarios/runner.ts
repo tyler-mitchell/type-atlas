@@ -1,6 +1,8 @@
+import { execFile } from "node:child_process";
 import { rmSync } from "node:fs";
 import { appendFile, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { relative, resolve } from "node:path";
+import { promisify } from "node:util";
 import { Client } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 
@@ -9,15 +11,68 @@ import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
  * invocation and restored — byte-true — after it, whatever happens. Paths
  * are fixture-relative. This exists for behavior that is *about* uncommitted
  * state (git markers); everything else runs against the committed fixture.
+ *
+ * The file operations produce `modified`, `untracked`, and `deleted`. The
+ * remaining change words are index states no file write can reach, so they
+ * are arranged through git itself — safely, because they act on the
+ * fixture's own repository (below), never the host's index.
  */
 export type Arrange = {
   readonly create?: Readonly<Record<string, string>>;
   readonly append?: Readonly<Record<string, string>>;
   readonly delete?: readonly string[];
+  /** Paths staged after the file operations — `added` in the tree. */
+  readonly stage?: readonly string[];
+  /** Tracked files moved through git, so the state is `renamed`, not add + delete. */
+  readonly renames?: readonly { readonly from: string; readonly to: string }[];
+  /**
+   * A merge stopped by both sides appending different lines to one file —
+   * the both-modified state that renders `conflicted`.
+   */
+  readonly conflict?: { readonly file: string; readonly ours: string; readonly theirs: string };
 };
 
 export { fixtureRoot, packageRoot } from "./fixture.ts";
 import { fixtureRoot, packageRoot } from "./fixture.ts";
+
+const run = promisify(execFile);
+
+/** Git addressed at the fixture's own repository — never the host's. */
+const fixtureGit = (...args: readonly string[]) =>
+  run("git", [
+    "-C",
+    fixtureRoot,
+    "-c",
+    "user.name=ledger",
+    "-c",
+    "user.email=ledger@fixture.invalid",
+    ...args,
+  ]);
+
+/**
+ * The fixture's own git repository, rebuilt from scratch: any existing
+ * `.git` removed, a fresh init, one baseline commit of the working tree.
+ *
+ * Change markers read whichever repository owns the listed directory.
+ * Without a repository of its own, the fixture answered from the HOST
+ * repository — so captures embedded this repo's transient state (five
+ * baselines once recorded `untracked` about files that ship committed), and
+ * the index states (`added`, `renamed`, `conflicted`) were unreachable,
+ * because arranging them would have meant staging into the host's live
+ * index. A nested repository makes marker state deterministic and every
+ * change word arrangeable. Host git never lists paths under a nested
+ * `.git`, so this directory is invisible to the host repository.
+ */
+export const ensureFixtureRepository = async (): Promise<void> => {
+  await rm(resolve(fixtureRoot, ".git"), { recursive: true, force: true });
+  await fixtureGit("init", "--quiet", "--initial-branch=main");
+  await fixtureGit("add", "--all");
+  await fixtureGit("commit", "--quiet", "--message", "baseline");
+};
+
+/** Removes the fixture's transient repository, leaving only working files. */
+export const removeFixtureRepository = (): Promise<void> =>
+  rm(resolve(fixtureRoot, ".git"), { recursive: true, force: true });
 
 export const responsesRoot = resolve(packageRoot, "test/scenarios/responses");
 
@@ -106,8 +161,16 @@ export const arrangeFixture = async ({
   create = {},
   append = {},
   delete: removed = [],
+  stage = [],
+  renames = [],
+  conflict,
 }: Arrange): Promise<() => Promise<void>> => {
-  const touched = [...Object.keys(append), ...removed];
+  const touched = [
+    ...Object.keys(append),
+    ...removed,
+    ...renames.map(({ from }) => from),
+    ...(conflict ? [conflict.file] : []),
+  ];
   const originals = new Map(
     await Promise.all(
       touched.map(
@@ -120,11 +183,30 @@ export const arrangeFixture = async ({
   for (const [relative, content] of Object.entries(append))
     await appendFile(resolve(fixtureRoot, relative), content);
   for (const relative of removed) await rm(resolve(fixtureRoot, relative));
+  for (const { from, to } of renames) await fixtureGit("mv", from, to);
+  if (stage.length > 0) await fixtureGit("add", "--", ...stage);
+  if (conflict) {
+    // Both sides append different lines to the same file, and the merge
+    // stops in the both-modified state — the arranged outcome, not an error.
+    const base = originals.get(conflict.file) ?? "";
+    await fixtureGit("checkout", "--quiet", "-b", "incoming");
+    await writeFile(resolve(fixtureRoot, conflict.file), `${base}${conflict.theirs}\n`);
+    await fixtureGit("commit", "--quiet", "--all", "--message", "incoming");
+    await fixtureGit("checkout", "--quiet", "main");
+    await writeFile(resolve(fixtureRoot, conflict.file), `${base}${conflict.ours}\n`);
+    await fixtureGit("commit", "--quiet", "--all", "--message", "ours");
+    await fixtureGit("merge", "incoming").catch(() => undefined);
+  }
+  const indexTouched = stage.length > 0 || renames.length > 0 || conflict !== undefined;
   return async () => {
     for (const [relative, bytes] of originals)
       await writeFile(resolve(fixtureRoot, relative), bytes);
     for (const relative of Object.keys(create))
       rmSync(resolve(fixtureRoot, relative), { force: true });
+    for (const { to } of renames) rmSync(resolve(fixtureRoot, to), { force: true });
+    // File bytes are back; an index state cannot be un-staged piecemeal with
+    // the same certainty, so the repository is rebuilt to its baseline.
+    if (indexTouched) await ensureFixtureRepository();
   };
 };
 

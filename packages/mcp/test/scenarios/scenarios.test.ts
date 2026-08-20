@@ -97,6 +97,59 @@ describe("list_files", () => {
       },
     ),
   );
+  // The index states pure file writes cannot reach: a drafted parser staged
+  // for commit (`added`) and a module moved through git (`renamed`, naming
+  // its origin so no follow-up git call is needed). Arranged in the
+  // fixture's own repository — the host's index is never touched.
+  scenarioTest("staged-and-renamed", ({ capture }) =>
+    capture(
+      "list_files",
+      { directory: "packages/importers", depth: 2 },
+      {
+        arrange: {
+          create: {
+            "packages/importers/src/ofx.ts": [
+              'import type { StatementRow } from "./csv.ts";',
+              "",
+              "/** OFX statements carry amounts in major units — scale before matching. */",
+              "export const parseOfx = (source: string): readonly StatementRow[] =>",
+              '  source.split("<STMTTRN>").slice(1).map((entry) => ({',
+              '    postedOn: entry.match(/<DTPOSTED>(\\d{8})/)?.[1] ?? "",',
+              '    description: entry.match(/<NAME>([^<\\r\\n]+)/)?.[1] ?? "",',
+              "    amountMinor: Math.round(Number(entry.match(/<TRNAMT>(-?[\\d.]+)/)?.[1] ?? 0) * 100),",
+              "  }));",
+              "",
+            ].join("\n"),
+          },
+          stage: ["packages/importers/src/ofx.ts"],
+          renames: [
+            {
+              from: "packages/importers/src/dedupe.ts",
+              to: "packages/importers/src/duplicate-rows.ts",
+            },
+          ],
+        },
+      },
+    ),
+  );
+  // A merge stopped by both sides editing the same region: `conflicted` is
+  // the word an agent meets mid-merge, sourced from a real both-modified
+  // index state.
+  scenarioTest("merge-conflict", ({ capture }) =>
+    capture(
+      "list_files",
+      { directory: "packages/money", depth: 2 },
+      {
+        arrange: {
+          conflict: {
+            file: "packages/money/src/currency.ts",
+            ours: "\n/** Ours: JPY rounds to whole yen at the statement boundary. */",
+            theirs: "\n/** Theirs: JPY carries no minor units at all. */",
+          },
+        },
+      },
+    ),
+  );
 });
 
 // ── read_file: economical reading ───────────────────────────────────────────

@@ -8,6 +8,8 @@ import {
   arrangeFixture,
   capturedScenarios,
   connectScenarioSession,
+  ensureFixtureRepository,
+  removeFixtureRepository,
   responsesRoot,
   warmFixtureProjects,
 } from "../test/scenarios/runner.ts";
@@ -162,8 +164,11 @@ try {
     temporaryDirectory,
   );
   try {
-    // The same deterministic warm-up the capture suite runs: several answers
-    // embed loaded-project state, and a cold replay diverges on exactly that.
+    // The same deterministic environment the capture suite runs in: the
+    // fixture's own baseline repository (git markers read it, and arranged
+    // index states act on it), and the warm-up, because several answers
+    // embed loaded-project state and a cold replay diverges on exactly that.
+    await ensureFixtureRepository();
     await warmFixtureProjects(session);
     const capturedCatalog = await readFile(join(responsesRoot, "tool-catalog.json"), "utf8");
     const installedCatalog = `${JSON.stringify(await session.catalog(), null, 2)}\n`;
@@ -204,6 +209,7 @@ try {
     );
   } finally {
     await session.close();
+    await removeFixtureRepository();
   }
 } finally {
   await rm(temporaryDirectory, { recursive: true, force: true });

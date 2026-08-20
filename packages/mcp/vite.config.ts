@@ -12,6 +12,21 @@ import { defineConfig } from "vite-plus";
  * so drift fails instead of being rewritten.
  */
 export default defineConfig({
+  // A package-level vite.config.ts replaces the root's rather than extending
+  // it, so the workspace publish contract is restated here — without it, the
+  // moment this file appeared (for the test block below), packs silently
+  // switched to .mjs and dropped the attw and publint gates.
+  pack: {
+    attw: {
+      level: "error",
+      profile: "esm-only",
+    },
+    dts: true,
+    fixedExtension: false,
+    format: "esm",
+    publint: true,
+    sourcemap: true,
+  },
   test: {
     // The default reporter surfaces a test's console output only when the
     // test fails — which silenced the capture echo on exactly the runs that

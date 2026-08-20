@@ -1,0 +1,14 @@
+{
+  "tool": "list_files",
+  "arguments": {
+    "directory": "packages/money",
+    "depth": 2
+  },
+  "arrange": {
+    "conflict": {
+      "file": "packages/money/src/currency.ts",
+      "ours": "\n/** Ours: JPY rounds to whole yen at the statement boundary. */",
+      "theirs": "\n/** Theirs: JPY carries no minor units at all. */"
+    }
+  }
+}

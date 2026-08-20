@@ -98,34 +98,87 @@ const changeWord = (index: string, worktree: string): string => {
   return "modified";
 };
 
+/** One file's change state: the word, and what makes it actionable. */
+type GitChange = { readonly word: string; readonly detail?: string };
+
 /**
  * What differs from HEAD, keyed by path relative to the listed directory —
  * `git status` fused into the one tree agents orient with, instead of a
  * second flat answer they must join by hand. Outside a repository, or when
  * git itself is unavailable, the map is empty and no row changes.
+ *
+ * Each change carries the fact that makes its word actionable without a
+ * follow-up git call: a rename names its origin (`renamed from posting.ts` —
+ * the bare word forced exactly that follow-up), and a tracked change carries
+ * its size (`modified +2 -1`), pricing the change the way `loc` prices the
+ * read. Untracked files have no baseline and conflicts no meaningful diff,
+ * so those words stand alone.
  */
-const gitChanges = async (directory: string): Promise<ReadonlyMap<string, string>> => {
+const gitChanges = async (directory: string): Promise<ReadonlyMap<string, GitChange>> => {
   const toplevel = await run("git", ["-C", directory, "rev-parse", "--show-toplevel"])
     .then(({ stdout }) => path.normalize(stdout.trim()))
     .catch(() => undefined);
   if (toplevel === undefined) return new Map();
-  const { stdout } = await run(
-    "git",
-    ["-C", directory, "status", "--porcelain=v1", "-z", "--untracked-files=all"],
-    { maxBuffer: 64 * 1024 * 1024 },
-  ).catch(() => ({ stdout: "" }));
+  const [{ stdout }, numstat] = await Promise.all([
+    run("git", ["-C", directory, "status", "--porcelain=v1", "-z", "--untracked-files=all"], {
+      maxBuffer: 64 * 1024 * 1024,
+    }).catch(() => ({ stdout: "" })),
+    // Index and worktree against HEAD in one pass; --no-renames keeps every
+    // record `added TAB removed TAB path`, since renames render their origin
+    // rather than their size.
+    run("git", ["-C", directory, "diff", "HEAD", "--numstat", "--no-renames", "-z"], {
+      maxBuffer: 64 * 1024 * 1024,
+    })
+      .then((result) => result.stdout)
+      .catch(() => ""),
+  ]);
+  const magnitudes = new Map(
+    numstat
+      .split("\0")
+      .map((record) => record.split("\t"))
+      .filter((parts): parts is [string, string, string] => parts.length === 3)
+      .map(([added, removed, file]) => [
+        file,
+        [
+          added !== "-" && added !== "0" ? `+${added}` : undefined,
+          removed !== "-" && removed !== "0" ? `-${removed}` : undefined,
+        ]
+          .filter(Boolean)
+          .join(" "),
+      ]),
+  );
   const fields = stdout.split("\0");
-  const changes = new Map<string, string>();
+  const changes = new Map<string, GitChange>();
   for (let at = 0; at < fields.length; at += 1) {
     const field = fields[at] ?? "";
     if (field.length < 4) continue;
     const [index, worktree] = [field[0] ?? " ", field[1] ?? " "];
     // A rename carries its origin as the next NUL field; the letter belongs
     // to the path the file lives at now, the way VS Code shows it.
-    if (index === "R" || index === "C" || worktree === "R" || worktree === "C") at += 1;
+    const renamed = index === "R" || index === "C" || worktree === "R" || worktree === "C";
+    const origin = renamed ? fields[at + 1] : undefined;
+    if (renamed) at += 1;
     const absolute = path.join(toplevel, field.slice(3));
     if (absolute !== directory && !isFileInDir(absolute, directory)) continue;
-    changes.set(path.relative(directory, absolute), changeWord(index, worktree));
+    const relative = path.relative(directory, absolute);
+    const word = changeWord(index, worktree);
+    const size = magnitudes.get(field.slice(3));
+    // A same-directory rename names its origin by basename — the row's own
+    // position already says the directory; a move across directories keeps
+    // the listing-relative path, because the directory IS the change.
+    const originListed =
+      origin === undefined ? undefined : path.relative(directory, path.join(toplevel, origin));
+    const detail =
+      word === "renamed" && originListed !== undefined
+        ? `from ${
+            path.dirname(originListed) === path.dirname(relative)
+              ? path.basename(originListed)
+              : originListed
+          }`
+        : (word === "modified" || word === "added" || word === "deleted") && size
+          ? size
+          : undefined;
+    changes.set(relative, { word, detail });
   }
   return changes;
 };
@@ -295,7 +348,7 @@ export const workspaceTree = async (input: {
   const { root, directory, realRoot } = await resolveListingDirectory(input);
   const changesHeld = input.git
     ? gitChanges(directory)
-    : Promise.resolve(new Map<string, string>());
+    : Promise.resolve(new Map<string, GitChange>());
   const submoduleRoots = input.includeSubmodules ? [] : await findGitSubmoduleRoots(root);
   const submodule = containingGitSubmodule(directory, submoduleRoots);
   if (submodule) {
@@ -439,8 +492,9 @@ export const workspaceTree = async (input: {
   const crawled = [...new Set([...baseCrawl, ...expansionCrawls.flat()])];
   const changed = await changesHeld;
   const fileMark = (relative: string): string => {
-    const word = changed.get(relative);
-    return word === undefined ? "" : ` · ${word}`;
+    const change = changed.get(relative);
+    if (change === undefined) return "";
+    return change.detail === undefined ? ` · ${change.word}` : ` · ${change.word} ${change.detail}`;
   };
   // Plain words, not a glyph: an editor's change-dot is pixels a model has
   // rarely read as text, while "3 changed" is self-describing on first
@@ -488,8 +542,8 @@ export const workspaceTree = async (input: {
     input.glob === undefined
       ? [...changed]
           .filter(
-            ([relative, word]) =>
-              word === "deleted" &&
+            ([relative, change]) =>
+              change.word === "deleted" &&
               relative.split("/").length <= input.depth &&
               !crawledSet.has(relative),
           )

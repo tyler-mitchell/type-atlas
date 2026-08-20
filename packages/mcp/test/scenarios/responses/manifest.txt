@@ -4,6 +4,8 @@ list_files/one-corner-opened-deeper
 list_files/without-line-counts
 list_files/test-files-only
 list_files/working-tree-changes
+list_files/staged-and-renamed
+list_files/merge-conflict
 read_file/class-folded-to-signatures
 read_file/two-files-one-call
 read_file/abstract-class-folded
