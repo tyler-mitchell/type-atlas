@@ -21,7 +21,7 @@ import {
 } from "@type-atlas/core";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { type } from "arktype";
-import { requestDiagnosticContext } from "./ambient-diagnostics.ts";
+import { requestDiagnosticContext, workspaceRelativeMessage } from "./ambient-diagnostics.ts";
 import { enclosingDeclaration } from "./reference-groups.ts";
 import { readOnlyToolAnnotations } from "./metadata.ts";
 import {
@@ -196,7 +196,10 @@ export const registerDocumentTools = (server: McpServer, workspaces: VolarWorksp
                 String(items.length),
                 code,
                 truncate({
-                  value: (items[0]?.diagnostic.message.split("\n")[0] ?? "").replace(/\s+/g, " "),
+                  value: workspaceRelativeMessage(
+                    (items[0]?.diagnostic.message.split("\n")[0] ?? "").replace(/\s+/g, " "),
+                    root,
+                  ),
                   columns: defaultDimensions.summaryColumns,
                 }),
               ])
@@ -208,7 +211,10 @@ export const registerDocumentTools = (server: McpServer, workspaces: VolarWorksp
           shown.items.map(
             async ({ uri, diagnostic }) =>
               [
-                `${uri} ${diagnostic.range.start.line}`,
+                // The full range keys the frame: two problems on one line each
+                // deserve their own caret, and a line-keyed map handed the
+                // second problem the first one's underline.
+                `${uri} ${diagnostic.range.start.line}:${diagnostic.range.start.character}:${diagnostic.range.end.character}`,
                 await sourceFor(uri).then((text) =>
                   text
                     ? codeFrame({
@@ -286,8 +292,11 @@ export const registerDocumentTools = (server: McpServer, workspaces: VolarWorksp
               within: owners.get(
                 `${uri} ${diagnostic.range.start.line}:${diagnostic.range.start.character}`,
               ),
-              message: diagnostic.message,
-              frame: frames.get(`${uri} ${diagnostic.range.start.line}`) || undefined,
+              message: workspaceRelativeMessage(diagnostic.message, root),
+              frame:
+                frames.get(
+                  `${uri} ${diagnostic.range.start.line}:${diagnostic.range.start.character}:${diagnostic.range.end.character}`,
+                ) || undefined,
             })),
           })),
         },

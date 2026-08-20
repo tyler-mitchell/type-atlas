@@ -1,0 +1,1 @@
+No diagnostic of any severity in packages/money/src/money.ts · packages/money/tsconfig.json.

@@ -1,0 +1,6 @@
+signedAmount · called from 2 places · 3 projects loaded
+
+packages/accounts/src/journal.ts
+└  post [method] 34:3-57:4 · calls 52:12-52:24
+packages/reports/src/balance.ts
+└  balancesAsOf [variable] 23:14-23:26 · range 23:14-51:2 · calls 34:57-34:69

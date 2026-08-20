@@ -1,0 +1,23 @@
+Journal [class] · packages/accounts/src/journal.ts:24:14-24:21 · range 24:1-73:2 · packages/accounts/tsconfig.json
+
+```typescript
+class Journal<TMeta = undefined>
+```
+
+An append-only journal of balanced entries. `TMeta` carries whatever a
+consumer attaches to each entry — an import batch id, an approval trail —
+without the journal knowing its shape.
+
+## Callers (3)
+
+packages/accounts/tests/journal.test.ts
+├  test("posts a balanced transfer through the overload") callback [function] 5:56-14:2 · calls 6:23-6:30
+└  test("refuses an unbalanced entry") callback [function] 16:37-29:2 · calls 17:23-17:30
+packages/reports/src/balance.ts
+└  balancesAsOf [variable] 23:14-23:26 · range 23:14-51:2 · calls 24:12-24:19
+
+## Mentions that are not calls (3 of 7 references · 4 projects loaded)
+
+packages/accounts/tests/journal.test.ts:3:25-3:32:  import { credit, debit, Journal, UnbalancedEntryError } from "../src/index.ts";
+packages/accounts/src/index.ts:11:22-11:29:  export { type Entry, Journal, UnbalancedEntryError } from "./journal.ts";
+packages/reports/src/balance.ts:4:8-4:15:  type Journal,

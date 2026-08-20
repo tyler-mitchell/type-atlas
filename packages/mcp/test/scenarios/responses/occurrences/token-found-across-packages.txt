@@ -1,0 +1,13 @@
+"signedAmount" occurs 8 times in 5 files · 48 files scanned under the workspace.
+
+packages/accounts/src/index.ts:12:39 · export { credit, debit, type Posting, signedAmount } from "./posting.ts";
+packages/accounts/src/journal.ts
+├  3:39  · import { credit, debit, type Posting, signedAmount } from "./posting.ts";
+└  52:12 · .map(signedAmount)
+packages/accounts/src/posting.ts:25:14 · export const signedAmount = (posting: Posting): Money => {
+packages/reconcile/src/drift.ts
+├  4:24  · import { type Posting, signedAmount } from "@ledger/accounts";
+└  20:37 · const journalTotal = postings.map(signedAmount).reduce((total, amount) => total + amount);
+packages/reports/src/balance.ts
+├  6:3   · signedAmount,
+└  34:57 · add(own.get(posting.account) ?? zero(currency), signedAmount(posting)),

@@ -1,0 +1,6 @@
+4 symbols matching Balance · 4 projects loaded · packages/reports/tsconfig.json
+
+BalanceLine [interface] · packages/reports/src/balance.ts:11:1-16:2
+balance [property] · packages/reports/src/balance.ts:13:3-13:27 — BalanceLine
+balancesAsOf [const] · packages/reports/src/balance.ts:23:14-51:2
+normalBalance [const] · packages/accounts/src/account.ts:18:14-19:62

@@ -1,0 +1,11 @@
+packages/money/src/money.ts:12:13
+
+```typescript
+type Money = { readonly minorUnits: bigint; readonly currency: Currency; readonly [brand]: "Money"; }
+```
+
+An exact amount of one currency, held in minor units (cents, pence, yen).
+
+The brand keeps a raw `{ amount, currency }` literal out of ledger math:
+every `Money` passed through the system was constructed by `money()` and is
+therefore integral and currency-tagged.

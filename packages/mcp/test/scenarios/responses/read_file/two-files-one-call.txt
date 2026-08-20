@@ -1,0 +1,50 @@
+2 files · 43 lines · 6 folded to signatures, pass fold: false for the bodies
+
+=== packages/accounts/src/posting.ts · 32 lines ===
+
+ 1 | import { type Money, negate } from "@ledger/money";
+ 2 | import type { AccountPath } from "./account.ts";
+ 3 |
+ 4 | /**
+ 5 |  * One side of a journal entry. The discriminant is the bookkeeping side, so
+ 6 |  * every consumer's switch is checked for exhaustiveness by the compiler.
+ 7 |  */
+ 8 | export type Posting =
+ 9 |   | { readonly side: "debit"; readonly account: AccountPath; readonly amount: Money }
+10 |   | { readonly side: "credit"; readonly account: AccountPath; readonly amount: Money };
+11 |
+12 | export const debit = (account: AccountPath, amount: Money): Posting => ({
+13 |   side: "debit",
+14 |   account,
+15 |   amount,
+16 | });
+17 |
+18 | export const credit = (account: AccountPath, amount: Money): Posting => ({
+19 |   side: "credit",
+20 |   account,
+21 |   amount,
+22 | });
+23 |
+24 | /** A posting's effect on a debit-normal running balance. */
+25 | export const signedAmount = (posting: Posting): Money => {
+   |   ... 26-31 folded
+32 | };
+
+=== packages/money/src/money.ts · lines 26-41 of 52 ===
+
+26 |
+27 | export const money = (minorUnits: bigint | number, currency: Currency): Money =>
+28 |   ({ minorUnits: BigInt(minorUnits), currency }) as Money;
+29 |
+30 | export const zero = (currency: Currency): Money => money(0n, currency);
+31 |
+32 | export const add = (left: Money, right: Money): Money => {
+33 |   if (left.currency !== right.currency) {
+34 |     throw new CurrencyMismatchError(left.currency, right.currency);
+35 |   }
+36 |   return money(left.minorUnits + right.minorUnits, left.currency);
+37 | };
+38 |
+39 | export const negate = (value: Money): Money => money(-value.minorUnits, value.currency);
+40 |
+41 | export const isZero = (value: Money): boolean => value.minorUnits === 0n;

@@ -1,0 +1,7 @@
+packages/accounts/src/journal.ts:28:3
+
+```typescript
+(method) Journal<TMeta = undefined>.post(entry: Entry<TMeta>): Entry<TMeta>;
+```
+
+Record a prepared entry, or build the common two-posting transfer.

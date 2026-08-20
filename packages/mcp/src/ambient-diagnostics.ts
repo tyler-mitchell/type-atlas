@@ -13,6 +13,16 @@ import { enclosingDeclaration } from "./reference-groups.ts";
 
 export type DiagnosticMode = "summary" | "verbose" | "off";
 
+/**
+ * TypeScript writes machine-absolute paths into message text —
+ * `import("/home/user/repo/packages/money/src/money").Money` — the one place
+ * the workspace-relative rule of every response was still broken. Relativized
+ * here, at the presentation boundary, for every surface that renders a
+ * diagnostic's message.
+ */
+export const workspaceRelativeMessage = (message: string, workspaceRoot: string): string =>
+  message.replaceAll(`${workspaceRoot.replace(/\/$/u, "")}/`, "");
+
 const reported = (report: DocumentDiagnosticReport | null | undefined): readonly Diagnostic[] =>
   report && "items" in report ? report.items : [];
 
@@ -40,7 +50,15 @@ export const formatDiagnosticMode = async (input: {
     variables: {
       verbose: input.mode === "verbose",
       // One file, so one group: the path leads it once rather than every row.
-      groups: [{ file, problems: entries }],
+      groups: [
+        {
+          file,
+          problems: entries.map((entry) => ({
+            ...entry,
+            message: workspaceRelativeMessage(entry.message, input.workspaceRoot),
+          })),
+        },
+      ],
       // A positionless request may not claim a position, however many of the
       // file's rows happen to sit where no focus was given.
       here: input.focus !== undefined && here.length > 0,

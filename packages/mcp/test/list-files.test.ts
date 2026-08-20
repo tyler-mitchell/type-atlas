@@ -80,26 +80,27 @@ test("list_files expands a subtree in place inside one tree", async () => {
       "featuretype/
       ├  atlascii/ · 82 files
       ├  docs/ · 7 files
+      ├  fixtures/ · 45 files
       ├  packages/
       │  └  core/
       │     └  src/
       │        └  markdoc/
       │           ├  documents/ · 34 files
       │           ├  partials/ · 15 files
-      │           ├  documents.lint.test.ts
-      │           ├  documents.test.ts
-      │           └  render.ts
+      │           ├  documents.lint.test.ts · 128 loc
+      │           ├  documents.test.ts · 244 loc
+      │           └  render.ts · 97 loc
       ├  scripts/ · 2 files
-      ├  AGENTS.md
-      ├  CONTRIBUTING.md
-      ├  LICENSE
-      ├  package.json
-      ├  pnpm-lock.yaml
-      ├  pnpm-workspace.yaml
-      ├  README.md
-      ├  server.json
-      ├  tsconfig.json
-      └  tsdown.config.ts"
+      ├  AGENTS.md · 76 loc
+      ├  CONTRIBUTING.md · 59 loc
+      ├  LICENSE · 188 loc
+      ├  package.json · 35 loc
+      ├  pnpm-lock.yaml · 3.9k loc
+      ├  pnpm-workspace.yaml · 50 loc
+      ├  README.md · 261 loc
+      ├  server.json · 23 loc
+      ├  tsconfig.json · 24 loc
+      └  tsdown.config.ts · 13 loc"
     `);
     // The glob record's namesake: a pattern key opens every directory it
     // matches — the monorepo-map call.
@@ -116,47 +117,48 @@ test("list_files expands a subtree in place inside one tree", async () => {
       "featuretype/
       ├  atlascii/ · 82 files
       ├  docs/ · 7 files
+      ├  fixtures/ · 45 files
       ├  packages/
       │  ├  core/
       │  │  ├  src/ · 63 files
       │  │  ├  test/ · 1 file
-      │  │  ├  CHANGELOG.md
-      │  │  ├  LICENSE
-      │  │  ├  package.json
-      │  │  ├  README.md
-      │  │  ├  tsconfig.json
-      │  │  └  tsdown.config.ts
+      │  │  ├  CHANGELOG.md · 88 loc
+      │  │  ├  LICENSE · 188 loc
+      │  │  ├  package.json · 75 loc
+      │  │  ├  README.md · 10 loc
+      │  │  ├  tsconfig.json · 10 loc
+      │  │  └  tsdown.config.ts · 27 loc
       │  ├  language-server/
       │  │  ├  bin/ · 1 file
       │  │  ├  src/ · 8 files
       │  │  ├  test/ · 3 files
-      │  │  ├  CHANGELOG.md
-      │  │  ├  LICENSE
-      │  │  ├  package.json
-      │  │  ├  README.md
-      │  │  └  tsconfig.json
+      │  │  ├  CHANGELOG.md · 23 loc
+      │  │  ├  LICENSE · 188 loc
+      │  │  ├  package.json · 101 loc
+      │  │  ├  README.md · 26 loc
+      │  │  └  tsconfig.json · 10 loc
       │  └  mcp/
       │     ├  assets/ · 1 file
       │     ├  bin/ · 1 file
       │     ├  scripts/ · 1 file
       │     ├  src/ · 31 files
-      │     ├  test/ · 13 files
-      │     ├  CHANGELOG.md
-      │     ├  LICENSE
-      │     ├  package.json
-      │     ├  README.md
-      │     └  tsconfig.json
+      │     ├  test/ · 38 files
+      │     ├  CHANGELOG.md · 162 loc
+      │     ├  LICENSE · 188 loc
+      │     ├  package.json · 88 loc
+      │     ├  README.md · 26 loc
+      │     └  tsconfig.json · 10 loc
       ├  scripts/ · 2 files
-      ├  AGENTS.md
-      ├  CONTRIBUTING.md
-      ├  LICENSE
-      ├  package.json
-      ├  pnpm-lock.yaml
-      ├  pnpm-workspace.yaml
-      ├  README.md
-      ├  server.json
-      ├  tsconfig.json
-      └  tsdown.config.ts"
+      ├  AGENTS.md · 76 loc
+      ├  CONTRIBUTING.md · 59 loc
+      ├  LICENSE · 188 loc
+      ├  package.json · 35 loc
+      ├  pnpm-lock.yaml · 3.9k loc
+      ├  pnpm-workspace.yaml · 50 loc
+      ├  README.md · 261 loc
+      ├  server.json · 23 loc
+      ├  tsconfig.json · 24 loc
+      └  tsdown.config.ts · 13 loc"
     `);
 
     // Mixed values in one record: sugar, options object, glob key together.
@@ -177,31 +179,32 @@ test("list_files expands a subtree in place inside one tree", async () => {
       ├  atlascii/ · 82 files
       ├  docs/
       │  ├  case-studies/
-      │  │  └  webgpu-engine-p0.md
-      │  ├  code-intelligence-mcp-comparison.md
-      │  ├  distribution-reference-research.md
-      │  ├  issues.md
-      │  ├  kek-monorepo-latency.md
-      │  ├  tool-latency-measurements.md
-      │  └  typescript-code-intelligence-comparison.md
+      │  │  └  webgpu-engine-p0.md · 173 loc
+      │  ├  code-intelligence-mcp-comparison.md · 742 loc
+      │  ├  distribution-reference-research.md · 279 loc
+      │  ├  issues.md · 581 loc
+      │  ├  kek-monorepo-latency.md · 405 loc
+      │  ├  tool-latency-measurements.md · 111 loc
+      │  └  typescript-code-intelligence-comparison.md · 400 loc
+      ├  fixtures/ · 45 files
       ├  packages/
       │  └  core/
       │     └  src/
       │        └  markdoc/
-      │           ├  documents.lint.test.ts
-      │           ├  documents.test.ts
-      │           └  render.ts
+      │           ├  documents.lint.test.ts · 128 loc
+      │           ├  documents.test.ts · 244 loc
+      │           └  render.ts · 97 loc
       ├  scripts/ · 2 files
-      ├  AGENTS.md
-      ├  CONTRIBUTING.md
-      ├  LICENSE
-      ├  package.json
-      ├  pnpm-lock.yaml
-      ├  pnpm-workspace.yaml
-      ├  README.md
-      ├  server.json
-      ├  tsconfig.json
-      └  tsdown.config.ts"
+      ├  AGENTS.md · 76 loc
+      ├  CONTRIBUTING.md · 59 loc
+      ├  LICENSE · 188 loc
+      ├  package.json · 35 loc
+      ├  pnpm-lock.yaml · 3.9k loc
+      ├  pnpm-workspace.yaml · 50 loc
+      ├  README.md · 261 loc
+      ├  server.json · 23 loc
+      ├  tsconfig.json · 24 loc
+      └  tsdown.config.ts · 13 loc"
     `);
   } finally {
     await client.close();

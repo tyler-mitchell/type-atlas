@@ -1,0 +1,28 @@
+Money [type] · packages/money/src/money.ts:12:13
+29 references · 3 projects loaded · packages/money/tsconfig.json
+
+1-20 of 29 references · pass offset: 20 for the rest
+
+packages/accounts/src/journal.ts
+├  1:28  — at module level
+├  14:35 — inside constructor
+├  31:61 — inside post
+└  36:62 — inside post
+packages/accounts/src/posting.ts
+├  10:80 — inside Posting
+├  12:53 — inside debit
+├  18:54 — inside credit
+└  25:49 — inside signedAmount
+packages/money/src/index.ts
+└  7:8 — at module level
+packages/money/src/money.ts
+├  27:73 — inside money
+├  28:53 — inside money
+├  30:43 — inside zero
+├  32:27 — inside add
+├  32:41 — inside add
+├  32:49 — inside add
+├  39:31 — inside negate
+├  39:39 — inside negate
+├  41:31 — inside isZero
+└  44:31 — inside format

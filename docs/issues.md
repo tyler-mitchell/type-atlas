@@ -10,8 +10,8 @@ before acting on it.
 
 An entry leaves this file when it is fixed, not when it is explained.
 
-**〈raised〉** marks an issue Tyler raised rather than one found while working,
-whether or not the message said `issue:` — anything he points out that reads as
+**〈raised〉** marks an issue the maintainer raised rather than one found while working,
+whether or not the message said `issue:` — anything they point out that reads as
 a defect belongs here, and waiting for the prefix loses the ones he mentions in
 passing.
 Those are deferred on arrival — captured here and left alone — unless they
@@ -99,7 +99,7 @@ pays for through the declaration chain (`within`). A reader must open the file
 to understand any row. The enrichment affordance exists and is in use one tool
 over; diagnostics rendering never adopted it. Applies to the ambient block and
 the diagnostics tool alike. Observed 2026-08-19, and consumed twice in passing
-before being caught — by Tyler, not by the session.
+before being caught — by the maintainer, not by the session.
 
 ### An absence branch asserts a conclusion the tool cannot know
 
@@ -195,6 +195,15 @@ as a single run-on clause. Raised as needing rethinking; the shape it should
 take is not decided here.
 
 ---
+
+### `references` counts a row it never lists
+
+`references` on `normalBalance` (ledger fixture) answers "4 references" and
+lists three rows; on `Money`'s earlier capture, "2 references" over one row.
+The declaration is inside the count and outside the listing, so the numbers
+never reconcile with what is on screen. Either the count should exclude the
+declaration or the declaration should be a row. Observed 2026-08-20 in the
+scenario captures (`packages/mcp/test/scenarios/responses/references/`).
 
 ## Language grounding
 
@@ -554,6 +563,33 @@ read to serve two characters. Worth revisiting only if a consumer appears that
 genuinely needs ASCII-only output.
 
 ---
+
+### `callees` drowns the project in the standard library
+
+`callees` on `balancesAsOf` (ledger fixture) answers 12 callables of which
+eight are `lib.*.d.ts` methods — `localeCompare` three times, once per lib
+file that redeclares it. The four project calls, which are the answer, sit
+under a pile of `map`/`sort`/`get`/`set`. Standard-library callees deserve a
+one-line fold ("+ 6 standard-library calls"), not rows that outnumber the
+signal. Observed 2026-08-20 in
+`responses/callees/what-balances-as-of-invokes.txt`.
+
+### `list_module_exports` leaks `__module.` into signatures
+
+Every re-exported signature renders as
+`(alias) const add: (left: __module.Money, …) => __module.Money` — an
+internal alias qualifier no consumer ever writes. The reader's name for that
+type is `Money`. Observed 2026-08-20 in
+`responses/list_module_exports/workspace-package-surface.txt`.
+
+### `inspect_symbol` elides mentions with no handle to the rest
+
+"Mentions that are not calls (3 of 7 references…)" names four unshown
+references and offers no way to see them — `references` in the same situation
+writes "pass offset: 20 for the rest". The alias-`Money` capture also renders
+an implementation-walk apology ("the walk reaches only files this session has
+opened…") for a type alias, where an implementations section can never apply.
+Observed 2026-08-20 in `responses/inspect_symbol/`.
 
 ## Architecture
 

@@ -1,0 +1,21 @@
+balancesAsOf · calls 12 callables
+
+typescript-native-bridge/lib/lib.es5.d.ts
+├  localeCompare [method] 4567:5-4567:18 · range 4561:5-4567:102 · calls 50:28-50:54
+├  localeCompare [method] 448:5-448:18 · range 444:5-448:41 · calls 50:28-50:54
+├  map [method] 1468:5-1468:8 · range 1463:5-1468:88 · calls 44:10-45:9
+└  sort [method] 1393:5-1393:9 · range 1383:5-1393:52 · calls 44:10-50:10
+typescript-native-bridge/lib/lib.es2020.string.d.ts
+└  localeCompare [method] 41:5-41:18 · range 35:5-41:105 · calls 50:28-50:54
+typescript-native-bridge/lib/lib.es2015.iterable.d.ts
+└  entries [method] 146:5-146:12 · range 143:5-146:36 · calls 44:14-44:28
+packages/accounts/src/account.ts
+└  lineage [function] 27:14-27:21 · range 27:24-28:86 · calls 40:28-40:35
+packages/accounts/src/posting.ts
+└  signedAmount [function] 25:14-25:26 · range 25:29-32:2 · calls 34:57-34:69
+packages/money/src/money.ts
+├  zero [function] 30:14-30:18 · range 30:21-30:71 · calls 34:41-34:45, 41:56-41:60, 48:32-48:36
+└  add [function] 32:14-32:17 · range 32:20-37:2 · calls 34:9-34:12, 41:28-41:31
+typescript-native-bridge/lib/lib.es2015.collection.d.ts
+├  get [method] 34:5-34:8 · range 30:5-34:32 · calls 34:13-34:20, 41:32-41:42, 48:12-48:19
+└  set [method] 42:5-42:8 · range 39:5-42:33 · calls 32:7-32:14, 41:7-41:17

@@ -358,8 +358,8 @@ replace thought — never on the guard itself.
 - **Findings leave the head immediately.** Anything noticed outside the
   immediate workstream goes to `docs/issues.md` at the moment of discovery,
   with how it was observed — a finding deferred to the end of a session is a
-  finding lost, and one raised by Tyler is captured whether or not he prefixed
-  it `issue:`.
+  finding lost, and one raised by the maintainer is captured whether or not
+  it carried an `issue:` prefix.
 - **Never end a turn waiting for input.** If an action is available, take it.
 
 ---

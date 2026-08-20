@@ -1,4 +1,4 @@
-import { realpath, stat } from "node:fs/promises";
+import { readFile, realpath, stat } from "node:fs/promises";
 import { containingGitSubmodule, findGitSubmoduleRoots } from "@type-atlas/core";
 import type { Row } from "atlascii";
 import { isFileInDir } from "@volar/language-server/node.js";
@@ -37,28 +37,21 @@ export type WorkspaceExpansion = {
   readonly includeIgnored?: boolean;
 };
 
-export const workspaceTree = async (input: {
+/**
+ * Resolve and validate the listing's two path arguments. Every failure names
+ * the argument that was wrong: `realpath` alone reports a missing or
+ * non-directory path as a raw errno naming an absolute path the caller never
+ * wrote.
+ */
+const resolveListingDirectory = async (input: {
   readonly workspace: string;
   readonly directory: string;
-  readonly depth: number;
-  readonly glob?: readonly string[];
-  /** Subtrees to open deeper than the shared depth, keyed by path relative to
-   * `directory` — a number is shorthand for `{ depth }`. */
-  readonly expand?: Readonly<Record<string, number | WorkspaceExpansion>>;
-  readonly includeIgnored: boolean;
-  readonly includeHidden: boolean;
-  readonly includeSubmodules: boolean;
-  readonly limit: number;
-  readonly signal: AbortSignal;
-  readonly view: "directories" | "files";
-}): Promise<WorkspaceListing> => {
+}): Promise<{ root: string; directory: string; realRoot: string }> => {
   const root = path.resolve(input.workspace);
   const directory = path.resolve(root, input.directory);
   if (directory !== root && !isFileInDir(directory, root)) {
     throw new Error(`Directory is outside the workspace: ${input.directory}`);
   }
-  // `realpath` reports a missing or non-directory path as a raw errno naming an
-  // absolute path the caller never wrote. Say which argument was wrong instead.
   const [realRoot, realDirectory] = await Promise.all([
     realpath(root)
       .then(path.normalize)
@@ -83,6 +76,166 @@ export const workspaceTree = async (input: {
       `${input.directory} is a file. Pass the directory containing it: ${path.relative(root, path.dirname(directory)) || "."}`,
     );
   }
+  return { root, directory, realRoot };
+};
+
+/** One node per path segment; a fold renders where children were not kept. */
+type Assembled = { directory: boolean; readonly children: Map<string, Assembled> };
+
+/**
+ * Assemble the one tree, enforcing the completeness rule for every way the
+ * bound can cut: no directory may render as complete while the limit dropped
+ * any of its contents. It wore three costumes before one rule replaced them —
+ * core-time/ as a lone README (base crawl truncated mid-subtree), packages/
+ * as 14 of 25 packages (an expansion sliced away wholesale), graph-grammar/
+ * as two files (an expansion sliced mid-record). A dropped directory stubs
+ * itself as a fold; a dropped file folds its whole parent; either way the
+ * fold's count then prices what the bound could not show.
+ *
+ * `renderedFiles` is what the tree actually shows as individual files — the
+ * set later stages may price without outgrowing the bound.
+ */
+const assembleTree = (
+  relatives: readonly string[],
+  limit: number,
+): { assembled: Assembled; renderedFiles: readonly string[] } => {
+  const kept = relatives.slice(0, limit);
+  const keptDirs = new Set(kept.filter((entry) => entry.endsWith("/")));
+  const stubs = new Set<string>();
+  const foldedParents = new Set<string>();
+  for (const entry of relatives.slice(limit)) {
+    const segments = (entry.endsWith("/") ? entry.slice(0, -1) : entry).split("/");
+    if (entry.endsWith("/")) {
+      const spine = segments.map((_, held) => `${segments.slice(0, held + 1).join("/")}/`);
+      const nearest = spine.find((ancestor) => !keptDirs.has(ancestor));
+      if (nearest !== undefined) stubs.add(nearest);
+    } else if (segments.length > 1) {
+      foldedParents.add(`${segments.slice(0, -1).join("/")}/`);
+    }
+  }
+  const insideFoldedParent = (entry: string) =>
+    [...foldedParents].some((parent) => entry !== parent && entry.startsWith(parent));
+  const assembled: Assembled = { directory: true, children: new Map() };
+  for (const entry of [
+    ...kept.filter((entry) => !insideFoldedParent(entry)),
+    ...[...stubs].filter((entry) => !insideFoldedParent(entry)),
+    ...foldedParents,
+  ]) {
+    const isDirectory = entry.endsWith("/");
+    (isDirectory ? entry.slice(0, -1) : entry).split("/").reduce((node, segment, index, all) => {
+      const held =
+        node.children.get(segment) ??
+        node.children
+          .set(segment, { directory: index < all.length - 1 || isDirectory, children: new Map() })
+          .get(segment)!;
+      held.directory ||= index < all.length - 1 || isDirectory;
+      return held;
+    }, assembled);
+  }
+  return {
+    assembled,
+    renderedFiles: kept.filter((entry) => !entry.endsWith("/") && !insideFoldedParent(entry)),
+  };
+};
+
+/** Every directory the tree renders folded — childless here, contents elsewhere. */
+const foldedDirectories = (
+  assembled: Assembled,
+  submodules: ReadonlySet<string>,
+): readonly string[] => {
+  const folded: string[] = [];
+  const collect = (node: Assembled, prefix: string): void => {
+    for (const [name, child] of node.children) {
+      const relative = prefix === "" ? name : `${prefix}/${name}`;
+      if (child.directory && child.children.size === 0 && !submodules.has(relative)) {
+        folded.push(relative);
+      }
+      collect(child, relative);
+    }
+  };
+  collect(assembled, "");
+  return folded;
+};
+
+const newlineCount = (source: Buffer): number => {
+  let count = 0;
+  for (let at = source.indexOf(10); at !== -1; at = source.indexOf(10, at + 1)) count += 1;
+  return count;
+};
+
+/**
+ * Rounded the way a reader weighs them: exact below a thousand, compact
+ * above — `1.3k loc`, not `1300 loc`. The number is a price, not a measurement.
+ */
+const compactLines = (lines: number): string => {
+  if (lines < 1000) return `${lines}`;
+  const scaled = lines < 1_000_000 ? lines / 1000 : lines / 1_000_000;
+  const unit = lines < 1_000_000 ? "k" : "m";
+  return `${(Math.round(scaled * 10) / 10).toString().replace(/\.0$/u, "")}${unit}`;
+};
+
+/**
+ * A file's line count is the price of reading it — the same budgeting the
+ * folded counts give directories, one level finer. Only rendered files are
+ * read, so the limit that bounds the tree bounds this too; a binary or an
+ * unreadable path stays unpriced rather than carrying a number that lies.
+ */
+const fileLinePrices = async (
+  base: string,
+  files: readonly string[],
+): Promise<ReadonlyMap<string, number>> => {
+  const prices = new Map<string, number>();
+  for (let held = 0; held < files.length; held += 64) {
+    await Promise.all(
+      files.slice(held, held + 64).map(async (relative) => {
+        const source = await readFile(path.resolve(base, relative)).catch(() => undefined);
+        if (source === undefined || source.includes(0)) return;
+        prices.set(
+          relative,
+          source.length === 0 ? 0 : newlineCount(source) + (source.at(-1) === 10 ? 0 : 1),
+        );
+      }),
+    );
+  }
+  return prices;
+};
+
+/** The assembled trie as atlascii rows, directories first, labels supplied by the caller. */
+const renderRows = (
+  node: Assembled,
+  prefix: string,
+  label: (entry: { readonly relative: string; readonly name: string; readonly directory: boolean }) => string,
+): readonly Row[] =>
+  [...node.children.entries()]
+    .sort(
+      ([leftName, left], [rightName, right]) =>
+        Number(right.directory) - Number(left.directory) || leftName.localeCompare(rightName),
+    )
+    .map(([name, child]) => {
+      const relative = prefix === "" ? name : `${prefix}/${name}`;
+      const rendered = label({ relative, name, directory: child.directory });
+      const children = renderRows(child, relative, label);
+      return children.length > 0 ? { name: rendered, children } : { name: rendered };
+    });
+
+export const workspaceTree = async (input: {
+  readonly workspace: string;
+  readonly directory: string;
+  readonly depth: number;
+  readonly glob?: readonly string[];
+  /** Subtrees to open deeper than the shared depth, keyed by path relative to
+   * `directory` — a number is shorthand for `{ depth }`. */
+  readonly expand?: Readonly<Record<string, number | WorkspaceExpansion>>;
+  readonly includeIgnored: boolean;
+  readonly includeHidden: boolean;
+  readonly includeSubmodules: boolean;
+  readonly limit: number;
+  /** Suffix each rendered file with its line count — `· 244 loc`. */
+  readonly loc: boolean;
+  readonly signal: AbortSignal;
+  readonly view: "directories" | "files";
+}): Promise<WorkspaceListing> => {
+  const { root, directory, realRoot } = await resolveListingDirectory(input);
   const submoduleRoots = input.includeSubmodules ? [] : await findGitSubmoduleRoots(root);
   const submodule = containingGitSubmodule(directory, submoduleRoots);
   if (submodule) {
@@ -182,7 +335,11 @@ export const workspaceTree = async (input: {
         const key = path.normalize(raw).replace(/\/$/u, "");
         const options = typeof held === "number" ? { depth: held } : held;
         if (!/[*?[{(!]/u.test(key)) return [{ key, ...options }];
-        const { dir, crawler } = scoped({ at: ".", depth: key.split("/").length + 1, glob: [`${key}/`] });
+        const { dir, crawler } = scoped({
+          at: ".",
+          depth: key.split("/").length + 1,
+          glob: [`${key}/`],
+        });
         const matched = await crawler.onlyDirs().crawl(dir).withPromise();
         return matched
           .filter((entry) => entry !== "." && entry.length > 0)
@@ -244,75 +401,23 @@ export const workspaceTree = async (input: {
         return relative.split("/").length > input.depth ? [] : [`${relative}/`];
       });
   const submodules = new Set(submodulePaths.map((entry) => entry.slice(0, -1)));
-  const relatives = [...crawled, ...submodulePaths].sort();
   // One tree, rooted at the asked directory — the shape `tree` and every
   // file explorer have always drawn. The previous form grouped files under
   // per-directory section headers, which read as disconnected fragments:
   // nothing said how `documents/` related to `./`, or what `./` even was.
-  type Assembled = { directory: boolean; readonly children: Map<string, Assembled> };
-  const assembled: Assembled = { directory: true, children: new Map() };
-  const kept = relatives.slice(0, input.limit);
-  // One completeness rule for every way the bound can cut: no directory may
-  // render as complete while the limit dropped any of its contents. It wore
-  // three costumes before one rule replaced them — core-time/ as a lone
-  // README (base crawl truncated mid-subtree), packages/ as 14 of 25
-  // packages (an expansion sliced away wholesale), graph-grammar/ as two
-  // files (an expansion sliced mid-record). A dropped directory stubs
-  // itself as a fold; a dropped file folds its whole parent; either way the
-  // fold's count then prices what the bound could not show.
-  const keptDirs = new Set(kept.filter((entry) => entry.endsWith("/")));
-  const stubs = new Set<string>();
-  const foldedParents = new Set<string>();
-  for (const entry of relatives.slice(input.limit)) {
-    const segments = (entry.endsWith("/") ? entry.slice(0, -1) : entry).split("/");
-    if (entry.endsWith("/")) {
-      const spine = segments.map((_, held) => `${segments.slice(0, held + 1).join("/")}/`);
-      const nearest = spine.find((ancestor) => !keptDirs.has(ancestor));
-      if (nearest !== undefined) stubs.add(nearest);
-    } else if (segments.length > 1) {
-      foldedParents.add(`${segments.slice(0, -1).join("/")}/`);
-    }
-  }
-  const insideFoldedParent = (entry: string) =>
-    [...foldedParents].some((parent) => entry !== parent && entry.startsWith(parent));
-  for (const entry of [
-    ...kept.filter((entry) => !insideFoldedParent(entry)),
-    ...[...stubs].filter((entry) => !insideFoldedParent(entry)),
-    ...foldedParents,
-  ]) {
-    const isDirectory = entry.endsWith("/");
-    (isDirectory ? entry.slice(0, -1) : entry).split("/").reduce((node, segment, index, all) => {
-      const held =
-        node.children.get(segment) ??
-        node.children
-          .set(segment, { directory: index < all.length - 1 || isDirectory, children: new Map() })
-          .get(segment)!;
-      held.directory ||= index < all.length - 1 || isDirectory;
-      return held;
-    }, assembled);
-  }
+  const relatives = [...crawled, ...submodulePaths].sort();
+  const { assembled, renderedFiles } = assembleTree(relatives, input.limit);
   // A folded directory states what it holds — `documents/ · 34 files` — so a
   // reader prices expanding it without a second call. fdir's own counter
   // (`onlyCounts`), under the same ignore rules, no paths materialized;
   // skipped wholesale past a bound so a huge shallow listing stays cheap.
-  const folded: string[] = [];
-  const collectFolded = (node: Assembled, prefix: string): void => {
-    for (const [name, child] of node.children) {
-      const relative = prefix === "" ? name : `${prefix}/${name}`;
-      if (child.directory && child.children.size === 0 && !submodules.has(relative)) {
-        folded.push(relative);
-      }
-      collectFolded(child, relative);
-    }
-  };
-  collectFolded(assembled, "");
   // Shallowest folds price first when there are more than the counting
   // budget: the map's top levels are what a reader weighs, and an
   // all-or-nothing bound once erased every price the moment stubs pushed
   // the fold count past it.
   const counted = new Map(
     await Promise.all(
-      [...folded]
+      [...foldedDirectories(assembled, submodules)]
         .filter((relative) => !buildOutput.has(relative.split("/").pop() ?? ""))
         .sort((left, right) => left.split("/").length - right.split("/").length)
         .slice(0, 60)
@@ -322,6 +427,9 @@ export const workspaceTree = async (input: {
         }),
     ),
   );
+  const lineCounts = input.loc
+    ? await fileLinePrices(directory, renderedFiles)
+    : new Map<string, number>();
   const holdings = (relative: string): string => {
     const counts = counted.get(relative);
     if (!counts || (counts.files === 0 && counts.directories <= 1)) return "";
@@ -329,21 +437,15 @@ export const workspaceTree = async (input: {
       ? ` · ${counts.files} ${counts.files === 1 ? "file" : "files"}`
       : ` · ${counts.directories - 1} ${counts.directories === 2 ? "dir" : "dirs"}`;
   };
-  const rows = (node: Assembled, prefix: string): readonly Row[] =>
-    [...node.children.entries()]
-      .sort(
-        ([leftName, left], [rightName, right]) =>
-          Number(right.directory) - Number(left.directory) || leftName.localeCompare(rightName),
-      )
-      .map(([name, child]) => {
-        const relative = prefix === "" ? name : `${prefix}/${name}`;
-        const label = child.directory
-          ? `${name}/${submodules.has(relative) ? " [submodule]" : holdings(relative)}`
-          : name;
-        const children = rows(child, relative);
-        return children.length > 0 ? { name: label, children } : { name: label };
-      });
-  const treeRows = rows(assembled, "");
+  const price = (relative: string): string => {
+    const lines = lineCounts.get(relative);
+    return lines === undefined ? "" : ` · ${compactLines(lines)} loc`;
+  };
+  const treeRows = renderRows(assembled, "", ({ relative, name, directory: isDirectory }) =>
+    isDirectory
+      ? `${name}/${submodules.has(relative) ? " [submodule]" : holdings(relative)}`
+      : `${name}${price(relative)}`,
+  );
   return {
     entries:
       treeRows.length === 0

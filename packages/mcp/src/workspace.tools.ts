@@ -56,6 +56,10 @@ const input = type({
     default: 500,
     description: "Maximum files or directories returned.",
   }),
+  "loc?": type("boolean").configure({
+    default: true,
+    description: "Suffix each file with its line count (`· 244 loc`).",
+  }),
   "view?": type.enumerated("directories", "files").configure(
     {
       description:
@@ -87,6 +91,7 @@ export const registerWorkspaceTools = (server: McpServer): void => {
         includeIgnored,
         includeSubmodules,
         limit,
+        loc,
         view,
       },
       { mcpReq: { signal } },
@@ -101,6 +106,7 @@ export const registerWorkspaceTools = (server: McpServer): void => {
         includeIgnored: includeIgnored ?? false,
         includeSubmodules: includeSubmodules ?? false,
         limit: limit ?? 500,
+        loc: loc ?? true,
         signal,
         view: view ?? "files",
       });
