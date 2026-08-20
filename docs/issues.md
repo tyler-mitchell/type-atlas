@@ -367,9 +367,6 @@ maintainer. Items already in flight are marked; the rest stand alone:
 - **`investigate_code` anchors unrelated symbols on conceptual questions.**
   It should say "relationship not found" sooner instead of decorating a weak
   retrieval with verified-looking relationships.
-- **`impact` reads as complete when it is not.** Unloaded projects stay
-  outside the count by design, and the caveat exists — but a user still
-  overread it. The boundary sentence may need to lead, not trail.
 - **Tool idea: evaluate declared execution grammar** — expand sequence
   repeats and indirect `count` into exact command multiplicity
   (webgpu-engine's dispatch grammar).

@@ -21,7 +21,7 @@ import {
   type VolarWorkspacePool,
 } from "@type-atlas/core";
 import { type } from "arktype";
-import { displayPath, markupText, rangeText, sameRange } from "atlascii";
+import { displayPath, markupText, positionText, rangeText, sameRange } from "atlascii";
 import { type DocumentAsk, documentAsks, isAskReference } from "atlascii/document";
 import { textResult } from "./mcp-result.ts";
 import { readOnlyToolAnnotations } from "./metadata.ts";
@@ -356,7 +356,10 @@ export const registerExperimentalTools = (
                 name: resolved.name,
                 kind: resolved.kind,
                 file: displayPath(resolved.declaredAt.uri, root),
-                at: resolved.declaredAt.selection.start,
+                // As text, one-based, like every position this surface
+                // writes — the raw LSP object rendered as nothing, leaving
+                // `file.ts:` with a dangling colon in the dossier heading.
+                at: positionText(resolved.declaredAt.selection.start),
               }
             : {};
         },
@@ -684,7 +687,15 @@ export const registerExperimentalTools = (
           beyond: candidates.filter(
             (name) => !explored.has(name) && !rows.some((row) => row.name === name),
           ),
-          columns: [{}, { align: "end" }, { align: "end" }, { align: "end" }],
+          // Two bare numeric columns read as a riddle — a user weighed "4 3"
+          // without knowing which was files. The component has always taken
+          // headings; impact just never passed them.
+          columns: [
+            { heading: "package" },
+            { heading: "uses", align: "end" },
+            { heading: "files", align: "end" },
+            { heading: "tests", align: "end" },
+          ],
           rows: rows.map(({ name, uses, files, tests }) => [
             name,
             String(uses),

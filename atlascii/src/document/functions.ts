@@ -71,8 +71,15 @@ export const functions: Config["functions"] = {
   ),
   /** A protocol range as `line:column-line:column`, counted from one. */
   range: of((value: Range) => rangeText(value)),
-  /** A protocol position as `line:column`, counted from one. */
-  position: of((value: Position) => positionText(value)),
+  /**
+   * A protocol position as `line:column`, counted from one. A value already
+   * formatted passes through, so a composer never has to know whether a
+   * bind carries the protocol shape or the finished text — `position($x)`
+   * and a bare `{% $x %}` agree wherever both are possible.
+   */
+  position: of((value: Position | string) =>
+    typeof value === "string" ? value : positionText(value),
+  ),
   /**
    * A protocol symbol kind as the word for it.
    *

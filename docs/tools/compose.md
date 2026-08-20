@@ -33,7 +33,7 @@ document: {% ask "subject" as="what" file="packages/accounts/src/posting.ts" lin
 ```
 
 ~~~text
-## signedAmount · packages/accounts/src/posting.ts:
+## signedAmount · packages/accounts/src/posting.ts:25:14
 
 10 uses across 6 files · 0 problems in the declaring file
 
