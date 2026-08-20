@@ -137,54 +137,63 @@ export const workspaceTree = async (input: {
     .withMaxFiles(input.limit + 2)
     .crawl(directory)
     .withPromise();
-  const entries = [
-    ...crawled
-      .filter((entry) => entry !== ".")
-      .map((entry) =>
-        entry.endsWith("/")
-          ? { directory: entry.slice(0, -1), name: undefined }
-          : { directory: path.dirname(entry) || ".", name: path.basename(entry) },
-      ),
-    ...(input.glob
-      ? []
-      : submoduleRoots.flatMap((submoduleRoot) => {
-          if (!isFileInDir(submoduleRoot, directory)) return [];
-          const relative = path.relative(directory, submoduleRoot);
-          if (relative.split("/").length > input.depth) return [];
-          return [
-            {
-              directory: path.dirname(relative) || ".",
-              name: `${path.basename(relative)}/ [submodule]`,
-            },
-          ];
-        })),
-  ]
-    .sort((left, right) =>
-      `${left.directory}/${left.name ?? ""}`.localeCompare(
-        `${right.directory}/${right.name ?? ""}`,
-      ),
-    )
-    .slice(0, input.limit + 1);
-  const groupedEntries = entries
-    .slice(0, input.limit)
-    .reduce<Map<string, readonly string[]>>((sections, entry) => {
-      const names = sections.get(entry.directory) ?? [];
-      return sections.set(
-        entry.directory,
-        entry.name === undefined ? names : [...names, entry.name],
-      );
-    }, new Map());
-  return {
-    entries: [...groupedEntries]
+  const submodulePaths = input.glob
+    ? []
+    : submoduleRoots.flatMap((submoduleRoot) => {
+        if (!isFileInDir(submoduleRoot, directory)) return [];
+        const relative = path.relative(directory, submoduleRoot);
+        return relative.split("/").length > input.depth ? [] : [`${relative}/`];
+      });
+  const submodules = new Set(submodulePaths.map((entry) => entry.slice(0, -1)));
+  const relatives = [
+    ...crawled.filter((entry) => entry !== "." && entry.length > 0),
+    ...submodulePaths,
+  ].sort();
+  // One tree, rooted at the asked directory — the shape `tree` and every
+  // file explorer have always drawn. The previous form grouped files under
+  // per-directory section headers, which read as disconnected fragments:
+  // nothing said how `documents/` related to `./`, or what `./` even was.
+  type Assembled = { directory: boolean; readonly children: Map<string, Assembled> };
+  const assembled: Assembled = { directory: true, children: new Map() };
+  for (const entry of relatives.slice(0, input.limit)) {
+    const isDirectory = entry.endsWith("/");
+    (isDirectory ? entry.slice(0, -1) : entry).split("/").reduce((node, segment, index, all) => {
+      const held =
+        node.children.get(segment) ??
+        node.children
+          .set(segment, { directory: index < all.length - 1 || isDirectory, children: new Map() })
+          .get(segment)!;
+      held.directory ||= index < all.length - 1 || isDirectory;
+      return held;
+    }, assembled);
+  }
+  const rows = (node: Assembled, prefix: string): readonly Row[] =>
+    [...node.children.entries()]
       .sort(
-        ([left], [right]) =>
-          Number(right === ".") - Number(left === ".") || left.localeCompare(right),
+        ([leftName, left], [rightName, right]) =>
+          Number(right.directory) - Number(left.directory) || leftName.localeCompare(rightName),
       )
-      .map(([relative, names]) => ({
-        name: `${relative}/`,
-        children: [...names].sort().map((name) => ({ name })),
-      })),
-    over: entries.length > input.limit,
+      .map(([name, child]) => {
+        const relative = prefix === "" ? name : `${prefix}/${name}`;
+        const label = child.directory
+          ? `${name}/${submodules.has(relative) ? " [submodule]" : ""}`
+          : name;
+        const children = rows(child, relative);
+        return children.length > 0 ? { name: label, children } : { name: label };
+      });
+  const treeRows = rows(assembled, "");
+  return {
+    entries:
+      treeRows.length === 0
+        ? []
+        : [
+            {
+              name:
+                input.directory === "." ? `${path.basename(realRoot)}/` : `${input.directory}/`,
+              children: treeRows,
+            },
+          ],
+    over: relatives.length > input.limit,
     limit: input.limit,
     filtered: input.glob !== undefined,
   };
