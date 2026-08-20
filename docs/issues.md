@@ -407,8 +407,24 @@ clean). A bundler's config is TypeScript and cannot be cheaply evaluated;
 the config-grounded extension is presence-based — a `dist/` beside a
 `vite.config.*`/`rollup.config.*`/`esbuild` config is that bundler's
 declared-by-default output and can be excluded under the same disclosure.
-The fixture cannot witness either branch (its dist is gitignored); a
-generated-output fixture corner is the corpus-deepening item.
+The presence-based extension shipped with the fixture's generated-output
+corner (a committed vite bundle in `packages/importers/dist`), so the corpus
+now witnesses the disclosure, the widening hint, and the deliberate opt-in;
+the kek bundles are excluded the same way.
+
+### The ambient problem line races its own background check
+
+Caught by the determinism gate flapping WITHIN one seed (502862052, three
+replays: two passed the case, one appended "1 problem in
+packages/reports/src/balance.ts" to `type_definitions/call-result-to-alias`):
+the ambient diagnostics context attaches when a background check happens to
+have finished, so the same call in the same order answers differently by
+wall-clock luck. Time-dependence is worse than order-dependence — no replay
+seed pins it. The attach policy must be deterministic: await the check, or
+never attach opportunistically. Belongs to the raised diagnostics rework
+above; the case is quarantined in the gate until then. Observed 2026-08-20.
+
+### A location is shown three ways
 
 Tree rows under a file (`references`, `file_references`,
 `document_highlights`), a `❯` pointer (`definitions`, `implementations`,

@@ -14,7 +14,7 @@ workspace: fixtures/ledger
 ~~~text
 ledger/
 ├  apps/ · 11 files
-├  packages/ · 44 files
+├  packages/ · 45 files
 ├  ledger.config.json · 10 loc
 ├  ledger.config.schema.json · 21 loc
 ├  package.json · 24 loc
@@ -48,6 +48,8 @@ ledger/
 │  │  ├  package.json · 22 loc
 │  │  └  tsconfig.json · 20 loc
 │  ├  importers/
+│  │  ├  dist/
+│  │  │  └  importers.js · 1 loc
 │  │  ├  src/
 │  │  │  ├  bank-profiles.ts · 42 loc
 │  │  │  ├  config.ts · 7 loc
@@ -56,7 +58,8 @@ ledger/
 │  │  │  ├  index.ts · 7 loc
 │  │  │  └  statement-parser.ts · 64 loc
 │  │  ├  package.json · 23 loc
-│  │  └  tsconfig.json · 19 loc
+│  │  ├  tsconfig.json · 19 loc
+│  │  └  vite.config.ts · 9 loc
 │  ├  money/
 │  │  ├  src/
 │  │  │  ├  currency.ts · 19 loc
@@ -216,6 +219,8 @@ depth: 2
 
 ~~~text
 packages/importers/
+├  dist/
+│  └  importers.js · 1 loc
 ├  src/ · 2 changed
 │  ├  bank-profiles.ts · 42 loc
 │  ├  config.ts · 7 loc
@@ -225,7 +230,8 @@ packages/importers/
 │  ├  ofx.ts · 9 loc · A +9
 │  └  statement-parser.ts · 64 loc
 ├  package.json · 23 loc
-└  tsconfig.json · 19 loc
+├  tsconfig.json · 19 loc
+└  vite.config.ts · 9 loc
 ~~~
 
 ## merge conflict
@@ -274,14 +280,14 @@ ledger/
 │  │  ├  package.json · 22 loc
 │  │  └  … 1 more
 │  ├  importers/
+│  │  ├  dist/
+│  │  │  └  importers.js · 1 loc
 │  │  ├  src/
 │  │  │  ├  bank-profiles.ts · 42 loc
 │  │  │  ├  config.ts · 7 loc
-│  │  │  ├  csv.ts · 47 loc
-│  │  │  ├  dedupe.ts · 18 loc
-│  │  │  └  … 2 more
+│  │  │  └  … 4 more
 │  │  ├  package.json · 23 loc
-│  │  └  … 1 more
+│  │  └  … 2 more
 │  ├  money/
 │  │  ├  src/
 │  │  │  ├  currency.ts · 19 loc
@@ -356,13 +362,14 @@ ledger/
 │  │  └  tests/
 │  │     └  journal.test.ts · 29 loc
 │  ├  importers/
-│  │  └  src/
-│  │     ├  bank-profiles.ts · 42 loc
-│  │     ├  config.ts · 7 loc
-│  │     ├  csv.ts · 47 loc
-│  │     ├  dedupe.ts · 18 loc
-│  │     ├  index.ts · 7 loc
-│  │     └  … 1 more
+│  │  ├  src/
+│  │  │  ├  bank-profiles.ts · 42 loc
+│  │  │  ├  config.ts · 7 loc
+│  │  │  ├  csv.ts · 47 loc
+│  │  │  ├  dedupe.ts · 18 loc
+│  │  │  ├  index.ts · 7 loc
+│  │  │  └  … 1 more
+│  │  └  … 1 more
 │  ├  money/ · 6 files
 │  ├  reconcile/ · 3 files
 │  ├  reports/ · 3 files

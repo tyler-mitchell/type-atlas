@@ -13,7 +13,7 @@ text: signedAmount
 ```
 
 ~~~text
-"signedAmount" occurs 12 times in 7 files · 66 files scanned under the workspace.
+"signedAmount" occurs 12 times in 7 files · 67 files scanned under the workspace · 1 file of declared build output not scanned.
 
 packages/accounts/src/index.ts:12:39 · export { credit, debit, type Posting, signedAmount } from "./posting.ts";
 packages/accounts/src/journal.ts
@@ -43,6 +43,24 @@ text: quantumFlux
 ```
 
 ~~~text
-Nothing under the workspace contains "quantumFlux" · 66 files scanned. This is a literal answer: the exact text does not occur in what was scanned, which is the proof a semantic search cannot give.
+Nothing under the workspace contains "quantumFlux" · 67 files scanned · 1 file of declared build output not scanned — scan a generated directory directly to include it. This is a literal answer: the exact text does not occur in what was scanned, which is the proof a semantic search cannot give.
+~~~
+
+## scanning generated output on purpose
+
+```yaml
+tool: Occurrences
+workspace: fixtures/ledger
+text: signedAmount
+directory: packages/importers/dist
+```
+
+~~~text
+"signedAmount" occurs 3 times in 1 file · 1 file scanned under packages/importers/dist.
+
+packages/importers/dist/importers.js
+├  1:83  · … {account:e.account,amount:t}}var g=(e,t)=>e.reduce((n,r)=>n+signedAmount(r,t),0);function signedAmount(e,t){return e.side==="debit"? …
+├  1:113 · … ar g=(e,t)=>e.reduce((n,r)=>n+signedAmount(r,t),0);function signedAmount(e,t){return e.side==="debit"?e.amount:-e.amount}export{d as …
+└  1:205 · … =="debit"?e.amount:-e.amount}export{d as posting,g as total,signedAmount}; …
 ~~~
 

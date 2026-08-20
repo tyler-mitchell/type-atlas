@@ -65,8 +65,8 @@ Files discussing it (5)
 packages/reports/src/balance.ts
 packages/accounts/src/account.ts
 packages/reports/src/index.ts
-packages/accounts/src/journal.ts
 packages/reports/src/statement.ts
+packages/accounts/src/journal.ts
 
 A file naming something the index does not declare is either discussing it from outside — a comment, a document, an import of someone else's — or declaring it in a project the index has not read. Read one before concluding which.
 

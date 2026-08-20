@@ -76,6 +76,7 @@ investigate_code/absent-concept-stays-absent
 explore_symbol/function-with-similarity-tail
 occurrences/token-found-across-packages
 occurrences/honest-zero
+occurrences/scanning-generated-output-on-purpose
 document_links/fixture-readme
 find_successor/renamed-method-hunch
 find_successor/close-miss-finds-the-successor

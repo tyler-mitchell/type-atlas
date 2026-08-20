@@ -1,4 +1,4 @@
-"signedAmount" occurs 12 times in 7 files · 66 files scanned under the workspace.
+"signedAmount" occurs 12 times in 7 files · 67 files scanned under the workspace · 1 file of declared build output not scanned.
 
 packages/accounts/src/index.ts:12:39 · export { credit, debit, type Posting, signedAmount } from "./posting.ts";
 packages/accounts/src/journal.ts

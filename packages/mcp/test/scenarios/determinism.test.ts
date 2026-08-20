@@ -43,6 +43,17 @@ const QUARANTINED = new Set([
   // family answers only in sessions with the right history — the ledger
   // already held this from manual observation; now it has a seed.
   "add_missing_imports/forgotten-imports",
+  // A declared session mutator, not a defect (seed 502862052): impact's whole
+  // design is loading consumer projects, so every scope disclosure after it
+  // honestly says a bigger number. The canonical order runs it late; shuffled
+  // ahead of a scope-disclosing case it changes that case's true answer.
+  "impact/weigh-a-change-to-signed-amount",
+  "impact/weigh-a-change-to-a-shared-type",
+  // Caught by this gate flapping WITHIN one seed (502862052): the ambient
+  // diagnostics line ("1 problem in …") attaches when a background check
+  // happens to have finished — time-dependent, not order-dependent. Leaves
+  // with the raised diagnostics rework (docs/issues.md).
+  "type_definitions/call-result-to-alias",
 ]);
 
 // Small seeded PRNG (mulberry32) — enough to make a failing order
@@ -83,12 +94,20 @@ test("every answer is order-independent under a shuffled replay", async () => {
     // their scope ("N projects loaded"), so the corpus is deterministic only
     // relative to the warmed session state every capture runs under.
     await warmFixtureProjects(session);
+    const executed: string[] = [];
     for (const scenario of shuffled(corpus, seed)) {
       const restore = scenario.arrange ? await arrangeFixture(scenario.arrange) : undefined;
       try {
         const answer = await session.invoke(scenario.tool, scenario.arguments);
         const committed = await readFile(resolve(responsesRoot, `${scenario.id}.txt`), "utf8");
+        // Failure stays terse — seed and victim. The suspect prefix prints
+        // only on a deliberate replay (pinned seed), because the cause ran
+        // earlier and that is when someone is actually hunting it.
+        if (answer !== committed && process.env.TYPE_ATLAS_SHUFFLE_SEED) {
+          console.log(`── order until divergence ──\n${executed.join("\n")}`);
+        }
         expect(answer, `${scenario.id} diverged under shuffle (seed ${seed})`).toBe(committed);
+        executed.push(scenario.id);
       } finally {
         await restore?.();
       }

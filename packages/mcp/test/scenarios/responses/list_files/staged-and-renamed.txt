@@ -1,4 +1,6 @@
 packages/importers/
+├  dist/
+│  └  importers.js · 1 loc
 ├  src/ · 2 changed
 │  ├  bank-profiles.ts · 42 loc
 │  ├  config.ts · 7 loc
@@ -8,4 +10,5 @@ packages/importers/
 │  ├  ofx.ts · 9 loc · A +9
 │  └  statement-parser.ts · 64 loc
 ├  package.json · 23 loc
-└  tsconfig.json · 19 loc
+├  tsconfig.json · 19 loc
+└  vite.config.ts · 9 loc

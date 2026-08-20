@@ -1,4 +1,5 @@
 import { defineConfig } from "vite-plus";
+import CaptureReporter from "./test/scenarios/capture-reporter.ts";
 
 /**
  * Three projects, two ordered groups. The scenario suite captures real tool
@@ -28,14 +29,12 @@ export default defineConfig({
     sourcemap: true,
   },
   test: {
-    // The default reporter surfaces a test's console output only when the
-    // test fails — which silenced the capture echo on exactly the runs that
-    // matter, the passing `-u` regenerations. Verbose is the terminal
-    // reporter that reports passing tests' output (and annotations), so the
-    // changed-capture echoes land in the run stream the developing agent is
-    // already reading. Skipped rows leave: verbose otherwise prints ~70 `↓`
-    // lines around the one echo a `-t`-filtered run exists to show.
-    reporters: ["verbose"],
+    // Snapshot-first means the run stream IS the witness: echoes and
+    // failures, not ceremony. CaptureReporter (see its header) prints the
+    // changed-capture echoes the moment they happen and otherwise stays as
+    // quiet as the default reporter — verbose once spent ~120 passing rows
+    // per run saying nothing.
+    reporters: [new CaptureReporter()],
     hideSkippedTests: true,
     // The scenario suite exercises the fixture and the tool source through a
     // spawned stdio server, which Vite's module graph cannot see — without

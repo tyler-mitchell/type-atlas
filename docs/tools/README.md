@@ -52,7 +52,7 @@ One page per tool, generated from the scenario suite's captured responses — ev
 
 | [`list_module_exports`](list_module_exports.md) | Inspect module | 2 |
 
-| [`occurrences`](occurrences.md) | Occurrences | 2 |
+| [`occurrences`](occurrences.md) | Occurrences | 3 |
 
 | [`organize_imports`](organize_imports.md) | Organize imports | 1 |
 

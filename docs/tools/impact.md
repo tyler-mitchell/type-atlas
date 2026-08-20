@@ -14,15 +14,13 @@ position: {"line":25,"character":14}
 ```
 
 ~~~text
-Changing signedAmount touches at least 10 uses in 6 files across 4 packages, in the projects loaded this session. No use sits in a test file.
+Changing signedAmount touches 10 uses in 6 files across 4 packages, in the projects loaded this session. No use sits in a test file.
 
 package             uses  files  tests
 packages/accounts      4      3
 packages/reports       2      1
 packages/reconcile     2      1
 packages/rules         2      1
-
-Retrieval also names packages/importers — not loaded and not confirmed as uses, so they are outside this count. Reading a file in one loads its project, and asking again weighs it.
 ~~~
 
 ## weigh a change to a shared type

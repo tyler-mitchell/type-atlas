@@ -281,7 +281,7 @@ text: quantumFlux
 ```
 
 ~~~text
-Nothing under the workspace contains "quantumFlux" · 66 files scanned. This is a literal answer: the exact text does not occur in what was scanned, which is the proof a semantic search cannot give.
+Nothing under the workspace contains "quantumFlux" · 67 files scanned · 1 file of declared build output not scanned — scan a generated directory directly to include it. This is a literal answer: the exact text does not occur in what was scanned, which is the proof a semantic search cannot give.
 ~~~
 
 ### `impact` — a change weighed before it is made
@@ -297,15 +297,13 @@ position: {"line":25,"character":14}
 ```
 
 ~~~text
-Changing signedAmount touches at least 10 uses in 6 files across 4 packages, in the projects loaded this session. No use sits in a test file.
+Changing signedAmount touches 10 uses in 6 files across 4 packages, in the projects loaded this session. No use sits in a test file.
 
 package             uses  files  tests
 packages/accounts      4      3
 packages/reports       2      1
 packages/reconcile     2      1
 packages/rules         2      1
-
-Retrieval also names packages/importers — not loaded and not confirmed as uses, so they are outside this count. Reading a file in one loads its project, and asking again weighs it.
 ~~~
 
 ## The tools
