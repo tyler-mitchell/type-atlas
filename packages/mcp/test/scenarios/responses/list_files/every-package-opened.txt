@@ -25,7 +25,7 @@ ledger/
 │  │  ├  src/
 │  │  │  ├  currency.ts · 19 loc
 │  │  │  ├  index.ts · 12 loc
-│  │  │  ├  money.ts · 52 loc
+│  │  │  ├  money.ts · 58 loc
 │  │  │  └  rounding-mode.ts · 15 loc
 │  │  ├  tests/
 │  │  │  ├  money.test.ts · 15 loc

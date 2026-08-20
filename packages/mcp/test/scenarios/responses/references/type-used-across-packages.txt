@@ -16,13 +16,13 @@ packages/money/src/money.ts
 ├  27:73 — inside money
 ├  28:53 — inside money
 ├  30:43 — inside zero
-├  32:27 — inside add
-├  32:41 — inside add
-├  32:49 — inside add
-├  39:31 — inside negate
-├  39:39 — inside negate
-├  41:31 — inside isZero
-└  44:31 — inside format
+├  38:27 — inside add
+├  38:41 — inside add
+├  38:49 — inside add
+├  45:31 — inside negate
+├  45:39 — inside negate
+├  47:31 — inside isZero
+└  50:31 — inside format
 packages/money/tests/rounding-parity.ts
 ├  1:15  — at module level
 ├  9:44  — inside assertRoundingParity

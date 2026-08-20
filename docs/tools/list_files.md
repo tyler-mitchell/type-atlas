@@ -61,7 +61,7 @@ ledger/
 │  │  ├  src/
 │  │  │  ├  currency.ts · 19 loc
 │  │  │  ├  index.ts · 12 loc
-│  │  │  ├  money.ts · 52 loc
+│  │  │  ├  money.ts · 58 loc
 │  │  │  └  rounding-mode.ts · 15 loc
 │  │  ├  tests/
 │  │  │  ├  money.test.ts · 15 loc
@@ -194,7 +194,7 @@ packages/money/
 ├  src/ · 3 changed
 │  ├  currency.ts · 21 loc · M +2
 │  ├  index.ts · D -12
-│  ├  money.ts · 52 loc
+│  ├  money.ts · 58 loc
 │  ├  rounding-mode.ts · 15 loc
 │  └  rounding.ts · 11 loc · U
 ├  tests/
@@ -243,7 +243,7 @@ packages/money/
 ├  src/ · 1 changed
 │  ├  currency.ts · 25 loc · C
 │  ├  index.ts · 12 loc
-│  ├  money.ts · 52 loc
+│  ├  money.ts · 58 loc
 │  └  rounding-mode.ts · 15 loc
 ├  tests/
 │  ├  money.test.ts · 15 loc
@@ -286,7 +286,7 @@ ledger/
 │  │  ├  src/
 │  │  │  ├  currency.ts · 19 loc
 │  │  │  ├  index.ts · 12 loc
-│  │  │  ├  money.ts · 52 loc
+│  │  │  ├  money.ts · 58 loc
 │  │  │  └  rounding-mode.ts · 15 loc
 │  │  ├  tests/ · 2 files
 │  │  ├  package.json · 19 loc

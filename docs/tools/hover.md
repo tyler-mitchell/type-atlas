@@ -63,6 +63,28 @@ const currencyProfiles: Record<Currency, CurrencyProfile>
 ```
 ~~~
 
+## jsdoc with inline link
+
+```yaml
+tool: Hover
+workspace: fixtures/ledger
+file: packages/money/src/money.ts
+position: {"line":38,"character":14}
+```
+
+~~~text
+packages/money/src/money.ts:38:14
+
+```typescript
+const add: (left: Money, right: Money) => Money
+```
+
+Exact addition in minor units.
+
+*@throws* — CurrencyMismatchError when the currencies differ — ledger
+math never converts silently.
+~~~
+
 ## conditional type
 
 ```yaml

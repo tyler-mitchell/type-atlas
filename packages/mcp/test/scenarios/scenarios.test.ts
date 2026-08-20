@@ -245,6 +245,15 @@ describe("hover", () => {
       position: { line: 12, character: 14 },
     }),
   );
+  // An inline `{@link X}` inside `@throws` — the shape the upstream markdown
+  // converter once shredded into a dangling brace and a detached *@link*
+  // heading. The sentence must survive whole.
+  scenarioTest("jsdoc-with-inline-link", ({ capture }) =>
+    capture("hover", {
+      file: "packages/money/src/money.ts",
+      position: { line: 38, character: 14 },
+    }),
+  );
   // The rules engine: generics the way production code writes them.
   scenarioTest("conditional-type", ({ capture }) =>
     capture("hover", {

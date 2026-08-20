@@ -21,6 +21,7 @@ document_symbols/config-values-fold-to-a-count
 hover/overloaded-method
 hover/branded-type
 hover/constant-with-documentation
+hover/jsdoc-with-inline-link
 hover/conditional-type
 hover/template-literal-pattern
 definitions/through-a-package-import

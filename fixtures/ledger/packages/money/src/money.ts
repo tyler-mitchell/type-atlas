@@ -29,6 +29,12 @@ export const money = (minorUnits: bigint | number, currency: Currency): Money =>
 
 export const zero = (currency: Currency): Money => money(0n, currency);
 
+/**
+ * Exact addition in minor units.
+ *
+ * @throws {@link CurrencyMismatchError} when the currencies differ — ledger
+ * math never converts silently.
+ */
 export const add = (left: Money, right: Money): Money => {
   if (left.currency !== right.currency) {
     throw new CurrencyMismatchError(left.currency, right.currency);

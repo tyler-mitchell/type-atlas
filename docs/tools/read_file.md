@@ -112,7 +112,7 @@ file: ["packages/accounts/src/posting.ts",{"path":"packages/money/src/money.ts",
    |   ... 26-31 folded
 32 | };
 
-=== packages/money/src/money.ts · lines 26-41 of 52 ===
+=== packages/money/src/money.ts · lines 26-41 of 58 ===
 
 26 |
 27 | export const money = (minorUnits: bigint | number, currency: Currency): Money =>
@@ -120,16 +120,16 @@ file: ["packages/accounts/src/posting.ts",{"path":"packages/money/src/money.ts",
 29 |
 30 | export const zero = (currency: Currency): Money => money(0n, currency);
 31 |
-32 | export const add = (left: Money, right: Money): Money => {
-33 |   if (left.currency !== right.currency) {
-34 |     throw new CurrencyMismatchError(left.currency, right.currency);
-35 |   }
-36 |   return money(left.minorUnits + right.minorUnits, left.currency);
-37 | };
-38 |
-39 | export const negate = (value: Money): Money => money(-value.minorUnits, value.currency);
-40 |
-41 | export const isZero = (value: Money): boolean => value.minorUnits === 0n;
+32 | /**
+33 |  * Exact addition in minor units.
+34 |  *
+35 |  * @throws {@link CurrencyMismatchError} when the currencies differ — ledger
+36 |  * math never converts silently.
+37 |  */
+38 | export const add = (left: Money, right: Money): Money => {
+39 |   if (left.currency !== right.currency) {
+40 |     throw new CurrencyMismatchError(left.currency, right.currency);
+41 |   }
 ~~~
 
 ## abstract class folded

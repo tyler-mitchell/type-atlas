@@ -592,24 +592,6 @@ about where file grouping applies inside a structural tree — possibly a shared
 mechanism other structural answers reuse. Observed 2026-08-19, kek-monorepo,
 `quorl` on `exactCoordinateOnClock`.
 
-### Documentation mangles a `{@link}` nested in another JSDoc tag
-
-```
-*@throws* — {
-
-*@link*
-PolicyViolation} when clocks differ, the grid is invalid, …
-```
-
-Upstream wrote `@throws {@link PolicyViolation} when …`; the rendering splits
-the inline link out of its enclosing tag, leaving a dangling `{`, a detached
-`*@link*` heading, and the class name wearing a stray `}`. The sentence a
-maintainer wrote is unreadable in exactly the answer meant to carry it.
-Whatever converts hover/documentation markup treats inline JSDoc tags as
-top-level ones. Observed 2026-08-19, kek-monorepo, `explore_symbol` on
-`quantizeTimelineCoordinate`; the same rendering path serves `hover` and
-`inspect_symbol`.
-
 ### `find_successor` cannot see a successor that changed vocabulary
 
 ```

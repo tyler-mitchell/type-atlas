@@ -18,14 +18,14 @@ money · packages/money/src/money.ts:27:14
 │     ├  5:14 · expect(add(money(1050, "USD"), money(25, "USD")).minorUnits).toBe(1075n);
 │     └  5:10 · expect(add(money(1050, "USD"), money(25, "USD")).minorUnits).toBe(1075n);
 ├  packages/money/src/money.ts
-│  ├  negate · 39:14
-│  │  ├  39:48 · export const negate = (value: Money): Money => money(-value.minorUnits, value.currency);
+│  ├  negate · 45:14
+│  │  ├  45:48 · export const negate = (value: Money): Money => money(-value.minorUnits, value.currency);
 │  │  ├  signedAmount · packages/accounts/src/posting.ts:25:14 · …
 │  │  │  └  30:14 · return negate(posting.amount);
 │  │  └  shown · packages/reports/src/statement.ts:9:9 · …
 │  │     └  9:60 · const shown = normalBalance(account.kind) === "credit" ? negate(balance) : balance;
-│  ├  add · 32:14
-│  │  ├  36:10 · return money(left.minorUnits + right.minorUnits, left.currency);
+│  ├  add · 38:14
+│  │  ├  42:10 · return money(left.minorUnits + right.minorUnits, left.currency);
 │  │  ├  imbalance · packages/accounts/src/journal.ts:51:11 · …
 │  │  │  ├  53:15 · .reduce(add, zero(entry.postings[0]?.amount.currency ?? "USD"));
 │  │  │  ├  53:20 · .reduce(add, zero(entry.postings[0]?.amount.currency ?? "USD"));

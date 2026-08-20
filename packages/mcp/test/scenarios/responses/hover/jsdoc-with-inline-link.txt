@@ -1,0 +1,10 @@
+packages/money/src/money.ts:38:14
+
+```typescript
+const add: (left: Money, right: Money) => Money
+```
+
+Exact addition in minor units.
+
+*@throws* — CurrencyMismatchError when the currencies differ — ledger
+math never converts silently.

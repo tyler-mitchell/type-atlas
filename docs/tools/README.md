@@ -34,7 +34,7 @@ One page per tool, generated from the scenario suite's captured responses — ev
 
 | [`format_document`](format_document.md) | Format document | 1 |
 
-| [`hover`](hover.md) | Hover | 5 |
+| [`hover`](hover.md) | Hover | 6 |
 
 | [`impact`](impact.md) | Impact | 2 |
 

@@ -22,7 +22,7 @@ packages/accounts/src/posting.ts
 └  signedAmount [function] 25:14-25:26 · range 25:29-32:2 · calls 34:57-34:69
 packages/money/src/money.ts
 ├  zero [function] 30:14-30:18 · range 30:21-30:71 · calls 34:41-34:45, 41:56-41:60, 48:32-48:36
-└  add [function] 32:14-32:17 · range 32:20-37:2 · calls 34:9-34:12, 41:28-41:31
+└  add [function] 38:14-38:17 · range 38:20-43:2 · calls 34:9-34:12, 41:28-41:31
 
 and 8 standard-library calls · entries, get, localeCompare, map, set, sort
 ~~~

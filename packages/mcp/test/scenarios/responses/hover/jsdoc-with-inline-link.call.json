@@ -1,0 +1,10 @@
+{
+  "tool": "hover",
+  "arguments": {
+    "file": "packages/money/src/money.ts",
+    "position": {
+      "line": 38,
+      "character": 14
+    }
+  }
+}
