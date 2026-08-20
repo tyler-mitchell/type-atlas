@@ -366,10 +366,6 @@ maintainer. Items already in flight are marked; the rest stand alone:
   Needs symbol-kind/property suppression for compact orientation — the same
   139-symbols-for-3-declarations disease the README leads with, resurfacing
   through config-literal shapes.
-- **`find_successor` overstates presence.** It said a capability "still
-  exists" where `occurrences` showed only tests/docs/research copies. The
-  successor answer needs active-code weighting — declarations in shipped
-  source outrank mentions in tests and documents.
 - **`explore_symbol`: the similar-code tail can be noise.** Consider making
   the similarity section opt-in or self-trimming when relevance is low.
 - **`investigate_code` anchors unrelated symbols on conceptual questions.**
@@ -621,13 +617,11 @@ top-level ones. Observed 2026-08-19, kek-monorepo, `explore_symbol` on
 `quantizeTimelineCoordinate`; the same rendering path serves `hover` and
 `inspect_symbol`.
 
-### `find_successor` cannot see a successor that changed vocabulary, and lists a file twice
+### `find_successor` cannot see a successor that changed vocabulary
 
 ```
 find_successor { name: "navigationNoun" }
 → Candidates (3): navigationItems, navigationTargets, registerNavigationTools
-  Files discussing it (5): packages/mcp/src/navigation.tools.ts,
-  packages/mcp/src/navigation.tools.ts, …
 ```
 
 A real deletion from the same session: `navigationNoun`'s actual successor
@@ -636,9 +630,10 @@ candidacy is lexical — "shares navigation" — so any succession that renames
 the concept (the common case in a real refactor) is invisible. The
 files-discussing list does point at the right files, and the caveats are
 honest, but the tool's own contract ("what currently occupies its role")
-goes unmet exactly when the role was renamed. Also: the files list prints
-`navigation.tools.ts` twice — no dedup — under a count that includes the
-duplicate. Observed 2026-08-20, featuretype, after deleting navigationNoun.
+goes unmet exactly when the role was renamed. Observed 2026-08-20,
+featuretype, after deleting navigationNoun. (The same observation's
+duplicate files-discussing rows were fixed 2026-08-20 — one row per file,
+witnessed in `find_successor/close-miss-finds-the-successor`.)
 
 ```
 Search: Related to packages/core-time/src/clock/offset.ts:75

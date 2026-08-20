@@ -1,0 +1,5 @@
+Declared only in tests (1) · assertRoundingParity
+
+packages/money/tests/rounding-parity.ts:9:14 · test
+
+Every declaration of this name is in a test file — no shipped source declares it. That is residue, not a capability: treat it as removed from active code, and read the tests only to learn what it used to assert.

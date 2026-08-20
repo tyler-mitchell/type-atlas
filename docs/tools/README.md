@@ -30,7 +30,7 @@ One page per tool, generated from the scenario suite's captured responses — ev
 
 | [`file_references`](file_references.md) | File references | 1 |
 
-| [`find_successor`](find_successor.md) | Find successor | 2 |
+| [`find_successor`](find_successor.md) | Find successor | 3 |
 
 | [`format_document`](format_document.md) | Format document | 1 |
 

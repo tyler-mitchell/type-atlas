@@ -13,9 +13,9 @@ file: packages/money/src/money.ts
 ```
 
 ~~~text
-packages/money/src/money.ts · referenced from 83 places · 8 projects loaded · packages/money/tsconfig.json
+packages/money/src/money.ts · referenced from 90 places · 8 projects loaded · packages/money/tsconfig.json
 
-1-20 of 83 places · pass offset: 20 for the rest
+1-20 of 90 places · pass offset: 20 for the rest
 
 packages/accounts/src/journal.ts
 ├  1:10  — at module level

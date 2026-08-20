@@ -14,7 +14,7 @@ workspace: fixtures/ledger
 ~~~text
 ledger/
 ├  apps/ · 11 files
-├  packages/ · 42 files
+├  packages/ · 43 files
 ├  ledger.config.json · 10 loc
 ├  ledger.config.schema.json · 21 loc
 ├  package.json · 24 loc
@@ -63,7 +63,8 @@ ledger/
 │  │  │  ├  money.ts · 52 loc
 │  │  │  └  rounding-mode.ts · 15 loc
 │  │  ├  tests/
-│  │  │  └  money.test.ts · 15 loc
+│  │  │  ├  money.test.ts · 15 loc
+│  │  │  └  rounding-parity.ts · 15 loc
 │  │  ├  package.json · 19 loc
 │  │  └  tsconfig.json · 20 loc
 │  ├  reconcile/
@@ -196,7 +197,8 @@ packages/money/
 │  ├  rounding-mode.ts · 15 loc
 │  └  rounding.ts · 11 loc · U
 ├  tests/
-│  └  money.test.ts · 15 loc
+│  ├  money.test.ts · 15 loc
+│  └  rounding-parity.ts · 15 loc
 ├  package.json · 19 loc
 └  tsconfig.json · 20 loc
 ~~~
@@ -242,7 +244,8 @@ packages/money/
 │  ├  money.ts · 52 loc
 │  └  rounding-mode.ts · 15 loc
 ├  tests/
-│  └  money.test.ts · 15 loc
+│  ├  money.test.ts · 15 loc
+│  └  rounding-parity.ts · 15 loc
 ├  package.json · 19 loc
 └  tsconfig.json · 20 loc
 ~~~
@@ -283,7 +286,7 @@ ledger/
 │  │  │  ├  index.ts · 12 loc
 │  │  │  ├  money.ts · 52 loc
 │  │  │  └  rounding-mode.ts · 15 loc
-│  │  ├  tests/ · 1 file
+│  │  ├  tests/ · 2 files
 │  │  ├  package.json · 19 loc
 │  │  └  … 1 more
 │  ├  reconcile/
@@ -357,7 +360,7 @@ ledger/
 │  │     ├  dedupe.ts · 18 loc
 │  │     ├  index.ts · 7 loc
 │  │     └  statement-parser.ts · 64 loc
-│  ├  money/ · 5 files
+│  ├  money/ · 6 files
 │  ├  reconcile/ · 3 files
 │  ├  reports/ · 3 files
 │  ├  rules/ · 3 files

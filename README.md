@@ -261,7 +261,8 @@ packages/money/
 │  ├  rounding-mode.ts · 15 loc
 │  └  rounding.ts · 11 loc · U
 ├  tests/
-│  └  money.test.ts · 15 loc
+│  ├  money.test.ts · 15 loc
+│  └  rounding-parity.ts · 15 loc
 ├  package.json · 19 loc
 └  tsconfig.json · 20 loc
 ~~~
@@ -278,7 +279,7 @@ text: quantumFlux
 ```
 
 ~~~text
-Nothing under the workspace contains "quantumFlux" · 64 files scanned. This is a literal answer: the exact text does not occur in what was scanned, which is the proof a semantic search cannot give.
+Nothing under the workspace contains "quantumFlux" · 65 files scanned. This is a literal answer: the exact text does not occur in what was scanned, which is the proof a semantic search cannot give.
 ~~~
 
 ### `impact` — a change weighed before it is made

@@ -80,17 +80,29 @@ export const createSuccessorSearch =
       .catch(() => []);
 
     if (declared.length) {
+      // Where a declaration lives is the verdict's substance: a name whose
+      // only declarations sit in test files is residue, not a capability,
+      // and answering "still exists" for it sent an agent hunting for an
+      // import problem that was actually a removal.
+      const testFile = (file: string): boolean =>
+        /(^|\/)(?:tests?|__tests__)\//u.test(file) || /\.(?:test|spec)\.[cm]?[jt]sx?$/u.test(file);
+      const located = declared.map((symbol) => ({
+        symbol,
+        file: displayPath(symbol.location.uri, request.workspace),
+      }));
+      const testTotal = located.filter(({ file }) => testFile(file)).length;
       return render({
         verdict: "declared",
         name: request.name,
         module: request.module,
         declaredTotal: declared.length,
-        declarations: declared.slice(0, request.limit).map((symbol) => ({
-          name: `${displayPath(symbol.location.uri, request.workspace)}${
+        testsOnly: testTotal === declared.length,
+        declarations: located.slice(0, request.limit).map(({ symbol, file }) => ({
+          name: `${file}${
             "range" in symbol.location && symbol.location.range
               ? `:${symbol.location.range.start.line + 1}:${symbol.location.range.start.character + 1}`
               : ""
-          }`,
+          }${testFile(file) ? " · test" : ""}`,
           detail: symbol.containerName || undefined,
         })),
       });
@@ -182,8 +194,12 @@ export const createSuccessorSearch =
         name: candidate.name,
         fields: [candidate.evidence, `shares ${candidate.overlap.join(", ")}`, candidate.where],
       })),
-      discussing: fromRetrieval
+      // One row per file: retrieval returns a result per matching chunk, and
+      // the same document listed three times read as three findings.
+      discussing: [
+        ...new Set(fromRetrieval.map((candidate) => candidate.where ?? candidate.name)),
+      ]
         .slice(0, request.limit)
-        .map((candidate) => ({ name: candidate.where ?? candidate.name })),
+        .map((name) => ({ name })),
     });
   };

@@ -64,12 +64,29 @@ Files discussing it (5)
 
 packages/reports/src/balance.ts
 packages/accounts/src/account.ts
-packages/reports/src/balance.ts
 packages/reports/src/index.ts
 packages/accounts/src/journal.ts
+packages/reports/src/statement.ts
 
 A file naming something the index does not declare is either discussing it from outside — a comment, a document, an import of someone else's — or declaring it in a project the index has not read. Read one before concluding which.
 
 A candidate is a lead, not a verdict. Confirm one by reading it before treating this capability as replaced, and treat an empty candidate list as evidence the capability was withdrawn rather than renamed.
+~~~
+
+## test residue is not a capability
+
+```yaml
+tool: Find successor
+workspace: fixtures/ledger
+file: packages/money/src/money.ts
+name: assertRoundingParity
+```
+
+~~~text
+Declared only in tests (1) · assertRoundingParity
+
+packages/money/tests/rounding-parity.ts:9:14 · test
+
+Every declaration of this name is in a test file — no shipped source declares it. That is residue, not a capability: treat it as removed from active code, and read the tests only to learn what it used to assert.
 ~~~
 

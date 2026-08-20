@@ -75,3 +75,4 @@ occurrences/honest-zero
 document_links/fixture-readme
 find_successor/renamed-method-hunch
 find_successor/close-miss-finds-the-successor
+find_successor/test-residue-is-not-a-capability

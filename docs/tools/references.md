@@ -15,9 +15,9 @@ position: {"line":12,"character":13}
 
 ~~~text
 Money [type] · packages/money/src/money.ts:12:13
-33 references · 8 projects loaded · packages/money/tsconfig.json
+37 references · 8 projects loaded · packages/money/tsconfig.json
 
-1-20 of 33 references · pass offset: 20 for the rest
+1-20 of 37 references · pass offset: 20 for the rest
 
 packages/accounts/src/journal.ts
 ├  1:28  — at module level
@@ -25,10 +25,6 @@ packages/accounts/src/journal.ts
 ├  31:61 — inside post
 └  36:62 — inside post
 packages/accounts/src/posting.ts
-├  9:79  — inside Posting
-├  10:80 — inside Posting
-├  12:53 — inside debit
-├  18:54 — inside credit
 └  25:49 — inside signedAmount
 packages/money/src/index.ts
 └  7:8 — at module level
@@ -43,6 +39,11 @@ packages/money/src/money.ts
 ├  39:39 — inside negate
 ├  41:31 — inside isZero
 └  44:31 — inside format
+packages/money/tests/rounding-parity.ts
+├  1:15  — at module level
+├  9:44  — inside assertRoundingParity
+├  9:58  — inside assertRoundingParity
+└  15:38 — inside paritySamples
 ~~~
 
 ## function with scoped answer

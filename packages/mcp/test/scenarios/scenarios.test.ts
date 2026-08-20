@@ -692,6 +692,14 @@ describe("the hazard corner", () => {
       name: "balanceOf",
     }),
   );
+  // Declarations that live only in test files are residue, not a capability
+  // — the answer must say so instead of "this name resolves".
+  scenarioTest("test-residue-is-not-a-capability", ({ capture }) =>
+    capture("find_successor", {
+      file: "packages/money/src/money.ts",
+      name: "assertRoundingParity",
+    }),
+  );
 });
 
 /**

@@ -11,6 +11,14 @@ This name is on the module's current surface. A call site that cannot see it has
 {% /if %}
 
 {% if equals($verdict, "declared") %}
+{% if $testsOnly %}
+Declared only in tests ({% $declaredTotal %}) · {% $name %}
+
+{% tree entries=$declarations /%}
+
+Every declaration of this name is in a test file — no shipped source declares it. That is residue, not a capability: treat it as removed from active code, and read the tests only to learn what it used to assert.
+{% /if %}
+{% if not($testsOnly) %}
 {% if $module %}
 Withdrawn from the surface ({% $declaredTotal %}) · {% $name %} · still declared, no longer exported by {% $module %}
 {% /if %}
@@ -25,6 +33,7 @@ The capability still exists; {% $module %} no longer publishes it. Reaching it m
 {% /if %}
 {% if not($module) %}
 This name resolves. A call site that cannot see it has an import or project problem, not a missing declaration.
+{% /if %}
 {% /if %}
 {% /if %}
 

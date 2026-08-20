@@ -1,6 +1,9 @@
-Closure of money · 21 declarations · 57 sites · depth 3
+Closure of money · 22 declarations · 61 sites · depth 3
 
 money · packages/money/src/money.ts:27:14
+├  paritySamples · packages/money/tests/rounding-parity.ts:15:14
+│  ├  15:67 · export const paritySamples: readonly Money[] = [money(1n, "USD"), money(99n, "USD")];
+│  └  15:49 · export const paritySamples: readonly Money[] = [money(1n, "USD"), money(99n, "USD")];
 ├  packages/money/tests/money.test.ts
 │  ├  test("formats major and minor units per currency") callback · :12:52
 │  │  ├  14:24 · expect(format(negate(money(5000, "JPY")))).toBe("-¥5000");

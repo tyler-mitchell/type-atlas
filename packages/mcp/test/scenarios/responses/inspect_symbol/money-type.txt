@@ -12,8 +12,9 @@ therefore integral and currency-tagged.
 
 No implementation answered — the walk reaches only files this session has opened, so a declaration realising this in an untouched file reports nothing here. references lists every use, including those declarations.
 
-## Mentions that are not calls (7 of 34 references · 8 projects loaded)
+## Mentions that are not calls (8 of 38 references · 8 projects loaded)
 
+packages/money/tests/rounding-parity.ts:1:15-1:20:  import { type Money, money } from "@ledger/money";
 packages/money/src/index.ts:7:8-7:13:  type Money,
 packages/accounts/src/journal.ts:1:28-1:33:  import { add, isZero, type Money, zero } from "@ledger/money";
 packages/accounts/src/posting.ts:1:15-1:20:  import { type Money, negate } from "@ledger/money";

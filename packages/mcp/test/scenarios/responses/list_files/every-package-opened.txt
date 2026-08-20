@@ -27,7 +27,8 @@ ledger/
 │  │  │  ├  money.ts · 52 loc
 │  │  │  └  rounding-mode.ts · 15 loc
 │  │  ├  tests/
-│  │  │  └  money.test.ts · 15 loc
+│  │  │  ├  money.test.ts · 15 loc
+│  │  │  └  rounding-parity.ts · 15 loc
 │  │  ├  package.json · 19 loc
 │  │  └  tsconfig.json · 20 loc
 │  ├  reconcile/
