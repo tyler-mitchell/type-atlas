@@ -6,6 +6,10 @@
 {% tree entries=$entries /%}
 {% /if %}
 {% if not(any($entries)) %}
+{% if $changedOnly %}
+Nothing here differs from HEAD — the working tree under this directory is clean.
+{% /if %}
+{% if not($changedOnly) %}
 {% if $filtered %}
 No path matched. The patterns are Picomatch, relative to the directory, and a directory only matches a pattern ending in a slash.
 {% /if %}
@@ -13,7 +17,4 @@ No path matched. The patterns are Picomatch, relative to the directory, and a di
 Nothing here. The directory exists and holds no entry this listing reports — .gitignore matches, dependency and VCS internals, and nested submodules are all left out.
 {% /if %}
 {% /if %}
-{% if $over %}
-
-… bounded at {% $limit %} entries — more remain, and directories cut by the bound show folded with their counts. Narrow the directory or a pattern, or raise the limit.
 {% /if %}

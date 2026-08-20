@@ -247,3 +247,155 @@ packages/money/
 └  tsconfig.json · 20 loc
 ~~~
 
+## subtree on a budget
+
+```yaml
+tool: List files
+workspace: fixtures/ledger
+expand: {"packages/*":{"depth":2,"limit":6}}
+```
+
+~~~text
+ledger/
+├  apps/ · 11 files
+├  packages/
+│  ├  accounts/
+│  │  ├  src/
+│  │  │  ├  account.ts · 56 loc
+│  │  │  ├  index.ts · 12 loc
+│  │  │  ├  journal.ts · 73 loc
+│  │  │  └  posting.ts · 32 loc
+│  │  ├  tests/ · 1 file
+│  │  ├  package.json · 22 loc
+│  │  └  … 1 more
+│  ├  importers/
+│  │  ├  src/
+│  │  │  ├  config.ts · 7 loc
+│  │  │  ├  csv.ts · 47 loc
+│  │  │  ├  dedupe.ts · 18 loc
+│  │  │  ├  index.ts · 7 loc
+│  │  │  └  … 1 more
+│  │  ├  package.json · 23 loc
+│  │  └  … 1 more
+│  ├  money/
+│  │  ├  src/
+│  │  │  ├  currency.ts · 19 loc
+│  │  │  ├  index.ts · 12 loc
+│  │  │  ├  money.ts · 52 loc
+│  │  │  └  rounding-mode.ts · 15 loc
+│  │  ├  tests/ · 1 file
+│  │  ├  package.json · 19 loc
+│  │  └  … 1 more
+│  ├  reconcile/
+│  │  ├  src/
+│  │  │  ├  drift.ts · 22 loc
+│  │  │  ├  index.ts · 4 loc
+│  │  │  └  matching.ts · 24 loc
+│  │  ├  package.json · 19 loc
+│  │  └  tsconfig.json · 20 loc
+│  ├  reports/
+│  │  ├  src/
+│  │  │  ├  balance.ts · 58 loc
+│  │  │  ├  index.ts · 2 loc
+│  │  │  └  statement.ts · 11 loc
+│  │  ├  package.json · 23 loc
+│  │  └  tsconfig.json · 20 loc
+│  ├  rules/
+│  │  ├  src/
+│  │  │  ├  builtin.ts · 49 loc
+│  │  │  ├  index.ts · 17 loc
+│  │  │  └  rule.ts · 56 loc
+│  │  ├  package.json · 23 loc
+│  │  └  tsconfig.json · 19 loc
+│  └  utils/
+│     ├  src/
+│     │  └  index.ts · 3 loc
+│     ├  tests/
+│     │  └  index.test.ts · 6 loc
+│     ├  package.json · 40 loc
+│     ├  README.md · 23 loc
+│     └  … 2 more
+├  ledger.config.json · 10 loc
+├  ledger.config.schema.json · 21 loc
+├  package.json · 24 loc
+├  pnpm-lock.yaml · 2.3k loc
+├  pnpm-workspace.yaml · 19 loc
+├  README.md · 32 loc
+├  tsconfig.json · 9 loc
+└  vite.config.ts · 13 loc
+~~~
+
+## bounded glob elides
+
+```yaml
+tool: List files
+workspace: fixtures/ledger
+glob: ["**/*.ts"]
+limit: 12
+```
+
+~~~text
+ledger/
+├  apps/
+│  └  website/
+│     └  src/
+│        ├  counter.ts · 9 loc
+│        └  main.ts · 60 loc
+├  packages/
+│  ├  accounts/
+│  │  ├  src/
+│  │  │  ├  account.ts · 56 loc
+│  │  │  ├  index.ts · 12 loc
+│  │  │  ├  journal.ts · 73 loc
+│  │  │  └  posting.ts · 32 loc
+│  │  └  tests/
+│  │     └  journal.test.ts · 29 loc
+│  ├  importers/
+│  │  └  src/
+│  │     ├  config.ts · 7 loc
+│  │     ├  csv.ts · 47 loc
+│  │     ├  dedupe.ts · 18 loc
+│  │     ├  index.ts · 7 loc
+│  │     └  statement-parser.ts · 64 loc
+│  ├  money/ · 5 files
+│  ├  reconcile/ · 3 files
+│  ├  reports/ · 3 files
+│  ├  rules/ · 3 files
+│  └  utils/ · 3 files
+└  … 1 more
+~~~
+
+## only the delta
+
+```yaml
+tool: List files
+workspace: fixtures/ledger
+# working tree arranged: currency.ts edited · qif.ts created · index.ts deleted
+changed: true
+```
+
+~~~text
+ledger/
+└  packages/ · 3 changed
+   ├  importers/ · 1 changed
+   │  └  src/ · 1 changed
+   │     └  qif.ts · 4 loc · U
+   └  money/ · 2 changed
+      └  src/ · 2 changed
+         ├  currency.ts · 21 loc · M +2
+         └  index.ts · D -12
+~~~
+
+## delta of a clean tree
+
+```yaml
+tool: List files
+workspace: fixtures/ledger
+directory: packages/accounts
+changed: true
+```
+
+~~~text
+Nothing here differs from HEAD — the working tree under this directory is clean.
+~~~
+

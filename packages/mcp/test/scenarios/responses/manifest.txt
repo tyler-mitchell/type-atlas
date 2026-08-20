@@ -6,6 +6,10 @@ list_files/test-files-only
 list_files/working-tree-changes
 list_files/staged-and-renamed
 list_files/merge-conflict
+list_files/subtree-on-a-budget
+list_files/bounded-glob-elides
+list_files/only-the-delta
+list_files/delta-of-a-clean-tree
 read_file/class-folded-to-signatures
 read_file/two-files-one-call
 read_file/abstract-class-folded

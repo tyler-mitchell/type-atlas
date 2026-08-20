@@ -150,6 +150,39 @@ describe("list_files", () => {
       },
     ),
   );
+  // A per-subtree budget: each opened package contributes its first entries
+  // and closes with `… N more` — partial and priced, never folded whole.
+  scenarioTest("subtree-on-a-budget", ({ capture }) =>
+    capture("list_files", { expand: { "packages/*": { depth: 2, limit: 6 } } }));
+  // The global bound cutting mid-tree under a glob: kept files stay shown,
+  // the cut directories elide or stub — a directory the bound touched can
+  // never read as complete.
+  scenarioTest("bounded-glob-elides", ({ capture }) =>
+    capture("list_files", { glob: ["**/*.ts"], limit: 12 }));
+  // The working-tree delta as one tree: exactly what changed, at any depth,
+  // without the clean rows around it — the two changed files in a large
+  // monorepo without the hundreds.
+  scenarioTest("only-the-delta", ({ capture }) =>
+    capture(
+      "list_files",
+      { changed: true },
+      {
+        arrange: {
+          append: {
+            "packages/money/src/currency.ts":
+              "\n// TODO: JPY carries no minor units — audit format() before adding currencies.\n",
+          },
+          create: {
+            "packages/importers/src/qif.ts":
+              'import type { StatementRow } from "./csv.ts";\n\n/** QIF is line-oriented; amounts carry no currency. */\nexport const parseQif = (source: string): readonly StatementRow[] => [];\n',
+          },
+          delete: ["packages/money/src/index.ts"],
+        },
+      },
+    ));
+  // The same ask against a clean tree answers with which nothing it is.
+  scenarioTest("delta-of-a-clean-tree", ({ capture }) =>
+    capture("list_files", { directory: "packages/accounts", changed: true }));
 });
 
 // ── read_file: economical reading ───────────────────────────────────────────

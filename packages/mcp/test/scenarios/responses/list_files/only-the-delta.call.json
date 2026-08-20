@@ -1,0 +1,17 @@
+{
+  "tool": "list_files",
+  "arguments": {
+    "changed": true
+  },
+  "arrange": {
+    "append": {
+      "packages/money/src/currency.ts": "\n// TODO: JPY carries no minor units — audit format() before adding currencies.\n"
+    },
+    "create": {
+      "packages/importers/src/qif.ts": "import type { StatementRow } from \"./csv.ts\";\n\n/** QIF is line-oriented; amounts carry no currency. */\nexport const parseQif = (source: string): readonly StatementRow[] => [];\n"
+    },
+    "delete": [
+      "packages/money/src/index.ts"
+    ]
+  }
+}

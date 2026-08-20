@@ -16,6 +16,11 @@ const input = type({
   "depth?": type("1 <= number.integer <= 10").configure({
     description: "Directory levels to include. Defaults to 10 with glob and 1 otherwise.",
   }),
+  "changed?": type("boolean").configure({
+    default: false,
+    description:
+      "List only paths git reports changed — the whole working-tree delta as one tree, at any depth, without the clean rows around it. depth, glob, and expand do not apply.",
+  }),
   "expand?": type({
     "[string]": type("1 <= number.integer <= 10").or(
       type({
@@ -25,6 +30,9 @@ const input = type({
           .describe("Picomatch patterns relative to this subtree."),
         "includeHidden?": "boolean",
         "includeIgnored?": "boolean",
+        "limit?": type("1 <= number.integer <= 5000").describe(
+          "Entries this subtree may contribute before the rest elides to an `… N more` row.",
+        ),
       }),
     ),
   }).configure(
@@ -88,6 +96,7 @@ export const registerWorkspaceTools = (server: McpServer): void => {
     async (
       {
         workspace: root,
+        changed,
         directory,
         depth,
         glob,
@@ -114,6 +123,7 @@ export const registerWorkspaceTools = (server: McpServer): void => {
         limit: limit ?? 500,
         loc: loc ?? true,
         git: git ?? true,
+        changed: changed ?? false,
         signal,
         view: view ?? "files",
       });

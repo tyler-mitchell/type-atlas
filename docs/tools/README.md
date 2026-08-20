@@ -44,7 +44,7 @@ One page per tool, generated from the scenario suite's captured responses — ev
 
 | [`inspect_symbol`](inspect_symbol.md) | Inspect symbol | 2 |
 
-| [`list_files`](list_files.md) | List files | 8 |
+| [`list_files`](list_files.md) | List files | 12 |
 
 | [`list_module_exports`](list_module_exports.md) | Inspect module | 2 |
 

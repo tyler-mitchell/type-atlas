@@ -1,0 +1,9 @@
+{
+  "tool": "list_files",
+  "arguments": {
+    "glob": [
+      "**/*.ts"
+    ],
+    "limit": 12
+  }
+}

@@ -26,9 +26,9 @@ const buildOutput = new Set(["dist", "build", "out", "coverage"]);
  */
 export type WorkspaceListing = {
   readonly entries: readonly Row[];
-  readonly over: boolean;
-  readonly limit: number;
   readonly filtered: boolean;
+  /** The listing was the working-tree delta, so an empty answer means clean. */
+  readonly changedOnly: boolean;
 };
 
 /** Per-subtree overrides for an expanded directory, each an existing option scoped down. */
@@ -37,6 +37,8 @@ export type WorkspaceExpansion = {
   readonly glob?: readonly string[];
   readonly includeHidden?: boolean;
   readonly includeIgnored?: boolean;
+  /** Entries this subtree may contribute before the rest elides to `… N more`. */
+  readonly limit?: number;
 };
 
 /**
@@ -196,44 +198,72 @@ const gitChanges = async (directory: string): Promise<ReadonlyMap<string, GitCha
 type Assembled = { directory: boolean; readonly children: Map<string, Assembled> };
 
 /**
- * Assemble the one tree, enforcing the completeness rule for every way the
- * bound can cut: no directory may render as complete while the limit dropped
- * any of its contents. It wore three costumes before one rule replaced them —
- * core-time/ as a lone README (base crawl truncated mid-subtree), packages/
- * as 14 of 25 packages (an expansion sliced away wholesale), graph-grammar/
- * as two files (an expansion sliced mid-record). A dropped directory stubs
- * itself as a fold; a dropped file folds its whole parent; either way the
- * fold's count then prices what the bound could not show.
+ * Assemble the one tree, enforcing the completeness rule for every way a
+ * bound can cut: no directory may render as complete while a limit dropped
+ * any of its contents. A dropped directory stubs itself as a fold, priced
+ * later with its counts; a dropped file leaves an `… N more` elision row on
+ * the parent that kept the rest of its children — the parent stays open and
+ * partial, where the earlier rule folded it whole and hid even the entries
+ * the bound had already paid for.
  *
- * `renderedFiles` is what the tree actually shows as individual files — the
- * set later stages may price without outgrowing the bound.
+ * `forcedDrop` carries entries cut by a narrower bound than the global one —
+ * a per-expansion `limit` — so every bound converges on this one
+ * attribution. `renderedFiles` is what the tree shows as individual files —
+ * the set later stages may price without outgrowing the bound.
  */
 const assembleTree = (
   relatives: readonly string[],
   limit: number,
-): { assembled: Assembled; renderedFiles: readonly string[] } => {
-  const kept = relatives.slice(0, limit);
-  const keptDirs = new Set(kept.filter((entry) => entry.endsWith("/")));
+  forcedDrop: ReadonlySet<string> = new Set(),
+): {
+  assembled: Assembled;
+  renderedFiles: readonly string[];
+  /** Directories owed an `… N more` row ("" is the listing root), with the count they hide. */
+  elided: ReadonlyMap<string, number>;
+} => {
+  const kept = relatives.filter((entry) => !forcedDrop.has(entry)).slice(0, limit);
+  const keptSet = new Set(kept);
+  // A directory "renders open" when it was kept as an entry OR any kept
+  // entry lies beneath it — a glob listing never crawls directories as
+  // entries, so without the ancestor half, a directory with kept children
+  // would swallow its dropped files with neither a stub nor an elision.
+  const openDirs = new Set(
+    kept.flatMap((entry) => {
+      const segments = (entry.endsWith("/") ? entry.slice(0, -1) : entry).split("/");
+      const upTo = entry.endsWith("/") ? segments.length : segments.length - 1;
+      return [
+        ...(entry.endsWith("/") ? [entry] : []),
+        ...segments.slice(0, upTo).map((_, held) => `${segments.slice(0, held + 1).join("/")}/`),
+      ];
+    }),
+  );
   const stubs = new Set<string>();
-  const foldedParents = new Set<string>();
-  for (const entry of relatives.slice(limit)) {
+  const elided = new Map<string, number>();
+  for (const entry of relatives) {
+    if (keptSet.has(entry)) continue;
     const segments = (entry.endsWith("/") ? entry.slice(0, -1) : entry).split("/");
+    const ancestors = (below: number) =>
+      segments.slice(0, below).map((_, held) => `${segments.slice(0, held + 1).join("/")}/`);
     if (entry.endsWith("/")) {
-      const spine = segments.map((_, held) => `${segments.slice(0, held + 1).join("/")}/`);
-      const nearest = spine.find((ancestor) => !keptDirs.has(ancestor));
+      const nearest = ancestors(segments.length).find((ancestor) => !openDirs.has(ancestor));
       if (nearest !== undefined) stubs.add(nearest);
-    } else if (segments.length > 1) {
-      foldedParents.add(`${segments.slice(0, -1).join("/")}/`);
+      continue;
+    }
+    const parent = segments.length > 1 ? `${segments.slice(0, -1).join("/")}/` : "";
+    if (parent === "" || openDirs.has(parent)) {
+      // The parent keeps its shown children and gains an elision row — it
+      // used to fold whole, which hid even the entries the bound had paid
+      // for. The count is exact over what the crawls saw; a crawl that
+      // filled its lookahead drops the root count rather than lying.
+      elided.set(parent, (elided.get(parent) ?? 0) + 1);
+    } else {
+      // The parent fell too: its stub's fold count prices this file.
+      const nearest = ancestors(segments.length - 1).find((ancestor) => !openDirs.has(ancestor));
+      if (nearest !== undefined) stubs.add(nearest);
     }
   }
-  const insideFoldedParent = (entry: string) =>
-    [...foldedParents].some((parent) => entry !== parent && entry.startsWith(parent));
   const assembled: Assembled = { directory: true, children: new Map() };
-  for (const entry of [
-    ...kept.filter((entry) => !insideFoldedParent(entry)),
-    ...[...stubs].filter((entry) => !insideFoldedParent(entry)),
-    ...foldedParents,
-  ]) {
+  for (const entry of [...kept, ...stubs]) {
     const isDirectory = entry.endsWith("/");
     (isDirectory ? entry.slice(0, -1) : entry).split("/").reduce((node, segment, index, all) => {
       const held =
@@ -247,7 +277,8 @@ const assembleTree = (
   }
   return {
     assembled,
-    renderedFiles: kept.filter((entry) => !entry.endsWith("/") && !insideFoldedParent(entry)),
+    renderedFiles: kept.filter((entry) => !entry.endsWith("/")),
+    elided,
   };
 };
 
@@ -313,7 +344,11 @@ const fileLinePrices = async (
   return prices;
 };
 
-/** The assembled trie as atlascii rows, directories first, labels supplied by the caller. */
+/**
+ * The assembled trie as atlascii rows, directories first, labels supplied by
+ * the caller. A directory owed an elision closes with `… N more` as its last
+ * row, so a partially shown directory can never read as complete.
+ */
 const renderRows = (
   node: Assembled,
   prefix: string,
@@ -322,8 +357,9 @@ const renderRows = (
     readonly name: string;
     readonly directory: boolean;
   }) => string,
-): readonly Row[] =>
-  [...node.children.entries()]
+  elided: ReadonlyMap<string, string>,
+): readonly Row[] => {
+  const rows = [...node.children.entries()]
     .sort(
       ([leftName, left], [rightName, right]) =>
         Number(right.directory) - Number(left.directory) || leftName.localeCompare(rightName),
@@ -331,9 +367,12 @@ const renderRows = (
     .map(([name, child]) => {
       const relative = prefix === "" ? name : `${prefix}/${name}`;
       const rendered = label({ relative, name, directory: child.directory });
-      const children = renderRows(child, relative, label);
+      const children = renderRows(child, relative, label, elided);
       return children.length > 0 ? { name: rendered, children } : { name: rendered };
     });
+  const hidden = elided.get(prefix === "" ? "" : `${prefix}/`);
+  return hidden === undefined ? rows : [...rows, { name: hidden }];
+};
 
 export const workspaceTree = async (input: {
   readonly workspace: string;
@@ -351,6 +390,8 @@ export const workspaceTree = async (input: {
   readonly loc: boolean;
   /** Mark git changes — badge letters (`· M +2 -1`) on files, `· N changed` on directories. */
   readonly git: boolean;
+  /** Only paths git reports changed — the whole working-tree delta, any depth. */
+  readonly changed: boolean;
   readonly signal: AbortSignal;
   readonly view: "directories" | "files";
 }): Promise<WorkspaceListing> => {
@@ -364,6 +405,79 @@ export const workspaceTree = async (input: {
     throw new Error(
       `Directory belongs to nested workspace ${path.relative(root, submodule)}. Use that path as workspace or pass includeSubmodules: true.`,
     );
+  }
+  const changed = await changesHeld;
+  const fileMark = (relative: string): string => {
+    const change = changed.get(relative);
+    if (change === undefined) return "";
+    return change.detail === undefined ? ` · ${change.word}` : ` · ${change.word} ${change.detail}`;
+  };
+  // A count in words rather than a glyph: an editor's change-dot is pixels a
+  // model has rarely read as text, while "3 changed" is self-describing on
+  // first contact and says how much dirt a fold hides.
+  const directoryMark = (relative: string): string => {
+    const prefix = `${relative}/`;
+    const count = [...changed.keys()].filter(
+      (key) => key === relative || key.startsWith(prefix),
+    ).length;
+    return count === 0 ? "" : ` · ${count} changed`;
+  };
+
+  if (input.changed) {
+    // The working-tree delta as one tree: exactly the changed paths, at any
+    // depth, without the hundreds of clean rows around them. Depth, glob,
+    // and expand describe a structural walk and do not apply here — the walk
+    // is git's own answer, which already carries deletions as ghost rows.
+    if (input.view === "directories") {
+      const holders = [
+        ...new Set(
+          [...changed.keys()].flatMap((file) => {
+            const segments = file.split("/").slice(0, -1);
+            return segments.map((_, held) => `${segments.slice(0, held + 1).join("/")}/`);
+          }),
+        ),
+      ].sort();
+      const shown = holders.slice(0, input.limit);
+      return {
+        entries: [
+          ...shown.map((name) => ({ name: `${name}${directoryMark(name.replace(/\/$/u, ""))}` })),
+          ...(holders.length > shown.length
+            ? [{ name: `… ${holders.length - shown.length} more` }]
+            : []),
+        ],
+        filtered: false,
+        changedOnly: true,
+      };
+    }
+    const relatives = [...changed.keys()].sort();
+    const { assembled, renderedFiles, elided } = assembleTree(relatives, input.limit);
+    const lineCounts = input.loc
+      ? await fileLinePrices(directory, renderedFiles)
+      : new Map<string, number>();
+    const treeRows = renderRows(
+      assembled,
+      "",
+      ({ relative, name, directory: isDirectory }) => {
+        if (isDirectory) return `${name}/${directoryMark(relative)}`;
+        const lines = lineCounts.get(relative);
+        return `${name}${lines === undefined ? "" : ` · ${compactLines(lines)} loc`}${fileMark(relative)}`;
+      },
+      new Map([...elided].map(([parent, count]) => [parent, `… ${count} more`] as const)),
+    );
+    return {
+      entries:
+        treeRows.length === 0
+          ? []
+          : [
+              {
+                name:
+                  input.directory === "." ? `${path.basename(realRoot)}/` : `${input.directory}/`,
+                children: treeRows,
+              },
+            ],
+      filtered: false,
+      changedOnly: true,
+    };
   }
 
   // Depth counts levels below the named directory. A file sits at the depth
@@ -434,12 +548,17 @@ export const workspaceTree = async (input: {
         }),
     };
   };
+  // Crawls look ahead of the limit so `… N more` rows carry exact counts for
+  // any ordinary overshoot; a crawl that fills the whole lookahead has an
+  // uncountable remainder, and the root's elision drops its number rather
+  // than stating one that lies.
+  const lookahead = input.limit + 500;
   const crawlScope = async (scope: Parameters<typeof scoped>[0]): Promise<readonly string[]> => {
     const { dir, crawler } = scoped(scope);
     const crawled = await (
       input.view === "directories"
-        ? crawler.withMaxFiles(input.limit + 2).onlyDirs()
-        : crawler.withDirs().withMaxFiles(input.limit + 2)
+        ? crawler.withMaxFiles(lookahead).onlyDirs()
+        : crawler.withDirs().withMaxFiles(lookahead)
     )
       .crawl(dir)
       .withPromise();
@@ -495,26 +614,23 @@ export const workspaceTree = async (input: {
         glob: expansion.glob,
         includeHidden: expansion.includeHidden,
         includeIgnored: expansion.includeIgnored,
-      }).then((entries) => entries.map((entry) => `${expansion.key}/${entry}`)),
+      }).then((entries) => {
+        const prefixed = entries.map((entry) => `${expansion.key}/${entry}`).sort();
+        // A subtree's own budget: entries past it are cut here and elide on
+        // their parents through the same attribution the global bound uses.
+        return expansion.limit === undefined
+          ? { entries: prefixed, overflow: [] as string[] }
+          : { entries: prefixed, overflow: prefixed.slice(expansion.limit) };
+      }),
     ),
   ]);
-  const crawled = [...new Set([...baseCrawl, ...expansionCrawls.flat()])];
-  const changed = await changesHeld;
-  const fileMark = (relative: string): string => {
-    const change = changed.get(relative);
-    if (change === undefined) return "";
-    return change.detail === undefined ? ` · ${change.word}` : ` · ${change.word} ${change.detail}`;
-  };
-  // Plain words, not a glyph: an editor's change-dot is pixels a model has
-  // rarely read as text, while "3 changed" is self-describing on first
-  // contact and says how much dirt a fold hides.
-  const directoryMark = (relative: string): string => {
-    const prefix = `${relative}/`;
-    const count = [...changed.keys()].filter(
-      (key) => key === relative || key.startsWith(prefix),
-    ).length;
-    return count === 0 ? "" : ` · ${count} changed`;
-  };
+  const crawled = [
+    ...new Set([...baseCrawl, ...expansionCrawls.flatMap(({ entries }) => entries)]),
+  ];
+  const forcedDrop = new Set(expansionCrawls.flatMap(({ overflow }) => overflow));
+  const lookaheadFull =
+    baseCrawl.length >= lookahead ||
+    expansionCrawls.some(({ entries }) => entries.length >= lookahead);
 
   if (input.view === "directories") {
     const submodules = input.glob
@@ -525,13 +641,18 @@ export const workspaceTree = async (input: {
           return relative.split("/").length <= input.depth ? [`${relative}/ [submodule]`] : [];
         });
     const directories = [...crawled, ...submodules].sort();
+    const shown = directories.slice(0, input.limit);
     return {
-      entries: directories.slice(0, input.limit).map((name) => ({
-        name: `${name}${directoryMark(name.replace(/ \[submodule\]$/u, "").replace(/\/$/u, ""))}`,
-      })),
-      over: directories.length > input.limit,
-      limit: input.limit,
+      entries: [
+        ...shown.map((name) => ({
+          name: `${name}${directoryMark(name.replace(/ \[submodule\]$/u, "").replace(/\/$/u, ""))}`,
+        })),
+        ...(directories.length > shown.length
+          ? [{ name: lookaheadFull ? "… more" : `… ${directories.length - shown.length} more` }]
+          : []),
+      ],
       filtered: input.glob !== undefined,
+      changedOnly: false,
     };
   }
   const submodulePaths = input.glob
@@ -563,7 +684,11 @@ export const workspaceTree = async (input: {
   // per-directory section headers, which read as disconnected fragments:
   // nothing said how `documents/` related to `./`, or what `./` even was.
   const relatives = [...crawled, ...ghosts, ...submodulePaths].sort();
-  const { assembled, renderedFiles } = assembleTree(relatives, input.limit);
+  const { assembled, renderedFiles, elided } = assembleTree(relatives, input.limit, forcedDrop);
+  const elisionRows = new Map<string, string>(
+    [...elided].map(([parent, count]) => [parent, `… ${count} more`]),
+  );
+  if (lookaheadFull) elisionRows.set("", "… more");
   // A folded directory states what it holds — `documents/ · 34 files` — so a
   // reader prices expanding it without a second call. fdir's own counter
   // (`onlyCounts`), under the same ignore rules, no paths materialized;
@@ -579,7 +704,14 @@ export const workspaceTree = async (input: {
         .sort((left, right) => left.split("/").length - right.split("/").length)
         .slice(0, 60)
         .map(async (relative) => {
-          const { dir, crawler } = scoped({ at: relative, excludeBuildOutput: true });
+          // The fold's count answers under the same glob as the listing —
+          // a ts-only listing once priced a fold at 7 files where expanding
+          // it under the same pattern would have shown 4.
+          const { dir, crawler } = scoped({
+            at: relative,
+            excludeBuildOutput: true,
+            glob: input.glob,
+          });
           return [relative, await crawler.onlyCounts().crawl(dir).withPromise()] as const;
         }),
     ),
@@ -598,10 +730,14 @@ export const workspaceTree = async (input: {
     const lines = lineCounts.get(relative);
     return lines === undefined ? "" : ` · ${compactLines(lines)} loc`;
   };
-  const treeRows = renderRows(assembled, "", ({ relative, name, directory: isDirectory }) =>
-    isDirectory
-      ? `${name}/${submodules.has(relative) ? " [submodule]" : holdings(relative)}${directoryMark(relative)}`
-      : `${name}${price(relative)}${fileMark(relative)}`,
+  const treeRows = renderRows(
+    assembled,
+    "",
+    ({ relative, name, directory: isDirectory }) =>
+      isDirectory
+        ? `${name}/${submodules.has(relative) ? " [submodule]" : holdings(relative)}${directoryMark(relative)}`
+        : `${name}${price(relative)}${fileMark(relative)}`,
+    elisionRows,
   );
   return {
     entries:
@@ -613,8 +749,7 @@ export const workspaceTree = async (input: {
               children: treeRows,
             },
           ],
-    over: relatives.length > input.limit,
-    limit: input.limit,
     filtered: input.glob !== undefined,
+    changedOnly: false,
   };
 };

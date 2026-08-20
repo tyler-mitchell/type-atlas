@@ -357,19 +357,35 @@ intent — the line-number gutter spends tokens on numbers nothing will use.
 An optional argument should let a reader ask for the bare text. Deferred on
 arrival per the standing rule.
 
-### 〈raised〉 `list_files` wants per-expansion limits and `… N more` elision rows
+### 〈raised〉 Codex field report, 2026-08-20 — split for separate fixing
 
-Raised 2026-08-20, with a sketch. Two asks beyond the existing global `limit`
-(default 500): the `expand` record's options object should accept its own
-`limit`, so one opened corner cannot eat the whole budget; and when the bound
-cuts inside a directory, the tree should show the children that fit plus a
-`… N more` row, instead of the current rule where a cut inside a directory
-folds the whole parent (`assembleTree`'s completeness rule — correct, but it
-hides even the entries that were crawled). The default should suit an agent
-in a very large monorepo. Sketch's formatting is illustrative, not binding.
-Investigation had reached `workspace-tree.ts` (assembleTree, the per-crawl
-`withMaxFiles(limit + 2)` cap, and the `over`/`limit` document variables)
-when the session moved on.
+From a Codex agent's real usage (webgpu-engine work), relayed by the
+maintainer. Items already in flight are marked; the rest stand alone:
+
+- **`document_symbols` dumps every nested property of large config objects.**
+  Needs symbol-kind/property suppression for compact orientation — the same
+  139-symbols-for-3-declarations disease the README leads with, resurfacing
+  through config-literal shapes.
+- **`find_successor` overstates presence.** It said a capability "still
+  exists" where `occurrences` showed only tests/docs/research copies. The
+  successor answer needs active-code weighting — declarations in shipped
+  source outrank mentions in tests and documents.
+- **`explore_symbol`: the similar-code tail can be noise.** Consider making
+  the similarity section opt-in or self-trimming when relevance is low.
+- **`investigate_code` anchors unrelated symbols on conceptual questions.**
+  It should say "relationship not found" sooner instead of decorating a weak
+  retrieval with verified-looking relationships.
+- **`impact` reads as complete when it is not.** Unloaded projects stay
+  outside the count by design, and the caveat exists — but a user still
+  overread it. The boundary sentence may need to lead, not trail.
+- **Tool idea: evaluate declared execution grammar** — expand sequence
+  repeats and indirect `count` into exact command multiplicity
+  (webgpu-engine's dispatch grammar).
+- **Tool idea: resource-flow trace** — writer → resource/view → reader,
+  including bind-group assignments; wake/invalidation and hot-path work.
+- **Check idea: call-argument keys the target config never consumes** —
+  would catch an ignored `solver: "block"` hidden behind an object spread;
+  TypeScript itself cannot see that contract lie through a spread.
 
 ### The scope clause has two phrasings
 

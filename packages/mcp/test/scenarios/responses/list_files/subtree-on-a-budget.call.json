@@ -1,0 +1,11 @@
+{
+  "tool": "list_files",
+  "arguments": {
+    "expand": {
+      "packages/*": {
+        "depth": 2,
+        "limit": 6
+      }
+    }
+  }
+}
