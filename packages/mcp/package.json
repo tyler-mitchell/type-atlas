@@ -60,6 +60,7 @@
     "dev": "node --conditions=development src/cli.ts",
     "prepack": "vp run build",
     "test": "vp test run",
+    "test:determinism": "vp test run --project=determinism",
     "test:scenarios": "vp test run --project=scenarios"
   },
   "dependencies": {

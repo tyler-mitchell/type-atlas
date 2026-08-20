@@ -141,7 +141,12 @@ export const renderWorkspaceEdit = async (
       };
     }),
   );
-  const files = rendered.filter((file): file is NonNullable<typeof file> => file !== undefined);
+  const files = rendered
+    .filter((file): file is NonNullable<typeof file> => file !== undefined)
+    // Path order, not server order: the edit map iterates in the language
+    // server's internal registry order, which is session history — the
+    // determinism gate caught two files swapping places between runs.
+    .sort((left, right) => left.file.file.localeCompare(right.file.file));
 
   return {
     fileCount: files.length,

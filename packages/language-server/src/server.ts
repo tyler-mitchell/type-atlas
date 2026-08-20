@@ -208,10 +208,14 @@ export const registerLanguageServer = (connection: Connection): void => {
         );
         // Two services answering about the same symbol report the same site, so
         // the merged answer is deduplicated on what a location is: its file and
-        // its span.
+        // its span. Probe documents are dropped first: TypeScript retains
+        // closed probes in the program, their sites are no reader's source,
+        // and one leaked into a rendered file_references answer as a phantom
+        // file (caught by the determinism gate, seed 2042533537).
         return {
           locations: found
             .flatMap((locations) => locations ?? [])
+            .filter((location) => !isProbeDocument(location.uri))
             .filter(
               (location, index, all) =>
                 all.findIndex(

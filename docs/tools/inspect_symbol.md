@@ -34,7 +34,7 @@ packages/reports/src/balance.ts
 packages/importers/src/csv.ts
 └  importStatement [variable] 28:14-28:29 · range 28:14-47:2 · calls 29:12-29:19
 
-## Mentions that are not calls (4 of 9 references · 8 projects loaded)
+## Mentions that are not calls (4 of 9 references · 9 projects loaded)
 
 packages/accounts/tests/journal.test.ts:3:25-3:32:  import { credit, debit, Journal, UnbalancedEntryError } from "../src/index.ts";
 packages/accounts/src/index.ts:11:22-11:29:  export { type Entry, Journal, UnbalancedEntryError } from "./journal.ts";
@@ -66,7 +66,7 @@ The brand keeps a raw `{ amount, currency }` literal out of ledger math:
 every `Money` passed through the system was constructed by `money()` and is
 therefore integral and currency-tagged.
 
-## Mentions that are not calls (8 of 38 references · 8 projects loaded)
+## Mentions that are not calls (8 of 38 references · 9 projects loaded)
 
 packages/money/tests/rounding-parity.ts:1:15-1:20:  import { type Money, money } from "@ledger/money";
 packages/money/src/index.ts:7:8-7:13:  type Money,

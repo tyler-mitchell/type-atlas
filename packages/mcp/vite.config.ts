@@ -79,6 +79,16 @@ export default defineConfig({
           sequence: { groupOrder: 1 },
         },
       },
+      {
+        test: {
+          name: "determinism",
+          include: ["test/scenarios/determinism.test.ts"],
+          // After the capture group, so a `-u` run's freshly written
+          // baselines are what the shuffled replay is held to.
+          sequence: { groupOrder: 1 },
+          testTimeout: 300_000,
+        },
+      },
     ],
   },
 });

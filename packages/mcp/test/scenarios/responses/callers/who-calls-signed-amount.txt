@@ -1,4 +1,4 @@
-signedAmount · called from 4 places · 8 projects loaded
+signedAmount · called from 4 places · 9 projects loaded
 
 packages/accounts/src/journal.ts
 └  post [method] 34:3-57:4 · calls 52:12-52:24

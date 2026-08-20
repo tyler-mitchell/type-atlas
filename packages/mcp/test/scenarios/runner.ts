@@ -144,6 +144,11 @@ export const warmFixtureProjects = async (session: {
     "packages/rules/src/rule.ts",
     "packages/utils/src/index.ts",
     "apps/website/src/counter.ts",
+    // The fixture-root project, owner of ledger.config.json. Missing, it
+    // loaded mid-session for whichever case touched that file first, and
+    // scope disclosures ("N projects loaded") varied with call order — the
+    // determinism gate caught the count flipping under shuffle.
+    "ledger.config.json",
   ];
   for (const file of doorways) {
     await session.invoke("project_config", { file });

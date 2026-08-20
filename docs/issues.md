@@ -299,7 +299,12 @@ The one witnessed patch carried its own wart: it imported a sibling
 workspace package as `../../money/src/money.ts` instead of the
 `@ledger/money` specifier the package boundary calls for. The honest-empty
 sentence covers the misses; the committed capture is the sentinel for
-whichever behavior stabilizes. Observed 2026-08-20.
+whichever behavior stabilizes. Observed 2026-08-20. Now seeded: the
+determinism gate reproduces the flip on demand
+(`TYPE_ATLAS_SHUFFLE_SEED=1308991141 vp run "@type-atlas/mcp#test:determinism"`
+with the case unquarantined) — the shuffled order yields the full 4-edit
+patch, relative-path wart included, where the canonical order yields the
+honest refusal.
 
 ## Language grounding
 
@@ -424,9 +429,22 @@ The same call — `inspect_symbol` on `TimelineExactCoordinate`, kek-monorepo �
 answered with `## Implementations (5)` on a warm server and with no
 implementations section at all on a cold one, forty minutes apart, code
 unchanged. A section that silently disappears reads as "there are none," which
-is the absence-honesty failure in section form. Which upstream request goes
-empty on a cold project, and whether the section should say "unanswered"
-rather than vanish, is undiagnosed. Observed 2026-08-19.
+is the absence-honesty failure in section form. Observed 2026-08-19.
+
+REPRODUCED IN-REPO with a replayable seed (2026-08-20): the determinism gate
+(`vp run "@type-atlas/mcp#test:determinism"`, the corpus replayed in shuffled
+order against its own baselines) caught `inspect_symbol/money-type` growing
+`## Implementations (1) · paritySamples` under seed 2005945456 — the section
+the canonical order never shows. Root, no longer a mystery: the
+implementations walk reaches only files the session has OPENED (the answer's
+own caveat says so), which makes the section a function of call history by
+design. The fix is a deterministic walk scope — program files, not
+session-opened files — and until it lands the case is quarantined from the
+gate; every other case is proven order-independent under fresh seeds each
+run. The gate's first-ever run also caught the corpus's own contract: answers
+disclose "N projects loaded", so baselines are deterministic only relative to
+the warmed session every capture runs under — the replay now warms
+identically.
 
 DIAGNOSED to its layer and QUARANTINED (2026-08-20): the in-repo shape flip
 was `verify_edit` poisoning session state for the proposed file. Full chain,

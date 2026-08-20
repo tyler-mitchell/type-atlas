@@ -1,4 +1,4 @@
-5 symbols matching Balance · 8 projects loaded · packages/reports/tsconfig.json
+5 symbols matching Balance · 9 projects loaded · packages/reports/tsconfig.json
 
 BalanceLine [interface] · packages/reports/src/balance.ts:11:1-16:2
 balance [property] · packages/reports/src/balance.ts:13:3-13:27 — BalanceLine

@@ -1,5 +1,5 @@
 normalBalance [function] · packages/accounts/src/account.ts:18:14
-3 references · 8 projects loaded · packages/accounts/tsconfig.json
+3 references · 9 projects loaded · packages/accounts/tsconfig.json
 
 packages/accounts/src/index.ts
 └  8:3 — at module level

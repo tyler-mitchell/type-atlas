@@ -14,7 +14,7 @@ position: {"line":25,"character":14}
 ```
 
 ~~~text
-signedAmount · called from 4 places · 8 projects loaded
+signedAmount · called from 4 places · 9 projects loaded
 
 packages/accounts/src/journal.ts
 └  post [method] 34:3-57:4 · calls 52:12-52:24
@@ -36,7 +36,7 @@ position: {"line":28,"character":3}
 ```
 
 ~~~text
-post · called from 3 places · 8 projects loaded
+post · called from 3 places · 9 projects loaded
 
 packages/accounts/tests/journal.test.ts
 ├  expect() callback [function] 18:10-27:7 · calls 19:13-19:17
