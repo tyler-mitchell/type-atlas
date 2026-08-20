@@ -197,6 +197,14 @@ export const workspaceTree = async (input: {
         `expand keys are directories inside ${input.directory}; "${expansion.key}" is not.`,
       );
     }
+    // Named directly (a pattern key only ever resolves to real directories),
+    // so a wrong key answers about the argument — a raw errno would name an
+    // absolute path with a trailing slash the caller never wrote.
+    if (!(await stat(target).catch(() => undefined))?.isDirectory()) {
+      throw new Error(
+        `No directory at "${expansion.key}" under ${input.directory}. An expand key is a directory, or a pattern matching directories.`,
+      );
+    }
   }
   const [baseCrawl, ...expansionCrawls] = await Promise.all([
     crawlScope({ at: ".", depth: input.depth, glob: input.glob }),

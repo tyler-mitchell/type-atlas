@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { fdir } from "fdir";
 import { isGitIgnored } from "globby";
@@ -127,6 +127,14 @@ const scanOccurrences = async (input: {
   const scanRoot = path.resolve(workspaceRoot, input.directory);
   if (scanRoot !== workspaceRoot && !isFileInDir(scanRoot, workspaceRoot)) {
     throw new Error(`Directory is outside the workspace: ${input.directory}`);
+  }
+  // A wrong argument answers about the argument: without this, a file passed
+  // as the directory surfaced as `ENOTDIR … lstat …/.gitignore` from the
+  // ignore walk — an errno about a file nobody named.
+  if (!(await stat(scanRoot).catch(() => undefined))?.isDirectory()) {
+    throw new Error(
+      `No directory at ${input.directory} in this workspace. Pass a directory to scan, and check the path.`,
+    );
   }
   // The same walk list_files answers from: gitignore honored, dependency
   // and VCS internals excluded — an absence claim is only as strong as

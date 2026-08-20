@@ -104,6 +104,15 @@ export const registerReadFileTool = (server: McpServer, workspaces: VolarWorkspa
       const views = await Promise.all(
         read.map(async (target) => {
           try {
+            // Named here, per entry: the renderer's own guard throws the bare
+            // rule with no file and no values, which reads as the tool's
+            // whole answer on a single-file call.
+            const { startLine, endLine } = target.window;
+            if (startLine !== undefined && endLine !== undefined && startLine > endLine) {
+              throw new Error(
+                `${target.file}: startLine ${startLine} is past endLine ${endLine} — the window reads top to bottom.`,
+              );
+            }
             const view = await readSourceView({ workspace, ...target, signal });
             const from = target.window.startLine ?? 1;
             // Clamped to the file: a header that echoes a request past the end

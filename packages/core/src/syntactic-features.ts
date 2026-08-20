@@ -72,6 +72,14 @@ export const readSourceView = async (input: {
 }): Promise<SourceView> => {
   const uri = input.workspace.getWorkspaceUri(input.file);
   const { source } = await input.workspace.readTextDocumentUri(uri, input.signal);
+  // A NUL byte marks content no reader lines up — the same rule the literal
+  // scanner applies. Without it, a zip archive answered as 152 lines of
+  // mojibake presented as source.
+  if (source.includes("\0")) {
+    throw new Error(
+      `${input.file} is a binary file (${source.length.toLocaleString("en-US")} bytes) — there is no text to read.`,
+    );
+  }
   const lines = sourceLines(source);
   const window = input.window ?? {};
   const viewLineCount =
