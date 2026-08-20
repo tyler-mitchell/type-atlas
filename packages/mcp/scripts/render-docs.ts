@@ -1,0 +1,204 @@
+/**
+ * Renders every snapshot-derived document from one source of truth.
+ *
+ * Two kinds of output, one pipeline:
+ *
+ * - Authored documents (`README.mdoc` → `README.md`, and the npm README):
+ *   ordinary Markdown plus one tag, `{% scenario "<tool>/<name>" /%}`, which
+ *   embeds the named captured response with the invocation that produced it.
+ * - Tool documents (`docs/tools/<tool>.md`, plus an index): one page per
+ *   tool, assembled entirely from the captures — the tool's own advertised
+ *   description, then every practical case with its invocation and response.
+ *   Nothing in them is written by hand.
+ *
+ * Both derive from the same files the regression suite maintains:
+ * scenario definitions (`test/scenarios/cases.ts`), captured responses
+ * (`test/scenarios/responses/`), and the captured `tools/list` catalog.
+ * Changing a tool's behavior changes its documentation in the same commit,
+ * or the gate says so.
+ *
+ * The scenario suite renders these as vitest file snapshots: `vitest -u`
+ * writes them, a plain run fails on drift. There is no separate command.
+ */
+import { readdir, readFile } from "node:fs/promises";
+import { relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import Markdoc from "@markdoc/markdoc";
+import { scenarios } from "../test/scenarios/cases.ts";
+import { fixtureRoot } from "../test/scenarios/runner.ts";
+
+const repositoryRoot = resolve(fileURLToPath(new URL("../../..", import.meta.url)));
+const responsesRoot = resolve(repositoryRoot, "packages/mcp/test/scenarios/responses");
+const toolDocumentsRoot = "docs/tools";
+
+/** Authored documents: repository front page and the npm landing page. */
+export const generatedDocuments = [
+  { source: "README.mdoc", target: "README.md" },
+  { source: "packages/mcp/README.mdoc", target: "packages/mcp/README.md" },
+] as const;
+
+const noticeFor = (source: string) =>
+  `<!-- Generated from ${source} by packages/mcp/scripts/render-docs.ts — edit the source, not this file. -->`;
+
+type CatalogEntry = { name: string; title?: string; description?: string };
+
+let catalogHeld: Promise<ReadonlyArray<CatalogEntry>> | undefined;
+const catalog = () =>
+  (catalogHeld ??= readFile(resolve(responsesRoot, "tool-catalog.json"), "utf8").then(
+    (source) => JSON.parse(source) as ReadonlyArray<CatalogEntry>,
+  ));
+
+/**
+ * The call as an MCP client presents it: `tool: <title>`, then one
+ * `key: value` line per argument — string values bare, everything else as
+ * JSON. Both halves derive from captures: the title from the server's own
+ * `tools/list` answer, the arguments from the scenario definition that
+ * produced the shown response. `workspace` leads every call the way an
+ * agent sends it; the fixture is that workspace, named by repository path.
+ */
+const invocationBlock = async (tool: string, argument: Record<string, unknown>) => {
+  const title = (await catalog()).find(({ name }) => name === tool)?.title ?? tool;
+  const lines = [
+    `tool: ${title}`,
+    `workspace: ${relative(repositoryRoot, fixtureRoot)}`,
+    ...Object.entries(argument).map(
+      ([key, value]) => `${key}: ${typeof value === "string" ? value : JSON.stringify(value)}`,
+    ),
+  ];
+  return `\`\`\`yaml\n${lines.join("\n")}\n\`\`\``;
+};
+
+/**
+ * Tilde fences, because responses carry backtick fences of their own (a
+ * hover's ```typescript block): inside `~~~`, backticks are plain content
+ * in every renderer, where a longer backtick fence still inverted one. The
+ * tilde run outgrows any tilde run a response might ever contain.
+ */
+const responseBlock = (captured: string): string => {
+  const content = captured.trimEnd();
+  const longestRun = [...content.matchAll(/~+/gu)].reduce(
+    (held, match) => Math.max(held, match[0].length),
+    0,
+  );
+  const fence = "~".repeat(Math.max(3, longestRun + 1));
+  return `${fence}text\n${content}\n${fence}`;
+};
+
+const capturedResponse = (id: string, where: string) =>
+  readFile(resolve(responsesRoot, `${id}.txt`), "utf8").catch(() => {
+    throw new Error(
+      `${where} needs scenario "${id}" but no response is captured at test/scenarios/responses/${id}.txt`,
+    );
+  });
+
+/** One authored .mdoc rendered to Markdown, scenario tags replaced by their cases. */
+export const renderAuthored = async (sourceRelative: string): Promise<string> => {
+  const source = await readFile(resolve(repositoryRoot, sourceRelative), "utf8");
+  const document = Markdoc.parse(source);
+  const tags = [...document.walk()].filter((node) => node.type === "tag");
+  const unknown = tags.filter((node) => node.tag !== "scenario");
+  if (unknown.length > 0) {
+    throw new Error(
+      `${sourceRelative} uses tags this renderer does not define: ${unknown
+        .map((node) => `{% ${node.tag} %} (line ${node.lines[0] ?? "?"})`)
+        .join(", ")}. The one defined tag is {% scenario "<tool>/<name>" /%}.`,
+    );
+  }
+  const embeds = await Promise.all(
+    tags.map(async (node) => {
+      const id = String(node.attributes.primary ?? "");
+      const scenario = scenarios.find((held) => `${held.tool}/${held.name}` === id);
+      if (scenario === undefined) {
+        throw new Error(
+          `${sourceRelative} embeds scenario "${id}" (line ${node.lines[0] ?? "?"}) but no such scenario is defined in test/scenarios/cases.ts`,
+        );
+      }
+      const captured = await capturedResponse(id, sourceRelative);
+      const invocation = await invocationBlock(scenario.tool, scenario.arguments);
+      const [from, to] = [Math.min(...node.lines), Math.max(...node.lines)];
+      // The tag's parsed span swallows the blank line after it; the block
+      // hands one back so following prose never leans on the code.
+      return { from, to, block: `${invocation}\n\n${responseBlock(captured)}\n` };
+    }),
+  );
+  const lines = source.split("\n");
+  const spliced = embeds
+    .sort((left, right) => right.from - left.from)
+    .reduce((held, embed) => held.toSpliced(embed.from, embed.to - embed.from + 1, embed.block), lines);
+  return `${noticeFor(sourceRelative)}\n${spliced.join("\n")}`;
+};
+
+const caseHeading = (name: string): string => name.replaceAll("-", " ");
+
+/** One tool's page: its advertised description, then every case it has. */
+export const renderToolDocument = async (tool: string): Promise<string> => {
+  const own = scenarios.filter((scenario) => scenario.tool === tool);
+  const description = (await catalog()).find(({ name }) => name === tool)?.description;
+  const cases = await Promise.all(
+    own.map(async (scenario) => {
+      const id = `${scenario.tool}/${scenario.name}`;
+      const invocation = await invocationBlock(scenario.tool, scenario.arguments);
+      const captured = await capturedResponse(id, `${toolDocumentsRoot}/${tool}.md`);
+      return `## ${caseHeading(scenario.name)}\n\n${invocation}\n\n${responseBlock(captured)}`;
+    }),
+  );
+  return [
+    noticeFor("the scenario captures"),
+    `# \`${tool}\``,
+    ...(description === undefined ? [] : [description]),
+    ...cases,
+    "",
+  ].join("\n\n");
+};
+
+/** The directory's index: every documented tool with its case count. */
+export const renderToolIndex = async (): Promise<string> => {
+  const held = await catalog();
+  const counts = Map.groupBy(scenarios, ({ tool }) => tool);
+  const rows = [...counts]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([tool, cases]) => {
+      const title = held.find(({ name }) => name === tool)?.title ?? tool;
+      return `| [\`${tool}\`](${tool}.md) | ${title} | ${cases.length} |`;
+    });
+  return [
+    noticeFor("the scenario captures"),
+    "# Tool documentation",
+    "One page per tool, generated from the scenario suite's captured responses — every case is a real invocation against [`fixtures/ledger`](../../fixtures/ledger/), regression-checked. See [how the examples stay honest](../../README.md#how-the-examples-stay-honest).",
+    "| Tool | | Cases |",
+    "| :--- | :--- | ---: |",
+    ...rows,
+    "",
+  ].join("\n\n");
+};
+
+/** Every generated file this pipeline owns, as {target, render} pairs. */
+export const generatedFiles = async (): Promise<
+  ReadonlyArray<{ target: string; render: () => Promise<string> }>
+> => {
+  const tools = [...new Set(scenarios.map(({ tool }) => tool))].sort();
+  return [
+    ...generatedDocuments.map(({ source, target }) => ({
+      target,
+      render: () => renderAuthored(source),
+    })),
+    ...tools.map((tool) => ({
+      target: `${toolDocumentsRoot}/${tool}.md`,
+      render: () => renderToolDocument(tool),
+    })),
+    { target: `${toolDocumentsRoot}/README.md`, render: renderToolIndex },
+  ];
+};
+
+/** Files in docs/tools/ that no current tool owns — a tool renamed or retired. */
+export const staleToolDocuments = async (): Promise<readonly string[]> => {
+  const expected = new Set((await generatedFiles()).map(({ target }) => target));
+  const standing = await readdir(resolve(repositoryRoot, toolDocumentsRoot)).catch(() => []);
+  return standing
+    .map((name) => `${toolDocumentsRoot}/${name}`)
+    .filter((target) => !expected.has(target));
+};
+
+// No CLI: the scenario suite renders these as vitest file snapshots, so
+// `vitest -u` writes documentation the same way it writes responses, and a
+// plain run diffs both. One workflow, vitest's own.

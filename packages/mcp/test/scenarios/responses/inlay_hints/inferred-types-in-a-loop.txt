@@ -1,0 +1,9 @@
+packages/reports/src/balance.ts:28:1-37:1 · 7 hints
+
+33:9 key:
+34:9 value:
+34:13 left:
+34:21 key:
+34:46 currency:
+34:57 right:
+34:70 posting:

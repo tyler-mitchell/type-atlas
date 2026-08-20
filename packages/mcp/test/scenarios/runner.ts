@@ -74,7 +74,7 @@ export const connectScenarioSession = async (
   cwd: string = packageRoot,
 ): Promise<{
   invoke: (tool: string, argument: Record<string, unknown>) => Promise<string>;
-  catalog: () => Promise<ReadonlyArray<{ name: string; title?: string }>>;
+  catalog: () => Promise<ReadonlyArray<{ name: string; title?: string; description?: string }>>;
   close: () => Promise<void>;
 }> => {
   const client = new Client({ name: "type-atlas-scenarios", version: "1.0.0" });
@@ -99,7 +99,11 @@ export const connectScenarioSession = async (
     catalog: async () => {
       const { tools } = await client.listTools();
       return tools
-        .map(({ name, title }) => ({ name, ...(title === undefined ? {} : { title }) }))
+        .map(({ name, title, description }) => ({
+          name,
+          ...(title === undefined ? {} : { title }),
+          ...(description === undefined ? {} : { description }),
+        }))
         .sort((left, right) => left.name.localeCompare(right.name));
     },
     close: () => client.close(),

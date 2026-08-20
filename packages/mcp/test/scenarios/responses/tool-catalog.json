@@ -1,170 +1,212 @@
 [
   {
     "name": "add_missing_imports",
-    "title": "Add missing imports"
+    "title": "Add missing imports",
+    "description": "Return TypeScript's source-wide missing-import fixes as a Codex patch. The MCP does not modify files."
   },
   {
     "name": "callees",
-    "title": "Callees"
+    "title": "Callees",
+    "description": "Show which callable symbols are invoked directly by the function at a position, grouped with exact call sites. Use this instead of references when tracing outgoing execution flow."
   },
   {
     "name": "callers",
-    "title": "Callers"
+    "title": "Callers",
+    "description": "Show which functions call the callable symbol at a position, grouped by caller with exact call sites. Use this instead of references when tracing incoming execution flow."
   },
   {
     "name": "code_actions",
-    "title": "Code actions"
+    "title": "Code actions",
+    "description": "Discover quick fixes and refactors for a range, or resolve a displayed action to a Codex patch. Stable source-wide actions have dedicated tools. The MCP does not modify files."
   },
   {
     "name": "completions",
-    "title": "Completions"
+    "title": "Completions",
+    "description": "Return a bounded completion page at a source position. Set resolve to include upstream details for that page or raw to return every unresolved candidate."
   },
   {
     "name": "compose",
-    "title": "Compose"
+    "title": "Compose",
+    "description": "Experimental: author your own code-intelligence answer as one markup document. You define all of it: self-closing ask tags declare the data and render nothing; the body you write is the entire answer, composing what the asks bind with the shipped tags and partials — {% $uses.total %}, {% tree entries=$uses.groups partial=\"reference-node.mdoc\" /%}, headings, prose. Asks chain: a later ask reads an earlier answer, e.g. {% ask \"diagnostics\" as=\"health\" files=$uses.paths /%} checks the files the reference search found. A document with no body renders nothing — the markup is yours, not the tool's.\n\nOperations and what each binds:\n- {% ask \"hover\" as=\"head\" file=\"src/x.ts\" line=5 character=10 /%} (one-based, on the symbol's name) → {text}: the signature and documentation, rendered with {% $head.text %}\n- {% ask \"references\" as=\"uses\" file=\"src/x.ts\" line=5 character=10 /%} → {total, files, paths, projects, groups}; render sites with {% tree entries=$uses.groups partial=\"reference-node.mdoc\" /%}\n- {% ask \"outline\" as=\"shape\" file=\"src/x.ts\" /%} → {total, tree}; render with {% tree entries=$shape.tree partial=\"symbol-node.mdoc\" /%}\n- {% ask \"diagnostics\" as=\"problems\" file=\"src/x.ts\" /%} → {total, groups}; render with {% each items=$problems.groups as=\"group\" partial=\"diagnostic-group.mdoc\" /%}\n- {% ask \"source\" as=\"body\" file=\"src/x.ts\" from=10 to=40 /%} → {lines, startLine}; render with {% source lines=$body.lines startLine=$body.startLine /%}\n- {% ask \"occurrences\" as=\"hits\" text=\"device.lost\" file=\"src\" /%} (file is the directory to scan) → {total, fileCount, scanned, groups}: every place the exact text occurs, or an honest zero with the scan count\n- {% ask \"subject\" as=\"what\" file=\"src/x.ts\" line=5 character=10 /%} → {name, kind, file, at}: what the position resolves to, and where it is declared\n- {% ask \"callers\" as=\"calledBy\" file=\"src/x.ts\" line=5 character=10 /%} → {name, total, projects, groups}; render with {% tree entries=$calledBy.groups partial=\"call-node.mdoc\" /%}\n\nOne ask failing binds {failed} and is stated in a feedback line under your answer; the rest of the composition still answers."
   },
   {
     "name": "definitions",
-    "title": "Definitions"
+    "title": "Definitions",
+    "description": "Return definition locations at a position."
   },
   {
     "name": "diagnostics",
-    "title": "Diagnostics"
+    "title": "Diagnostics",
+    "description": "Report diagnostics for the TypeScript projects you have touched — the compiler's own whole-program check, run once per project."
   },
   {
     "name": "document_highlights",
-    "title": "Document highlights"
+    "title": "Document highlights",
+    "description": "Return same-document semantic usages at a position."
   },
   {
     "name": "document_links",
-    "title": "Document links"
+    "title": "Document links",
+    "description": "Return resolved links discovered by the active language service in a Markdown or JSON document."
   },
   {
     "name": "document_symbols",
-    "title": "Document symbols"
+    "title": "Document symbols",
+    "description": "Return the top-level document outline and source ranges. Set depth to include nested symbols or raw to return the complete hierarchy."
   },
   {
     "name": "explore_symbol",
-    "title": "Explore symbol"
+    "title": "Explore symbol",
+    "description": "Combine exact definitions, types, implementations, callers, calls, and references for one symbol with structurally similar code. Verified relationships and similarity are separate."
   },
   {
     "name": "file_references",
-    "title": "File references"
+    "title": "File references",
+    "description": "Return a bounded page of module references from the TypeScript project selected by file. Set raw to return every project-scoped reference."
   },
   {
     "name": "find_successor",
-    "title": "Find successor"
+    "title": "Find successor",
+    "description": "Establish what happened to a symbol that no longer resolves: whether it still exists somewhere, or was withdrawn, and what currently occupies its role. Use this before concluding a capability is gone — a name that returns nothing from search is the case this answers, not evidence of removal."
   },
   {
     "name": "fix_all",
-    "title": "Fix all"
+    "title": "Fix all",
+    "description": "Return TypeScript's source-wide fix-all action as a Codex patch when applicable. The MCP does not modify files."
   },
   {
     "name": "format_document",
-    "title": "Format document"
+    "title": "Format document",
+    "description": "Return a Codex patch containing document-formatting edits. The MCP does not modify files."
   },
   {
     "name": "hover",
-    "title": "Hover"
+    "title": "Hover",
+    "description": "Return type and documentation hover at a position."
   },
   {
     "name": "impact",
-    "title": "Impact"
+    "title": "Impact",
+    "description": "Experimental: weigh a change to the symbol at a position — every use, grouped by package, with how many sit in tests. Loads the projects of consumers retrieval can see, so the answer reaches past what this session happened to touch. Composed for the decision, not the enumeration; references lists the sites themselves."
   },
   {
     "name": "implementations",
-    "title": "Implementations"
+    "title": "Implementations",
+    "description": "Return implementation locations at a position."
   },
   {
     "name": "inlay_hints",
-    "title": "Inlay hints"
+    "title": "Inlay hints",
+    "description": "Return inline type and parameter hints for a source range."
   },
   {
     "name": "inspect_symbol",
-    "title": "Inspect symbol"
+    "title": "Inspect symbol",
+    "description": "Return a bounded working view of a symbol: type and documentation, exact definition/body ranges, distinct implementations and types, callers, direct calls, remaining references, project scope, and optional source. Select by exact file-local symbol name or source position."
   },
   {
     "name": "investigate_code",
-    "title": "Investigate code"
+    "title": "Investigate code",
+    "description": "Retrieve ranked code for an implementation question and attach verified relationships to the exact identifier match or a bounded set of distinct candidates. Structural similarity is optional and remains separate."
   },
   {
     "name": "list_files",
-    "title": "List files"
+    "title": "List files",
+    "description": "Show a bounded workspace-relative project structure. `view: \"files\"` (the default) is the file tree rooted at the directory, directories first; `view: \"directories\"` is a compact directory list for architecture orientation. Results honor .gitignore, omit dependency and VCS internals, and treat Git submodules as separate workspaces by default."
   },
   {
     "name": "list_module_exports",
-    "title": "Inspect module"
+    "title": "Inspect module",
+    "description": "Inspect the usable module surface visible from an importing TypeScript file. Returns runtime signatures by default, declared package subpaths at package roots, nested runtime paths on request, and exported types or their members as opt-ins."
   },
   {
     "name": "occurrences",
-    "title": "Occurrences"
+    "title": "Occurrences",
+    "description": "Experimental: every place an exact text occurs under a directory, with an honest zero — the literal proof of absence a semantic search cannot give. Scans workspace files (gitignore honored, dependencies excluded); use it for teardown checks, string keys, config references, and \"is this token ever used\" questions. search_code finds meaning; this finds bytes."
   },
   {
     "name": "organize_imports",
-    "title": "Organize imports"
+    "title": "Organize imports",
+    "description": "Return the TypeScript organize-imports action as a Codex patch. The MCP does not modify files."
   },
   {
     "name": "project_config",
-    "title": "Project configuration"
+    "title": "Project configuration",
+    "description": "Return the TypeScript configuration selected for a source file."
   },
   {
     "name": "quorl",
-    "title": "Quorl"
+    "title": "Quorl",
+    "description": "Expand the transitive reference closure of a symbol, breadth-first, reporting every site with its source line and the declaration enclosing it, plus the frontier that was not expanded. Use before removing or replacing something, when you need the whole blast radius rather than one hop."
   },
   {
     "name": "read_file",
-    "title": "Read files"
+    "title": "Read files",
+    "description": "Read one or more UTF-8 text files, including source, Markdown, and JSON, with stable line numbers. Pass every path in one call rather than calling repeatedly. Function bodies fold to their signatures by default; startLine, endLine, and fold apply to every path in the call."
   },
   {
     "name": "references",
-    "title": "References"
+    "title": "References",
+    "description": "Return a bounded page of reference locations, across every project loaded this session unless scope narrows it. Set raw to return the complete scope instead of one page."
   },
   {
     "name": "related_code",
-    "title": "Related code"
+    "title": "Related code",
+    "description": "Find structurally similar code for a source line and anchor each match to an exact language-server symbol. Similarity is not a call, reference, or runtime relationship."
   },
   {
     "name": "remove_unused_code",
-    "title": "Remove unused code"
+    "title": "Remove unused code",
+    "description": "Return TypeScript's source-wide unused-code removal as a Codex patch. The MCP does not modify files."
   },
   {
     "name": "rename_files",
-    "title": "Rename files"
+    "title": "Rename files",
+    "description": "Return a Codex patch that moves files and updates affected references. The MCP does not modify files."
   },
   {
     "name": "rename_symbol",
-    "title": "Rename symbol"
+    "title": "Rename symbol",
+    "description": "Return a Codex patch for a TypeScript-project symbol rename at a source position. The MCP does not modify files."
   },
   {
     "name": "search_code",
-    "title": "Search code"
+    "title": "Search code",
+    "description": "Find code by behavior or concept and anchor each match to an exact language-server symbol. The first search of a repository builds its index and takes seconds; later searches answer in milliseconds."
   },
   {
     "name": "search_dependency_code",
-    "title": "Search dependency code"
+    "title": "Search dependency code",
+    "description": "Search installed package code and its matching public runtime API without indexing all of node_modules. Use path for a known namespace or type for instance and chained methods. The importing file selects the exact package versions visible to that project."
   },
   {
     "name": "selection_ranges",
-    "title": "Selection ranges"
+    "title": "Selection ranges",
+    "description": "Return the nested structural ranges an editor expands through from one or more source positions."
   },
   {
     "name": "signature_help",
-    "title": "Signature help"
+    "title": "Signature help",
+    "description": "Return overload and parameter information at a call site."
   },
   {
     "name": "type_definitions",
-    "title": "Type definitions"
+    "title": "Type definitions",
+    "description": "Return type-definition locations at a position."
   },
   {
     "name": "verify_edit",
-    "title": "Verify edit"
+    "title": "Verify edit",
+    "description": "Experimental: the diagnostics a proposed edit would introduce, before anything is written. Each file's complete proposed content is checked in memory against the file as it stands; the answer reports what the change introduces and resolves in those files. A change can also break importers — diagnostics after applying reports those."
   },
   {
     "name": "watch_diagnostics",
-    "title": "Watch diagnostics"
+    "title": "Watch diagnostics",
+    "description": "Subscribe to a file's diagnostics for a bounded time. Returns the current diagnostics, then invalidates this file's diagnostics resource whenever they change, so a client that subscribes to resource updates is told without you calling anything — including when an edit to another file is what broke this one. Call it after editing a file you intend to keep working on. Requires a client that acts on resources/updated; the reply names whether this one does."
   },
   {
     "name": "workspace_symbols",
-    "title": "Workspace symbols"
+    "title": "Workspace symbols",
+    "description": "Search symbols across TypeScript projects activated in this workspace session. Potentially expensive in large monorepos: each call may search many project files, and limit only bounds returned output. Use document_symbols when the file is known; avoid parallel or repeated speculative searches."
   }
 ]

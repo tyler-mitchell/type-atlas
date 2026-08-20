@@ -1,0 +1,3 @@
+balance [parameter] · type declared at 1 target
+
+Money · packages/money/src/money.ts:12:21-16:2

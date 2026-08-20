@@ -1,4 +1,4 @@
-<!-- Generated from README.mdoc by packages/mcp/scripts/render-readme.ts — edit the .mdoc, not this file. -->
+<!-- Generated from README.mdoc by packages/mcp/scripts/render-docs.ts — edit the source, not this file. -->
 <div align="center">
 
 <img src="packages/mcp/assets/type-atlas.png" width="112" alt="" />
@@ -70,29 +70,31 @@ file: packages/accounts/src/journal.ts
 symbol: Journal
 ```
 
-    Journal [class] · packages/accounts/src/journal.ts:24:14-24:21 · range 24:1-73:2 · packages/accounts/tsconfig.json
+~~~text
+Journal [class] · packages/accounts/src/journal.ts:24:14-24:21 · range 24:1-73:2 · packages/accounts/tsconfig.json
 
-    ```typescript
-    class Journal<TMeta = undefined>
-    ```
+```typescript
+class Journal<TMeta = undefined>
+```
 
-    An append-only journal of balanced entries. `TMeta` carries whatever a
-    consumer attaches to each entry — an import batch id, an approval trail —
-    without the journal knowing its shape.
+An append-only journal of balanced entries. `TMeta` carries whatever a
+consumer attaches to each entry — an import batch id, an approval trail —
+without the journal knowing its shape.
 
-    ## Callers (3)
+## Callers (3)
 
-    packages/accounts/tests/journal.test.ts
-    ├  test("posts a balanced transfer through the overload") callback [function] 5:56-14:2 · calls 6:23-6:30
-    └  test("refuses an unbalanced entry") callback [function] 16:37-29:2 · calls 17:23-17:30
-    packages/reports/src/balance.ts
-    └  balancesAsOf [variable] 23:14-23:26 · range 23:14-51:2 · calls 24:12-24:19
+packages/accounts/tests/journal.test.ts
+├  test("posts a balanced transfer through the overload") callback [function] 5:56-14:2 · calls 6:23-6:30
+└  test("refuses an unbalanced entry") callback [function] 16:37-29:2 · calls 17:23-17:30
+packages/reports/src/balance.ts
+└  balancesAsOf [variable] 23:14-23:26 · range 23:14-51:2 · calls 24:12-24:19
 
-    ## Mentions that are not calls (3 of 7 references · 4 projects loaded)
+## Mentions that are not calls (3 of 7 references · 4 projects loaded)
 
-    packages/accounts/tests/journal.test.ts:3:25-3:32:  import { credit, debit, Journal, UnbalancedEntryError } from "../src/index.ts";
-    packages/accounts/src/index.ts:11:22-11:29:  export { type Entry, Journal, UnbalancedEntryError } from "./journal.ts";
-    packages/reports/src/balance.ts:4:8-4:15:  type Journal,
+packages/accounts/tests/journal.test.ts:3:25-3:32:  import { credit, debit, Journal, UnbalancedEntryError } from "../src/index.ts";
+packages/accounts/src/index.ts:11:22-11:29:  export { type Entry, Journal, UnbalancedEntryError } from "./journal.ts";
+packages/reports/src/balance.ts:4:8-4:15:  type Journal,
+~~~
 
 ### `document_symbols` — errors arrive unasked
 
@@ -107,13 +109,15 @@ workspace: fixtures/ledger
 file: packages/reconcile/src/drift.ts
 ```
 
-    === packages/reconcile/src/drift.ts · 3 top-level symbols ===
+~~~text
+=== packages/reconcile/src/drift.ts · 3 top-level symbols ===
 
-    drift [variable] 19:14-19:19 · range 19:14-22:2
-    StatementLine [interface] 8:18-8:31 · range 8:1-12:2
-    statementTotal [variable] 15:14-15:28 · range 15:14-16:56
+drift [variable] 19:14-19:19 · range 19:14-22:2
+StatementLine [interface] 8:18-8:31 · range 8:1-12:2
+statementTotal [variable] 15:14-15:28 · range 15:14-16:56
 
-    4 problems in packages/reconcile/src/drift.ts
+4 problems in packages/reconcile/src/drift.ts
+~~~
 
 ### `rename_symbol` — edits are patches, and scope is stated
 
@@ -131,30 +135,32 @@ position: {"line":18,"character":14}
 newName: balanceSide
 ```
 
-    Rename to balanceSide · resolved normalBalance · packages/accounts/src/account.ts:18:14 · Scope: project only · packages/accounts/tsconfig.json · 2 files · 2 edits
+~~~text
+Rename to balanceSide · resolved normalBalance · packages/accounts/src/account.ts:18:14 · Scope: project only · packages/accounts/tsconfig.json · 2 files · 2 edits
 
-    *** Begin Patch
-    *** Update File: packages/accounts/src/account.ts
-    @@
-       readonly closedAt?: Date;
-     }
-     
-    -export const normalBalance = (kind: AccountKind): "debit" | "credit" =>
-    +export const balanceSide = (kind: AccountKind): "debit" | "credit" =>
-       kind === "asset" || kind === "expense" ? "debit" : "credit";
-     
-     export const parentPath = (path: AccountPath): AccountPath | undefined => {
-    *** Update File: packages/accounts/src/index.ts
-    @@
-       type AccountStore,
-       lineage,
-       MemoryAccountStore,
-    -  normalBalance,
-    +  balanceSide as normalBalance,
-       parentPath,
-     } from "./account.ts";
-     export { type Entry, Journal, UnbalancedEntryError } from "./journal.ts";
-    *** End Patch
+*** Begin Patch
+*** Update File: packages/accounts/src/account.ts
+@@
+   readonly closedAt?: Date;
+ }
+ 
+-export const normalBalance = (kind: AccountKind): "debit" | "credit" =>
++export const balanceSide = (kind: AccountKind): "debit" | "credit" =>
+   kind === "asset" || kind === "expense" ? "debit" : "credit";
+ 
+ export const parentPath = (path: AccountPath): AccountPath | undefined => {
+*** Update File: packages/accounts/src/index.ts
+@@
+   type AccountStore,
+   lineage,
+   MemoryAccountStore,
+-  normalBalance,
++  balanceSide as normalBalance,
+   parentPath,
+ } from "./account.ts";
+ export { type Entry, Journal, UnbalancedEntryError } from "./journal.ts";
+*** End Patch
+~~~
 
 ### `read_file` — bodies fold to signatures
 
@@ -168,124 +174,92 @@ workspace: fixtures/ledger
 file: ["packages/accounts/src/journal.ts"]
 ```
 
-    1 file · 52 lines · 22 folded to signatures, pass fold: false for the bodies
+~~~text
+1 file · 52 lines · 22 folded to signatures, pass fold: false for the bodies
 
-    === packages/accounts/src/journal.ts · 73 lines ===
+=== packages/accounts/src/journal.ts · 73 lines ===
 
-     1 | import { add, isZero, type Money, zero } from "@ledger/money";
-     2 | import type { AccountPath } from "./account.ts";
-     3 | import { credit, debit, type Posting, signedAmount } from "./posting.ts";
-     4 |
-     5 | /** A balanced set of postings, recorded together or not at all. */
-     6 | export interface Entry<TMeta = undefined> {
-     7 |   readonly recordedAt: Date;
-     8 |   readonly description: string;
-     9 |   readonly postings: readonly Posting[];
-    10 |   readonly meta: TMeta;
-    11 | }
-    12 |
-    13 | export class UnbalancedEntryError extends Error {
-    14 |   constructor(readonly imbalance: Money) {
-    15 |     super(`Entry does not balance: off by ${imbalance.minorUnits} minor units`);
-    16 |   }
-    17 | }
-    18 |
-    19 | /**
-    20 |  * An append-only journal of balanced entries. `TMeta` carries whatever a
-    21 |  * consumer attaches to each entry — an import batch id, an approval trail —
-    22 |  * without the journal knowing its shape.
-    23 |  */
-    24 | export class Journal<TMeta = undefined> {
-    25 |   private readonly entries: Entry<TMeta>[] = [];
-    26 |
-    27 |   /** Record a prepared entry, or build the common two-posting transfer. */
-    28 |   post(entry: Entry<TMeta>): Entry<TMeta>;
-    29 |   post(
-    30 |     description: string,
-    31 |     transfer: { from: AccountPath; to: AccountPath; amount: Money },
-    32 |     meta: TMeta,
-    33 |   ): Entry<TMeta>;
-    34 |   post(
-       |     ... 35-56 folded
-    57 |   }
-    58 |
-    59 |   /** Entries touching an account, oldest first. */
-    60 |   history(account: AccountPath): readonly Entry<TMeta>[] {
-    61 |     return this.entries.filter((entry) =>
-    62 |       entry.postings.some((posting) => posting.account === account),
-    63 |     );
-    64 |   }
-    65 |
-    66 |   get length(): number {
-    67 |     return this.entries.length;
-    68 |   }
-    69 |
-    70 |   [Symbol.iterator](): Iterator<Entry<TMeta>> {
-    71 |     return this.entries[Symbol.iterator]();
-    72 |   }
-    73 | }
+ 1 | import { add, isZero, type Money, zero } from "@ledger/money";
+ 2 | import type { AccountPath } from "./account.ts";
+ 3 | import { credit, debit, type Posting, signedAmount } from "./posting.ts";
+ 4 |
+ 5 | /** A balanced set of postings, recorded together or not at all. */
+ 6 | export interface Entry<TMeta = undefined> {
+ 7 |   readonly recordedAt: Date;
+ 8 |   readonly description: string;
+ 9 |   readonly postings: readonly Posting[];
+10 |   readonly meta: TMeta;
+11 | }
+12 |
+13 | export class UnbalancedEntryError extends Error {
+14 |   constructor(readonly imbalance: Money) {
+15 |     super(`Entry does not balance: off by ${imbalance.minorUnits} minor units`);
+16 |   }
+17 | }
+18 |
+19 | /**
+20 |  * An append-only journal of balanced entries. `TMeta` carries whatever a
+21 |  * consumer attaches to each entry — an import batch id, an approval trail —
+22 |  * without the journal knowing its shape.
+23 |  */
+24 | export class Journal<TMeta = undefined> {
+25 |   private readonly entries: Entry<TMeta>[] = [];
+26 |
+27 |   /** Record a prepared entry, or build the common two-posting transfer. */
+28 |   post(entry: Entry<TMeta>): Entry<TMeta>;
+29 |   post(
+30 |     description: string,
+31 |     transfer: { from: AccountPath; to: AccountPath; amount: Money },
+32 |     meta: TMeta,
+33 |   ): Entry<TMeta>;
+34 |   post(
+   |     ... 35-56 folded
+57 |   }
+58 |
+59 |   /** Entries touching an account, oldest first. */
+60 |   history(account: AccountPath): readonly Entry<TMeta>[] {
+61 |     return this.entries.filter((entry) =>
+62 |       entry.postings.some((posting) => posting.account === account),
+63 |     );
+64 |   }
+65 |
+66 |   get length(): number {
+67 |     return this.entries.length;
+68 |   }
+69 |
+70 |   [Symbol.iterator](): Iterator<Entry<TMeta>> {
+71 |     return this.entries[Symbol.iterator]();
+72 |   }
+73 | }
+~~~
 
-### `list_files` — structure that states its reading cost
+### `list_files` — structure, reading cost, and what changed
 
 One bounded tree: folded directories say what they hold, every file carries
-its line count, and one call opens every package of a monorepo in place.
+its line count, and `git status` is fused in as plain words — including a
+ghost row for a deleted file, which exists in git's answer and nowhere on
+disk. One orientation call answers what is here, what it costs to read, and
+what differs from HEAD:
 
 ```yaml
 tool: List files
 workspace: fixtures/ledger
-expand: {"packages/*":2}
+directory: packages/money
+depth: 2
 ```
 
-    ledger/
-    ├  apps/ · 11 files
-    ├  packages/
-    │  ├  accounts/
-    │  │  ├  src/
-    │  │  │  ├  account.ts · 56 loc
-    │  │  │  ├  index.ts · 12 loc
-    │  │  │  ├  journal.ts · 73 loc
-    │  │  │  └  posting.ts · 32 loc
-    │  │  ├  tests/
-    │  │  │  └  journal.test.ts · 29 loc
-    │  │  ├  package.json · 22 loc
-    │  │  └  tsconfig.json · 20 loc
-    │  ├  money/
-    │  │  ├  src/
-    │  │  │  ├  currency.ts · 19 loc
-    │  │  │  ├  index.ts · 11 loc
-    │  │  │  └  money.ts · 52 loc
-    │  │  ├  tests/
-    │  │  │  └  money.test.ts · 15 loc
-    │  │  ├  package.json · 19 loc
-    │  │  └  tsconfig.json · 20 loc
-    │  ├  reconcile/
-    │  │  ├  src/
-    │  │  │  ├  drift.ts · 22 loc
-    │  │  │  └  index.ts · 1 loc
-    │  │  ├  package.json · 19 loc
-    │  │  └  tsconfig.json · 20 loc
-    │  ├  reports/
-    │  │  ├  src/
-    │  │  │  ├  balance.ts · 58 loc
-    │  │  │  ├  index.ts · 2 loc
-    │  │  │  └  statement.ts · 11 loc
-    │  │  ├  package.json · 23 loc
-    │  │  └  tsconfig.json · 20 loc
-    │  └  utils/
-    │     ├  src/
-    │     │  └  index.ts · 3 loc
-    │     ├  tests/
-    │     │  └  index.test.ts · 6 loc
-    │     ├  package.json · 40 loc
-    │     ├  README.md · 23 loc
-    │     ├  tsconfig.json · 20 loc
-    │     └  vite.config.ts · 17 loc
-    ├  package.json · 24 loc
-    ├  pnpm-lock.yaml · 2.3k loc
-    ├  pnpm-workspace.yaml · 19 loc
-    ├  README.md · 32 loc
-    ├  tsconfig.json · 9 loc
-    └  vite.config.ts · 13 loc
+~~~text
+packages/money/
+├  src/ · 3 changed
+│  ├  currency.ts · 21 loc · modified
+│  ├  index.ts · deleted
+│  ├  money.ts · 52 loc
+│  └  rounding.ts · 11 loc · untracked
+├  tests/
+│  └  money.test.ts · 15 loc
+├  package.json · 19 loc
+└  tsconfig.json · 20 loc
+~~~
 
 ### `occurrences` — proof of absence
 
@@ -298,7 +272,9 @@ workspace: fixtures/ledger
 text: quantumFlux
 ```
 
-    Nothing under the workspace contains "quantumFlux" · 48 files scanned. This is a literal answer: the exact text does not occur in what was scanned, which is the proof a semantic search cannot give.
+~~~text
+Nothing under the workspace contains "quantumFlux" · 54 files scanned. This is a literal answer: the exact text does not occur in what was scanned, which is the proof a semantic search cannot give.
+~~~
 
 ### `impact` — a change weighed before it is made
 
@@ -312,13 +288,13 @@ file: packages/accounts/src/posting.ts
 position: {"line":25,"character":14}
 ```
 
-    Changing signedAmount touches 8 uses in 5 files across 3 packages, in the projects loaded this session. No use sits in a test file.
+~~~text
+Changing signedAmount touches 8 uses in 5 files across 3 packages, in the projects loaded this session. No use sits in a test file.
 
-    packages/accounts   4  3
-    packages/reconcile  2  1
-    packages/reports    2  1
-
-    Retrieval also names apps/website — not loaded and not confirmed as uses, so they are outside this count. Reading a file in one loads its project, and asking again weighs it.
+packages/accounts   4  3
+packages/reconcile  2  1
+packages/reports    2  1
+~~~
 
 ## The tools
 

@@ -216,6 +216,71 @@ all-or-nothing "there is no text" is an absence lie; the honest answer reads
 the text and names the anomaly ("contains a NUL at byte N"). Observed
 2026-08-20.
 
+### `document_links` on the fixture README kills the server — with a unifying stack
+
+`document_links { file: "README.md" }` against `fixtures/ledger` exits the
+language server (code 1), deterministically captured by the scenario suite
+before the scenario was withdrawn. The stack is the new evidence the
+existing unowned-document entry lacked:
+
+```
+at synchronizeHostDataWorker (typescript-native-bridge/lib/typescript.js:167426)
+at Object.getProgram (…:167503)
+at initProject (typescript-auto-import-cache/out/5_0/project.js:168)
+at default_1 (typescript-auto-import-cache/out/5_0/index.js:29)
+```
+
+`typescript-auto-import-cache` initializing a project against the bridge is
+the frame that dies. The same machinery being broken would explain the
+missing-import fixes the engine never offers (see below) — one suspect for
+three symptoms: the unowned-document crash, this crash, and absent
+auto-import. Diagnosing whether the cache's `initProject` is incompatible
+with the bridge's `synchronizeHostData` is the next concrete step, and it is
+a real candidate for disabling or patching the cache integration in the
+language-server package. Observed 2026-08-20.
+
+### `implementations` answers empty for an interface with a same-file implementor
+
+`implementations` at `AccountStore` (ledger fixture, account.ts:31:18) answers
+the no-implementation sentence although `MemoryAccountStore implements
+AccountStore` stands in the same file — warm server, file open, 68ms. Yet a
+kek-monorepo observation (2026-08-19) shows the same tool answering
+`Implementations (5)` warm. Whether the interface case specifically fails in
+the bridge's goToImplementation, or the walk drops it, is undiagnosed; the
+committed capture (`responses/implementations/store-interface.txt`) pins the
+current wrong answer and will flag any change. Observed 2026-08-20.
+
+### `signature_help` never names the active parameter
+
+The one question at a call site is "which parameter am I on", and the answer
+(`responses/signature_help/inside-a-call.txt`) renders the signature and the
+parameter list without marking the active one, though LSP supplies
+`activeParameter`. Observed 2026-08-20.
+
+### `rename_files` warns about files that need no update
+
+The move patch's honesty note lists `journal.test.ts`, `csv.ts`,
+`matching.ts`, `drift.ts` as "not updated" after moving `posting.ts` — but
+every one of them imports through the barrel or the package specifier and
+needs no change. A warning that cries wolf sends an agent to fix four files
+that need nothing. The list should contain only files whose import specifier
+actually names the moved module. Observed 2026-08-20 in
+`responses/rename_files/module-move-updates-importers.txt`.
+
+### The engine offers no missing-import fixes
+
+`add_missing_imports` on `packages/reconcile/src/matching.ts` (ledger
+fixture; two unresolved names with obvious workspace exports) returns no
+edit, and `code_actions` at the unresolved name offers "Add missing function
+declaration" but nothing from the fixMissingImport family — so the codefix
+machinery works and specifically auto-import does not, which points at the
+typescript-native-bridge/tsgo preview rather than this relay. The empty
+answer now states the situation honestly instead of "No missing imports."
+The committed capture
+(`responses/add_missing_imports/forgotten-imports.txt`) is the sentinel:
+when the bridge gains auto-import, the scenario suite flags the change.
+Observed 2026-08-20.
+
 ## Language grounding
 
 ### `kindAt` reads TypeScript hover text with a regular expression

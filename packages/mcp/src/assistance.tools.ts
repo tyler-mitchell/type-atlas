@@ -335,6 +335,13 @@ export const registerAssistanceTools = (
           // annotation, not a listing; the full type is one hover away.
           hints: hints
             .filter((hint) => containsPosition(range, hint.position))
+            // Reading order, not provider order: the engine answers grouped
+            // by hint kind, which interleaves positions.
+            .sort(
+              (left, right) =>
+                left.position.line - right.position.line ||
+                left.position.character - right.position.character,
+            )
             .map((hint) => ({
             name: positionText(hint.position),
             notes: [

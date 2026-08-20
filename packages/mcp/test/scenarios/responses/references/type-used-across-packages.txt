@@ -1,7 +1,7 @@
 Money [type] · packages/money/src/money.ts:12:13
-31 references · 4 projects loaded · packages/money/tsconfig.json
+30 references · 4 projects loaded · packages/money/tsconfig.json
 
-1-20 of 31 references · pass offset: 20 for the rest
+1-20 of 30 references · pass offset: 20 for the rest
 
 packages/accounts/src/journal.ts
 ├  1:28  — at module level
@@ -9,6 +9,7 @@ packages/accounts/src/journal.ts
 ├  31:61 — inside post
 └  36:62 — inside post
 packages/accounts/src/posting.ts
+├  9:79  — inside Posting
 ├  10:80 — inside Posting
 ├  12:53 — inside debit
 ├  18:54 — inside credit

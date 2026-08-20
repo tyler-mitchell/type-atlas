@@ -227,6 +227,156 @@ export const scenarios: readonly Scenario[] = [
     arguments: { fromFile: "packages/reports/src/balance.ts", module: "@ledger/money" },
   },
 
+  // ── type_definitions: from a value to the type behind it ─────────────────
+  {
+    tool: "type_definitions",
+    name: "parameter-to-branded-type",
+    arguments: {
+      file: "packages/reports/src/statement.ts",
+      position: { line: 8, character: 49 },
+    },
+  },
+
+  // ── implementations: who realises this interface ─────────────────────────
+  {
+    tool: "implementations",
+    name: "store-interface",
+    arguments: {
+      file: "packages/accounts/src/account.ts",
+      position: { line: 31, character: 18 },
+    },
+  },
+
+  // ── document_highlights: every same-file use of one symbol ───────────────
+  {
+    tool: "document_highlights",
+    name: "private-field-within-class",
+    arguments: {
+      file: "packages/accounts/src/journal.ts",
+      position: { line: 25, character: 20 },
+    },
+  },
+
+  // ── quorl: the transitive blast radius, breadth-first ────────────────────
+  {
+    tool: "quorl",
+    name: "two-hops-from-signed-amount",
+    arguments: {
+      file: "packages/accounts/src/posting.ts",
+      position: { line: 25, character: 14 },
+      depth: 2,
+    },
+  },
+
+  // ── signature_help: mid-call, which overload and which parameter ─────────
+  {
+    tool: "signature_help",
+    name: "inside-a-call",
+    arguments: {
+      file: "packages/reports/src/balance.ts",
+      position: { line: 34, character: 13 },
+    },
+  },
+
+  // ── inlay_hints: the types the source does not write ─────────────────────
+  {
+    tool: "inlay_hints",
+    name: "inferred-types-in-a-loop",
+    arguments: {
+      file: "packages/reports/src/balance.ts",
+      range: { start: { line: 28, character: 1 }, end: { line: 37, character: 1 } },
+    },
+  },
+
+  // ── selection_ranges: the structural nest an editor expands through ──────
+  {
+    tool: "selection_ranges",
+    name: "expression-to-file",
+    arguments: {
+      file: "packages/reports/src/balance.ts",
+      position: { line: 34, character: 20 },
+    },
+  },
+
+  // ── project_config: which tsconfig owns this file ────────────────────────
+  {
+    tool: "project_config",
+    name: "package-ownership",
+    arguments: { file: "packages/reports/src/balance.ts" },
+  },
+
+  // document_links is deliberately uncovered: asking it about the fixture's
+  // README crashes the language server in typescript-auto-import-cache's
+  // initProject (docs/issues.md, "Asking about an unowned document kills the
+  // server" and the auto-import entries). The scenario returns when the
+  // crash is fixed — its capture would today pin a machine-specific stack.
+
+  // ── find_successor: what happened to a name that no longer resolves ──────
+  {
+    tool: "find_successor",
+    name: "renamed-method-hunch",
+    arguments: { file: "packages/accounts/src/journal.ts", name: "postEntry" },
+  },
+
+  // ── organize_imports: sort, merge, and drop what is unused ───────────────
+  {
+    tool: "organize_imports",
+    name: "messy-import-block",
+    arguments: { file: "packages/importers/src/csv.ts" },
+  },
+
+  // ── remove_unused_code: the dead weight, as a patch ──────────────────────
+  {
+    tool: "remove_unused_code",
+    name: "dead-helpers",
+    arguments: { file: "packages/importers/src/dedupe.ts" },
+  },
+
+  // ── format_document: mangled source, normalized ──────────────────────────
+  {
+    tool: "format_document",
+    name: "mangled-file",
+    arguments: { file: "packages/importers/src/dedupe.ts" },
+  },
+
+  // ── add_missing_imports: the names a file forgot to import ───────────────
+  {
+    tool: "add_missing_imports",
+    name: "forgotten-imports",
+    arguments: { file: "packages/reconcile/src/matching.ts" },
+  },
+
+  // ── code_actions: what the language service offers at a problem ──────────
+  {
+    tool: "code_actions",
+    name: "at-a-type-error",
+    arguments: {
+      file: "packages/reconcile/src/drift.ts",
+      range: { start: { line: 21, character: 65 }, end: { line: 21, character: 70 } },
+    },
+  },
+
+  // ── diagnostics: a file whose names do not resolve ───────────────────────
+  {
+    tool: "diagnostics",
+    name: "missing-imports-diagnosed",
+    arguments: { file: "packages/reconcile/src/matching.ts" },
+  },
+
+  // ── rename_files: a move, with every import updated ──────────────────────
+  {
+    tool: "rename_files",
+    name: "module-move-updates-importers",
+    arguments: {
+      files: [
+        {
+          from: "packages/accounts/src/posting.ts",
+          to: "packages/accounts/src/entry-side.ts",
+        },
+      ],
+    },
+  },
+
   // ── rename_symbol: a reviewable patch, never a silent write ──────────────
   {
     tool: "rename_symbol",

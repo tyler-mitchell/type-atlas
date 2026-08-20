@@ -1,0 +1,19 @@
+<!-- Generated from the scenario captures by packages/mcp/scripts/render-docs.ts — edit the source, not this file. -->
+
+# `implementations`
+
+Return implementation locations at a position.
+
+## store interface
+
+```yaml
+tool: Implementations
+workspace: fixtures/ledger
+file: packages/accounts/src/account.ts
+position: {"line":31,"character":18}
+```
+
+~~~text
+No implementation answered at this position. Implementations are reported for a symbol that something overrides or realises — an interface, an abstract member, an overload — and the walk reaches only files this session has opened, so an implementor in an untouched file reports nothing here. references finds every use, including the declarations that realise this.
+~~~
+

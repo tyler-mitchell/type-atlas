@@ -2,10 +2,10 @@
 tool: references
 ---
 
-{% if equals($total, 0) %}
+{% if not($found) %}
 Nothing was found at this position, so there is no symbol to report references for. Check the line and character — both are one-based, and they must land on the symbol's own name.
 {% /if %}
-{% if not(equals($total, 0)) %}
+{% if $found %}
 {% tight %}
 {% if any($subject) %}{% $subject %}{% if $kind %} [{% $kind %}]{% /if %}{% if $container %} · inside {% $container %}{% /if %}{% if $declaredAt %} · {% $declaredAt.file %}:{% position($declaredAt.at) %}{% /if %}{% /if %}{% if not(any($subject)) %}the symbol at this position{% if $declaredAt %} · {% $declaredAt.file %}:{% position($declaredAt.at) %}{% /if %}{% /if %}
 

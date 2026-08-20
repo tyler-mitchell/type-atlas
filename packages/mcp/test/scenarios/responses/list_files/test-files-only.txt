@@ -1,5 +1,5 @@
 ledger/
-└  packages/
+└  packages/ · 6 changed
    ├  accounts/
    │  └  tests/
    │     └  journal.test.ts · 29 loc

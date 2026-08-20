@@ -91,12 +91,15 @@ asked for, and many files batch into one call.
 
 {% scenario "read_file/class-folded-to-signatures" /%}
 
-### `list_files` — structure that states its reading cost
+### `list_files` — structure, reading cost, and what changed
 
 One bounded tree: folded directories say what they hold, every file carries
-its line count, and one call opens every package of a monorepo in place.
+its line count, and `git status` is fused in as plain words — including a
+ghost row for a deleted file, which exists in git's answer and nowhere on
+disk. One orientation call answers what is here, what it costs to read, and
+what differs from HEAD:
 
-{% scenario "list_files/every-package-opened" /%}
+{% scenario "list_files/working-tree-changes" /%}
 
 ### `occurrences` — proof of absence
 

@@ -1,4 +1,4 @@
-<!-- Generated from packages/mcp/README.mdoc by packages/mcp/scripts/render-readme.ts — edit the .mdoc, not this file. -->
+<!-- Generated from packages/mcp/README.mdoc by packages/mcp/scripts/render-docs.ts — edit the source, not this file. -->
 <div align="center">
 
 <img src="https://raw.githubusercontent.com/tyler-mitchell/type-atlas/main/packages/mcp/assets/type-atlas.png" width="96" alt="" />
@@ -53,13 +53,15 @@ workspace: fixtures/ledger
 file: packages/reconcile/src/drift.ts
 ```
 
-    === packages/reconcile/src/drift.ts · 3 top-level symbols ===
+~~~text
+=== packages/reconcile/src/drift.ts · 3 top-level symbols ===
 
-    drift [variable] 19:14-19:19 · range 19:14-22:2
-    StatementLine [interface] 8:18-8:31 · range 8:1-12:2
-    statementTotal [variable] 15:14-15:28 · range 15:14-16:56
+drift [variable] 19:14-19:19 · range 19:14-22:2
+StatementLine [interface] 8:18-8:31 · range 8:1-12:2
+statementTotal [variable] 15:14-15:28 · range 15:14-16:56
 
-    4 problems in packages/reconcile/src/drift.ts
+4 problems in packages/reconcile/src/drift.ts
+~~~
 
 An editor shows diagnostics in the gutter continuously, so a human cannot miss
 them. An agent only learns what it asks about — so a file's symbols arrive

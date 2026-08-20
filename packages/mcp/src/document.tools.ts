@@ -501,9 +501,10 @@ export const registerDocumentTools = (server: McpServer, workspaces: VolarWorksp
       const rendered = await renderDocument({
         document: "project-config.tool.mdoc",
         variables: {
-          // Absolute: a tsconfig path is for opening, and a reader who has to
-          // rejoin it to a root to use it has been handed arithmetic.
-          project: result ? displayPath(result.uri, root, { style: "absolute" }) : undefined,
+          // Workspace-relative, like every path this surface answers —
+          // diagnostics names these very tsconfigs relatively, and one tool
+          // answering absolute contradicted the surface's own contract.
+          project: result ? displayPath(result.uri, root) : undefined,
         },
       });
       return textResult(rendered.text);

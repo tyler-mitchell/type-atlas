@@ -96,6 +96,14 @@ const sourceActions = [
     description: "Return TypeScript's source-wide missing-import fixes as a Codex patch.",
     kind: `${CodeActionKind.Source}.addMissingImports.ts`,
     empty: "No missing imports.",
+    // "No missing imports" over unresolved names is an absence lie. The
+    // engine can decline to offer import fixes (the current bridge offers
+    // declaration fixes but none of the fixMissingImport family); when names
+    // do not resolve, the honest empty says so instead of "all clear".
+    emptyDespiteProblems: (count: number) =>
+      `The language service offered no import fixes, although ${count} ${
+        count === 1 ? "name" : "names"
+      } in this file ${count === 1 ? "does" : "do"} not resolve. If an import should exist for them, write it by hand — the engine proposed none.`,
   },
   {
     name: "fix_all",
@@ -110,12 +118,12 @@ const runSourceAction = async (
   workspaces: VolarWorkspacePool,
   root: string,
   file: string,
-  kind: string,
+  action: (typeof sourceActions)[number],
   options: { readonly tabSize: number; readonly insertSpaces: boolean },
   includeDiagnostics: DiagnosticMode,
-  empty: string,
   signal: AbortSignal,
 ) => {
+  const { kind } = action;
   const workspace = await workspaces.get(root);
   const textDocument = await workspace.getTextDocument(file);
   const diagnosticReportRequest = workspace.sendRequest(
@@ -153,6 +161,16 @@ const runSourceAction = async (
           workspaceRoot: root,
           mode: includeDiagnostics,
         });
+  // Unresolved names in the file the action just declined to fix: the empty
+  // sentence must not read as "all clear" while they stand.
+  const unresolvedNames =
+    "emptyDespiteProblems" in action && diagnosticReport && "items" in diagnosticReport
+      ? diagnosticReport.items.filter(({ code }) => code === 2304 || code === 2552).length
+      : 0;
+  const empty =
+    unresolvedNames > 0 && "emptyDespiteProblems" in action
+      ? action.emptyDespiteProblems(unresolvedNames)
+      : action.empty;
   if (!resolved) return appendDiagnosticContext(textResult(empty), diagnosticContext);
   if (resolved.disabled) throw new Error(resolved.disabled.reason);
   if (!resolved.edit) {
@@ -311,10 +329,9 @@ export const registerCodeActionTools = (
           workspaces,
           workspace,
           file,
-          sourceAction.kind,
+          sourceAction,
           { tabSize, insertSpaces },
           includeDiagnostics,
-          sourceAction.empty,
           signal,
         ),
     );

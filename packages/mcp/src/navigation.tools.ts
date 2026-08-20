@@ -229,9 +229,6 @@ const input = type.module({
     ...observedFileInput,
     position: positionInput,
     "scope?": referenceScopeInput,
-    "includeDeclaration?": type("boolean").configure({
-      description: "Include the symbol's own declaration among the results.",
-    }),
     ...paginationInput,
   }),
   FileReferences: type({
@@ -674,7 +671,6 @@ export const registerNavigationTools = (
         workspace: root,
         file,
         position,
-        includeDeclaration = true,
         scope = "workspace",
         offset = 0,
         limit = 20,
@@ -685,10 +681,15 @@ export const registerNavigationTools = (
     ) => {
       const workspace = await workspaces.get(root);
       const intelligence = createTypeAtlas(workspace);
+      // Uses only, never the declaration: the subject line above the rows
+      // already names the declaration site, and counting a row the listing
+      // deliberately renders elsewhere left every total and page window off
+      // by one. The rest of this surface (quorl, compose, inspection) has
+      // always asked this way.
       const { textDocument, result: references, projects } = await intelligence.references({
         file,
         signal,
-        params: { position, context: { includeDeclaration }, scope },
+        params: { position, context: { includeDeclaration: false }, scope },
       });
       const diagnosticContext = requestDiagnosticContext(
         workspace,
@@ -699,12 +700,6 @@ export const registerNavigationTools = (
         position,
       );
       const project = workspace.sendRequest(GetMatchTsConfigRequest.type, textDocument, signal);
-      const output =
-        references === null
-          ? null
-          : raw
-            ? page(references, 0, references.length)
-            : page(references, offset, limit);
       // What the position resolved to, from the one subject owner — the name
       // this answer opens with, and the declaration site the rows below mark
       // themselves against. This replaced a hover noun and a hand-rolled
@@ -717,6 +712,22 @@ export const registerNavigationTools = (
       });
       const declarationUri = resolved?.declaredAt.uri;
       const declarationRange = resolved?.declaredAt.selection;
+      // Uses only, filtered before the page: the language service reports the
+      // declaration among references whatever the request says, the subject
+      // line above the rows already names it, and a row counted or windowed
+      // for a site the listing renders elsewhere left every total off by one.
+      const uses =
+        references?.filter(
+          ({ uri, range }) =>
+            !(
+              uri === declarationUri &&
+              declarationRange !== undefined &&
+              range.start.line === declarationRange.start.line &&
+              range.start.character === declarationRange.start.character
+            ),
+        ) ?? null;
+      const output =
+        uses === null ? null : raw ? page(uses, 0, uses.length) : page(uses, offset, limit);
       // Concurrent over the page: each row's owner is one outline chain, and
       // awaiting them one by one serialized twenty file reads behind each
       // other — the tool-layer share of a references answer that breached
@@ -731,17 +742,11 @@ export const registerNavigationTools = (
           // The innermost declaration is often the reference itself — an
           // object-literal property is a declaration in the outline — so the
           // holder is the last one that does not stand on this very position.
-          const owner = enclosingDeclaration(chain, range);
           return {
             file: displayPath(uri, root),
             line: range.start.line + 1,
             character: range.start.character + 1,
-            within: owner?.name,
-            declaration:
-              uri === declarationUri &&
-              declarationRange !== undefined &&
-              declarationRange.start.line === range.start.line &&
-              declarationRange.start.character === range.start.character,
+            within: enclosingDeclaration(chain, range)?.name,
           };
         }),
       );
@@ -751,18 +756,32 @@ export const registerNavigationTools = (
           left.line - right.line ||
           left.character - right.character,
       );
-      const declarationSite = ordered.find((site) => site.declaration);
-      const uses = ordered.filter((site) => !site.declaration);
+      // The declaration's own holder — a method's class, a property's
+      // interface — from one chain at the declaration, since no row stands
+      // there any more.
+      const holder =
+        declarationUri !== undefined && declarationRange !== undefined
+          ? enclosingDeclaration(
+              await declarationChainAtPosition({
+                workspace,
+                uri: declarationUri,
+                position: declarationRange.start,
+              }).catch(() => []),
+              declarationRange,
+            )?.name
+          : undefined;
       const matched = await project;
       const rendered = await renderDocument({
         document: "references.tool.mdoc",
         variables: {
           subject: resolved?.name,
           kind: resolved?.kind,
+          // Whether the position resolved to anything at all — the document's
+          // fork between "no symbol here" and "a symbol nothing uses".
+          found: resolved !== undefined || (output?.total ?? 0) > 0,
           // A top-level declaration is its own enclosing declaration, so the
           // outline names it as its own container — which says nothing.
-          container:
-            declarationSite?.within === resolved?.name ? undefined : declarationSite?.within,
+          container: holder === resolved?.name ? undefined : holder,
           // From the definition itself, not from the page rows: the subject
           // line owes its location in every state, and deriving it from the
           // page dropped it whenever the declaration row fell outside the
@@ -782,9 +801,7 @@ export const registerNavigationTools = (
           // is supposed to hold none.
           anchor: matched ? displayPath(matched.uri, root) : undefined,
           total: output?.total ?? 0,
-          // Exact at offset 0, where a declaration row can appear; deeper
-          // windows always have more references than one declaration.
-          noUses: (output?.total ?? 0) - (declarationSite ? 1 : 0) <= 0,
+          noUses: (output?.total ?? 0) === 0,
           page:
             output && (output.nextOffset !== undefined || output.offset > 0)
               ? {
@@ -795,7 +812,7 @@ export const registerNavigationTools = (
                   next: output.nextOffset,
                 }
               : undefined,
-          groups: referenceGroups(uses),
+          groups: referenceGroups(ordered),
         },
       });
       return appendDiagnosticContext(textResult(rendered.text), await diagnosticContext);

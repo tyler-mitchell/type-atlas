@@ -1,4 +1,4 @@
-"signedAmount" occurs 8 times in 5 files · 48 files scanned under the workspace.
+"signedAmount" occurs 10 times in 6 files · 54 files scanned under the workspace.
 
 packages/accounts/src/index.ts:12:39 · export { credit, debit, type Posting, signedAmount } from "./posting.ts";
 packages/accounts/src/journal.ts
@@ -8,6 +8,9 @@ packages/accounts/src/posting.ts:25:14 · export const signedAmount = (posting: 
 packages/reconcile/src/drift.ts
 ├  4:24  · import { type Posting, signedAmount } from "@ledger/accounts";
 └  20:37 · const journalTotal = postings.map(signedAmount).reduce((total, amount) => total + amount);
+packages/reconcile/src/matching.ts
+├  1:55  · // DELIBERATELY BROKEN — the imports for `money` and `signedAmount` are
+└  14:20 · const amount = signedAmount(posting);
 packages/reports/src/balance.ts
 ├  6:3   · signedAmount,
 └  34:57 · add(own.get(posting.account) ?? zero(currency), signedAmount(posting)),

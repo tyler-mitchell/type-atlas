@@ -1,0 +1,67 @@
+<!-- Generated from the scenario captures by packages/mcp/scripts/render-docs.ts — edit the source, not this file. -->
+
+# `references`
+
+Return a bounded page of reference locations, across every project loaded this session unless scope narrows it. Set raw to return the complete scope instead of one page.
+
+## type used across packages
+
+```yaml
+tool: References
+workspace: fixtures/ledger
+file: packages/money/src/money.ts
+position: {"line":12,"character":13}
+```
+
+~~~text
+Money [type] · packages/money/src/money.ts:12:13
+30 references · 4 projects loaded · packages/money/tsconfig.json
+
+1-20 of 30 references · pass offset: 20 for the rest
+
+packages/accounts/src/journal.ts
+├  1:28  — at module level
+├  14:35 — inside constructor
+├  31:61 — inside post
+└  36:62 — inside post
+packages/accounts/src/posting.ts
+├  9:79  — inside Posting
+├  10:80 — inside Posting
+├  12:53 — inside debit
+├  18:54 — inside credit
+└  25:49 — inside signedAmount
+packages/money/src/index.ts
+└  7:8 — at module level
+packages/money/src/money.ts
+├  27:73 — inside money
+├  28:53 — inside money
+├  30:43 — inside zero
+├  32:27 — inside add
+├  32:41 — inside add
+├  32:49 — inside add
+├  39:31 — inside negate
+├  39:39 — inside negate
+├  41:31 — inside isZero
+└  44:31 — inside format
+~~~
+
+## function with scoped answer
+
+```yaml
+tool: References
+workspace: fixtures/ledger
+file: packages/accounts/src/account.ts
+position: {"line":18,"character":14}
+```
+
+~~~text
+normalBalance [function] · packages/accounts/src/account.ts:18:14
+3 references · 4 projects loaded · packages/accounts/tsconfig.json
+
+packages/accounts/src/index.ts
+└  8:3 — at module level
+packages/reports/src/statement.ts
+├  1:24 — at module level
+└  9:17 — inside shown
+~~~
+

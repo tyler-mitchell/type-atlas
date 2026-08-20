@@ -1,0 +1,20 @@
+packages/reconcile/src/matching.ts · 2 problems · packages/reconcile/tsconfig.json
+
+=== packages/reconcile/src/matching.ts ===
+
+error ts(2304) 14:20-14:32 — inside amount
+  Cannot find name 'signedAmount'.
+   12 |   const matched = new Map<Posting, StatementLine>();
+   13 |   for (const posting of postings) {
+   14 |     const amount = signedAmount(posting);
+      |                    ^^^^^^^^^^^^
+   15 |     const line = lines.find(
+   16 |       (candidate) => candidate.amount.minorUnits === amount.minorUnits,
+
+error ts(2304) 24:37-24:42 — inside emptyRemainder
+  Cannot find name 'money'.
+   22 |
+   23 | /** The zero of a matching pass, for currencies the statement never names.…
+   24 | export const emptyRemainder = () => money(0, "USD");
+      |                                     ^^^^^
+   25 |
