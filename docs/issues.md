@@ -694,15 +694,6 @@ one-line fold ("+ 6 standard-library calls"), not rows that outnumber the
 signal. Observed 2026-08-20 in
 `responses/callees/what-balances-as-of-invokes.txt`.
 
-### `inspect_symbol` elides mentions with no handle to the rest
-
-"Mentions that are not calls (3 of 7 references…)" names four unshown
-references and offers no way to see them — `references` in the same situation
-writes "pass offset: 20 for the rest". The alias-`Money` capture also renders
-an implementation-walk apology ("the walk reaches only files this session has
-opened…") for a type alias, where an implementations section can never apply.
-Observed 2026-08-20 in `responses/inspect_symbol/`.
-
 ## Architecture
 
 ### `atlascii` still carries test-reporter output formats

@@ -40,6 +40,8 @@ packages/accounts/tests/journal.test.ts:3:25-3:32:  import { credit, debit, Jour
 packages/accounts/src/index.ts:11:22-11:29:  export { type Entry, Journal, UnbalancedEntryError } from "./journal.ts";
 packages/reports/src/balance.ts:4:8-4:15:  type Journal,
 packages/importers/src/csv.ts:1:10-1:17:  import { Journal, type Entry, credit, debit, type AccountPath } from "@ledger/accounts";
+
+references lists all 9, with paging.
 ~~~
 
 ## money type
@@ -64,8 +66,6 @@ The brand keeps a raw `{ amount, currency }` literal out of ledger math:
 every `Money` passed through the system was constructed by `money()` and is
 therefore integral and currency-tagged.
 
-No implementation answered — the walk reaches only files this session has opened, so a declaration realising this in an untouched file reports nothing here. references lists every use, including those declarations.
-
 ## Mentions that are not calls (8 of 38 references · 8 projects loaded)
 
 packages/money/tests/rounding-parity.ts:1:15-1:20:  import { type Money, money } from "@ledger/money";
@@ -76,5 +76,7 @@ packages/reports/src/statement.ts:2:23-2:28:  import { format, type Money, negat
 packages/reports/src/balance.ts:8:35-8:40:  import { add, type Currency, type Money, zero } from "@ledger/money";
 packages/reconcile/src/drift.ts:5:30-5:35:  import { format, money, type Money } from "@ledger/money";
 packages/rules/src/builtin.ts:2:34-2:39:  import { add, isZero, zero, type Money } from "@ledger/money";
+
+references lists all 38, with paging.
 ~~~
 

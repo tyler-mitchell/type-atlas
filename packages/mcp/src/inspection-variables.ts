@@ -217,9 +217,15 @@ export const inspectionVariables = (input: {
     // nowhere", and on this platform the implementation walk answers only
     // from files the session has opened — a kek interface with realisers in
     // untouched files misled exactly that way. Only for kinds a reader
-    // expects the section on; a variable's absent section claims nothing.
+    // expects the section on; a variable's absent section claims nothing —
+    // and neither does a type alias's: nature maps aliases to [interface]
+    // for the kind word, but nobody writes `implements` against a branded
+    // alias, and the walk apology under `Money` read as a promise of hidden
+    // implementors. The alias shows itself in hover's own first line.
     unansweredImplementations:
-      primary.kind === SymbolKind.Interface && implementations.length === 0,
+      primary.kind === SymbolKind.Interface &&
+      implementations.length === 0 &&
+      !/^```\w*\s*type\s/u.test(result.hover ?? ""),
     typeDefinitions: counted(typeDefinitions, locationGroups(typeDefinitions, root)),
     callers:
       callers.length > 0

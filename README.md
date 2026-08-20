@@ -97,6 +97,8 @@ packages/accounts/tests/journal.test.ts:3:25-3:32:  import { credit, debit, Jour
 packages/accounts/src/index.ts:11:22-11:29:  export { type Entry, Journal, UnbalancedEntryError } from "./journal.ts";
 packages/reports/src/balance.ts:4:8-4:15:  type Journal,
 packages/importers/src/csv.ts:1:10-1:17:  import { Journal, type Entry, credit, debit, type AccountPath } from "@ledger/accounts";
+
+references lists all 9, with paging.
 ~~~
 
 ### `document_symbols` — errors arrive unasked
