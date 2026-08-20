@@ -22,7 +22,33 @@ const ensureFixtureInstalled = (): void => {
   }
 };
 
+/**
+ * The fixture has no git identity of its own — `list_files`' change markers
+ * read this repository's status. Captures accepted while fixture files sat
+ * uncommitted here therefore baselined `· untracked` rows about files that
+ * ship committed, and the documentation repeated the lie until the next
+ * clean-tree run failed on it. Accepting is where the poison enters, so an
+ * update run refuses a dirty fixture; a plain run only warns, because
+ * iterating against a fixture mid-edit is legitimate.
+ */
+const ensureFixtureCleanForAccept = (): void => {
+  const status = spawnSync("git", ["status", "--porcelain", "--", fixtureRoot], {
+    cwd: fixtureRoot,
+    stdio: "pipe",
+    encoding: "utf8",
+  });
+  const dirty = status.status === 0 ? status.stdout.trim() : "";
+  if (dirty.length === 0) return;
+  const updating = process.argv.some((argument) => argument === "-u" || argument === "--update");
+  const message = `The fixture has uncommitted changes, and list_files captures embed git state:\n${dirty}`;
+  if (updating) {
+    throw new Error(`${message}\nCommit the fixture before accepting captures (vitest -u).`);
+  }
+  console.warn(`${message}\nGit-marked captures will differ until the fixture is committed.`);
+};
+
 export default function setup(project: TestProject) {
   ensureFixtureInstalled();
+  ensureFixtureCleanForAccept();
   project.onTestsRerun(() => ensureFixtureInstalled());
 }

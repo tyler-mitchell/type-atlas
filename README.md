@@ -253,11 +253,11 @@ depth: 2
 
 ~~~text
 packages/money/
-├  src/ · 4 changed
+├  src/ · 3 changed
 │  ├  currency.ts · 21 loc · modified
 │  ├  index.ts · deleted
 │  ├  money.ts · 52 loc
-│  ├  rounding-mode.ts · 15 loc · untracked
+│  ├  rounding-mode.ts · 15 loc
 │  └  rounding.ts · 11 loc · untracked
 ├  tests/
 │  └  money.test.ts · 15 loc

@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { createTwoFilesPatch } from "diff";
 import { expect, test as baseTest } from "vitest";
 import {
   type Arrange,
@@ -72,10 +73,17 @@ export const scenarioTest = baseTest
         // the run output — new and changed responses are exactly the ones a
         // developing agent must read, and the run stream is where they are
         // read. Unchanged captures stay silent; echoing all of them would
-        // drown the signal in hundreds of unchanged lines.
+        // drown the signal in hundreds of unchanged lines. A changed capture
+        // also carries its diff: the full response is how presentation is
+        // judged, the diff is what an accepting `-u` run is agreeing to — and
+        // `-u` otherwise shows no diff at all at the one irreversible step.
         if (committed === undefined || committed.trimEnd() !== response.trimEnd()) {
+          const diff =
+            committed === undefined
+              ? ""
+              : `\n${createTwoFilesPatch(`${id} (committed)`, `${id} (this run)`, committed, response)}`;
           console.log(
-            `── ${id} ${committed === undefined ? "(new)" : "(changed)"} ──\n${response}`,
+            `── ${id} ${committed === undefined ? "(new)" : "(changed)"} ──\n${response}\n${diff}`,
           );
         }
         await expect(

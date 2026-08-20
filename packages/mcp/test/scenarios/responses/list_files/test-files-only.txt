@@ -1,9 +1,9 @@
 ledger/
-└  packages/ · 11 changed
+└  packages/
    ├  accounts/
    │  └  tests/
    │     └  journal.test.ts · 29 loc
-   ├  money/ · 2 changed
+   ├  money/
    │  └  tests/
    │     └  money.test.ts · 15 loc
    └  utils/

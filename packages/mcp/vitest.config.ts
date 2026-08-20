@@ -18,8 +18,10 @@ export default defineConfig({
     // matter, the passing `-u` regenerations. Verbose is the terminal
     // reporter that reports passing tests' output (and annotations), so the
     // changed-capture echoes land in the run stream the developing agent is
-    // already reading.
+    // already reading. Skipped rows leave: verbose otherwise prints ~70 `↓`
+    // lines around the one echo a `-t`-filtered run exists to show.
     reporters: ["verbose"],
+    hideSkippedTests: true,
     // The scenario suite exercises the fixture and the tool source through a
     // spawned stdio server, which Vite's module graph cannot see — without
     // these triggers, watch mode would never rerun captures after the edits

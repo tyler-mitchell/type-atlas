@@ -7,10 +7,19 @@ import { capturedIds, scenarioTest } from "./scenario-test.ts";
  * `it(...)`: its test name is the case name, `capture` snapshots the
  * invocation as `responses/<tool>/<name>.call.json` and the response as
  * `responses/<tool>/<name>.txt`, and the final test snapshots the manifest
- * every downstream consumer enumerates. `vitest -u` regenerates all of it
- * after a deliberate change; the diff under `responses/` is then reviewed
- * like code — and read, capture by capture — because it is what both
- * regression comparison and the generated documentation say to agents.
+ * every downstream consumer enumerates.
+ *
+ * The development loop is single-case, not full-suite. To iterate on one
+ * tool: `pnpm case "<case-name>"` — watch mode filtered to the case, and
+ * `watchTriggerPatterns` reruns it on edits in `packages/{core,mcp,
+ * language-server}/src`, `atlascii/src`, and the fixture, which the module
+ * graph cannot see. Every new or changed response prints itself, with its
+ * diff, into the run output — read it there; the response in full is how
+ * presentation is judged. `pnpm accept "<case-name>"` writes the capture
+ * once it is right. Then, before any commit: a full `pnpm test` — a
+ * tool change ripples into sibling captures and the generated docs, and the
+ * filtered loop deliberately sees neither; the full plain run is the gate
+ * that fails on whatever the narrow loop left stale.
  *
  * Positions are one-based and point at the symbol's name, the way an agent
  * sends them. They are load-bearing: editing a fixture file shifts them, so

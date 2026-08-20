@@ -358,6 +358,20 @@ intent — the line-number gutter spends tokens on numbers nothing will use.
 An optional argument should let a reader ask for the bare text. Deferred on
 arrival per the standing rule.
 
+### 〈raised〉 `list_files` wants per-expansion limits and `… N more` elision rows
+
+Raised 2026-08-20, with a sketch. Two asks beyond the existing global `limit`
+(default 500): the `expand` record's options object should accept its own
+`limit`, so one opened corner cannot eat the whole budget; and when the bound
+cuts inside a directory, the tree should show the children that fit plus a
+`… N more` row, instead of the current rule where a cut inside a directory
+folds the whole parent (`assembleTree`'s completeness rule — correct, but it
+hides even the entries that were crawled). The default should suit an agent
+in a very large monorepo. Sketch's formatting is illustrative, not binding.
+Investigation had reached `workspace-tree.ts` (assembleTree, the per-crawl
+`withMaxFiles(limit + 2)` cap, and the `over`/`limit` document variables)
+when the session moved on.
+
 ### The scope clause has two phrasings
 
 `callers` writes "across loaded projects" where `references`,
