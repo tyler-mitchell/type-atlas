@@ -15,14 +15,18 @@ import { type } from "arktype";
 import { dispatchTool, registerTool } from "./tool.ts";
 
 /**
- * Whether this server is running from source — the development loop's mode.
+ * Whether this server belongs to the development loop's host.
  *
- * The published package runs `dist`; the development hosts run `src/cli.ts`
- * under `--conditions=development`, so the module path itself is the mode,
- * and nothing configurable can leave development affordances reachable from
- * a production install.
+ * Two facts, both required: running from source (`src/cli.ts` under
+ * `--conditions=development` — the published package runs `dist`, so no
+ * production install can ever qualify), and the development host's own
+ * explicit marker in its server environment. The second exists because
+ * every local host here runs source — production agents and the loop share
+ * the machine — and a development affordance visible in a production
+ * catalog plants the idea that the server is theirs to modify.
  */
-const runningFromSource = import.meta.url.includes("/src/");
+const developmentHost =
+  import.meta.url.includes("/src/") && process.env.TYPE_ATLAS_DEV === "1";
 
 export const registerTools = (
   server: McpServer,
@@ -45,7 +49,7 @@ export const registerTools = (
   // one schema that never changes: any registered tool, by name, validated
   // by its live schema at dispatch. Source-run only; a production install
   // runs dist and never has it.
-  if (runningFromSource) {
+  if (developmentHost) {
     registerTool(
       server,
       "call",
