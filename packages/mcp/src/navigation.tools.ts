@@ -575,7 +575,7 @@ export const registerNavigationTools = (
     {
       title: "Callers",
       description:
-        "Show which functions call the callable symbol at a position, grouped by caller with exact call sites. Use this instead of references when tracing incoming execution flow.",
+        "Show which functions call the callable symbol at a position, across every project loaded this session, grouped by caller with exact call sites. Use this instead of references when tracing incoming execution flow.",
       inputSchema: input.Position,
       annotations: readOnlyToolAnnotations,
     },

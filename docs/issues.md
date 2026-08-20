@@ -376,13 +376,6 @@ maintainer. Items already in flight are marked; the rest stand alone:
   would catch an ignored `solver: "block"` hidden behind an object spread;
   TypeScript itself cannot see that contract lie through a spread.
 
-### The scope clause has two phrasings
-
-`callers` writes "across loaded projects" where `references`,
-`file_references`, and `workspace_symbols` write "across every project loaded
-this session". One fact, two sentences; the catalog should own the phrase
-once. Observed 2026-08-19.
-
 ### A location is shown three ways
 
 Tree rows under a file (`references`, `file_references`,
