@@ -8,8 +8,6 @@ import { registerExperimentalTools } from "./experimental.tools.ts";
 import { registerIntelligenceTools } from "./intelligence.tools.ts";
 import { registerNavigationTools } from "./navigation.tools.ts";
 import { registerReadFileTool } from "./read_file.tool.ts";
-import { existsSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { registerWorkspaceTools } from "./workspace.tools.ts";
 import type { Semble } from "./semble.ts";
 import type { VolarWorkspacePool } from "@type-atlas/core";
@@ -20,24 +18,17 @@ import { dispatchTool, registerTool } from "./tool.ts";
  * Whether this server belongs to the development loop.
  *
  * Running from source is the hard wall: the published package runs `dist`,
- * so no external install can ever qualify. The marker — an env var, or a
- * `.type-atlas-dev` file beside the repo's package.json — exists so the
- * door can open for a session whose host env predates it: the file is read
- * at each backend boot, and a reload is a boot, so no host restart is ever
- * needed to enter or leave development.
+ * so no external install can ever qualify. The env marker is the second,
+ * set only in the development hosts' server configs.
  */
 export const developmentHost =
-  import.meta.url.includes("/src/") &&
-  (process.env.TYPE_ATLAS_DEV === "1" ||
-    existsSync(fileURLToPath(new URL("../../../.type-atlas-dev", import.meta.url))));
+  import.meta.url.includes("/src/") && process.env.TYPE_ATLAS_DEV === "1";
 
 /**
- * What a development session must know before its first call, appended to the
- * server instructions only where the gateway itself exists. A client pins
- * tool schemas when it connects, and an agent that learns this from a failed
- * call has already lost an hour to it.
+ * What a development session must know before its first call, appended to
+ * the server instructions only where the gateway itself exists.
  */
-export const developmentInstructions = `Development loop: your client pinned every tool schema when it connected, so a tool or parameter added after that is invisible or silently stripped from your calls. The \`call\` tool is the door: \`call { tool, arguments }\` dispatches to any current tool, validated by its live schema — use it whenever a capability is newer than your session. \`reload\` rebuilds and restarts this server; a failed build leaves the running server untouched.`;
+export const developmentInstructions = `Development loop: your client reads this server's tool list once, at connect, so a tool created after that is not in your catalog — \`call { tool, arguments }\` dispatches to any current tool by name, validated by its live schema. \`reload\` rebuilds and restarts this server; a failed build leaves the running server untouched.`;
 
 export const registerTools = (
   server: McpServer,
