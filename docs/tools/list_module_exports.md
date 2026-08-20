@@ -18,27 +18,27 @@ Seen from packages/reports/src/balance.ts · runtime surface.
 
 === @ledger/money · 11 exports ===
 
-add: (alias) const add: (left: __module.Money, right: __module.Money) => __module.Money
+add: (alias) const add: (left: Money, right: Money) => Money
    export add
 CurrencyMismatchError: (alias) class CurrencyMismatchError
    export CurrencyMismatchError
-currencyProfiles: (alias) const currencyProfiles: Record<__module.Currency, __module.CurrencyProfile>
+currencyProfiles: (alias) const currencyProfiles: Record<Currency, CurrencyProfile>
    export currencyProfiles
-format: (alias) const format: (value: __module.Money) => string
+format: (alias) const format: (value: Money) => string
    export format
-isCurrency: (alias) const isCurrency: (value: string) => value is __module.Currency
+isCurrency: (alias) const isCurrency: (value: string) => value is Currency
    export isCurrency
-isZero: (alias) const isZero: (value: __module.Money) => boolean
+isZero: (alias) const isZero: (value: Money) => boolean
    export isZero
-money: (alias) const money: (minorUnits: bigint | number, currency: __module.Currency) => __module.Money
+money: (alias) const money: (minorUnits: bigint | number, currency: Currency) => Money
    export money
-negate: (alias) const negate: (value: __module.Money) => __module.Money
+negate: (alias) const negate: (value: Money) => Money
    export negate
 RoundingMode: (alias) enum RoundingMode
    export RoundingMode
-roundingModeOf: (alias) const roundingModeOf: (bank: string) => __module.RoundingMode
+roundingModeOf: (alias) const roundingModeOf: (bank: string) => RoundingMode
    export roundingModeOf
-zero: (alias) const zero: (currency: __module.Currency) => __module.Money
+zero: (alias) const zero: (currency: Currency) => Money
    export zero
 ~~~
 
@@ -57,7 +57,7 @@ Seen from packages/reports/src/balance.ts · runtime surface · matching balance
 
 === @ledger/accounts · 2 exports ===
 
-normalBalance: (alias) const normalBalance: (kind: __module.AccountKind) => "debit" | "credit"
+normalBalance: (alias) const normalBalance: (kind: AccountKind) => "debit" | "credit"
    export normalBalance
 UnbalancedEntryError: (alias) class UnbalancedEntryError
    export UnbalancedEntryError

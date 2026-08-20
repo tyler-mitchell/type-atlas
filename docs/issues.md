@@ -694,14 +694,6 @@ one-line fold ("+ 6 standard-library calls"), not rows that outnumber the
 signal. Observed 2026-08-20 in
 `responses/callees/what-balances-as-of-invokes.txt`.
 
-### `list_module_exports` leaks `__module.` into signatures
-
-Every re-exported signature renders as
-`(alias) const add: (left: __module.Money, …) => __module.Money` — an
-internal alias qualifier no consumer ever writes. The reader's name for that
-type is `Money`. Observed 2026-08-20 in
-`responses/list_module_exports/workspace-package-surface.txt`.
-
 ### `inspect_symbol` elides mentions with no handle to the rest
 
 "Mentions that are not calls (3 of 7 references…)" names four unshown

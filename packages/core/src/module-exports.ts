@@ -132,6 +132,27 @@ const probe = ({
 };
 
 /**
+ * The probe imports the module under the alias `__module`, and TypeScript
+ * prints that alias into every resolved signature — `(left: __module.Money)`
+ * is scaffolding no consumer ever wrote. The alias leaves the text here,
+ * before anything downstream reads it.
+ */
+const withoutProbeAlias = (item: CompletionItem): CompletionItem => ({
+  ...item,
+  ...(item.detail === undefined ? {} : { detail: item.detail.replaceAll("__module.", "") }),
+  ...(typeof item.documentation === "string"
+    ? { documentation: item.documentation.replaceAll("__module.", "") }
+    : item.documentation !== undefined && "value" in item.documentation
+      ? {
+          documentation: {
+            ...item.documentation,
+            value: item.documentation.value.replaceAll("__module.", ""),
+          },
+        }
+      : {}),
+});
+
+/**
  * Lists the exports TypeScript exposes to an importing file.
  *
  * Results preserve Volar's completion order. Runtime mode observes namespace
@@ -296,7 +317,7 @@ export const listModuleExports = async ({
         subpaths,
         isIncomplete: Array.isArray(completion) ? false : (completion?.isIncomplete ?? false),
         ...resultPage,
-        items: selectedItems,
+        items: selectedItems.map(withoutProbeAlias),
         resolved: completion !== null,
       };
     },

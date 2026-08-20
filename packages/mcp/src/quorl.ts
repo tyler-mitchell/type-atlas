@@ -164,8 +164,11 @@ export const createQuorl =
       return {
         name: node.name,
         fields: [
+          // Same file as the parent: the position stands alone, the way
+          // every grouped location on this surface reads — `:12:52` kept a
+          // colon whose path the row above had already said.
           underFile
-            ? `:${positionText(node.selection.start)}`
+            ? positionText(node.selection.start)
             : `${displayPath(node.uri, request.workspace)}:${positionText(node.selection.start)}`,
           frontier.has(id) ? frontierMark : undefined,
         ],
