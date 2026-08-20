@@ -8,13 +8,17 @@ Every account's balance as of a cutoff, including ancestor accounts that
 were never posted to directly — `assets` earns a line because
 `assets:bank:checking` did.
 
-## Calls (3 workspace · 6 dependency/runtime)
+## Calls (4 workspace · 6 dependency/runtime)
 
 Every call site is in packages/reports/src/balance.ts; each row names where the callee is declared.
 
-lineage [function] packages/accounts/src/account.ts:27:14-27:21 · range 27:24-28:86 · calls 40:28-40:35
-signedAmount [function] packages/accounts/src/posting.ts:25:14-25:26 · range 25:29-32:2 · calls 34:57-34:69
-zero [function] packages/money/src/money.ts:14:14-14:18 · range 14:21-14:71 · calls 34:41-34:45, 41:56-41:60, 48:32-48:36
+packages/accounts/src/account.ts
+└  lineage [function] 27:14-27:21 · range 27:24-28:86 · calls 40:28-40:35
+packages/accounts/src/posting.ts
+└  signedAmount [function] 25:14-25:26 · range 25:29-32:2 · calls 34:57-34:69
+packages/money/src/money.ts
+├  zero [function] 30:14-30:18 · range 30:21-30:71 · calls 34:41-34:45, 41:56-41:60, 48:32-48:36
+└  add [function] 38:14-38:17 · range 38:20-43:2 · calls 34:9-34:12, 41:28-41:31
 
 Dependency/runtime: localeCompare, entries, map, sort, get, set
 

@@ -3,6 +3,7 @@ import { readFile, stat } from "node:fs/promises";
 import { watch } from "chokidar";
 import * as path from "pathe";
 import {
+  DidChangeTextDocumentNotification,
   DidCloseTextDocumentNotification,
   DidOpenTextDocumentNotification,
   FileChangeType,
@@ -244,9 +245,34 @@ const startVolarWorkspace = async (workspaceRoot: string, languageServerEntry: U
       const preceding = openDocuments.get(uri) ?? Promise.resolve();
       const attempt = preceding.then(async () => {
         signal?.throwIfAborted();
+        // Opening a real file's uri with text that differs from disk poisons
+        // the platform: Volar stores the OPENED text in a cache keyed by the
+        // DISK mtime (updateFsCacheFromSyncedDocument), the tool never
+        // writes, so the poison outlives the close and the file answers with
+        // the synthetic text for the rest of the session — verify_edit's
+        // closed proposal flipped explore_symbol's corpus with run breadth.
+        // No after-the-fact cure worked: cache rewrites, watched-file pings,
+        // mtime touches all lost a race to the bridge's own async state.
+        // So don't poison: open with DISK text (cache write is a no-op),
+        // then EDIT to the synthetic text — an honest versioned didChange,
+        // the editor path — and edit back before the close. A probe's uri
+        // has no disk file and opens directly with its text.
+        const onDisk = await readFile(fileURLToPath(uri), "utf8").catch(() => undefined);
+        const editedOverDisk = onDisk !== undefined && onDisk !== source;
         await server.sendNotification(DidOpenTextDocumentNotification.type, {
-          textDocument: { uri, languageId, version: ++documentVersion, text: source },
+          textDocument: {
+            uri,
+            languageId,
+            version: ++documentVersion,
+            text: editedOverDisk ? onDisk : source,
+          },
         });
+        if (editedOverDisk) {
+          await server.sendNotification(DidChangeTextDocumentNotification.type, {
+            textDocument: { uri, version: ++documentVersion },
+            contentChanges: [{ text: source }],
+          });
+        }
         try {
           return await task({ uri });
         } finally {
@@ -255,6 +281,12 @@ const startVolarWorkspace = async (workspaceRoot: string, languageServerEntry: U
           // as a bare "Connection is disposed" from this close, masking the
           // exit report that named the crash, for as long as it could throw.
           try {
+            if (editedOverDisk) {
+              await server.sendNotification(DidChangeTextDocumentNotification.type, {
+                textDocument: { uri, version: ++documentVersion },
+                contentChanges: [{ text: onDisk }],
+              });
+            }
             await server.sendNotification(DidCloseTextDocumentNotification.type, {
               textDocument: { uri },
             });

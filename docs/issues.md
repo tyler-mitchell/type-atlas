@@ -428,26 +428,44 @@ is the absence-honesty failure in section form. Which upstream request goes
 empty on a cold project, and whether the section should say "unanswered"
 rather than vanish, is undiagnosed. Observed 2026-08-19.
 
-Now deterministically reproducible in-repo through `explore_symbol`
-(2026-08-20), and worse than a vanishing section — the call section changes
-shape and content with run breadth. The committed
-`responses/explore_symbol/function-with-similarity-tail.txt` baseline, written
-by a full-suite `capture` run, shows `## Calls (3 workspace …)` as flat rows
-with `zero` at a position money.ts has not had for days (`14:14`); every
-filtered run of the same case (`vp run "@type-atlas/mcp#case"
-function-with-similarity-tail`) renders `## Calls (4 workspace …)` grouped by
-declaring file, `add` included, `zero` at its current `30:14`. A second full
-plain run reproduced the flat form byte-for-byte (85/85 green), so the two
-shapes are each stable — the discriminator is what the session did before the
-call. Suspicion: an earlier case's fixture arrangement leaves the language
-server holding a superseded document state that the inspection's call walk then
-reads. First discriminating run (2026-08-20): `only-the-delta` immediately
-before the explore case — an arrangement that edits and restores fixture files
-— still rendered the grouped/current form, so that arrangement class alone
-does NOT flip it; the discriminator sits earlier in the full run's prefix.
-Until diagnosed, any accept run for this case records whichever shape
-its run breadth produces, and the corpus gate will flip when the other breadth
-runs it.
+DIAGNOSED to its layer and QUARANTINED (2026-08-20): the in-repo shape flip
+was `verify_edit` poisoning session state for the proposed file. Full chain,
+each step witnessed:
+
+- **The poisoner is `verify_edit`**, not run breadth: with only
+  `proposed-edit-breaks-a-consumer` before it, `explore_symbol` on
+  `balancesAsOf` answers the wrong form; alone, it answers true (grouped,
+  `add` present, `zero` at its real `30:14`).
+- **Half the mechanism is Volar's, found and FIXED**: `typescriptProjectLs`
+  writes the OPENED text into its module-level `fsFileSnapshots` keyed by the
+  DISK mtime (`updateFsCacheFromSyncedDocument`), and a read-only tool never
+  moves the mtime, so a proposal opened over a real uri stayed authoritative
+  after its close. `withTextDocument` now opens with DISK text and applies
+  the synthetic source as an honest versioned `didChange` (and change-back
+  before close) — the editor path; the poisoned-cache class is closed for
+  every consumer.
+- **The residue is scenario-session-only state corruption**: after the (now
+  cache-clean) proposal diagnostics, the suite session answers `zero` at
+  `10:4-10:8 · range 10:11-12:14` — coordinates matching NO text (not disk,
+  not the proposal, not any sibling file), with `add` dropped. `callees` and
+  `explore_symbol` are hit identically (so it is server state, not one
+  answer path), and the SAME sequence live over the attached server — cold
+  fork, the suite's own eight-doorway warm-up replayed, back-to-back calls —
+  answers perfectly, every time. Every after-the-fact repair lost to it
+  identically: watched-file pings, didChange-to-disk, disk re-open (which
+  produced the same phantom coordinates), mtime touch, double sync pumps,
+  sacrificial requests. Same family as the torn inlay-hint spans (below):
+  positions assembled from state no current text has.
+- **Quarantine**: the case now lives in the hazard corner, after every
+  scenario that reads positions, so the corpus is order-deterministic again;
+  its own capture is sound. Reproducer, should the platform move: put the
+  case back before `explore_symbol` and run
+  `vp run "@type-atlas/mcp#case:run" "proposed-edit-breaks-a-consumer|function-with-similarity-tail"`
+  — a tear renders `zero` off its true `30:14`.
+
+Why the suite session tears where a live session does not is the open
+remainder; the kek warmth observation above may be this same class witnessed
+from the other end.
 
 ### The bridge prints a type containing torn source text
 

@@ -70,7 +70,6 @@ impact/weigh-a-change-to-signed-amount
 impact/weigh-a-change-to-a-shared-type
 file_references/who-imports-money
 document_links/json-schema-reference
-verify_edit/proposed-edit-breaks-a-consumer
 compose/settlement-dossier
 investigate_code/behavioral-question-lands
 investigate_code/absent-concept-stays-absent
@@ -81,3 +80,4 @@ document_links/fixture-readme
 find_successor/renamed-method-hunch
 find_successor/close-miss-finds-the-successor
 find_successor/test-residue-is-not-a-capability
+verify_edit/proposed-edit-breaks-a-consumer
