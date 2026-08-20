@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/server";
 import { serveStdio } from "@modelcontextprotocol/server/stdio";
 import { serverInfo, serverInstructions } from "./metadata.ts";
+import { developmentHost, developmentInstructions } from "./tools.ts";
 import { configurePresentation } from "atlascii";
 import { presentationFromEnvironment } from "./presentation.ts";
 
@@ -65,7 +66,9 @@ export const startMcpServer = async (): Promise<void> => {
     () => {
       const server = new McpServer(serverInfo, {
         instructions: runtime.ok
-          ? serverInstructions
+          ? developmentHost
+            ? `${serverInstructions}\n\n${developmentInstructions}`
+            : serverInstructions
           : `This server could not load its tools: ${runtime.error.message}\n\nIt is answering so the session survives the failure. Fix the source and call \`reload\`; the tools return with it.`,
         capabilities,
       });

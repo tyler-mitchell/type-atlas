@@ -26,10 +26,18 @@ import { dispatchTool, registerTool } from "./tool.ts";
  * at each backend boot, and a reload is a boot, so no host restart is ever
  * needed to enter or leave development.
  */
-const developmentHost =
+export const developmentHost =
   import.meta.url.includes("/src/") &&
   (process.env.TYPE_ATLAS_DEV === "1" ||
     existsSync(fileURLToPath(new URL("../../../.type-atlas-dev", import.meta.url))));
+
+/**
+ * What a development session must know before its first call, appended to the
+ * server instructions only where the gateway itself exists. A client pins
+ * tool schemas when it connects, and an agent that learns this from a failed
+ * call has already lost an hour to it.
+ */
+export const developmentInstructions = `Development loop: your client pinned every tool schema when it connected, so a tool or parameter added after that is invisible or silently stripped from your calls. The \`call\` tool is the door: \`call { tool, arguments }\` dispatches to any current tool, validated by its live schema — use it whenever a capability is newer than your session. \`reload\` rebuilds and restarts this server; a failed build leaves the running server untouched.`;
 
 export const registerTools = (
   server: McpServer,
