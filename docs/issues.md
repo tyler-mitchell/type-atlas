@@ -395,7 +395,20 @@ maintainer. Items already in flight are marked; the rest stand alone:
   would catch an ignored `solver: "block"` hidden behind an object spread;
   TypeScript itself cannot see that contract lie through a spread.
 
-### A location is shown three ways
+### Generated-output discovery sees tsconfig outDirs and misses bundlers
+
+The occurrences exclusion (bcf1ef0) discovers build output from tsconfig
+`outDir` alone — and kek's committed bundles come from Vite, whose outDir
+lives in `vite.config.ts`, so the scan that motivated the feature still
+drowns: `occurrences "enabled:" packages/webgpu-engine/examples` leads with
+five minified rows from `examples/dist/assets/` (witnessed 2026-08-20, new
+server, feature live — the same scan one directory down, `examples/src`, is
+clean). A bundler's config is TypeScript and cannot be cheaply evaluated;
+the config-grounded extension is presence-based — a `dist/` beside a
+`vite.config.*`/`rollup.config.*`/`esbuild` config is that bundler's
+declared-by-default output and can be excluded under the same disclosure.
+The fixture cannot witness either branch (its dist is gitignored); a
+generated-output fixture corner is the corpus-deepening item.
 
 Tree rows under a file (`references`, `file_references`,
 `document_highlights`), a `❯` pointer (`definitions`, `implementations`,
