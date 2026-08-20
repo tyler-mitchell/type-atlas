@@ -732,6 +732,43 @@ genuinely needs ASCII-only output.
 
 ## Architecture
 
+### The two-graph problem: agents navigate a declared program graph this surface cannot see
+
+Design finding from a full navigation quest through kek-monorepo's
+webgpu-engine (2026-08-20): tracing "how does a declared system become GPU
+work" end to end — `core/system.ts` (91-symbol declaration vocabulary) →
+`definePipelineSystem` ("one cold-validated execution authority", producing
+`declaredTopology`) → `graph/compile.ts#compilePipeline` (~440 lines; orders
+passes by write→read hazard edges over declared accesses) →
+`world-engine/src/world-frame.ts#compileWorldFrame` (links GPU tables and
+readbacks into `system.contract` through seventeen string-id validation
+errors).
+
+The structural truth: an agent there works over TWO graphs. The TypeScript
+symbol graph, which this surface serves well — and the DECLARED program
+graph (command ids, resource keys, access modes, phases, capability
+exports), which is where the codebase's complexity, invariants, and runtime
+failures actually live, and to which TypeScript is structurally blind
+(string-keyed contracts, spread-carried config). Every hard question in the
+quest — who writes this resource, what order do passes run, will the linker
+accept this declaration — was a graph-two question answerable only by
+full-reading the compiler functions. Systemic coherency in such codebases IS
+graph-two coherency.
+
+Consequences, in order: (1) `occurrences` is the accidental graph-two
+workhorse (string ids) and must know generated output from authored source —
+the workspace-authority work covers this. (2) The Codex field report's three
+tool ideas (resource-flow trace, execution-grammar evaluation,
+unconsumed-config check) are all projections of graph two and should not
+become three bespoke analyzers; the engine already materializes the graph as
+plain data (`declaredTopology`, `system.contract`). (3) The general
+capability is a declared-value inspection seam — evaluate a module's
+exported declaration in its own project environment and render the resulting
+data with this surface's presentation discipline; kek's TypeGPU inspector
+already validates the pattern (it exists precisely because static tooling
+cannot see runtime-declared programs). Product-scope expansion (an
+evaluation trust model) — needs the maintainer's read before any code.
+
 ### `atlascii` still carries test-reporter output formats
 
 Removed: `format/terminal.ts` (ANSI cursor control for a live view) and
