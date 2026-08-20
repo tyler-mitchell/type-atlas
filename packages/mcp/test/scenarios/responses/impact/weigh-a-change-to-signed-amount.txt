@@ -1,0 +1,7 @@
+Changing signedAmount touches 8 uses in 5 files across 3 packages, in the projects loaded this session. No use sits in a test file.
+
+packages/accounts   4  3
+packages/reconcile  2  1
+packages/reports    2  1
+
+Retrieval also names apps/website — not loaded and not confirmed as uses, so they are outside this count. Reading a file in one loads its project, and asking again weighs it.

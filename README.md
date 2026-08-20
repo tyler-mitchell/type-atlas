@@ -42,15 +42,22 @@ are the expensive part; each one is a model turn.
 **Errors you forgot to check for.** Ask for a file's symbols and you also get its
 diagnostics, unasked:
 
+<!-- scenario:document_symbols/broken-file-answers-with-diagnostics -->
 ```
-Symbols (2 top-level) · src/example.ts
-ok [variable] selection 2:14-2:16; body 2:14-2:20
-wrong [variable] selection 1:14-1:19; body 1:14-1:40
+=== packages/reconcile/src/drift.ts · 3 top-level symbols ===
 
-Diagnostics: 1 error · src/example.ts
-error ts(2322) 1:14-1:19
-  Type 'string' is not assignable to type 'number'.
+drift [variable] 19:14-19:19 · range 19:14-22:2
+StatementLine [interface] 8:18-8:31 · range 8:1-12:2
+statementTotal [variable] 15:14-15:28 · range 15:14-16:56
+
+4 problems in packages/reconcile/src/drift.ts
 ```
+<!-- /scenario -->
+
+That response is not written by hand: it is [captured](packages/mcp/test/scenarios/)
+from the real server against a [realistic fixture monorepo](fixtures/ledger/),
+regression-checked, and embedded here by the same pipeline — what you read is
+what the tool answered.
 
 An editor shows diagnostics in the gutter continuously, so a human cannot miss
 them. An agent only learns what it asks about — and an agent that just edited

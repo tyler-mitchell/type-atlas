@@ -156,7 +156,10 @@ const scanOccurrences = async (input: {
     .crawl(scanRoot)
     .withPromise();
   const over = files.length > fileBudget;
-  const scanned = files.slice(0, fileBudget);
+  // Lexicographic, not crawl order: the filesystem's traversal order is not
+  // deterministic, and an answer that reorders between identical runs cannot
+  // be compared across changes — the same file set must read the same way.
+  const scanned = [...files].sort().slice(0, fileBudget);
   const sites: { file: string; line: number; character: number; text: string }[] = [];
   let total = 0;
   const seenFiles = new Set<string>();

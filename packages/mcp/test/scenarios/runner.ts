@@ -29,11 +29,15 @@ export const ensureFixtureInstalled = (): void => {
 };
 
 /**
- * Latency is real but not behavior: the trailing `· 12ms` line changes every
- * run, so it leaves before a response is compared or published.
+ * Latency is real but not behavior: the trailing `· 12ms` line — and the
+ * ` · 12ms` an ambient summary hangs on its last sentence — change every run,
+ * so they leave before a response is compared or published.
  */
 export const normalizeResponse = (text: string): string =>
-  text.replace(/\n\n· \d+(?:\.\d+)?m?s$/u, "").replace(/^· \d+(?:\.\d+)?m?s$/u, "");
+  text
+    .replace(/\n\n· \d+(?:\.\d+)?m?s\s*$/u, "")
+    .replace(/^· \d+(?:\.\d+)?m?s\s*$/u, "")
+    .replace(/ · \d+(?:\.\d+)?m?s\s*$/u, "");
 
 /**
  * One real server, one client, every scenario through the same stdio boundary

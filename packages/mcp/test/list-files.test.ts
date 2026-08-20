@@ -97,7 +97,7 @@ test("list_files expands a subtree in place inside one tree", async () => {
       ├  package.json · 35 loc
       ├  pnpm-lock.yaml · 3.9k loc
       ├  pnpm-workspace.yaml · 50 loc
-      ├  README.md · 261 loc
+      ├  README.md · 268 loc
       ├  server.json · 23 loc
       ├  tsconfig.json · 24 loc
       └  tsdown.config.ts · 13 loc"
@@ -140,9 +140,9 @@ test("list_files expands a subtree in place inside one tree", async () => {
       │  └  mcp/
       │     ├  assets/ · 1 file
       │     ├  bin/ · 1 file
-      │     ├  scripts/ · 1 file
+      │     ├  scripts/ · 2 files
       │     ├  src/ · 31 files
-      │     ├  test/ · 38 files
+      │     ├  test/ · 43 files
       │     ├  CHANGELOG.md · 162 loc
       │     ├  LICENSE · 188 loc
       │     ├  package.json · 88 loc
@@ -155,7 +155,7 @@ test("list_files expands a subtree in place inside one tree", async () => {
       ├  package.json · 35 loc
       ├  pnpm-lock.yaml · 3.9k loc
       ├  pnpm-workspace.yaml · 50 loc
-      ├  README.md · 261 loc
+      ├  README.md · 268 loc
       ├  server.json · 23 loc
       ├  tsconfig.json · 24 loc
       └  tsdown.config.ts · 13 loc"
@@ -182,7 +182,7 @@ test("list_files expands a subtree in place inside one tree", async () => {
       │  │  └  webgpu-engine-p0.md · 173 loc
       │  ├  code-intelligence-mcp-comparison.md · 742 loc
       │  ├  distribution-reference-research.md · 279 loc
-      │  ├  issues.md · 581 loc
+      │  ├  issues.md · 628 loc
       │  ├  kek-monorepo-latency.md · 405 loc
       │  ├  tool-latency-measurements.md · 111 loc
       │  └  typescript-code-intelligence-comparison.md · 400 loc
@@ -201,7 +201,7 @@ test("list_files expands a subtree in place inside one tree", async () => {
       ├  package.json · 35 loc
       ├  pnpm-lock.yaml · 3.9k loc
       ├  pnpm-workspace.yaml · 50 loc
-      ├  README.md · 261 loc
+      ├  README.md · 268 loc
       ├  server.json · 23 loc
       ├  tsconfig.json · 24 loc
       └  tsdown.config.ts · 13 loc"

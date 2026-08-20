@@ -63,6 +63,11 @@ export const scenarios: readonly Scenario[] = [
     name: "journal-outline",
     arguments: { file: "packages/accounts/src/journal.ts" },
   },
+  {
+    tool: "document_symbols",
+    name: "broken-file-answers-with-diagnostics",
+    arguments: { file: "packages/reconcile/src/drift.ts" },
+  },
 
   // ── hover: type and documentation at a position ──────────────────────────
   {
@@ -164,6 +169,34 @@ export const scenarios: readonly Scenario[] = [
     tool: "list_module_exports",
     name: "workspace-package-surface",
     arguments: { fromFile: "packages/reports/src/balance.ts", module: "@ledger/money" },
+  },
+
+  // ── rename_symbol: a reviewable patch, never a silent write ──────────────
+  {
+    tool: "rename_symbol",
+    name: "rename-across-packages",
+    arguments: {
+      file: "packages/accounts/src/account.ts",
+      position: { line: 18, character: 14 },
+      newName: "balanceSide",
+    },
+  },
+
+  // ── impact: weigh a change before making it ──────────────────────────────
+  {
+    tool: "impact",
+    name: "weigh-a-change-to-signed-amount",
+    arguments: {
+      file: "packages/accounts/src/posting.ts",
+      position: { line: 25, character: 14 },
+    },
+  },
+
+  // ── file_references: who imports this module ─────────────────────────────
+  {
+    tool: "file_references",
+    name: "who-imports-money",
+    arguments: { file: "packages/money/src/money.ts" },
   },
 
   // ── occurrences: literal proof of presence and absence ───────────────────

@@ -205,6 +205,17 @@ never reconcile with what is on screen. Either the count should exclude the
 declaration or the declaration should be a row. Observed 2026-08-20 in the
 scenario captures (`packages/mcp/test/scenarios/responses/references/`).
 
+### One stray NUL byte refuses a whole text file
+
+`read_file` on `~/.claude/skills/guardrails/scripts/navigation-guard.ts`
+(9,317 bytes) answered "is a binary file — there is no text to read", and
+`list_files` left the same file unpriced — both NUL detectors agree the file
+carries at least one NUL somewhere, yet the default Read tool renders ~199
+lines of ordinary TypeScript from it. When a file is overwhelmingly text, an
+all-or-nothing "there is no text" is an absence lie; the honest answer reads
+the text and names the anomaly ("contains a NUL at byte N"). Observed
+2026-08-20.
+
 ## Language grounding
 
 ### `kindAt` reads TypeScript hover text with a regular expression
