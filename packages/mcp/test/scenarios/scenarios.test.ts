@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, expect, test } from "vitest";
 import { scenarios } from "./cases.ts";
-import { connectScenarioSession, ensureFixtureInstalled } from "./runner.ts";
+import { arrangeFixture, connectScenarioSession, ensureFixtureInstalled } from "./runner.ts";
 
 /**
  * Every predefined scenario, through one real server, in declaration order.
@@ -33,9 +33,14 @@ test("tool catalog", { timeout: 60_000 }, async () => {
 
 for (const scenario of scenarios) {
   test(`${scenario.tool} · ${scenario.name}`, { timeout: 120_000 }, async () => {
-    const response = await session.invoke(scenario.tool, scenario.arguments);
-    await expect(response).toMatchFileSnapshot(
-      `responses/${scenario.tool}/${scenario.name}.txt`,
-    );
+    const restore = scenario.arrange ? await arrangeFixture(scenario.arrange) : undefined;
+    try {
+      const response = await session.invoke(scenario.tool, scenario.arguments);
+      await expect(response).toMatchFileSnapshot(
+        `responses/${scenario.tool}/${scenario.name}.txt`,
+      );
+    } finally {
+      restore?.();
+    }
   });
 }

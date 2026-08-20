@@ -63,7 +63,7 @@ const input = type({
   "git?": type("boolean").configure({
     default: true,
     description:
-      "Mark git changes: `· M`/`A`/`D`/`U`/`R`/`!` on files (deleted files appear as ghost rows), `· N changed` on directories holding changes. Silent outside a repository.",
+      "Mark git changes in plain words: `· modified`/`added`/`deleted`/`untracked`/`renamed`/`conflicted` on files (deleted files appear as ghost rows), `· N changed` on directories holding changes. Silent outside a repository.",
   }),
   "view?": type.enumerated("directories", "files").configure(
     {

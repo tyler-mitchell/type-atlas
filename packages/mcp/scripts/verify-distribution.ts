@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { createTwoFilesPatch } from "diff";
 import { execa } from "execa";
 import { scenarios } from "../test/scenarios/cases.ts";
-import { connectScenarioSession } from "../test/scenarios/runner.ts";
+import { arrangeFixture, connectScenarioSession } from "../test/scenarios/runner.ts";
 
 type PackedPackage = {
   name: string;
@@ -167,7 +167,12 @@ try {
     }
     const mismatched: string[] = [];
     for (const scenario of scenarios) {
-      const answer = await session.invoke(scenario.tool, scenario.arguments);
+      // The same working-tree arrangement the capture ran under — a scenario
+      // about uncommitted state cannot reproduce against a clean fixture.
+      const restore = scenario.arrange ? await arrangeFixture(scenario.arrange) : undefined;
+      const answer = await session
+        .invoke(scenario.tool, scenario.arguments)
+        .finally(() => restore?.());
       const committed = await readFile(
         join(responsesRoot, `${scenario.tool}/${scenario.name}.txt`),
         "utf8",

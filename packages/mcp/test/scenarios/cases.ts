@@ -15,6 +15,18 @@ export type Scenario = {
   /** Response filename: `responses/<tool>/<name>.txt`. */
   readonly name: string;
   readonly arguments: Record<string, unknown>;
+  /**
+   * Working-tree state this scenario needs, applied to the fixture before
+   * the invocation and restored — bit for bit — after it, whatever happens.
+   * Paths are fixture-relative. This exists for behavior that is *about*
+   * uncommitted state (git markers); everything else runs against the
+   * committed fixture and needs none.
+   */
+  readonly arrange?: {
+    readonly create?: Readonly<Record<string, string>>;
+    readonly append?: Readonly<Record<string, string>>;
+    readonly delete?: readonly string[];
+  };
 };
 
 export const scenarios: readonly Scenario[] = [
@@ -31,6 +43,19 @@ export const scenarios: readonly Scenario[] = [
   },
   {
     tool: "list_files",
+    name: "one-corner-opened-deeper",
+    // The record's two value forms together: a bare number as depth sugar,
+    // and the options object scoping a glob to its own subtree — one tree,
+    // each corner under its own rules.
+    arguments: {
+      expand: {
+        "packages/accounts": 1,
+        "packages/reports": { depth: 2, glob: ["**/*.ts"] },
+      },
+    },
+  },
+  {
+    tool: "list_files",
     name: "without-line-counts",
     arguments: { directory: "packages/accounts", loc: false },
   },
@@ -38,6 +63,37 @@ export const scenarios: readonly Scenario[] = [
     tool: "list_files",
     name: "test-files-only",
     arguments: { glob: ["**/*.test.ts"] },
+  },
+  {
+    tool: "list_files",
+    name: "working-tree-changes",
+    arguments: { directory: "packages/money", depth: 2 },
+    // A mid-refactor moment: one file edited, one drafted, the barrel gone.
+    // The tree must answer with plain-word change states, a ghost row for
+    // the deletion, and per-directory changed counts.
+    arrange: {
+      append: {
+        "packages/money/src/currency.ts":
+          "\n// TODO: JPY carries no minor units — audit format() before adding currencies.\n",
+      },
+      create: {
+        "packages/money/src/rounding.ts": [
+          'import { type Currency, currencyProfiles } from "./currency.ts";',
+          "",
+          "/** Banker's rounding for statement subtotals — draft, not yet wired in. */",
+          "export const roundToMinor = (value: number, currency: Currency): bigint => {",
+          "  const scaled = value * currencyProfiles[currency].minorUnitsPerMajor;",
+          "  const floor = Math.floor(scaled);",
+          "  const fraction = scaled - floor;",
+          "  if (fraction > 0.5) return BigInt(floor + 1);",
+          "  if (fraction < 0.5) return BigInt(floor);",
+          "  return BigInt(floor % 2 === 0 ? floor : floor + 1);",
+          "};",
+          "",
+        ].join("\n"),
+      },
+      delete: ["packages/money/src/index.ts"],
+    },
   },
 
   // ── read_file: economical reading ─────────────────────────────────────────

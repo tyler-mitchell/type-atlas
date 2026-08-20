@@ -84,18 +84,18 @@ const resolveListingDirectory = async (input: {
 const run = promisify(execFile);
 
 /**
- * VS Code's own change letter for one porcelain entry — the vocabulary every
- * model has read a million times: `M` modified, `A` added, `D` deleted, `U`
- * untracked, `R` renamed, `!` conflicted.
+ * One porcelain entry as a plain word. A single letter next to `1.1k loc`
+ * reads as magnitude notation — `M` is a million there, not modified — and a
+ * bare letter needs a legend where a word needs nothing.
  */
-const changeLetter = (index: string, worktree: string): string => {
-  if (index === "?") return "U";
+const changeWord = (index: string, worktree: string): string => {
+  if (index === "?") return "untracked";
   const both = `${index}${worktree}`;
-  if (index === "U" || worktree === "U" || both === "AA" || both === "DD") return "!";
-  if (index === "R" || worktree === "R") return "R";
-  if (index === "D" || worktree === "D") return "D";
-  if (index === "A") return "A";
-  return "M";
+  if (index === "U" || worktree === "U" || both === "AA" || both === "DD") return "conflicted";
+  if (index === "R" || worktree === "R") return "renamed";
+  if (index === "D" || worktree === "D") return "deleted";
+  if (index === "A") return "added";
+  return "modified";
 };
 
 /**
@@ -125,7 +125,7 @@ const gitChanges = async (directory: string): Promise<ReadonlyMap<string, string
     if (index === "R" || index === "C" || worktree === "R" || worktree === "C") at += 1;
     const absolute = path.join(toplevel, field.slice(3));
     if (absolute !== directory && !isFileInDir(absolute, directory)) continue;
-    changes.set(path.relative(directory, absolute), changeLetter(index, worktree));
+    changes.set(path.relative(directory, absolute), changeWord(index, worktree));
   }
   return changes;
 };
@@ -283,7 +283,7 @@ export const workspaceTree = async (input: {
   readonly limit: number;
   /** Suffix each rendered file with its line count — `· 244 loc`. */
   readonly loc: boolean;
-  /** Mark git changes — porcelain letters on files, `· N changed` on directories. */
+  /** Mark git changes in plain words — `· modified` on files, `· N changed` on directories. */
   readonly git: boolean;
   readonly signal: AbortSignal;
   readonly view: "directories" | "files";
@@ -432,8 +432,8 @@ export const workspaceTree = async (input: {
   const crawled = [...new Set([...baseCrawl, ...expansionCrawls.flat()])];
   const changed = await changesHeld;
   const fileMark = (relative: string): string => {
-    const letter = changed.get(relative);
-    return letter === undefined ? "" : ` · ${letter}`;
+    const word = changed.get(relative);
+    return word === undefined ? "" : ` · ${word}`;
   };
   // Plain words, not a glyph: an editor's change-dot is pixels a model has
   // rarely read as text, while "3 changed" is self-describing on first
@@ -473,16 +473,16 @@ export const workspaceTree = async (input: {
       });
   const submodules = new Set(submodulePaths.map((entry) => entry.slice(0, -1)));
   // A deleted file exists in git's answer and nowhere on disk. It renders as
-  // a ghost row carrying its `D`, the way VS Code keeps deletions visible —
-  // omitting it would make the tree claim a file count the repository
+  // a ghost row carrying `· deleted`, the way editors keep deletions visible
+  // — omitting it would make the tree claim a file count the repository
   // disputes. Ghosts follow the base depth and stay out of filtered views.
   const crawledSet = new Set(crawled);
   const ghosts =
     input.glob === undefined
       ? [...changed]
           .filter(
-            ([relative, letter]) =>
-              letter === "D" &&
+            ([relative, word]) =>
+              word === "deleted" &&
               relative.split("/").length <= input.depth &&
               !crawledSet.has(relative),
           )
