@@ -1,15 +1,17 @@
 # Type Atlas
 
-Code intelligence for coding agents, as an MCP server. TypeScript for now,
-since that is what I work in.
+Type Atlas is an MCP server for code intelligence. A Volar language server
+answers from the TypeScript project that owns each file, so definitions,
+references, types, diagnostics, and ranges match what an editor shows.
 
-I built it for my own agents and use it daily, mostly on a large monorepo that
-is maintained almost entirely through agents.
+Responses are written for a context window instead of a screen. A file outline
+is the declarations in it, not every nested callback. A read folds bodies to
+signatures. `inspect_symbol` composes eight language-server requests into one
+answer. Every answer states the scope it covered and what it cost.
 
-There is a language server underneath, so definitions, types, diagnostics, and
-ranges are the same ones LSP gives an editor.
+I use it every day, on a large monorepo maintained almost entirely by agents.
 
-Requires Node.js 22.20 or newer.
+TypeScript, Markdown, and JSON. Node 22.20 or newer.
 
 ## Install
 
