@@ -151,6 +151,11 @@ export const warmFixtureProjects = async (session: {
     // scope disclosures ("N projects loaded") varied with call order — the
     // determinism gate caught the count flipping under shuffle.
     "ledger.config.json",
+    // No tsconfig names it, so it enters the money program only when the
+    // server gets round to it. Whether it had arrived decided if
+    // inspect_symbol on Money printed an Implementations section — the
+    // answer differed between this machine and a Linux runner.
+    "packages/money/tests/rounding-parity.ts",
   ];
   for (const file of doorways) {
     await session.invoke("project_config", { file });
