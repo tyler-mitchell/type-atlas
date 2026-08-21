@@ -1,5 +1,11 @@
 <!-- Generated from packages/mcp/README.mdoc by packages/mcp/scripts/render-docs.ts — edit the source, not this file. -->
+<div align="center">
+
+<img src="https://raw.githubusercontent.com/tyler-mitchell/type-atlas/main/packages/mcp/assets/type-atlas.png" width="96" alt="" />
+
 # Type Atlas
+
+</div>
 
 Type Atlas is an MCP server for code intelligence. A Volar language server
 answers from the TypeScript project that owns each file, so definitions,
