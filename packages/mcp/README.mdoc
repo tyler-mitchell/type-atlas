@@ -15,33 +15,36 @@ TypeScript, Markdown, and JSON. Node 22.20 or newer.
 
 ## Install
 
-Paste this to your coding agent:
+Codex:
 
-> Set up the Type Atlas MCP server. Run
-> `codex mcp add type-atlas -- npx --yes @type-atlas/mcp@latest` if I use Codex,
-> or `claude mcp add --scope user type-atlas -- npx --yes @type-atlas/mcp@latest`
-> if I use Claude Code. Then append the rule below to `AGENTS.md` or
-> `CLAUDE.md`, creating the file if it does not exist, and tell me to restart so
-> the client loads the server.
->
-> ```
-> Type Atlas MCP is the required tool for code navigation, reading, and
-> diagnostics in TypeScript and JavaScript. This is not a preference. Do not
-> use grep, glob, find, or plain file reads on code. The only valid fallbacks
-> are a server that is down, a call that errored, or a file that is neither
-> TS nor JS.
-> ```
+```sh
+codex mcp add type-atlas -- npx --yes @type-atlas/mcp@latest
+```
 
-The rule is there because installing the server does not change what an agent
-reaches for. Claude in particular will go back to grep and whole-file reads and
-produce a fresh justification every time, so the wording has to say it is
-required and name the only exceptions.
+Claude Code:
+
+```sh
+claude mcp add --scope user type-atlas -- npx --yes @type-atlas/mcp@latest
+```
 
 Claude Desktop, VS Code, Windows, and generic client config are in the
 [install section](https://github.com/tyler-mitchell/type-atlas#install).
 Clients read MCP config at startup, so restart after. `@latest` resolves on
 every process start; pin a version if you do not want tool behavior moving
 under you.
+
+### Recommended
+
+Installing the server does not change what an agent reaches for. Claude in
+particular goes back to grep and whole-file reads and produces a fresh
+justification each time, so the instruction has to say required and name the
+exceptions. Add this to `AGENTS.md` or `CLAUDE.md`:
+
+> Type Atlas MCP is the required tool for code navigation, reading, and
+> diagnostics in TypeScript and JavaScript. This is not a preference. Do not
+> use grep, glob, find, or plain file reads on code. The only valid fallbacks
+> are a server that is down, a call that errored, or a file that is neither TS
+> nor JS.
 
 `search_code`, `related_code`, `investigate_code`, and `search_dependency_code`
 run a semantic index through `uvx` and need

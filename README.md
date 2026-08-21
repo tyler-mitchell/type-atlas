@@ -16,33 +16,7 @@ TypeScript, Markdown, and JSON. Node 22.20 or newer. Apache-2.0.
 
 ## Install
 
-Paste this to your coding agent:
-
-```text
-Set up the Type Atlas MCP server.
-
-Register it: `codex mcp add type-atlas -- npx --yes @type-atlas/mcp@latest`
-for Codex, or `claude mcp add --scope user type-atlas -- npx --yes
-@type-atlas/mcp@latest` for Claude Code.
-
-Then append this to AGENTS.md or CLAUDE.md, creating the file if needed:
-
-  Type Atlas MCP is the required tool for code navigation, reading, and
-  diagnostics in TypeScript and JavaScript. This is not a preference. Do
-  not use grep, glob, find, or plain file reads on code. The only valid
-  fallbacks are a server that is down, a call that errored, or a file
-  that is neither TS nor JS.
-
-Then tell me to restart the client so it loads the server.
-```
-
-The rule is there because installing the server does not change what an agent
-reaches for. Claude in particular goes back to grep and whole-file reads and
-produces a fresh justification every time, so the wording has to say required
-and name the only exceptions.
-
-<details>
-<summary>Codex, by hand</summary>
+Codex:
 
 ```sh
 codex mcp add type-atlas -- npx --yes @type-atlas/mcp@latest
@@ -51,10 +25,7 @@ codex mcp add type-atlas -- npx --yes @type-atlas/mcp@latest
 Writes to `~/.codex/config.toml`, so every repository Codex opens has it.
 `codex mcp list` confirms it, `codex mcp remove type-atlas` undoes it.
 
-</details>
-
-<details>
-<summary>Claude Code, by hand</summary>
+Claude Code:
 
 ```sh
 claude mcp add --scope user type-atlas -- npx --yes @type-atlas/mcp@latest
@@ -64,8 +35,11 @@ claude mcp add --scope user type-atlas -- npx --yes @type-atlas/mcp@latest
 `.mcp.json` your collaborators share, `--scope local` is one repository on one
 machine.
 
-Claude Desktop keeps a separate server list, so this does not reach it. Add it
-under `mcpServers` in `claude_desktop_config.json`, at
+<details>
+<summary>Claude Desktop</summary>
+
+Claude Desktop keeps a separate server list, so the Claude Code CLI does not
+reach it. Add it under `mcpServers` in `claude_desktop_config.json`, at
 `~/Library/Application Support/Claude/` on macOS or `%APPDATA%\Claude\` on
 Windows:
 
@@ -123,6 +97,19 @@ run a semantic index through `uvx` and need
 [uv](https://docs.astral.sh/uv/getting-started/installation/). Without it those
 four report that uv is missing, `explore_symbol` drops its related-code
 section, and the rest is unaffected.
+
+### Recommended
+
+Installing the server does not change what an agent reaches for. Claude in
+particular goes back to grep and whole-file reads and produces a fresh
+justification each time, so the instruction has to say required and name the
+exceptions. Add this to `AGENTS.md` or `CLAUDE.md`:
+
+> Type Atlas MCP is the required tool for code navigation, reading, and
+> diagnostics in TypeScript and JavaScript. This is not a preference. Do not
+> use grep, glob, find, or plain file reads on code. The only valid fallbacks
+> are a server that is down, a call that errored, or a file that is neither TS
+> nor JS.
 
 ### `--require-intent`
 
