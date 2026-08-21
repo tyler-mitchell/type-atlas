@@ -100,16 +100,17 @@ section, and the rest is unaffected.
 
 ### Recommended
 
-Installing the server does not change what an agent reaches for. Claude in
-particular goes back to grep and whole-file reads and produces a fresh
-justification each time, so the instruction has to say required and name the
-exceptions. Add this to `AGENTS.md` or `CLAUDE.md`:
+Installing the server does not change what an agent reaches for. Claude will
+assemble whatever its shell allows, chained together, and produce a fresh
+justification each time, so naming a few commands to avoid does not hold. The
+instruction has to rule out the whole category and name the exceptions. Add
+this to `AGENTS.md` or `CLAUDE.md`:
 
-> Type Atlas MCP is the required tool for code navigation, reading, and
-> diagnostics in TypeScript and JavaScript. This is not a preference. Do not
-> use grep, glob, find, or plain file reads on code. The only valid fallbacks
-> are a server that is down, a call that errored, or a file that is neither TS
-> nor JS.
+> Type Atlas MCP is the required tool for reading and navigating code in
+> TypeScript and JavaScript. This is not a preference. No shell command is an
+> acceptable substitute, whatever it is composed of, and neither is a plain
+> file read. The only valid fallbacks are a server that is down, a call that
+> errored, or a file that is neither TS nor JS.
 
 ### `--require-intent`
 
