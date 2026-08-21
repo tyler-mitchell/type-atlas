@@ -38,6 +38,9 @@ export type RetrievalMatch = {
   readonly displayFile: string;
   readonly path?: readonly SymbolPathItem[];
   readonly selected?: SymbolPathItem;
+  /** The declaration the printed snippet shows, which the label names. */
+  readonly shownPath?: readonly SymbolPathItem[];
+  readonly shown?: SymbolPathItem;
   readonly exactIdentifier: boolean;
   /** The range is import/export statements only — names, not behavior. */
   readonly plumbing: boolean;
@@ -182,17 +185,17 @@ export const enrichRetrievalPage = async (input: {
         const symbols = documentSymbols({ uri: read.textDocument.uri, source });
         const resultStartLine = result.start_line - 1;
         const resultEndLine = result.end_line - 1;
-        const symbolPaths = [
-          ...overlappingSymbolPaths(symbols ?? [], resultStartLine, resultEndLine),
-        ].sort(
-          (left, right) =>
-            overlapLength(right.at(-1)!.range, resultStartLine, resultEndLine) -
-              overlapLength(left.at(-1)!.range, resultStartLine, resultEndLine) ||
-            right.length - left.length,
-        );
-        const symbolPath =
-          symbolPaths.find((path) => queryIdentifiers.has(path.at(-1)!.symbol.name)) ??
-          symbolPaths[0];
+        // The declaration that best covers a line window: most overlap first,
+        // deepest on a tie, and a name the query used wins outright.
+        const bestPath = (from: number, to: number) => {
+          const ranked = [...overlappingSymbolPaths(symbols ?? [], from, to)].sort(
+            (left, right) =>
+              overlapLength(right.at(-1)!.range, from, to) -
+                overlapLength(left.at(-1)!.range, from, to) || right.length - left.length,
+          );
+          return ranked.find((path) => queryIdentifiers.has(path.at(-1)!.symbol.name)) ?? ranked[0];
+        };
+        const symbolPath = bestPath(resultStartLine, resultEndLine);
         const selected = symbolPath?.at(-1);
         const exactIdentifier = !!selected && queryIdentifiers.has(selected.symbol.name);
         // The snippet is cut from the file, not from the matched chunk the
@@ -217,13 +220,21 @@ export const enrichRetrievalPage = async (input: {
               );
         const snippetEnd =
           input.snippetLines === null ? resultEndLine + 1 : snippetStart + input.snippetLines;
+        // Anchor the label to the lines actually printed, not to the chunk
+        // retrieval matched. The snippet re-centres on the query's own
+        // identifier, so the two windows differ, and a declaration that merely
+        // overlapped the chunk was being named above a snippet that never
+        // showed it — `AccountStore` titling six lines of `parentPath`. The
+        // name a reader sees now belongs to the code beside it.
+        const shownPath = bestPath(snippetStart, snippetEnd - 1) ?? symbolPath;
+        const shown = shownPath?.at(-1);
         const hover =
-          selected && input.includeTypes
+          shown && input.includeTypes
             ? (
                 await intelligence.hover({
                   file,
                   signal: input.signal,
-                  params: { position: selected.selection.start },
+                  params: { position: shown.selection.start },
                 })
               ).result
             : undefined;
@@ -231,8 +242,16 @@ export const enrichRetrievalPage = async (input: {
           result,
           file,
           displayFile: displayPath(URI.file(file).toString(), input.root),
+          // Two anchors, because two jobs. `path`/`selected` is the
+          // declaration retrieval matched, and relationship expansion keys off
+          // it — narrowing it to the printed window stopped
+          // `investigate_code` landing on questions it used to answer.
+          // `shownPath`/`shown` is what the snippet actually displays, and
+          // only the label uses it.
           path: symbolPath,
           selected,
+          shownPath,
+          shown,
           exactIdentifier,
           // A range in a file whose outline is empty is a barrel or manifest
           // — the range test alone misses a slice from the middle of one
@@ -363,22 +382,25 @@ const searchPage = (input: {
     unanchorable: anchoredCount === 0 && anchors.length === 0,
     matches: ranked.map((match, index) => {
       const lines = match.content?.split("\n");
+      // The label follows the printed snippet, not the matched chunk: the two
+      // windows differ, and naming a declaration the reader cannot see sends
+      // the next call to the wrong position.
+      const labelledPath = match.shownPath ?? match.path;
+      const labelled = match.shown ?? match.selected;
       return {
         rank: index + 1,
         file: match.displayFile,
         startLine: lines?.length ? match.contentStartLine + 1 : match.result.start_line,
         endLine: match.result.end_line,
         relevance: relevanceOf(match.result.score, topScore),
-        within: match.path?.map(({ symbol }) => symbol.name),
-        name: match.selected?.symbol.name,
-        kind: match.selected?.symbol.kind,
-        selection: match.selected?.selection,
+        within: labelledPath?.map(({ symbol }) => symbol.name),
+        name: labelled?.symbol.name,
+        kind: labelled?.symbol.kind,
+        selection: labelled?.selection,
         // Named only when it differs from the selection: repeating an
         // identifier's own span costs a second read to learn nothing.
         extent:
-          match.selected && !sameRange(match.selected.range, match.selected.selection)
-            ? match.selected.range
-            : undefined,
+          labelled && !sameRange(labelled.range, labelled.selection) ? labelled.range : undefined,
         anchored: match.exactIdentifier,
         plumbing: match.plumbing,
         documentation: match.hover

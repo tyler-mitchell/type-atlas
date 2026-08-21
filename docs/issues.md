@@ -803,6 +803,16 @@ it, and the position it would carry into the next call points at the wrong
 declaration. Both are visible in `search_code/behavior-with-no-matching-words`,
 the case the README embeds. Observed 2026-08-21, fixtures/ledger.
 
+Fixed. The anchor was chosen by largest overlap with the chunk retrieval
+matched, while the snippet re-centres on the query's own identifier — two
+different windows, so `AccountStore` (31-35) outscored `parentPath` (21-24)
+and then titled six lines that showed `parentPath`. A match now carries both:
+`selected` stays the chunk's declaration, because relationship expansion keys
+off it, and `shown` is the printed window's, which the label uses. Collapsing
+them into one was the first attempt and it cost `investigate_code` its
+verified-relationships section — the tool stopped landing on a question it had
+answered. Two anchors, because two jobs.
+
 ### `investigate_code` titles its sections `###`
 
 Every other tool uses `##`. Caught by the document lint's heading rule only

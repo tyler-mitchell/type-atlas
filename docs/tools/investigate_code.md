@@ -25,8 +25,8 @@ Search: how are account balances rolled up to ancestor accounts
 
 === 1 · packages/accounts/src/account.ts:21-35 ===
 
-Structure: AccountStore
-Symbol: AccountStore [interface] · selection 31:18-31:30 · range 31:1-35:2
+Structure: parentPath
+Symbol: parentPath [variable] · selection 21:14-21:24 · range 21:14-24:2
 
 21 | export const parentPath = (path: AccountPath): AccountPath | undefined => {
 22 |   const at = path.lastIndexOf(":");
@@ -99,8 +99,8 @@ Search: where is the retry backoff for failed network requests configured
 
 === 1 · packages/importers/src/config.ts:1-7 ===
 
-Structure: defaultCurrencyCode
-Symbol: defaultCurrencyCode [variable] · selection 7:14-7:33 · range 7:14-7:72
+Structure: suspenseAccount
+Symbol: suspenseAccount [variable] · selection 4:14-4:29 · range 4:14-4:68
 
 1 | import ledgerConfig from "../../../ledger.config.json" with { type: "json" };
 2 |
@@ -111,8 +111,8 @@ Symbol: defaultCurrencyCode [variable] · selection 7:14-7:33 · range 7:14-7:72
 
 === 2 · packages/accounts/src/account.ts:21-35 ===
 
-Structure: AccountStore
-Symbol: AccountStore [interface] · selection 31:18-31:30 · range 31:1-35:2
+Structure: parentPath
+Symbol: parentPath [variable] · selection 21:14-21:24 · range 21:14-24:2
 
 21 | export const parentPath = (path: AccountPath): AccountPath | undefined => {
 22 |   const at = path.lastIndexOf(":");

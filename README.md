@@ -327,8 +327,8 @@ Search: walking an account up through each of its ancestor accounts
 
 === 1 · packages/accounts/src/account.ts:21-35 ===
 
-Structure: AccountStore
-Symbol: AccountStore [interface] · selection 31:18-31:30 · range 31:1-35:2
+Structure: parentPath
+Symbol: parentPath [variable] · selection 21:14-21:24 · range 21:14-24:2
 
 21 | export const parentPath = (path: AccountPath): AccountPath | undefined => {
 22 |   const at = path.lastIndexOf(":");
