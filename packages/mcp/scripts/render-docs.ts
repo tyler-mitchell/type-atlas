@@ -111,20 +111,13 @@ const invocationBlock = async ({
 };
 
 /**
- * Tilde fences, because responses carry backtick fences of their own (a
- * hover's ```typescript block): inside `~~~`, backticks are plain content
- * in every renderer, where a longer backtick fence still inverted one. The
- * tilde run outgrows any tilde run a response might ever contain.
+ * Tilde fence, because responses carry backtick fences of their own (a
+ * hover's ```typescript block): inside `~~~`, backticks are plain content in
+ * every renderer, where a longer backtick fence still inverted one. A
+ * response containing its own tilde fence would need a longer run; none does,
+ * and the docs gate compares byte for byte, so one would not pass unnoticed.
  */
-const responseBlock = (captured: string): string => {
-  const content = captured.trimEnd();
-  const longestRun = [...content.matchAll(/~+/gu)].reduce(
-    (held, match) => Math.max(held, match[0].length),
-    0,
-  );
-  const fence = "~".repeat(Math.max(3, longestRun + 1));
-  return `${fence}text\n${content}\n${fence}`;
-};
+const responseBlock = (captured: string): string => `~~~text\n${captured.trimEnd()}\n~~~`;
 
 // One case, labelled: what the agent sent, then what came back.
 const casePair = async (scenario: CapturedScenario, captured: string): Promise<string> =>
