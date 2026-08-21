@@ -34,6 +34,10 @@ jobs:
           node-version-file: .node-version
           package-manager-cache: false
           registry-url: https://registry.npmjs.org
+      # The retrieval tools shell out to uvx. Without uv they report it
+      # missing and every answer that names the semantic index in its scope
+      # line comes back shorter than the captured corpus.
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
       - run: pnpm install --frozen-lockfile
       - id: changesets
         uses: changesets/action@63a615b9cd06ba9a3e6d13796c7fbcb080a60a0b # v1
