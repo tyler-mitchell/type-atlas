@@ -196,10 +196,7 @@ describe("read_file", () => {
   );
   scenarioTest("two-files-one-call", ({ capture }) =>
     capture("read_file", {
-      file: [
-        "packages/accounts/src/posting.ts",
-        { path: "packages/money/src/money.ts", startLine: 26, endLine: 41, fold: false },
-      ],
+      file: ["packages/accounts/src/posting.ts", "packages/money/src/rounding-mode.ts"],
     }),
   );
   scenarioTest("abstract-class-folded", ({ capture }) =>

@@ -228,77 +228,70 @@ statementTotal [variable] 15:14-15:28 · range 15:14-16:56
 
 ### `read_file`
 
-Bodies fold to signatures by default. Overloads survive folding, bodies come
-back with `fold: false`, and the argument takes an array so several files land
-in one call.
+The argument is an array, so several files arrive in one call. Bodies fold to
+signatures by default and the header says how many lines that saved; `fold:
+false` returns them.
 
 **Agent's Input**
 
 ```yaml
 tool: Read files
 workspace: fixtures/ledger
-file: ["packages/accounts/src/journal.ts"]
+file: ["packages/accounts/src/posting.ts","packages/money/src/rounding-mode.ts"]
 ```
 
 **Response**
 
 ~~~text
-1 file · 52 lines · 22 folded to signatures, pass fold: false for the bodies
+2 files · 42 lines · 6 folded to signatures, pass fold: false for the bodies
 
-=== packages/accounts/src/journal.ts · 73 lines ===
+=== packages/accounts/src/posting.ts · 32 lines ===
 
- 1 | import { add, isZero, type Money, zero } from "@ledger/money";
+ 1 | import { type Money, negate } from "@ledger/money";
  2 | import type { AccountPath } from "./account.ts";
- 3 | import { credit, debit, type Posting, signedAmount } from "./posting.ts";
- 4 |
- 5 | /** A balanced set of postings, recorded together or not at all. */
- 6 | export interface Entry<TMeta = undefined> {
- 7 |   readonly recordedAt: Date;
- 8 |   readonly description: string;
- 9 |   readonly postings: readonly Posting[];
-10 |   readonly meta: TMeta;
-11 | }
-12 |
-13 | export class UnbalancedEntryError extends Error {
-14 |   constructor(readonly imbalance: Money) {
-15 |     super(`Entry does not balance: off by ${imbalance.minorUnits} minor units`);
-16 |   }
-17 | }
-18 |
-19 | /**
-20 |  * An append-only journal of balanced entries. `TMeta` carries whatever a
-21 |  * consumer attaches to each entry — an import batch id, an approval trail —
-22 |  * without the journal knowing its shape.
-23 |  */
-24 | export class Journal<TMeta = undefined> {
-25 |   private readonly entries: Entry<TMeta>[] = [];
-26 |
-27 |   /** Record a prepared entry, or build the common two-posting transfer. */
-28 |   post(entry: Entry<TMeta>): Entry<TMeta>;
-29 |   post(
-30 |     description: string,
-31 |     transfer: { from: AccountPath; to: AccountPath; amount: Money },
-32 |     meta: TMeta,
-33 |   ): Entry<TMeta>;
-34 |   post(
-   |     ... 35-56 folded
-57 |   }
-58 |
-59 |   /** Entries touching an account, oldest first. */
-60 |   history(account: AccountPath): readonly Entry<TMeta>[] {
-61 |     return this.entries.filter((entry) =>
-62 |       entry.postings.some((posting) => posting.account === account),
-63 |     );
-64 |   }
-65 |
-66 |   get length(): number {
-67 |     return this.entries.length;
-68 |   }
-69 |
-70 |   [Symbol.iterator](): Iterator<Entry<TMeta>> {
-71 |     return this.entries[Symbol.iterator]();
-72 |   }
-73 | }
+ 3 |
+ 4 | /**
+ 5 |  * One side of a journal entry. The discriminant is the bookkeeping side, so
+ 6 |  * every consumer's switch is checked for exhaustiveness by the compiler.
+ 7 |  */
+ 8 | export type Posting =
+ 9 |   | { readonly side: "debit"; readonly account: AccountPath; readonly amount: Money }
+10 |   | { readonly side: "credit"; readonly account: AccountPath; readonly amount: Money };
+11 |
+12 | export const debit = (account: AccountPath, amount: Money): Posting => ({
+13 |   side: "debit",
+14 |   account,
+15 |   amount,
+16 | });
+17 |
+18 | export const credit = (account: AccountPath, amount: Money): Posting => ({
+19 |   side: "credit",
+20 |   account,
+21 |   amount,
+22 | });
+23 |
+24 | /** A posting's effect on a debit-normal running balance. */
+25 | export const signedAmount = (posting: Posting): Money => {
+   |   ... 26-31 folded
+32 | };
+
+=== packages/money/src/rounding-mode.ts · 15 lines ===
+
+ 1 | /** How sub-minor precision resolves when a statement and the books disagree. */
+ 2 | export enum RoundingMode {
+ 3 |   HalfUp = "half-up",
+ 4 |   HalfEven = "half-even",
+ 5 |   Truncate = "truncate",
+ 6 | }
+ 7 |
+ 8 | /** Per-institution conventions, as observed in their exports. */
+ 9 | const bankRounding: Readonly<Record<string, RoundingMode>> = {
+10 |   "first-national": RoundingMode.HalfEven,
+11 |   "harbor-credit": RoundingMode.HalfUp,
+12 | };
+13 |
+14 | export const roundingModeOf = (bank: string): RoundingMode =>
+15 |   bankRounding[bank] ?? RoundingMode.HalfEven;
 ~~~
 
 ### `list_files`
@@ -386,21 +379,40 @@ packages/money/tests/rounding-parity.ts
 
 ### `occurrences`
 
-Literal text, with the number of files scanned. The semantic tools rank what
-exists, which is useless for confirming a token is gone after a teardown.
+Literal text, grouped by file, with the number of files scanned. The semantic
+tools rank what exists, which is useless for confirming a token is gone after a
+teardown; a zero here comes with the same scan count, so it means something.
 
 **Agent's Input**
 
 ```yaml
 tool: Occurrences
 workspace: fixtures/ledger
-text: quantumFlux
+text: signedAmount
 ```
 
 **Response**
 
 ~~~text
-Nothing under the workspace contains "quantumFlux" · 67 files scanned · 1 file of declared build output not scanned — scan a generated directory directly to include it. This is a literal answer: the exact text does not occur in what was scanned, which is the proof a semantic search cannot give.
+"signedAmount" occurs 12 times in 7 files · 67 files scanned under the workspace · 1 file of declared build output not scanned.
+
+packages/accounts/src/index.ts:12:39 · export { credit, debit, type Posting, signedAmount } from "./posting.ts";
+packages/accounts/src/journal.ts
+├  3:39  · import { credit, debit, type Posting, signedAmount } from "./posting.ts";
+└  52:12 · .map(signedAmount)
+packages/accounts/src/posting.ts:25:14 · export const signedAmount = (posting: Posting): Money => {
+packages/reconcile/src/drift.ts
+├  4:24  · import { type Posting, signedAmount } from "@ledger/accounts";
+└  20:37 · const journalTotal = postings.map(signedAmount).reduce((total, amount) => total + amount);
+packages/reconcile/src/matching.ts
+├  1:55  · // DELIBERATELY BROKEN — the imports for `money` and `signedAmount` are
+└  14:20 · const amount = signedAmount(posting);
+packages/reports/src/balance.ts
+├  6:3   · signedAmount,
+└  34:57 · add(own.get(posting.account) ?? zero(currency), signedAmount(posting)),
+packages/rules/src/builtin.ts
+├  1:10  · import { signedAmount } from "@ledger/accounts";
+└  26:12 · .map(signedAmount)
 ~~~
 
 ### `investigate_code`

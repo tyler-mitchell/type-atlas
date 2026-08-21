@@ -169,11 +169,11 @@ and an agent that just edited code usually does not think to ask.
 
 ### `read_file`
 
-Bodies fold to signatures by default. Overloads survive folding, bodies come
-back with `fold: false`, and the argument takes an array so several files land
-in one call.
+The argument is an array, so several files arrive in one call. Bodies fold to
+signatures by default and the header says how many lines that saved; `fold:
+false` returns them.
 
-{% scenario "read_file/class-folded-to-signatures" /%}
+{% scenario "read_file/two-files-one-call" /%}
 
 ### `list_files`
 
@@ -193,10 +193,11 @@ denominator and an agent can decide whether to widen.
 
 ### `occurrences`
 
-Literal text, with the number of files scanned. The semantic tools rank what
-exists, which is useless for confirming a token is gone after a teardown.
+Literal text, grouped by file, with the number of files scanned. The semantic
+tools rank what exists, which is useless for confirming a token is gone after a
+teardown; a zero here comes with the same scan count, so it means something.
 
-{% scenario "occurrences/honest-zero" /%}
+{% scenario "occurrences/token-found-across-packages" /%}
 
 ### `investigate_code`
 

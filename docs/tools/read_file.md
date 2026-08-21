@@ -82,13 +82,13 @@ file: ["packages/accounts/src/journal.ts"]
 ```yaml
 tool: Read files
 workspace: fixtures/ledger
-file: ["packages/accounts/src/posting.ts",{"path":"packages/money/src/money.ts","startLine":26,"endLine":41,"fold":false}]
+file: ["packages/accounts/src/posting.ts","packages/money/src/rounding-mode.ts"]
 ```
 
 **Response**
 
 ~~~text
-2 files · 43 lines · 6 folded to signatures, pass fold: false for the bodies
+2 files · 42 lines · 6 folded to signatures, pass fold: false for the bodies
 
 === packages/accounts/src/posting.ts · 32 lines ===
 
@@ -120,24 +120,23 @@ file: ["packages/accounts/src/posting.ts",{"path":"packages/money/src/money.ts",
    |   ... 26-31 folded
 32 | };
 
-=== packages/money/src/money.ts · lines 26-41 of 58 ===
+=== packages/money/src/rounding-mode.ts · 15 lines ===
 
-26 |
-27 | export const money = (minorUnits: bigint | number, currency: Currency): Money =>
-28 |   ({ minorUnits: BigInt(minorUnits), currency }) as Money;
-29 |
-30 | export const zero = (currency: Currency): Money => money(0n, currency);
-31 |
-32 | /**
-33 |  * Exact addition in minor units.
-34 |  *
-35 |  * @throws {@link CurrencyMismatchError} when the currencies differ — ledger
-36 |  * math never converts silently.
-37 |  */
-38 | export const add = (left: Money, right: Money): Money => {
-39 |   if (left.currency !== right.currency) {
-40 |     throw new CurrencyMismatchError(left.currency, right.currency);
-41 |   }
+ 1 | /** How sub-minor precision resolves when a statement and the books disagree. */
+ 2 | export enum RoundingMode {
+ 3 |   HalfUp = "half-up",
+ 4 |   HalfEven = "half-even",
+ 5 |   Truncate = "truncate",
+ 6 | }
+ 7 |
+ 8 | /** Per-institution conventions, as observed in their exports. */
+ 9 | const bankRounding: Readonly<Record<string, RoundingMode>> = {
+10 |   "first-national": RoundingMode.HalfEven,
+11 |   "harbor-credit": RoundingMode.HalfUp,
+12 | };
+13 |
+14 | export const roundingModeOf = (bank: string): RoundingMode =>
+15 |   bankRounding[bank] ?? RoundingMode.HalfEven;
 ~~~
 
 ## abstract class folded
