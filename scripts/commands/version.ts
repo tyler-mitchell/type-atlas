@@ -65,6 +65,6 @@ export default defineCommand({
   run: async () => {
     await step("changeset", ["version"]);
     await synchronizeServerManifest();
-    await step("vp", ["pm", "install", "--lockfile-only", "--no-frozen-lockfile"]);
+    await step("vp", ["install", "--lockfile-only", "--no-frozen-lockfile"]);
   },
 });

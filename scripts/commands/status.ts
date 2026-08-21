@@ -114,7 +114,9 @@ export default defineCommand({
             ? "interrupted release — the MCP Registry is behind npm"
             : pending.count
               ? `${pending.count} changeset${pending.count === 1 ? "" : "s"} awaiting release`
-              : "released and consistent";
+              : workingVersion[0] !== suiteVersion
+                ? `versioned at ${workingVersion[0]}, awaiting publish`
+                : "released and consistent";
 
     console.log(
       [
