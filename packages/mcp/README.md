@@ -31,8 +31,7 @@ code --add-mcp '{"name":"type-atlas","command":"npx","args":["--yes","@type-atla
 ```
 
 Any other client takes the standard `mcpServers` shape with `npx` and
-`["--yes", "@type-atlas/mcp@latest"]`. Claude Desktop, Windows, and the rest
-are in the
+`["--yes", "@type-atlas/mcp@latest"]`. Windows and the rest are in the
 [install section](https://github.com/tyler-mitchell/type-atlas#install).
 Clients read MCP config at startup, so restart after. `@latest` resolves on
 every process start; pin a version if you do not want tool behavior moving
@@ -40,9 +39,10 @@ under you.
 
 ### Recommended
 
-Installing the server does not change what an agent reaches for. Claude will
-assemble whatever its shell allows, chained together, so naming a few commands
-to avoid does not hold. Add this to `AGENTS.md` or `CLAUDE.md`:
+Installing the server does not change what an agent reaches for. Some agents,
+Claude among them, will assemble whatever their shell allows, chained together,
+so naming a few commands to avoid does not hold. Add this to `AGENTS.md` or
+`CLAUDE.md`:
 
 > Type Atlas MCP is the required tool for reading and navigating code in
 > TypeScript and JavaScript. This is not a preference. No shell command is an

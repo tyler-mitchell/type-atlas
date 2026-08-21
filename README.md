@@ -47,11 +47,9 @@ Any other client takes the standard shape:
 }
 ```
 
-Claude Desktop reads its own list at
-`~/Library/Application Support/Claude/claude_desktop_config.json`, and starts
-servers without your shell `PATH`, so give the absolute path from `which npx`
-if it fails to start. On Windows, a client that cannot launch the `npx.cmd`
-shim needs `"command": "cmd"` with
+A client that starts servers without your shell `PATH` will not find `npx` by
+name; give the absolute path from `which npx` when that happens. On Windows, a
+client that cannot launch the `npx.cmd` shim needs `"command": "cmd"` with
 `"args": ["/c", "npx", "--yes", "@type-atlas/mcp@latest"]`.
 
 Clients read MCP config at startup, so restart after. `@latest` resolves on
@@ -66,11 +64,11 @@ section, and the rest is unaffected.
 
 ### Recommended
 
-Installing the server does not change what an agent reaches for. Claude will
-assemble whatever its shell allows, chained together, and produce a fresh
-justification each time, so naming a few commands to avoid does not hold. The
-instruction has to rule out the whole category and name the exceptions. Add
-this to `AGENTS.md` or `CLAUDE.md`:
+Installing the server does not change what an agent reaches for. Some agents,
+Claude among them, will assemble whatever their shell allows, chained together,
+and produce a fresh justification each time, so naming a few commands to avoid
+does not hold. The instruction has to rule out the whole category and name the
+exceptions. Add this to `AGENTS.md` or `CLAUDE.md`:
 
 > Type Atlas MCP is the required tool for reading and navigating code in
 > TypeScript and JavaScript. This is not a preference. No shell command is an
