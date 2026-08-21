@@ -5,9 +5,13 @@ description: Release the Type Atlas npm package suite and MCP Registry record th
 
 # Release Type Atlas
 
-Release `@type-atlas/core`, `@type-atlas/language-server`, and `@type-atlas/mcp`
-as one fixed-version package suite. Keep versions, changelogs, tags, and npm
-publication under Changesets ownership.
+Release `@type-atlas/core`, `@type-atlas/language-server`, `@type-atlas/mcp`,
+and `atlascii` as one fixed-version package suite. Keep versions, changelogs,
+tags, and npm publication under Changesets ownership.
+
+`atlascii` is unscoped and joined the suite after the others were already on
+npm. It counts: `@type-atlas/core` and `@type-atlas/mcp` depend on it, so an
+install of either resolves it from the registry.
 
 ## Interpret the request
 
@@ -158,6 +162,11 @@ Confirm that a clean consumer can resolve the CLI:
 npx --yes @type-atlas/mcp@latest --help
 ```
 
+The release chain now asks this itself: `release` runs
+`node scripts/cli.ts verify-published` after the publish, installing the
+published server into a clean directory. Packing proves the tarball; only this
+proves the registry can resolve what the tarball declares.
+
 Confirm that the MCP Registry exposes the same release under
 `io.github.tyler-mitchell/type-atlas`. A missing Registry entry after successful
 npm publication is an interrupted release; manually dispatch the `Release`
@@ -202,7 +211,37 @@ this routine setup to the npm website:
 npx --yes --package=node@24 --package=npm@latest -c 'npm trust github @type-atlas/language-server --file release.yml --repository tyler-mitchell/type-atlas --allow-publish --yes'
 npx --yes --package=node@24 --package=npm@latest -c 'npm trust github @type-atlas/core --file release.yml --repository tyler-mitchell/type-atlas --allow-publish --yes'
 npx --yes --package=node@24 --package=npm@latest -c 'npm trust github @type-atlas/mcp --file release.yml --repository tyler-mitchell/type-atlas --allow-publish --yes'
+npx --yes --package=node@24 --package=npm@latest -c 'npm trust github atlascii --file release.yml --repository tyler-mitchell/type-atlas --allow-publish --yes'
 ```
+
+## When the suite gains a package
+
+A package that has never been published cannot be published by the release
+workflow. OIDC authenticates against a trusted publisher, and npm cannot hold
+one for a name that does not exist — the publish returns `E404`, which reads
+like a missing package rather than a refused credential.
+
+This is not theoretical. The 0.4.0 release published the three `@type-atlas`
+packages and failed on `atlascii`, leaving `@type-atlas/core@0.4.0` and
+`@type-atlas/mcp@0.4.0` on npm depending on a package that was not there. Both
+were uninstallable and every gate had been green, because the distribution
+check installs packed tarballs, where a workspace dependency resolves from
+disk.
+
+So before the first release that includes a new package, bootstrap it by hand
+and give it a trusted publisher:
+
+```sh
+npm login
+```
+
+```sh
+npm publish --access public
+```
+
+Then add its `npm trust github <name> …` line above, and add it to `published`
+in `scripts/commands/status.ts` so `pnpm release:status` counts it. A package
+absent from that list is a package the release oracle cannot see.
 
 The first settings mutation may require a one-time npm browser approval. Select
 npm's short-lived option to skip repeated challenges and run all three commands
