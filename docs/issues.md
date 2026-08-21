@@ -813,6 +813,16 @@ them into one was the first attempt and it cost `investigate_code` its
 verified-relationships section — the tool stopped landing on a question it had
 answered. Two anchors, because two jobs.
 
+One case the fix reaches but does not sharpen: a snippet of `Journal`'s
+`history` method is still labelled `Journal [class]`, because the window opens
+on the method's doc comment, which lies inside the class and outside the
+method — six lines of overlap for the class against five for the method, so
+raw overlap picks the class. Not wrong, just coarser than the reader needs.
+Ranking by how fully a declaration sits inside the window (overlap over its
+own length, then larger overlap, then shallower) would name `history`, and
+would have to reject nested callbacks the same metric otherwise favours. It
+re-ranks every retrieval answer, so it wants its own change.
+
 ### `investigate_code` titles its sections `###`
 
 Every other tool uses `##`. Caught by the document lint's heading rule only
