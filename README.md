@@ -1,67 +1,177 @@
 <!-- Generated from README.mdoc by packages/mcp/scripts/render-docs.ts — edit the source, not this file. -->
-<div align="center">
-
-<img src="packages/mcp/assets/type-atlas.png" width="112" alt="" />
-
 # Type Atlas
 
-**Editor-grade TypeScript, Markdown, and JSON intelligence for coding agents,**<br />
-**shaped for a context window instead of a screen.**
+Code intelligence for coding agents, as an MCP server. TypeScript for now,
+since that is what I work in.
 
-[![npm](https://img.shields.io/npm/v/%40type-atlas%2Fmcp?style=flat-square&label=npm&color=2b7489)](https://www.npmjs.com/package/@type-atlas/mcp)
-[![node](https://img.shields.io/node/v/%40type-atlas%2Fmcp?style=flat-square&color=417e38)](https://nodejs.org)
-[![license](https://img.shields.io/npm/l/%40type-atlas%2Fmcp?style=flat-square&color=8250df)](LICENSE)
+I built it for my own agents and use it daily, mostly on a large monorepo that
+is maintained almost entirely through agents. At that size the things that
+actually mattered were how many tokens an answer costs, how many round trips a
+question takes, and whether an answer tells you how much of the repository it
+looked at. That is most of what this is.
 
-[Install](#install) · [The answers](#what-an-answer-looks-like) · [The tools](#the-tools) · [Comparison](#an-honest-comparison) · [How the examples stay honest](#how-the-examples-stay-honest)
+There is a language server underneath, so definitions, types, diagnostics, and
+ranges are the same ones LSP gives an editor.
 
-</div>
+Requires Node.js 22.20 or newer. Apache-2.0.
 
----
+## Install
 
-Type Atlas runs locally over stdio and answers from the TypeScript project that
-owns each file, so definitions, references, diagnostics, and source ranges
-reflect the repository an agent is actually changing.
-
-The language intelligence is not the hard part. Every LSP bridge has that. The
-hard part is deciding what an agent does not need to see.
-
-## Why it exists
-
-Ask a language server what is in one 286-line file and it returns 139 symbol
-nodes — 3 real declarations and 136 nested object properties and anonymous
-callbacks. Type Atlas answers the same question, from the same TypeScript
-engine, in 271 characters:
-
-| the same question, answered three ways        |    size |
-| :-------------------------------------------- | ------: |
-| LSP `documentSymbol`, passed through as JSON   | 31,584 chars — 2.9× the source file |
-| the same result formatted as an indented tree | ~4,900 chars |
-| **Type Atlas**                                | **271 chars** |
+Paste this to your coding agent:
 
 ```text
-Symbols (3 top-level) · packages/mcp/src/dependency-search.ts
-createDependencySearch [variable] selection 38:13-38:35; body 38:13-285:3
-DependencySearchResult [variable] selection 12:5-12:27; body 12:0-29:6
-queryMatchCount [variable] selection 31:6-31:21; body 31:6-36:51
+Set up the Type Atlas MCP server.
+
+Register it: `codex mcp add type-atlas -- npx --yes @type-atlas/mcp@latest`
+for Codex, or `claude mcp add --scope user type-atlas -- npx --yes
+@type-atlas/mcp@latest` for Claude Code.
+
+Then append this to AGENTS.md or CLAUDE.md, creating the file if needed:
+
+  Type Atlas MCP is the required tool for code navigation, reading, and
+  diagnostics in TypeScript and JavaScript. This is not a preference. Do
+  not use grep, glob, find, or plain file reads on code. The only valid
+  fallbacks are a server that is down, a call that errored, or a file
+  that is neither TS nor JS.
+
+Then tell me to restart the client so it loads the server.
 ```
 
-That is the product.
+The rule is there because installing the server does not change what an agent
+reaches for. Claude in particular goes back to grep and whole-file reads and
+produces a fresh justification every time, so the wording has to say required
+and name the only exceptions.
 
-## What an answer looks like
+<details>
+<summary>Codex, by hand</summary>
 
-Every response below is captured from the running server against
-[`fixtures/ledger`](fixtures/ledger/), a realistic example monorepo, by the
-[scenario suite](packages/mcp/test/scenarios/) that also regression-checks
-them. None is written by hand, and a stale example fails the build.
+```sh
+codex mcp add type-atlas -- npx --yes @type-atlas/mcp@latest
+```
 
-### `inspect_symbol` — the whole picture in one call
+Writes to `~/.codex/config.toml`, so every repository Codex opens has it.
+`codex mcp list` confirms it, `codex mcp remove type-atlas` undoes it.
 
-Hover, definitions, type definitions, implementations, callers, calls,
-references, and project scope, composed into one answer. References are
-reported as the _residual_ after callers and definitions are accounted for, so
-nothing is counted twice. Measured against running the individual tools
-separately: 4× fewer characters and 7× fewer round trips — and each round trip
-is a model turn.
+</details>
+
+<details>
+<summary>Claude Code, by hand</summary>
+
+```sh
+claude mcp add --scope user type-atlas -- npx --yes @type-atlas/mcp@latest
+```
+
+`--scope user` covers every repository. `--scope project` writes a checked-in
+`.mcp.json` your collaborators share, `--scope local` is one repository on one
+machine.
+
+Claude Desktop keeps a separate server list, so this does not reach it. Add it
+under `mcpServers` in `claude_desktop_config.json`, at
+`~/Library/Application Support/Claude/` on macOS or `%APPDATA%\Claude\` on
+Windows:
+
+```json
+{
+  "mcpServers": {
+    "type-atlas": {
+      "command": "npx",
+      "args": ["--yes", "@type-atlas/mcp@latest"]
+    }
+  }
+}
+```
+
+Claude Desktop starts servers without your shell `PATH`, so an nvm or Homebrew
+runtime is not found by name and the server fails to start. Use the absolute
+path from `which npx` when that happens.
+
+</details>
+
+<details>
+<summary>Other clients</summary>
+
+VS Code:
+
+```sh
+code --add-mcp '{"name":"type-atlas","command":"npx","args":["--yes","@type-atlas/mcp@latest"]}'
+```
+
+Anything else that reads the standard shape:
+
+```json
+{
+  "mcpServers": {
+    "type-atlas": {
+      "command": "npx",
+      "args": ["--yes", "@type-atlas/mcp@latest"]
+    }
+  }
+}
+```
+
+Clients that cannot launch the `npx.cmd` shim need `cmd`: `"command": "cmd"`
+with `"args": ["/c", "npx", "--yes", "@type-atlas/mcp@latest"]`, or
+`codex mcp add type-atlas -- cmd /c npx --yes @type-atlas/mcp@latest`.
+
+</details>
+
+Clients read MCP config at startup, so restart after. `@latest` resolves on
+every process start; pin a version if you do not want tool behavior moving
+under you.
+
+`search_code`, `related_code`, `investigate_code`, and `search_dependency_code`
+run a semantic index through `uvx` and need
+[uv](https://docs.astral.sh/uv/getting-started/installation/). Without it those
+four report that uv is missing, `explore_symbol` drops its related-code
+section, and the rest is unaffected.
+
+### `--require-intent`
+
+With this flag, a read-only call has to carry one sentence naming the decision
+it serves, and that sentence is echoed above the answer. A call without one
+fails.
+
+```sh
+codex mcp add type-atlas -- npx --yes @type-atlas/mcp@latest --require-intent
+```
+
+This is for agents that navigate far past what their change needs and cannot
+say why afterwards. Off by default.
+
+## Tools
+
+| Question                         | Tools                                                                                                                                                                              |
+| :------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Understand a symbol, in one call | `inspect_symbol` · `explore_symbol`                                                                                                                                                |
+| Navigate a relationship in full  | `definitions` · `type_definitions` · `implementations` · `callers` · `callees` · `references` · `file_references` · `document_highlights` · `document_symbols` · `workspace_symbols` |
+| Read economically                | `read_file` · `list_files`                                                                                                                                                         |
+| Stay correct while editing       | `diagnostics` · `code_actions` · `organize_imports` · `add_missing_imports` · `remove_unused_code` · `fix_all` · `format_document` · `rename_symbol` · `rename_files`              |
+| Understand a dependency          | `list_module_exports` · `search_dependency_code`                                                                                                                                   |
+| Find code by meaning             | `search_code` · `related_code` · `investigate_code`                                                                                                                                |
+| Prove exact text                 | `occurrences`                                                                                                                                                                      |
+
+Paths are workspace-relative, coordinates are one-based, so a location in one
+answer is valid input to the next call. Editing tools return patches; nothing
+is written for you. Per-tool pages with more cases are in
+[docs/tools](docs/tools/).
+
+## Output
+
+Everything below is captured from the running server against
+[`fixtures/ledger`](fixtures/ledger/) by the
+[scenario suite](packages/mcp/test/scenarios/), which replays the same calls
+and fails on drift. Nothing here is hand-written, and changing what a tool
+answers changes this file in the same commit. The source is
+[`README.mdoc`](README.mdoc).
+
+### `inspect_symbol`
+
+Hover, definitions, type definitions, implementations, callers, calls, and
+references in one call. References are the residual after callers and
+definitions are accounted for, so a use is listed once. Against calling those
+tools separately it is 4x fewer characters and 7x fewer round trips.
+
+**Agent's Input**
 
 ```yaml
 tool: Inspect symbol
@@ -69,6 +179,8 @@ workspace: fixtures/ledger
 file: packages/accounts/src/journal.ts
 symbol: Journal
 ```
+
+**Response**
 
 ~~~text
 Journal [class] · packages/accounts/src/journal.ts:24:14-24:21 · range 24:1-73:2 · packages/accounts/tsconfig.json
@@ -101,18 +213,21 @@ packages/importers/src/csv.ts:1:10-1:17:  import { Journal, type Entry, credit, 
 references lists all 9, with paging.
 ~~~
 
-### `document_symbols` — errors arrive unasked
+### `document_symbols`
 
-An editor shows diagnostics in the gutter continuously, so a human cannot miss
-them. An agent only learns what it asks about — and an agent that just edited
-code often does not think to ask. So a file's symbols arrive with its
-diagnostics attached:
+An outline arrives with the file's diagnostics attached. Editors put errors in
+the gutter so a human cannot miss them. An agent only sees what it asked for,
+and an agent that just edited code usually does not think to ask.
+
+**Agent's Input**
 
 ```yaml
 tool: Document symbols
 workspace: fixtures/ledger
 file: packages/reconcile/src/drift.ts
 ```
+
+**Response**
 
 ~~~text
 === packages/reconcile/src/drift.ts · 3 top-level symbols ===
@@ -124,60 +239,21 @@ statementTotal [variable] 15:14-15:28 · range 15:14-16:56
 4 problems in packages/reconcile/src/drift.ts
 ~~~
 
-### `rename_symbol` — edits are patches, and scope is stated
+### `read_file`
 
-A rename returns a reviewable patch instead of silently rewriting the tree.
-When the symbol is re-exported beyond the project the rename can reach, the
-answer says so — `Scope: project only` — and the patch preserves the public
-name rather than breaking consumers it cannot see. A silent partial answer is
-the worst failure in this category, because the agent cannot detect it.
+Bodies fold to signatures by default. Overloads survive folding, bodies come
+back with `fold: false`, and the argument takes an array so several files land
+in one call.
 
-```yaml
-tool: Rename symbol
-workspace: fixtures/ledger
-file: packages/accounts/src/account.ts
-position: {"line":18,"character":14}
-newName: balanceSide
-```
-
-~~~text
-Rename to balanceSide · resolved normalBalance · packages/accounts/src/account.ts:18:14 · Scope: project only · packages/accounts/tsconfig.json · 2 files · 2 edits
-
-*** Begin Patch
-*** Update File: packages/accounts/src/account.ts
-@@
-   readonly closedAt?: Date;
- }
- 
--export const normalBalance = (kind: AccountKind): "debit" | "credit" =>
-+export const balanceSide = (kind: AccountKind): "debit" | "credit" =>
-   kind === "asset" || kind === "expense" ? "debit" : "credit";
- 
- export const parentPath = (path: AccountPath): AccountPath | undefined => {
-*** Update File: packages/accounts/src/index.ts
-@@
-   type AccountStore,
-   lineage,
-   MemoryAccountStore,
--  normalBalance,
-+  balanceSide as normalBalance,
-   parentPath,
- } from "./account.ts";
- export { type Entry, Journal, UnbalancedEntryError } from "./journal.ts";
-*** End Patch
-~~~
-
-### `read_file` — bodies fold to signatures
-
-Reading costs what the question needs: function bodies fold to their
-signatures by default, overload lists survive, implementations wait until
-asked for, and many files batch into one call.
+**Agent's Input**
 
 ```yaml
 tool: Read files
 workspace: fixtures/ledger
 file: ["packages/accounts/src/journal.ts"]
 ```
+
+**Response**
 
 ~~~text
 1 file · 52 lines · 22 folded to signatures, pass fold: false for the bodies
@@ -238,13 +314,13 @@ file: ["packages/accounts/src/journal.ts"]
 73 | }
 ~~~
 
-### `list_files` — structure, reading cost, and what changed
+### `list_files`
 
-One bounded tree: folded directories say what they hold, every file carries
-its line count, and `git status` is fused in with the editor-standard badge
-letters and change sizes — including a ghost row for a deleted file, which
-exists in git's answer and nowhere on disk. One orientation call answers
-what is here, what it costs to read, and what differs from HEAD:
+Structure, line counts, and `git status` in one tree, using the badge letters
+editors already use. Deleted files get a row even though they exist only in
+git's answer. Folded directories say what they hold rather than disappearing.
+
+**Agent's Input**
 
 ```yaml
 tool: List files
@@ -253,6 +329,8 @@ workspace: fixtures/ledger
 directory: packages/money
 depth: 2
 ```
+
+**Response**
 
 ~~~text
 packages/money/
@@ -269,10 +347,62 @@ packages/money/
 └  tsconfig.json · 20 loc
 ~~~
 
-### `occurrences` — proof of absence
+### `references`
 
-The semantic tools rank what exists. `occurrences` proves what does not, with
-the scan count that makes the zero honest:
+Answers from every project loaded in the session, and names how many that was.
+A bare count reads as complete when it is not, so the line carries the
+denominator and an agent can decide whether to widen.
+
+**Agent's Input**
+
+```yaml
+tool: References
+workspace: fixtures/ledger
+file: packages/money/src/money.ts
+position: {"line":12,"character":13}
+```
+
+**Response**
+
+~~~text
+Money [type] · packages/money/src/money.ts:12:13
+37 references · all 9 projects searched · packages/money/tsconfig.json
+
+1-20 of 37 references · pass offset: 20 for the rest
+
+packages/accounts/src/journal.ts
+├  1:28  — at module level
+├  14:35 — inside constructor
+├  31:61 — inside post
+└  36:62 — inside post
+packages/accounts/src/posting.ts
+└  25:49 — inside signedAmount
+packages/money/src/index.ts
+└  7:8 — at module level
+packages/money/src/money.ts
+├  27:73 — inside money
+├  28:53 — inside money
+├  30:43 — inside zero
+├  38:27 — inside add
+├  38:41 — inside add
+├  38:49 — inside add
+├  45:31 — inside negate
+├  45:39 — inside negate
+├  47:31 — inside isZero
+└  50:31 — inside format
+packages/money/tests/rounding-parity.ts
+├  1:15  — at module level
+├  9:44  — inside assertRoundingParity
+├  9:58  — inside assertRoundingParity
+└  15:38 — inside paritySamples
+~~~
+
+### `occurrences`
+
+Literal text, with the number of files scanned. The semantic tools rank what
+exists, which is useless for confirming a token is gone after a teardown.
+
+**Agent's Input**
 
 ```yaml
 tool: Occurrences
@@ -280,14 +410,78 @@ workspace: fixtures/ledger
 text: quantumFlux
 ```
 
+**Response**
+
 ~~~text
 Nothing under the workspace contains "quantumFlux" · 67 files scanned · 1 file of declared build output not scanned — scan a generated directory directly to include it. This is a literal answer: the exact text does not occur in what was scanned, which is the proof a semantic search cannot give.
 ~~~
 
-### `impact` — a change weighed before it is made
+### `investigate_code`
 
-Who is touched, where, how much of it is tests — and what could not be
-confirmed, named instead of omitted:
+Retrieval always returns its nearest neighbours and its top hit always shows as
+100%. When nothing retrieved declares anything the question named, the answer
+says so and stops rather than expanding relationships around the wrong symbol.
+
+**Agent's Input**
+
+```yaml
+tool: Investigate code
+workspace: fixtures/ledger
+question: where is the retry backoff for failed network requests configured
+```
+
+**Response**
+
+~~~text
+Search: where is the retry backoff for failed network requests configured
+
+3 matches · relevance is relative to the strongest match · no identifier to anchor on, so these are ranked by meaning alone
+
+=== 1 · packages/importers/src/config.ts:1-7 · relevance 100% ===
+
+Structure: defaultCurrencyCode
+Symbol: defaultCurrencyCode [variable] · selection 7:14-7:33 · range 7:14-7:72
+
+1 | import ledgerConfig from "../../../ledger.config.json" with { type: "json" };
+2 |
+3 | /** The account unmatched statement lines land in until a bookkeeper files them. */
+4 | export const suspenseAccount: string = ledgerConfig.suspenseAccount;
+5 |
+6 | /** The currency a bank export is assumed to use when it does not say. */
+
+=== 2 · packages/accounts/src/account.ts:21-35 · relevance 92% ===
+
+Structure: AccountStore
+Symbol: AccountStore [interface] · selection 31:18-31:30 · range 31:1-35:2
+
+21 | export const parentPath = (path: AccountPath): AccountPath | undefined => {
+22 |   const at = path.lastIndexOf(":");
+23 |   return at === -1 ? undefined : path.slice(0, at);
+24 | };
+25 |
+26 | /** Every ancestor from root to the account itself: `a`, `a:b`, `a:b:c`. */
+
+=== 3 · packages/importers/vite.config.ts:1-9 · relevance 92% ===
+
+Structure: default
+Symbol: default [variable] · selection 4:1-9:3
+
+1 | // Importers ship to the bookkeeping portal as a browser bundle; the library
+2 | // packages stay unbundled. Output lands in the default `dist` beside this
+3 | // config, which the repository commits so the portal deploy needs no build.
+4 | export default {
+5 |   build: {
+6 |     outDir: "dist",
+
+None of these declares anything the question names, so no relationship expansion follows — the matches above are retrieval's nearest neighbours, not an answer. If the concept should exist here, ask again naming an identifier from it; if you are proving absence, occurrences gives the literal zero.
+~~~
+
+### `impact`
+
+What a change would touch, by package, with the test share separated and the
+unconfirmed part named.
+
+**Agent's Input**
 
 ```yaml
 tool: Impact
@@ -295,6 +489,8 @@ workspace: fixtures/ledger
 file: packages/accounts/src/posting.ts
 position: {"line":25,"character":14}
 ```
+
+**Response**
 
 ~~~text
 Changing signedAmount touches 10 uses in 6 files across 4 packages, in the projects loaded this session. No use sits in a test file.
@@ -306,212 +502,57 @@ packages/reconcile     2      1
 packages/rules         2      1
 ~~~
 
-## The tools
+## Cost
 
-| Question                        | Tools                                                                                                                                                                              |
-| :------------------------------ | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Understand a symbol, in one call | `inspect_symbol` · `explore_symbol`                                                                                                                                                |
-| Navigate a relationship in full | `definitions` · `type_definitions` · `implementations` · `callers` · `callees` · `references` · `file_references` · `document_highlights` · `document_symbols` · `workspace_symbols` |
-| Read economically               | `read_file` · `list_files`                                                                                                                                                         |
-| Stay correct while editing      | `diagnostics` · `code_actions` · `organize_imports` · `add_missing_imports` · `remove_unused_code` · `fix_all` · `format_document` · `rename_symbol` · `rename_files`              |
-| Understand a dependency         | `list_module_exports` · `search_dependency_code`                                                                                                                                   |
-| Find code by meaning            | `search_code` · `related_code` · `investigate_code`                                                                                                                                |
+`documentSymbol` for one 286-line file returns 139 nodes, 3 of them real
+declarations and the rest nested object properties and anonymous callbacks.
+As JSON that is 31,584 characters, 2.9x the source file. The same question here
+is 271 characters, from the same engine.
 
-Every response uses workspace-relative paths and one-based coordinates, so
-locations can be used directly. Token-expanding detail is opt-in throughout.
-Editing tools return reviewable patches; nothing is applied silently. One
-Volar-composed language server answers TypeScript, Markdown, and JSON from a
-single project model — not one process per language.
+On that monorepo a `references` call is about 150ms warm. The first call after
+the server starts pays for building that TypeScript program, which was 2.5s
+there. Every answer carries its own elapsed time and request count, so a cold
+project is visible rather than inferred.
+[Measurements](docs/tool-latency-measurements.md), and
+[the same on a large monorepo](docs/kek-monorepo-latency.md).
 
-The server also ships usage instructions in the MCP handshake, so guidance on
-which tool to reach for persists in an agent's context even when tool schemas
-do not.
+The tool list is a standing cost in every session: about 15,400 tokens of
+schema, measured when there were 35 tools, and there are more now.
 
-## An honest comparison
+## Limits
 
-Type Atlas is not the most capable code-intelligence MCP server, and the
-comparisons say so with receipts — every competitor examined from source,
-including where they win, and a list of their ideas worth adopting.
+References stop at the TypeScript project boundary. Projects the session has
+not loaded cannot contribute, which is why the answer states how many it
+searched and reading a file in another package widens the next one. No other
+code-intelligence MCP server examined resolves this either.
 
-- [TypeScript field comparison](docs/typescript-code-intelligence-comparison.md)
-  — the closest peers, judged on monorepo behaviour
-- [Broader comparison](docs/code-intelligence-mcp-comparison.md) — polyglot
-  toolkits and generic LSP bridges
+Retrieval matches meaning, not text, and will not reliably find an exact
+string, error message, or comment. Use `occurrences` or your client's search.
 
-Across eight tools examined, **none resolves references across package
-boundaries**, including this one. Type Atlas is the only one that tells you
-when an answer is scoped.
+This only does TypeScript, Markdown, and JSON.
+[Serena](https://github.com/oraios/serena) handles around 60 languages if you
+need that.
 
-Pick something else if:
-
-- **you are not in a TypeScript codebase** — [Serena](https://github.com/oraios/serena)
-  covers ~60 languages and is excellent;
-- **you want simulation sessions, build runners, or cross-repo analysis** —
-  [agent-lsp](https://github.com/blackwell-systems/agent-lsp) has them;
-- **you want a thin, auditable 1:1 LSP bridge** —
-  [mcpls](https://github.com/bug-ops/mcpls) is exactly that.
-
-Known limits, stated up front: references stop at the TypeScript project
-boundary, so a monorepo-wide usage audit needs a text search too; the
-retrieval tools match meaning rather than text and will not find an exact
-string; and the tool surface costs ~15k tokens of schema to describe.
-
-## Install
-
-Type Atlas requires Node.js 22.20 or newer. No global installation is
-required.
-
-> [!NOTE]
-> Navigation, diagnostics, code actions, and reads work with Node.js alone.
-> The retrieval tools `search_code`, `related_code`, `investigate_code`, and
-> `search_dependency_code` additionally require [uv](https://docs.astral.sh/uv/getting-started/installation/),
-> which supplies the `uvx` command used to run the semantic index. Without it
-> those four tools report that `uvx` is missing, and `explore_symbol` returns
-> its language-server inspection without the related-code section.
-
-### Codex
-
-```sh
-codex mcp add type-atlas -- npx --yes @type-atlas/mcp@latest
-```
-
-This registers the server in `~/.codex/config.toml`, so it is available in
-every repository Codex opens. `codex mcp list` confirms the entry; remove it
-with `codex mcp remove type-atlas`.
-
-### Claude Code
-
-```sh
-claude mcp add --scope user type-atlas -- npx --yes @type-atlas/mcp@latest
-```
-
-`--scope user` installs Type Atlas for every repository. Use `--scope project`
-to write a checked-in `.mcp.json` that your collaborators share, or
-`--scope local` for one repository on one machine.
-
-<details>
-<summary><b>Claude Desktop</b></summary>
-
-Claude Desktop keeps its own server list, so installing through the Claude
-Code CLI does not add Type Atlas to Claude Desktop, and the reverse is also
-true. Add it under `mcpServers` in `claude_desktop_config.json`, at
-`~/Library/Application Support/Claude/` on macOS or `%APPDATA%\Claude\` on
-Windows:
-
-```json
-{
-  "mcpServers": {
-    "type-atlas": {
-      "command": "npx",
-      "args": ["--yes", "@type-atlas/mcp@latest"]
-    }
-  }
-}
-```
-
-Claude Desktop starts servers without your shell's `PATH`, so a runtime
-installed by nvm, Homebrew, or another version manager is not found by name
-and the server fails to start. Give the absolute path when that happens —
-`which npx` prints it:
-
-```json
-{
-  "mcpServers": {
-    "type-atlas": {
-      "command": "/opt/homebrew/bin/npx",
-      "args": ["--yes", "@type-atlas/mcp@latest"]
-    }
-  }
-}
-```
-
-</details>
-
-<details>
-<summary><b>VS Code</b></summary>
-
-```sh
-code --add-mcp '{"name":"type-atlas","command":"npx","args":["--yes","@type-atlas/mcp@latest"]}'
-```
-
-</details>
-
-<details>
-<summary><b>Other MCP clients</b></summary>
-
-```json
-{
-  "mcpServers": {
-    "type-atlas": {
-      "command": "npx",
-      "args": ["--yes", "@type-atlas/mcp@latest"]
-    }
-  }
-}
-```
-
-</details>
-
-<details>
-<summary><b>Native Windows</b></summary>
-
-Clients that cannot launch the `npx.cmd` shim directly should invoke it
-through `cmd`:
-
-```powershell
-codex mcp add type-atlas -- cmd /c npx --yes @type-atlas/mcp@latest
-claude mcp add --scope user type-atlas -- cmd /c npx --yes @type-atlas/mcp@latest
-```
-
-For JSON configuration, use `"command": "cmd"` and
-`"args": ["/c", "npx", "--yes", "@type-atlas/mcp@latest"]`.
-
-</details>
-
-> [!IMPORTANT]
-> Clients load MCP servers at startup, so restart your client after changing
-> its configuration. `@latest` starts the current npm release; pin an exact
-> version when reproducible tool behavior matters more than automatic
-> upgrades.
-
-## How the examples stay honest
-
-```mermaid
-graph LR
-  F["fixtures/ledger<br/>example monorepo"] --> S["scenario suite<br/>real stdio invocations"]
-  S --> R["captured responses"]
-  R --> G["regression gate"]
-  R --> D["README examples"]
-```
-
-This README is rendered from [`README.mdoc`](README.mdoc). Every embedded
-response is read from
-[`packages/mcp/test/scenarios/responses/`](packages/mcp/test/scenarios/responses/),
-where the scenario suite captures real tool invocations against
-[`fixtures/ledger`](fixtures/ledger/) and fails when behavior drifts. Changing
-a tool's answer changes this document, in the same commit, or the build says
-so.
+Claude Code's `typescript-lsp` plugin is the obvious thing to compare against,
+since it wraps the same engine. I ran both in one session against the same
+symbols and kept using this one. Those notes, and the same treatment for the
+other code-intelligence MCP servers, are in
+[the comparison](docs/code-intelligence-mcp-comparison.md).
 
 ## Packages
 
-| Package                                                        | Role                                                     |
-| :------------------------------------------------------------- | :------------------------------------------------------- |
-| [`@type-atlas/mcp`](packages/mcp)                               | the installable MCP server                               |
-| [`@type-atlas/core`](packages/core)                             | the headless code-intelligence API                       |
-| [`@type-atlas/language-server`](packages/language-server)       | the Volar-based language server used by the core package |
+| Package                                                   | Role                                                    |
+| :-------------------------------------------------------- | :------------------------------------------------------ |
+| [`@type-atlas/mcp`](packages/mcp)                          | the MCP server                                          |
+| [`@type-atlas/core`](packages/core)                        | headless code-intelligence API                          |
+| [`@type-atlas/language-server`](packages/language-server)  | the Volar-based language server the core package drives |
 
 ## Development
 
 ```sh
-pnpm install
-pnpm check
-pnpm check:distribution
+vp install
+vp run check
+vp run check:distribution
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the change and release process.
-
----
-
-<div align="center">
-<sub>Apache-2.0 · built on <a href="https://volarjs.dev">Volar</a> and the TypeScript language service</sub>
-</div>
+[CONTRIBUTING.md](CONTRIBUTING.md) has the change and release process.

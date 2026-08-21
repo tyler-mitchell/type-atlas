@@ -6,11 +6,15 @@ Report diagnostics for the TypeScript projects you have touched — the compiler
 
 ## deliberately broken reconcile
 
+**Agent's Input**
+
 ```yaml
 tool: Diagnostics
 workspace: fixtures/ledger
 file: packages/reconcile/src/drift.ts
 ```
+
+**Response**
 
 ~~~text
 packages/reconcile/src/drift.ts · 4 problems · packages/reconcile/tsconfig.json
@@ -56,11 +60,15 @@ error ts(2362) 21:23-21:35 — inside drift
 
 ## clean file
 
+**Agent's Input**
+
 ```yaml
 tool: Diagnostics
 workspace: fixtures/ledger
 file: packages/money/src/money.ts
 ```
+
+**Response**
 
 ~~~text
 No diagnostic of any severity in packages/money/src/money.ts · packages/money/tsconfig.json.
@@ -68,11 +76,15 @@ No diagnostic of any severity in packages/money/src/money.ts · packages/money/t
 
 ## missing imports diagnosed
 
+**Agent's Input**
+
 ```yaml
 tool: Diagnostics
 workspace: fixtures/ledger
 file: packages/reconcile/src/matching.ts
 ```
+
+**Response**
 
 ~~~text
 packages/reconcile/src/matching.ts · 2 problems · packages/reconcile/tsconfig.json

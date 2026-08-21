@@ -6,12 +6,16 @@ Search symbols across TypeScript projects activated in this workspace session. P
 
 ## balance across packages
 
+**Agent's Input**
+
 ```yaml
 tool: Workspace symbols
 workspace: fixtures/ledger
 file: packages/reports/src/balance.ts
 query: Balance
 ```
+
+**Response**
 
 ~~~text
 5 symbols matching Balance · 9 projects loaded · packages/reports/tsconfig.json
@@ -25,12 +29,16 @@ closedPeriodsBalance [const] · packages/rules/src/builtin.ts:22:14-35:2
 
 ## case insensitive partial name
 
+**Agent's Input**
+
 ```yaml
 tool: Workspace symbols
 workspace: fixtures/ledger
 file: packages/accounts/src/account.ts
 query: store
 ```
+
+**Response**
 
 ~~~text
 2 symbols matching store · 9 projects loaded · packages/accounts/tsconfig.json
@@ -41,12 +49,16 @@ MemoryAccountStore [class] · packages/accounts/src/account.ts:37:1-56:2
 
 ## class family by suffix
 
+**Agent's Input**
+
 ```yaml
 tool: Workspace symbols
 workspace: fixtures/ledger
 file: packages/importers/src/statement-parser.ts
 query: Parser
 ```
+
+**Response**
 
 ~~~text
 3 symbols matching Parser · 9 projects loaded · packages/importers/tsconfig.json

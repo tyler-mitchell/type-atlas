@@ -6,12 +6,16 @@ Combine exact definitions, types, implementations, callers, calls, and reference
 
 ## function with similarity tail
 
+**Agent's Input**
+
 ```yaml
 tool: Explore symbol
 workspace: fixtures/ledger
 file: packages/reports/src/balance.ts
 symbol: balancesAsOf
 ```
+
+**Response**
 
 ~~~text
 balancesAsOf [function] · packages/reports/src/balance.ts:23:14-23:26 · range 23:14-51:2 · packages/reports/tsconfig.json

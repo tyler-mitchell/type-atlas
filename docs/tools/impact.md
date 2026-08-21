@@ -6,12 +6,16 @@ Experimental: weigh a change to the symbol at a position — every use, grouped 
 
 ## weigh a change to signed amount
 
+**Agent's Input**
+
 ```yaml
 tool: Impact
 workspace: fixtures/ledger
 file: packages/accounts/src/posting.ts
 position: {"line":25,"character":14}
 ```
+
+**Response**
 
 ~~~text
 Changing signedAmount touches 10 uses in 6 files across 4 packages, in the projects loaded this session. No use sits in a test file.
@@ -25,12 +29,16 @@ packages/rules         2      1
 
 ## weigh a change to a shared type
 
+**Agent's Input**
+
 ```yaml
 tool: Impact
 workspace: fixtures/ledger
 file: packages/money/src/money.ts
 position: {"line":12,"character":13}
 ```
+
+**Response**
 
 ~~~text
 Changing Money touches 38 uses in 9 files across 5 packages, in the projects loaded this session. 4 of the uses sit in test files.

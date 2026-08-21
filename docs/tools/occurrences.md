@@ -6,11 +6,15 @@ Experimental: every place an exact text occurs under a directory, with an honest
 
 ## token found across packages
 
+**Agent's Input**
+
 ```yaml
 tool: Occurrences
 workspace: fixtures/ledger
 text: signedAmount
 ```
+
+**Response**
 
 ~~~text
 "signedAmount" occurs 12 times in 7 files · 67 files scanned under the workspace · 1 file of declared build output not scanned.
@@ -36,11 +40,15 @@ packages/rules/src/builtin.ts
 
 ## honest zero
 
+**Agent's Input**
+
 ```yaml
 tool: Occurrences
 workspace: fixtures/ledger
 text: quantumFlux
 ```
+
+**Response**
 
 ~~~text
 Nothing under the workspace contains "quantumFlux" · 67 files scanned · 1 file of declared build output not scanned — scan a generated directory directly to include it. This is a literal answer: the exact text does not occur in what was scanned, which is the proof a semantic search cannot give.
@@ -48,12 +56,16 @@ Nothing under the workspace contains "quantumFlux" · 67 files scanned · 1 file
 
 ## scanning generated output on purpose
 
+**Agent's Input**
+
 ```yaml
 tool: Occurrences
 workspace: fixtures/ledger
 text: signedAmount
 directory: packages/importers/dist
 ```
+
+**Response**
 
 ~~~text
 "signedAmount" occurs 3 times in 1 file · 1 file scanned under packages/importers/dist.

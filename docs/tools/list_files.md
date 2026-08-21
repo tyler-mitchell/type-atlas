@@ -6,10 +6,14 @@ Show a bounded workspace-relative project structure. `view: "files"` (the defaul
 
 ## monorepo first contact
 
+**Agent's Input**
+
 ```yaml
 tool: List files
 workspace: fixtures/ledger
 ```
+
+**Response**
 
 ~~~text
 ledger/
@@ -27,11 +31,15 @@ ledger/
 
 ## every package opened
 
+**Agent's Input**
+
 ```yaml
 tool: List files
 workspace: fixtures/ledger
 expand: {"packages/*":2}
 ```
+
+**Response**
 
 ~~~text
 ledger/
@@ -113,11 +121,15 @@ ledger/
 
 ## one corner opened deeper
 
+**Agent's Input**
+
 ```yaml
 tool: List files
 workspace: fixtures/ledger
 expand: {"packages/accounts":1,"packages/reports":{"depth":2,"glob":["**/*.ts"]}}
 ```
+
+**Response**
 
 ~~~text
 ledger/
@@ -145,12 +157,16 @@ ledger/
 
 ## without line counts
 
+**Agent's Input**
+
 ```yaml
 tool: List files
 workspace: fixtures/ledger
 directory: packages/accounts
 loc: false
 ```
+
+**Response**
 
 ~~~text
 packages/accounts/
@@ -162,11 +178,15 @@ packages/accounts/
 
 ## test files only
 
+**Agent's Input**
+
 ```yaml
 tool: List files
 workspace: fixtures/ledger
 glob: ["**/*.test.ts"]
 ```
+
+**Response**
 
 ~~~text
 ledger/
@@ -184,6 +204,8 @@ ledger/
 
 ## working tree changes
 
+**Agent's Input**
+
 ```yaml
 tool: List files
 workspace: fixtures/ledger
@@ -191,6 +213,8 @@ workspace: fixtures/ledger
 directory: packages/money
 depth: 2
 ```
+
+**Response**
 
 ~~~text
 packages/money/
@@ -209,6 +233,8 @@ packages/money/
 
 ## staged and renamed
 
+**Agent's Input**
+
 ```yaml
 tool: List files
 workspace: fixtures/ledger
@@ -216,6 +242,8 @@ workspace: fixtures/ledger
 directory: packages/importers
 depth: 2
 ```
+
+**Response**
 
 ~~~text
 packages/importers/
@@ -236,6 +264,8 @@ packages/importers/
 
 ## merge conflict
 
+**Agent's Input**
+
 ```yaml
 tool: List files
 workspace: fixtures/ledger
@@ -243,6 +273,8 @@ workspace: fixtures/ledger
 directory: packages/money
 depth: 2
 ```
+
+**Response**
 
 ~~~text
 packages/money/
@@ -260,11 +292,15 @@ packages/money/
 
 ## subtree on a budget
 
+**Agent's Input**
+
 ```yaml
 tool: List files
 workspace: fixtures/ledger
 expand: {"packages/*":{"depth":2,"limit":6}}
 ```
+
+**Response**
 
 ~~~text
 ledger/
@@ -338,12 +374,16 @@ ledger/
 
 ## bounded glob elides
 
+**Agent's Input**
+
 ```yaml
 tool: List files
 workspace: fixtures/ledger
 glob: ["**/*.ts"]
 limit: 12
 ```
+
+**Response**
 
 ~~~text
 ledger/
@@ -380,12 +420,16 @@ ledger/
 
 ## only the delta
 
+**Agent's Input**
+
 ```yaml
 tool: List files
 workspace: fixtures/ledger
 # working tree arranged: currency.ts edited · qif.ts created · index.ts deleted
 changed: true
 ```
+
+**Response**
 
 ~~~text
 ledger/
@@ -401,12 +445,16 @@ ledger/
 
 ## delta of a clean tree
 
+**Agent's Input**
+
 ```yaml
 tool: List files
 workspace: fixtures/ledger
 directory: packages/accounts
 changed: true
 ```
+
+**Response**
 
 ~~~text
 Nothing here differs from HEAD — the working tree under this directory is clean.

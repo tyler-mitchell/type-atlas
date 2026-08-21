@@ -6,12 +6,16 @@ Discover quick fixes and refactors for a range, or resolve a displayed action to
 
 ## at a type error
 
+**Agent's Input**
+
 ```yaml
 tool: Code actions
 workspace: fixtures/ledger
 file: packages/reconcile/src/drift.ts
 range: {"start":{"line":21,"character":65},"end":{"line":21,"character":70}}
 ```
+
+**Response**
 
 ~~~text
 packages/reconcile/src/drift.ts:21:65-21:70 · 5 actions

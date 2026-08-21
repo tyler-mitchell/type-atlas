@@ -18,6 +18,8 @@ One ask failing binds {failed} and is stated in a feedback line under your answe
 
 ## settlement dossier
 
+**Agent's Input**
+
 ```yaml
 tool: Compose
 workspace: fixtures/ledger
@@ -31,6 +33,8 @@ document: {% ask "subject" as="what" file="packages/accounts/src/posting.ts" lin
 
 {% tree entries=$uses.groups partial="reference-node.mdoc" /%}
 ```
+
+**Response**
 
 ~~~text
 ## signedAmount · packages/accounts/src/posting.ts:25:14

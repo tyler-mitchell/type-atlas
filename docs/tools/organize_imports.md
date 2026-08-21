@@ -6,11 +6,15 @@ Return the TypeScript organize-imports action as a Codex patch. The MCP does not
 
 ## messy import block
 
+**Agent's Input**
+
 ```yaml
 tool: Organize imports
 workspace: fixtures/ledger
 file: packages/importers/src/csv.ts
 ```
+
+**Response**
 
 ~~~text
 Organize Imports · 1 file · 3 edits

@@ -6,12 +6,16 @@ Show which functions call the callable symbol at a position, across every projec
 
 ## who calls signed amount
 
+**Agent's Input**
+
 ```yaml
 tool: Callers
 workspace: fixtures/ledger
 file: packages/accounts/src/posting.ts
 position: {"line":25,"character":14}
 ```
+
+**Response**
 
 ~~~text
 signedAmount · called from 4 places · 9 projects loaded
@@ -28,12 +32,16 @@ packages/rules/src/builtin.ts
 
 ## who calls an overloaded method
 
+**Agent's Input**
+
 ```yaml
 tool: Callers
 workspace: fixtures/ledger
 file: packages/accounts/src/journal.ts
 position: {"line":28,"character":3}
 ```
+
+**Response**
 
 ~~~text
 post · called from 3 places · 9 projects loaded

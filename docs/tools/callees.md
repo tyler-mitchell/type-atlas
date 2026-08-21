@@ -6,12 +6,16 @@ Show which callable symbols are invoked directly by the function at a position, 
 
 ## what balances as of invokes
 
+**Agent's Input**
+
 ```yaml
 tool: Callees
 workspace: fixtures/ledger
 file: packages/reports/src/balance.ts
 position: {"line":23,"character":14}
 ```
+
+**Response**
 
 ~~~text
 balancesAsOf · calls 12 callables
@@ -29,6 +33,8 @@ and 8 standard-library calls · entries, get, localeCompare, map, set, sort
 
 ## what a method invokes
 
+**Agent's Input**
+
 ```yaml
 tool: Callees
 workspace: fixtures/ledger
@@ -36,11 +42,15 @@ file: packages/accounts/src/journal.ts
 position: {"line":28,"character":3}
 ```
 
+**Response**
+
 ~~~text
 post invokes nothing the owning project resolves. A call to something the project cannot resolve is not reported here — diagnostics say why a name does not resolve.
 ~~~
 
 ## what evaluate invokes
+
+**Agent's Input**
 
 ```yaml
 tool: Callees
@@ -48,6 +58,8 @@ workspace: fixtures/ledger
 file: packages/rules/src/rule.ts
 position: {"line":46,"character":14}
 ```
+
+**Response**
 
 ~~~text
 evaluate invokes nothing the owning project resolves. A call to something the project cannot resolve is not reported here — diagnostics say why a name does not resolve.

@@ -6,11 +6,15 @@ Return resolved links discovered by the active language service in a Markdown or
 
 ## json schema reference
 
+**Agent's Input**
+
 ```yaml
 tool: Document links
 workspace: fixtures/ledger
 file: ledger.config.json
 ```
+
+**Response**
 
 ~~~text
 Nothing in ledger.config.json links anywhere. A link is a target an editor can follow — a Markdown link, a JSON $schema — and a TypeScript import is not one of them, so a module full of imports reports none here. For what a module imports, read it; for what imports it, use file_references.
@@ -18,11 +22,15 @@ Nothing in ledger.config.json links anywhere. A link is a target an editor can f
 
 ## fixture readme
 
+**Agent's Input**
+
 ```yaml
 tool: Document links
 workspace: fixtures/ledger
 file: README.md
 ```
+
+**Response**
 
 ~~~text
 README.md names 1 link.

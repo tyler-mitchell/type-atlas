@@ -6,12 +6,16 @@ Return the nested structural ranges an editor expands through from one or more s
 
 ## expression to file
 
+**Agent's Input**
+
 ```yaml
 tool: Selection ranges
 workspace: fixtures/ledger
 file: packages/reports/src/balance.ts
 position: {"line":34,"character":20}
 ```
+
+**Response**
 
 ~~~text
 packages/reports/src/balance.ts · 1 position expands through 19 ranges · each contains the one above it

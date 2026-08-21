@@ -6,6 +6,8 @@ Expand the transitive reference closure of a symbol, breadth-first, reporting ev
 
 ## two hops from signed amount
 
+**Agent's Input**
+
 ```yaml
 tool: Quorl
 workspace: fixtures/ledger
@@ -13,6 +15,8 @@ file: packages/accounts/src/posting.ts
 position: {"line":25,"character":14}
 depth: 2
 ```
+
+**Response**
 
 ~~~text
 Closure of signedAmount · 7 declarations · 19 sites · depth 2
@@ -37,6 +41,8 @@ signedAmount · packages/accounts/src/posting.ts:25:14
 
 ## three hops from money
 
+**Agent's Input**
+
 ```yaml
 tool: Quorl
 workspace: fixtures/ledger
@@ -45,6 +51,8 @@ position: {"line":27,"character":14}
 depth: 3
 limit: 20
 ```
+
+**Response**
 
 ~~~text
 Closure of money · 23 declarations · 64 sites · depth 3
@@ -117,6 +125,8 @@ money · packages/money/src/money.ts:27:14
 
 ## pattern matcher closure
 
+**Agent's Input**
+
 ```yaml
 tool: Quorl
 workspace: fixtures/ledger
@@ -124,6 +134,8 @@ file: packages/rules/src/rule.ts
 position: {"line":37,"character":14}
 depth: 2
 ```
+
+**Response**
 
 ~~~text
 Closure of matches · 2 declarations · 6 sites · depth 2

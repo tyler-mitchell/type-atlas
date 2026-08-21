@@ -6,11 +6,15 @@ Return the top-level document outline and source ranges. Set depth to include ne
 
 ## journal outline
 
+**Agent's Input**
+
 ```yaml
 tool: Document symbols
 workspace: fixtures/ledger
 file: packages/accounts/src/journal.ts
 ```
+
+**Response**
 
 ~~~text
 === packages/accounts/src/journal.ts · 3 top-level symbols ===
@@ -22,11 +26,15 @@ UnbalancedEntryError [class] 13:14-13:34 · range 13:1-17:2
 
 ## broken file answers with diagnostics
 
+**Agent's Input**
+
 ```yaml
 tool: Document symbols
 workspace: fixtures/ledger
 file: packages/reconcile/src/drift.ts
 ```
+
+**Response**
 
 ~~~text
 === packages/reconcile/src/drift.ts · 3 top-level symbols ===
@@ -40,11 +48,15 @@ statementTotal [variable] 15:14-15:28 · range 15:14-16:56
 
 ## importer module outline
 
+**Agent's Input**
+
 ```yaml
 tool: Document symbols
 workspace: fixtures/ledger
 file: packages/importers/src/csv.ts
 ```
+
+**Response**
 
 ~~~text
 === packages/importers/src/csv.ts · 4 top-level symbols ===
@@ -59,11 +71,15 @@ StatementRow [interface] 6:18-6:30 · range 6:1-11:2
 
 ## generic module outline
 
+**Agent's Input**
+
 ```yaml
 tool: Document symbols
 workspace: fixtures/ledger
 file: packages/rules/src/rule.ts
 ```
+
+**Response**
 
 ~~~text
 === packages/rules/src/rule.ts · 9 top-level symbols ===
@@ -81,12 +97,16 @@ Verdict [interface] 17:13-17:20 · range 17:1-17:101
 
 ## config values fold to a count
 
+**Agent's Input**
+
 ```yaml
 tool: Document symbols
 workspace: fixtures/ledger
 file: packages/importers/src/bank-profiles.ts
 depth: 3
 ```
+
+**Response**
 
 ~~~text
 === packages/importers/src/bank-profiles.ts · 3 top-level symbols ===

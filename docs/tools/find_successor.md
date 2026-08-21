@@ -6,12 +6,16 @@ Establish what happened to a symbol that no longer resolves: whether it still ex
 
 ## renamed method hunch
 
+**Agent's Input**
+
 ```yaml
 tool: Find successor
 workspace: fixtures/ledger
 file: packages/accounts/src/journal.ts
 name: postEntry
 ```
+
+**Response**
 
 ~~~text
 Not found · postEntry · no declaration of this name is in the symbol index
@@ -40,12 +44,16 @@ A candidate is a lead, not a verdict. Confirm one by reading it before treating 
 
 ## close miss finds the successor
 
+**Agent's Input**
+
 ```yaml
 tool: Find successor
 workspace: fixtures/ledger
 file: packages/reports/src/balance.ts
 name: balanceOf
 ```
+
+**Response**
 
 ~~~text
 Not found · balanceOf · no declaration of this name is in the symbol index
@@ -75,12 +83,16 @@ A candidate is a lead, not a verdict. Confirm one by reading it before treating 
 
 ## test residue is not a capability
 
+**Agent's Input**
+
 ```yaml
 tool: Find successor
 workspace: fixtures/ledger
 file: packages/money/src/money.ts
 name: assertRoundingParity
 ```
+
+**Response**
 
 ~~~text
 Declared only in tests (1) · assertRoundingParity

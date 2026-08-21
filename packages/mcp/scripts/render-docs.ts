@@ -122,6 +122,18 @@ const responseBlock = (captured: string): string => {
   return `${fence}text\n${content}\n${fence}`;
 };
 
+// One case, labelled: what the agent sent, then what came back.
+const casePair = async (
+  scenario: Pick<CapturedScenario, "tool" | "arguments" | "arrange">,
+  captured: string,
+): Promise<string> =>
+  [
+    "**Agent's Input**",
+    await invocationBlock(scenario),
+    "**Response**",
+    responseBlock(captured),
+  ].join("\n\n");
+
 const capturedResponse = (id: string, where: string) =>
   readFile(resolve(responsesRoot, `${id}.txt`), "utf8").catch(() => {
     throw new Error(
@@ -152,11 +164,10 @@ export const renderAuthored = async (sourceRelative: string): Promise<string> =>
         );
       }
       const captured = await capturedResponse(id, sourceRelative);
-      const invocation = await invocationBlock(scenario);
       const [from, to] = [Math.min(...node.lines), Math.max(...node.lines)];
       // The tag's parsed span swallows the blank line after it; the block
       // hands one back so following prose never leans on the code.
-      return { from, to, block: `${invocation}\n\n${responseBlock(captured)}\n` };
+      return { from, to, block: `${await casePair(scenario, captured)}\n` };
     }),
   );
   const lines = source.split("\n");
@@ -177,9 +188,8 @@ export const renderToolDocument = async (tool: string): Promise<string> => {
   const description = (await catalog()).find(({ name }) => name === tool)?.description;
   const cases = await Promise.all(
     own.map(async (scenario) => {
-      const invocation = await invocationBlock(scenario);
       const captured = await capturedResponse(scenario.id, `${toolDocumentsRoot}/${tool}.md`);
-      return `## ${caseHeading(scenario.name)}\n\n${invocation}\n\n${responseBlock(captured)}`;
+      return `## ${caseHeading(scenario.name)}\n\n${await casePair(scenario, captured)}`;
     }),
   );
   return [

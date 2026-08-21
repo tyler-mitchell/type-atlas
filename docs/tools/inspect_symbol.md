@@ -6,12 +6,16 @@ Return a bounded working view of a symbol: type and documentation, exact definit
 
 ## journal class
 
+**Agent's Input**
+
 ```yaml
 tool: Inspect symbol
 workspace: fixtures/ledger
 file: packages/accounts/src/journal.ts
 symbol: Journal
 ```
+
+**Response**
 
 ~~~text
 Journal [class] · packages/accounts/src/journal.ts:24:14-24:21 · range 24:1-73:2 · packages/accounts/tsconfig.json
@@ -46,12 +50,16 @@ references lists all 9, with paging.
 
 ## money type
 
+**Agent's Input**
+
 ```yaml
 tool: Inspect symbol
 workspace: fixtures/ledger
 file: packages/money/src/money.ts
 symbol: Money
 ```
+
+**Response**
 
 ~~~text
 Money [interface] · packages/money/src/money.ts:12:13-12:18 · range 12:1-16:3 · packages/money/tsconfig.json

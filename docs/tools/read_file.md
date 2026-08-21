@@ -6,11 +6,15 @@ Read one or more UTF-8 text files, including source, Markdown, and JSON, with st
 
 ## class folded to signatures
 
+**Agent's Input**
+
 ```yaml
 tool: Read files
 workspace: fixtures/ledger
 file: ["packages/accounts/src/journal.ts"]
 ```
+
+**Response**
 
 ~~~text
 1 file · 52 lines · 22 folded to signatures, pass fold: false for the bodies
@@ -73,11 +77,15 @@ file: ["packages/accounts/src/journal.ts"]
 
 ## two files one call
 
+**Agent's Input**
+
 ```yaml
 tool: Read files
 workspace: fixtures/ledger
 file: ["packages/accounts/src/posting.ts",{"path":"packages/money/src/money.ts","startLine":26,"endLine":41,"fold":false}]
 ```
+
+**Response**
 
 ~~~text
 2 files · 43 lines · 6 folded to signatures, pass fold: false for the bodies
@@ -134,11 +142,15 @@ file: ["packages/accounts/src/posting.ts",{"path":"packages/money/src/money.ts",
 
 ## abstract class folded
 
+**Agent's Input**
+
 ```yaml
 tool: Read files
 workspace: fixtures/ledger
 file: ["packages/importers/src/statement-parser.ts"]
 ```
+
+**Response**
 
 ~~~text
 1 file · 34 lines · 33 folded to signatures, pass fold: false for the bodies

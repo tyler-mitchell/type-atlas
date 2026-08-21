@@ -6,11 +6,15 @@ Return TypeScript's source-wide unused-code removal as a Codex patch. The MCP do
 
 ## dead helpers
 
+**Agent's Input**
+
 ```yaml
 tool: Remove unused code
 workspace: fixtures/ledger
 file: packages/importers/src/dedupe.ts
 ```
+
+**Response**
 
 ~~~text
 Remove all unused code · 1 file · 2 edits

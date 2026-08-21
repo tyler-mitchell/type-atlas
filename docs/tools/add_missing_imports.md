@@ -6,11 +6,15 @@ Return TypeScript's source-wide missing-import fixes as a Codex patch. The MCP d
 
 ## forgotten imports
 
+**Agent's Input**
+
 ```yaml
 tool: Add missing imports
 workspace: fixtures/ledger
 file: packages/reconcile/src/matching.ts
 ```
+
+**Response**
 
 ~~~text
 The language service offered no import fixes, although 2 names in this file do not resolve. If an import should exist for them, write it by hand — the engine proposed none.

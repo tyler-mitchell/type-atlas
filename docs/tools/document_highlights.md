@@ -6,12 +6,16 @@ Return same-document semantic usages at a position.
 
 ## private field within class
 
+**Agent's Input**
+
 ```yaml
 tool: Document highlights
 workspace: fixtures/ledger
 file: packages/accounts/src/journal.ts
 position: {"line":25,"character":20}
 ```
+
+**Response**
 
 ~~~text
 entries [property] · 5 uses in this file

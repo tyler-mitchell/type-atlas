@@ -6,6 +6,8 @@ Return a Codex patch for a TypeScript-project symbol rename at a source position
 
 ## rename across packages
 
+**Agent's Input**
+
 ```yaml
 tool: Rename symbol
 workspace: fixtures/ledger
@@ -13,6 +15,8 @@ file: packages/accounts/src/account.ts
 position: {"line":18,"character":14}
 newName: balanceSide
 ```
+
+**Response**
 
 ~~~text
 Rename to balanceSide · resolved normalBalance · packages/accounts/src/account.ts:18:14 · Scope: project only · packages/accounts/tsconfig.json · 2 files · 2 edits
@@ -43,6 +47,8 @@ Rename to balanceSide · resolved normalBalance · packages/accounts/src/account
 
 ## class rename within project
 
+**Agent's Input**
+
 ```yaml
 tool: Rename symbol
 workspace: fixtures/ledger
@@ -50,6 +56,8 @@ file: packages/accounts/src/account.ts
 position: {"line":37,"character":14}
 newName: InMemoryAccountStore
 ```
+
+**Response**
 
 ~~~text
 Rename to InMemoryAccountStore · resolved MemoryAccountStore · packages/accounts/src/account.ts:37:14 · Scope: project only · packages/accounts/tsconfig.json · 2 files · 2 edits

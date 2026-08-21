@@ -6,11 +6,15 @@ Return a bounded page of module references from the TypeScript project selected 
 
 ## who imports money
 
+**Agent's Input**
+
 ```yaml
 tool: File references
 workspace: fixtures/ledger
 file: packages/money/src/money.ts
 ```
+
+**Response**
 
 ~~~text
 packages/money/src/money.ts · referenced from 90 places · 10 projects loaded · packages/money/tsconfig.json

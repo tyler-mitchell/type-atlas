@@ -6,12 +6,16 @@ Return a bounded page of reference locations, across every project loaded this s
 
 ## type used across packages
 
+**Agent's Input**
+
 ```yaml
 tool: References
 workspace: fixtures/ledger
 file: packages/money/src/money.ts
 position: {"line":12,"character":13}
 ```
+
+**Response**
 
 ~~~text
 Money [type] · packages/money/src/money.ts:12:13
@@ -48,12 +52,16 @@ packages/money/tests/rounding-parity.ts
 
 ## function with scoped answer
 
+**Agent's Input**
+
 ```yaml
 tool: References
 workspace: fixtures/ledger
 file: packages/accounts/src/account.ts
 position: {"line":18,"character":14}
 ```
+
+**Response**
 
 ~~~text
 normalBalance [function] · packages/accounts/src/account.ts:18:14
@@ -68,12 +76,16 @@ packages/reports/src/statement.ts
 
 ## enum member
 
+**Agent's Input**
+
 ```yaml
 tool: References
 workspace: fixtures/ledger
 file: packages/money/src/rounding-mode.ts
 position: {"line":4,"character":3}
 ```
+
+**Response**
 
 ~~~text
 HalfEven [enum member] · inside RoundingMode · packages/money/src/rounding-mode.ts:4:3

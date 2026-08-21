@@ -6,12 +6,16 @@ Return type and documentation hover at a position.
 
 ## overloaded method
 
+**Agent's Input**
+
 ```yaml
 tool: Hover
 workspace: fixtures/ledger
 file: packages/accounts/src/journal.ts
 position: {"line":28,"character":3}
 ```
+
+**Response**
 
 ~~~text
 packages/accounts/src/journal.ts:28:3
@@ -25,12 +29,16 @@ Record a prepared entry, or build the common two-posting transfer.
 
 ## branded type
 
+**Agent's Input**
+
 ```yaml
 tool: Hover
 workspace: fixtures/ledger
 file: packages/money/src/money.ts
 position: {"line":12,"character":13}
 ```
+
+**Response**
 
 ~~~text
 packages/money/src/money.ts:12:13
@@ -48,12 +56,16 @@ therefore integral and currency-tagged.
 
 ## constant with documentation
 
+**Agent's Input**
+
 ```yaml
 tool: Hover
 workspace: fixtures/ledger
 file: packages/money/src/currency.ts
 position: {"line":12,"character":14}
 ```
+
+**Response**
 
 ~~~text
 packages/money/src/currency.ts:12:14
@@ -65,12 +77,16 @@ const currencyProfiles: Record<Currency, CurrencyProfile>
 
 ## jsdoc with inline link
 
+**Agent's Input**
+
 ```yaml
 tool: Hover
 workspace: fixtures/ledger
 file: packages/money/src/money.ts
 position: {"line":38,"character":14}
 ```
+
+**Response**
 
 ~~~text
 packages/money/src/money.ts:38:14
@@ -87,12 +103,16 @@ math never converts silently.
 
 ## conditional type
 
+**Agent's Input**
+
 ```yaml
 tool: Hover
 workspace: fixtures/ledger
 file: packages/rules/src/rule.ts
 position: {"line":27,"character":13}
 ```
+
+**Response**
 
 ~~~text
 packages/rules/src/rule.ts:27:13
@@ -107,12 +127,16 @@ consumer can name the payload of one event without writing the map out.
 
 ## template literal pattern
 
+**Agent's Input**
+
 ```yaml
 tool: Hover
 workspace: fixtures/ledger
 file: packages/rules/src/rule.ts
 position: {"line":35,"character":13}
 ```
+
+**Response**
 
 ~~~text
 packages/rules/src/rule.ts:35:13

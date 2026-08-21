@@ -6,11 +6,15 @@ Return a Codex patch that moves files and updates affected references. The MCP d
 
 ## module move updates importers
 
+**Agent's Input**
+
 ```yaml
 tool: Rename files
 workspace: fixtures/ledger
 files: [{"from":"packages/accounts/src/posting.ts","to":"packages/accounts/src/entry-side.ts"}]
 ```
+
+**Response**
 
 ~~~text
 Rename · 3 files · 2 edits

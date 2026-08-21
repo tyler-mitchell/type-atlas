@@ -6,11 +6,15 @@ Retrieve ranked code for an implementation question and attach verified relation
 
 ## behavioral question lands
 
+**Agent's Input**
+
 ```yaml
 tool: Investigate code
 workspace: fixtures/ledger
 question: how are account balances rolled up to ancestor accounts
 ```
+
+**Response**
 
 ~~~text
 Search: how are account balances rolled up to ancestor accounts
@@ -74,11 +78,15 @@ references lists all 3, with paging.
 
 ## absent concept stays absent
 
+**Agent's Input**
+
 ```yaml
 tool: Investigate code
 workspace: fixtures/ledger
 question: where is the retry backoff for failed network requests configured
 ```
+
+**Response**
 
 ~~~text
 Search: where is the retry backoff for failed network requests configured

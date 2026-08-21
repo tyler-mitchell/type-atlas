@@ -6,12 +6,16 @@ Return inline type and parameter hints for a source range.
 
 ## inferred types in a loop
 
+**Agent's Input**
+
 ```yaml
 tool: Inlay hints
 workspace: fixtures/ledger
 file: packages/reports/src/balance.ts
 range: {"start":{"line":28,"character":1},"end":{"line":37,"character":1}}
 ```
+
+**Response**
 
 ~~~text
 packages/reports/src/balance.ts:28:1-37:1 · 7 hints

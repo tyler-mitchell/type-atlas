@@ -6,6 +6,8 @@ Return implementation locations at a position.
 
 ## store interface
 
+**Agent's Input**
+
 ```yaml
 tool: Implementations
 workspace: fixtures/ledger
@@ -13,11 +15,15 @@ file: packages/accounts/src/account.ts
 position: {"line":31,"character":18}
 ```
 
+**Response**
+
 ~~~text
 No implementation answered at this position. Implementations are reported for a symbol that something overrides or realises — an interface, an abstract member, an overload — and the walk reaches only files this session has opened, so an implementor in an untouched file reports nothing here. references finds every use, including the declarations that realise this.
 ~~~
 
 ## abstract parser
+
+**Agent's Input**
 
 ```yaml
 tool: Implementations
@@ -25,6 +31,8 @@ workspace: fixtures/ledger
 file: packages/importers/src/statement-parser.ts
 position: {"line":7,"character":23}
 ```
+
+**Response**
 
 ~~~text
 StatementParser · implemented in 3 places

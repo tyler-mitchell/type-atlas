@@ -6,12 +6,16 @@ Return overload and parameter information at a call site.
 
 ## inside a call
 
+**Agent's Input**
+
 ```yaml
 tool: Signature help
 workspace: fixtures/ledger
 file: packages/reports/src/balance.ts
 position: {"line":34,"character":13}
 ```
+
+**Response**
 
 ~~~text
 packages/reports/src/balance.ts:34:13 · 1 signature
@@ -23,12 +27,16 @@ add(left: Money, right: Money): Money
 
 ## overload and second argument
 
+**Agent's Input**
+
 ```yaml
 tool: Signature help
 workspace: fixtures/ledger
 file: packages/accounts/tests/journal.test.ts
 position: {"line":9,"character":5}
 ```
+
+**Response**
 
 ~~~text
 packages/accounts/tests/journal.test.ts:9:5 · 2 signatures · number 2 in use

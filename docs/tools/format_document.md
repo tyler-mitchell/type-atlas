@@ -6,11 +6,15 @@ Return a Codex patch containing document-formatting edits. The MCP does not modi
 
 ## mangled file
 
+**Agent's Input**
+
 ```yaml
 tool: Format document
 workspace: fixtures/ledger
 file: packages/importers/src/dedupe.ts
 ```
+
+**Response**
 
 ~~~text
 Format document · 1 file · 28 edits

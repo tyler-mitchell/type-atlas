@@ -1,57 +1,68 @@
 <!-- Generated from packages/mcp/README.mdoc by packages/mcp/scripts/render-docs.ts — edit the source, not this file. -->
-<div align="center">
-
-<img src="https://raw.githubusercontent.com/tyler-mitchell/type-atlas/main/packages/mcp/assets/type-atlas.png" width="96" alt="" />
-
 # Type Atlas
 
-**Editor-grade TypeScript, Markdown, and JSON intelligence for coding agents,**<br />
-**shaped for a context window instead of a screen.**
+Code intelligence for coding agents, as an MCP server. TypeScript for now,
+since that is what I work in.
 
-</div>
+I built it for my own agents and use it daily, mostly on a large monorepo that
+is maintained almost entirely through agents.
 
-Type Atlas runs locally over stdio and answers from the TypeScript project
-that owns each file, so definitions, references, diagnostics, and source
-ranges reflect the repository an agent is actually changing. The language
-intelligence is not the hard part — every LSP bridge has that. The hard part
-is deciding what an agent does not need to see.
+There is a language server underneath, so definitions, types, diagnostics, and
+ranges are the same ones LSP gives an editor.
+
+Requires Node.js 22.20 or newer.
 
 ## Install
 
-```sh
-codex mcp add type-atlas -- npx --yes @type-atlas/mcp@latest
-```
+Paste this to your coding agent:
 
-```sh
-claude mcp add --scope user type-atlas -- npx --yes @type-atlas/mcp@latest
-```
+> Set up the Type Atlas MCP server. Run
+> `codex mcp add type-atlas -- npx --yes @type-atlas/mcp@latest` if I use Codex,
+> or `claude mcp add --scope user type-atlas -- npx --yes @type-atlas/mcp@latest`
+> if I use Claude Code. Then append the rule below to `AGENTS.md` or
+> `CLAUDE.md`, creating the file if it does not exist, and tell me to restart so
+> the client loads the server.
+>
+> ```
+> Type Atlas MCP is the required tool for code navigation, reading, and
+> diagnostics in TypeScript and JavaScript. This is not a preference. Do not
+> use grep, glob, find, or plain file reads on code. The only valid fallbacks
+> are a server that is down, a call that errored, or a file that is neither
+> TS nor JS.
+> ```
 
-For Claude Desktop, VS Code, native Windows, and generic MCP client setup, see
-the [installation guide](https://github.com/tyler-mitchell/type-atlas#install).
+The rule is there because installing the server does not change what an agent
+reaches for. Claude in particular will go back to grep and whole-file reads and
+produce a fresh justification every time, so the wording has to say it is
+required and name the only exceptions.
 
-Requires Node.js 22.20 or newer; no global installation. `@latest` starts the
-current release each time the MCP process starts — pin an exact version when
-reproducible tool behavior matters more than automatic upgrades.
+Claude Desktop, VS Code, Windows, and generic client config are in the
+[install section](https://github.com/tyler-mitchell/type-atlas#install).
+Clients read MCP config at startup, so restart after. `@latest` resolves on
+every process start; pin a version if you do not want tool behavior moving
+under you.
 
-Navigation, diagnostics, code actions, and reads work with Node.js alone. The
-retrieval tools `search_code`, `related_code`, `investigate_code`, and
-`search_dependency_code` additionally require
-[uv](https://docs.astral.sh/uv/getting-started/installation/), which supplies
-the `uvx` command used to run the semantic index. Without it those four tools
-report that `uvx` is missing, and `explore_symbol` returns its language-server
-inspection without the related-code section.
+`search_code`, `related_code`, `investigate_code`, and `search_dependency_code`
+run a semantic index through `uvx` and need
+[uv](https://docs.astral.sh/uv/getting-started/installation/). Without it those
+four report that uv is missing, `explore_symbol` drops its related-code
+section, and the rest is unaffected.
 
-## What an answer looks like
+## Output
 
-Captured from the running server against a realistic example monorepo by the
-scenario suite that regression-checks every response —
-[none is written by hand](https://github.com/tyler-mitchell/type-atlas#how-the-examples-stay-honest):
+An outline arrives with the file's diagnostics attached. Editors put errors in
+the gutter so a human cannot miss them. An agent only sees what it asked for,
+and an agent that just edited code usually does not think to ask.
+
+**Agent's Input**
 
 ```yaml
 tool: Document symbols
 workspace: fixtures/ledger
 file: packages/reconcile/src/drift.ts
 ```
+
+**Response**
 
 ~~~text
 === packages/reconcile/src/drift.ts · 3 top-level symbols ===
@@ -63,13 +74,11 @@ statementTotal [variable] 15:14-15:28 · range 15:14-16:56
 4 problems in packages/reconcile/src/drift.ts
 ~~~
 
-An editor shows diagnostics in the gutter continuously, so a human cannot miss
-them. An agent only learns what it asks about — so a file's symbols arrive
-with its diagnostics attached, unasked. The
-[repository README](https://github.com/tyler-mitchell/type-atlas#what-an-answer-looks-like)
-gives the other core tools the same treatment.
+That is captured from the running server by the suite that regression-checks
+it. The [repository README](https://github.com/tyler-mitchell/type-atlas#output)
+does the same for the other tools, with the token and latency numbers.
 
-## The tools
+## Tools
 
 | Question                         | Tools                                                                                                                                                                              |
 | :------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -79,14 +88,10 @@ gives the other core tools the same treatment.
 | Stay correct while editing       | `diagnostics` · `code_actions` · `organize_imports` · `add_missing_imports` · `remove_unused_code` · `fix_all` · `format_document` · `rename_symbol` · `rename_files`              |
 | Understand a dependency          | `list_module_exports` · `search_dependency_code`                                                                                                                                   |
 | Find code by meaning             | `search_code` · `related_code` · `investigate_code`                                                                                                                                |
+| Prove exact text                 | `occurrences`                                                                                                                                                                      |
 
-Every response uses workspace-relative paths and one-based coordinates.
-Editing tools return reviewable patches; nothing is applied silently. One
-Volar-composed language server answers TypeScript, Markdown, and JSON from a
-single project model.
+Paths are workspace-relative, coordinates are one-based, so a location in one
+answer is valid input to the next call. Editing tools return patches; nothing
+is written for you.
 
----
-
-<div align="center">
-<sub>Apache-2.0 · <a href="https://github.com/tyler-mitchell/type-atlas">github.com/tyler-mitchell/type-atlas</a></sub>
-</div>
+Apache-2.0 · [github.com/tyler-mitchell/type-atlas](https://github.com/tyler-mitchell/type-atlas)

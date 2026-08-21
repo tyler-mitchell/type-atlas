@@ -6,12 +6,16 @@ Inspect the usable module surface visible from an importing TypeScript file. Ret
 
 ## workspace package surface
 
+**Agent's Input**
+
 ```yaml
 tool: Inspect module
 workspace: fixtures/ledger
 fromFile: packages/reports/src/balance.ts
 module: @ledger/money
 ```
+
+**Response**
 
 ~~~text
 Seen from packages/reports/src/balance.ts · runtime surface.
@@ -44,6 +48,8 @@ zero: (alias) const zero: (currency: Currency) => Money
 
 ## surface filtered by query
 
+**Agent's Input**
+
 ```yaml
 tool: Inspect module
 workspace: fixtures/ledger
@@ -51,6 +57,8 @@ fromFile: packages/reports/src/balance.ts
 module: @ledger/accounts
 query: balance
 ```
+
+**Response**
 
 ~~~text
 Seen from packages/reports/src/balance.ts · runtime surface · matching balance.
