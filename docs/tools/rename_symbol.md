@@ -14,7 +14,8 @@ workspace: fixtures/ledger
 file: packages/accounts/src/account.ts
 position: {"line":18,"character":14}
 newName: balanceSide
-# answered in 6ms
+
+# answered in 8ms
 ```
 
 **Response**
@@ -56,7 +57,8 @@ workspace: fixtures/ledger
 file: packages/accounts/src/account.ts
 position: {"line":37,"character":14}
 newName: InMemoryAccountStore
-# answered in 4ms
+
+# answered in 6ms
 ```
 
 **Response**

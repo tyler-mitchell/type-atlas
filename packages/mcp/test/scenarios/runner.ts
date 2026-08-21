@@ -236,8 +236,11 @@ export const arrangeFixture = async ({
  * a capture run rewrites it, and the documentation says what the call really
  * cost rather than a band that fits every call.
  */
-export const elapsedOf = (text: string): string | undefined =>
-  /(?:^|\n)· (\d+(?:\.\d+)?(?:ms|s))\b/u.exec(text)?.[1];
+/** What the caller waited, rounded the way the server's own trailer reads. */
+const elapsedSince = (started: number): string => {
+  const ms = performance.now() - started;
+  return ms < 1000 ? `${Math.round(ms)}ms` : `${(ms / 1000).toFixed(2)}s`;
+};
 
 export const normalizeResponse = (text: string): string =>
   text
@@ -255,11 +258,11 @@ export const connectScenarioSession = async (
   entrypoint: readonly string[] = ["--conditions=development", "src/cli.ts"],
   cwd: string = packageRoot,
 ): Promise<{
-  /** The answer and what the server measured for it. */
+  /** The answer, and how long the call took to come back. */
   call: (
     tool: string,
     argument: Record<string, unknown>,
-  ) => Promise<{ text: string; elapsed?: string }>;
+  ) => Promise<{ text: string; elapsed: string }>;
   invoke: (tool: string, argument: Record<string, unknown>) => Promise<string>;
   catalog: () => Promise<ReadonlyArray<{ name: string; title?: string; description?: string }>>;
   close: () => Promise<void>;
@@ -280,10 +283,12 @@ export const connectScenarioSession = async (
     if (stderrHeld.length > 200) stderrHeld.shift();
   });
   const call = async (tool: string, argument: Record<string, unknown>) => {
+    const started = performance.now();
     const result = await client.callTool({
       name: tool,
       arguments: { workspace: fixtureRoot, ...argument },
     });
+    const elapsed = elapsedSince(started);
     const content = result.content as ReadonlyArray<{ type: string; text?: string }>;
     const text = content.find((item) => item.type === "text")?.text ?? "";
     // A tool error must fail the scenario, never become its capture: an
@@ -295,7 +300,7 @@ export const connectScenarioSession = async (
         `${tool} answered with a tool error:\n${text}\n\nServer stderr tail:\n${stderrHeld.slice(-40).join("")}`,
       );
     }
-    return { text: normalizeResponse(text), elapsed: elapsedOf(text) };
+    return { text: normalizeResponse(text), elapsed };
   };
   return {
     call,

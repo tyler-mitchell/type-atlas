@@ -4,5 +4,5 @@
     "file": "packages/reports/src/balance.ts",
     "symbol": "balancesAsOf"
   },
-  "elapsed": "55ms"
+  "elapsed": "44ms"
 }

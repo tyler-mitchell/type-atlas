@@ -4,5 +4,5 @@
     "file": "packages/reports/src/balance.ts",
     "query": "Balance"
   },
-  "elapsed": "830ms"
+  "elapsed": "764ms"
 }

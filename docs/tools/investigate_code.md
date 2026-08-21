@@ -12,7 +12,8 @@ Retrieve ranked code for an implementation question and attach verified relation
 tool: Investigate code
 workspace: fixtures/ledger
 question: how are account balances rolled up to ancestor accounts
-# answered in 49ms
+
+# answered in 32ms
 ```
 
 **Response**
@@ -85,7 +86,8 @@ references lists all 3, with paging.
 tool: Investigate code
 workspace: fixtures/ledger
 question: where is the retry backoff for failed network requests configured
-# answered in 23ms
+
+# answered in 21ms
 ```
 
 **Response**

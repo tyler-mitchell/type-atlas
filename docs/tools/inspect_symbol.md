@@ -13,7 +13,8 @@ tool: Inspect symbol
 workspace: fixtures/ledger
 file: packages/accounts/src/journal.ts
 symbol: Journal
-# answered in 62ms
+
+# answered in 47ms
 ```
 
 **Response**
@@ -58,7 +59,8 @@ tool: Inspect symbol
 workspace: fixtures/ledger
 file: packages/money/src/money.ts
 symbol: Money
-# answered in 92ms
+
+# answered in 63ms
 ```
 
 **Response**

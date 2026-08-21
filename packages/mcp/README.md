@@ -68,7 +68,8 @@ and an agent that just edited code usually does not think to ask.
 tool: Document symbols
 workspace: fixtures/ledger
 file: packages/reconcile/src/drift.ts
-# answered in 40ms
+
+# answered in 34ms
 ```
 
 **Response**

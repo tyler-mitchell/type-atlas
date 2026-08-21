@@ -103,9 +103,9 @@ const invocationBlock = async ({
     ...Object.entries(argument).map(
       ([key, value]) => `${key}: ${typeof value === "string" ? value : JSON.stringify(value)}`,
     ),
-    // Last, because what the call cost is a fact about the answer rather than
-    // an argument.
-    ...(elapsed === undefined ? [] : [`# answered in ${elapsed}`]),
+    // Last and set apart, because what the call cost is a fact about the
+    // answer rather than an argument.
+    ...(elapsed === undefined ? [] : ["", `# answered in ${elapsed}`]),
   ];
   return `\`\`\`yaml\n${lines.join("\n")}\n\`\`\``;
 };

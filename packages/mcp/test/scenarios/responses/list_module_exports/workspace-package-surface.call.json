@@ -4,5 +4,5 @@
     "fromFile": "packages/reports/src/balance.ts",
     "module": "@ledger/money"
   },
-  "elapsed": "183ms"
+  "elapsed": "113ms"
 }

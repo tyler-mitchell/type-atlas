@@ -5,5 +5,5 @@
     "module": "@ledger/accounts",
     "query": "balance"
   },
-  "elapsed": "96ms"
+  "elapsed": "87ms"
 }

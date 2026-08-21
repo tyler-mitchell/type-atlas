@@ -13,7 +13,8 @@ tool: Selection ranges
 workspace: fixtures/ledger
 file: packages/reports/src/balance.ts
 position: {"line":34,"character":20}
-# answered in 3ms
+
+# answered in 7ms
 ```
 
 **Response**

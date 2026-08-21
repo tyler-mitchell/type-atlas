@@ -13,7 +13,8 @@ tool: Definitions
 workspace: fixtures/ledger
 file: packages/reports/src/balance.ts
 position: {"line":6,"character":3}
-# answered in 25ms
+
+# answered in 27ms
 ```
 
 **Response**
@@ -33,7 +34,8 @@ tool: Definitions
 workspace: fixtures/ledger
 file: packages/accounts/tests/journal.test.ts
 position: {"line":7,"character":25}
-# answered in 25ms
+
+# answered in 22ms
 ```
 
 **Response**

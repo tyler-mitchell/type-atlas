@@ -4,5 +4,5 @@
     "file": "packages/reports/src/balance.ts",
     "name": "balanceOf"
   },
-  "elapsed": "141ms"
+  "elapsed": "130ms"
 }

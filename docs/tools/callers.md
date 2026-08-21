@@ -13,7 +13,8 @@ tool: Callers
 workspace: fixtures/ledger
 file: packages/accounts/src/posting.ts
 position: {"line":25,"character":14}
-# answered in 70ms
+
+# answered in 54ms
 ```
 
 **Response**
@@ -40,7 +41,8 @@ tool: Callers
 workspace: fixtures/ledger
 file: packages/accounts/src/journal.ts
 position: {"line":28,"character":3}
-# answered in 45ms
+
+# answered in 61ms
 ```
 
 **Response**

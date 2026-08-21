@@ -4,5 +4,5 @@
     "file": "packages/accounts/src/journal.ts",
     "symbol": "Journal"
   },
-  "elapsed": "62ms"
+  "elapsed": "47ms"
 }

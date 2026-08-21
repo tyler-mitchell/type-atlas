@@ -13,7 +13,8 @@ tool: Signature help
 workspace: fixtures/ledger
 file: packages/reports/src/balance.ts
 position: {"line":34,"character":13}
-# answered in 7ms
+
+# answered in 10ms
 ```
 
 **Response**
@@ -35,7 +36,8 @@ tool: Signature help
 workspace: fixtures/ledger
 file: packages/accounts/tests/journal.test.ts
 position: {"line":9,"character":5}
-# answered in 6ms
+
+# answered in 9ms
 ```
 
 **Response**

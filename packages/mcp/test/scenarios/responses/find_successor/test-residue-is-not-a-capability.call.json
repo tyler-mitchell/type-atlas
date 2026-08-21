@@ -4,5 +4,5 @@
     "file": "packages/money/src/money.ts",
     "name": "assertRoundingParity"
   },
-  "elapsed": "99ms"
+  "elapsed": "70ms"
 }

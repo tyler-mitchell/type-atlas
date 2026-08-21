@@ -11,7 +11,8 @@ Show a bounded workspace-relative project structure. `view: "files"` (the defaul
 ```yaml
 tool: List files
 workspace: fixtures/ledger
-# answered in 126ms
+
+# answered in 95ms
 ```
 
 **Response**
@@ -38,7 +39,8 @@ ledger/
 tool: List files
 workspace: fixtures/ledger
 expand: {"packages/*":2}
-# answered in 127ms
+
+# answered in 68ms
 ```
 
 **Response**
@@ -129,7 +131,8 @@ ledger/
 tool: List files
 workspace: fixtures/ledger
 expand: {"packages/accounts":1,"packages/reports":{"depth":2,"glob":["**/*.ts"]}}
-# answered in 66ms
+
+# answered in 62ms
 ```
 
 **Response**
@@ -167,6 +170,7 @@ tool: List files
 workspace: fixtures/ledger
 directory: packages/accounts
 loc: false
+
 # answered in 50ms
 ```
 
@@ -188,7 +192,8 @@ packages/accounts/
 tool: List files
 workspace: fixtures/ledger
 glob: ["**/*.test.ts"]
-# answered in 48ms
+
+# answered in 49ms
 ```
 
 **Response**
@@ -217,7 +222,8 @@ workspace: fixtures/ledger
 # working tree arranged: currency.ts edited · rounding.ts created · index.ts deleted
 directory: packages/money
 depth: 2
-# answered in 55ms
+
+# answered in 51ms
 ```
 
 **Response**
@@ -247,7 +253,8 @@ workspace: fixtures/ledger
 # working tree arranged: ofx.ts created and staged · dedupe.ts renamed to duplicate-rows.ts
 directory: packages/importers
 depth: 2
-# answered in 85ms
+
+# answered in 45ms
 ```
 
 **Response**
@@ -279,7 +286,8 @@ workspace: fixtures/ledger
 # working tree arranged: merge conflict on currency.ts
 directory: packages/money
 depth: 2
-# answered in 53ms
+
+# answered in 45ms
 ```
 
 **Response**
@@ -306,7 +314,8 @@ packages/money/
 tool: List files
 workspace: fixtures/ledger
 expand: {"packages/*":{"depth":2,"limit":6}}
-# answered in 72ms
+
+# answered in 57ms
 ```
 
 **Response**
@@ -390,6 +399,7 @@ tool: List files
 workspace: fixtures/ledger
 glob: ["**/*.ts"]
 limit: 12
+
 # answered in 42ms
 ```
 
@@ -437,7 +447,8 @@ tool: List files
 workspace: fixtures/ledger
 # working tree arranged: currency.ts edited · qif.ts created · index.ts deleted
 changed: true
-# answered in 32ms
+
+# answered in 37ms
 ```
 
 **Response**
@@ -463,7 +474,8 @@ tool: List files
 workspace: fixtures/ledger
 directory: packages/accounts
 changed: true
-# answered in 36ms
+
+# answered in 41ms
 ```
 
 **Response**

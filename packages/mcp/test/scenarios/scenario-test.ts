@@ -92,7 +92,7 @@ export const scenarioTest = baseTest
               tool,
               arguments: argument,
               ...(options?.arrange ? { arrange: options.arrange } : {}),
-              ...(elapsed === undefined ? {} : { elapsed }),            },
+              elapsed,            },
             null,
             2,
           )}\n`,

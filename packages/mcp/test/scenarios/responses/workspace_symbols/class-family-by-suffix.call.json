@@ -4,5 +4,5 @@
     "file": "packages/importers/src/statement-parser.ts",
     "query": "Parser"
   },
-  "elapsed": "100ms"
+  "elapsed": "98ms"
 }

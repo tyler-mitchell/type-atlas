@@ -13,7 +13,8 @@ tool: Hover
 workspace: fixtures/ledger
 file: packages/accounts/src/journal.ts
 position: {"line":28,"character":3}
-# answered in 6ms
+
+# answered in 10ms
 ```
 
 **Response**
@@ -37,7 +38,8 @@ tool: Hover
 workspace: fixtures/ledger
 file: packages/money/src/money.ts
 position: {"line":12,"character":13}
-# answered in 27ms
+
+# answered in 31ms
 ```
 
 **Response**
@@ -65,7 +67,8 @@ tool: Hover
 workspace: fixtures/ledger
 file: packages/money/src/currency.ts
 position: {"line":12,"character":14}
-# answered in 15ms
+
+# answered in 16ms
 ```
 
 **Response**
@@ -87,7 +90,8 @@ tool: Hover
 workspace: fixtures/ledger
 file: packages/money/src/money.ts
 position: {"line":38,"character":14}
-# answered in 3ms
+
+# answered in 5ms
 ```
 
 **Response**
@@ -114,7 +118,8 @@ tool: Hover
 workspace: fixtures/ledger
 file: packages/rules/src/rule.ts
 position: {"line":27,"character":13}
-# answered in 2ms
+
+# answered in 4ms
 ```
 
 **Response**
@@ -139,7 +144,8 @@ tool: Hover
 workspace: fixtures/ledger
 file: packages/rules/src/rule.ts
 position: {"line":35,"character":13}
-# answered in 2ms
+
+# answered in 4ms
 ```
 
 **Response**

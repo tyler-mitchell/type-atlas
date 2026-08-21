@@ -3,5 +3,5 @@
   "arguments": {
     "file": "packages/reports/src/balance.ts"
   },
-  "elapsed": "1ms"
+  "elapsed": "3ms"
 }

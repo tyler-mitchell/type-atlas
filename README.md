@@ -129,7 +129,8 @@ tool: Inspect symbol
 workspace: fixtures/ledger
 file: packages/accounts/src/journal.ts
 symbol: Journal
-# answered in 62ms
+
+# answered in 47ms
 ```
 
 **Response**
@@ -177,7 +178,8 @@ and an agent that just edited code usually does not think to ask.
 tool: Document symbols
 workspace: fixtures/ledger
 file: packages/reconcile/src/drift.ts
-# answered in 40ms
+
+# answered in 34ms
 ```
 
 **Response**
@@ -204,7 +206,8 @@ false` returns them.
 tool: Read files
 workspace: fixtures/ledger
 file: ["packages/accounts/src/posting.ts","packages/money/src/rounding-mode.ts"]
-# answered in 4ms
+
+# answered in 7ms
 ```
 
 **Response**
@@ -275,7 +278,8 @@ workspace: fixtures/ledger
 # working tree arranged: currency.ts edited · rounding.ts created · index.ts deleted
 directory: packages/money
 depth: 2
-# answered in 55ms
+
+# answered in 51ms
 ```
 
 **Response**
@@ -308,7 +312,8 @@ tool: References
 workspace: fixtures/ledger
 file: packages/money/src/money.ts
 position: {"line":12,"character":13}
-# answered in 101ms
+
+# answered in 93ms
 ```
 
 **Response**
@@ -358,7 +363,8 @@ teardown; a zero here comes with the same scan count, so it means something.
 tool: Occurrences
 workspace: fixtures/ledger
 text: signedAmount
-# answered in 11ms
+
+# answered in 14ms
 ```
 
 **Response**
@@ -397,7 +403,8 @@ says so and stops rather than expanding relationships around the wrong symbol.
 tool: Investigate code
 workspace: fixtures/ledger
 question: where is the retry backoff for failed network requests configured
-# answered in 23ms
+
+# answered in 21ms
 ```
 
 **Response**
@@ -458,7 +465,8 @@ tool: Impact
 workspace: fixtures/ledger
 file: packages/accounts/src/posting.ts
 position: {"line":25,"character":14}
-# answered in 106ms
+
+# answered in 87ms
 ```
 
 **Response**

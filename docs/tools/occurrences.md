@@ -12,7 +12,8 @@ Experimental: every place an exact text occurs under a directory, with an honest
 tool: Occurrences
 workspace: fixtures/ledger
 text: signedAmount
-# answered in 11ms
+
+# answered in 14ms
 ```
 
 **Response**
@@ -47,7 +48,8 @@ packages/rules/src/builtin.ts
 tool: Occurrences
 workspace: fixtures/ledger
 text: quantumFlux
-# answered in 10ms
+
+# answered in 12ms
 ```
 
 **Response**
@@ -65,7 +67,8 @@ tool: Occurrences
 workspace: fixtures/ledger
 text: signedAmount
 directory: packages/importers/dist
-# answered in 3ms
+
+# answered in 4ms
 ```
 
 **Response**

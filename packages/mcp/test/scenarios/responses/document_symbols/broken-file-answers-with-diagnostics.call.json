@@ -3,5 +3,5 @@
   "arguments": {
     "file": "packages/reconcile/src/drift.ts"
   },
-  "elapsed": "40ms"
+  "elapsed": "34ms"
 }
