@@ -56,7 +56,7 @@ run a semantic index through `uvx` and need
 four report that uv is missing, `explore_symbol` drops its related-code
 section, and the rest is unaffected.
 
-## Output
+## Tool call results
 
 An outline arrives with the file's diagnostics attached. Editors put errors in
 the gutter so a human cannot miss them. An agent only sees what it asked for,
@@ -84,7 +84,7 @@ statementTotal [variable] 15:14-15:28 · range 15:14-16:56
 ~~~
 
 That is captured from the running server by the suite that regression-checks
-it. The [repository README](https://github.com/tyler-mitchell/type-atlas#output)
+it. The [repository README](https://github.com/tyler-mitchell/type-atlas#tool-call-results)
 does the same for the other tools, with the token and latency numbers.
 
 ## Tools

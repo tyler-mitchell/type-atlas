@@ -106,7 +106,7 @@ answer is valid input to the next call. Editing tools return patches; nothing
 is written for you. Per-tool pages with more cases are in
 [docs/tools](docs/tools/).
 
-## Output
+## Tool call results
 
 Everything below is captured from the running server against
 [`fixtures/ledger`](fixtures/ledger/) by the
