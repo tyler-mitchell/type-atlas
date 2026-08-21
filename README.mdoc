@@ -138,8 +138,10 @@ teardown; a zero here comes with the same scan count, so it means something.
 ### `search_code`
 
 Finds code by what it does, for when you cannot guess what it is called. Hits
-are ranked against the strongest one rather than scored absolutely, and each
-carries the file range it came from, so the next call has somewhere to go.
+come back in rank order, each carrying the file range it came from, so the
+next call has somewhere to go. Live answers also carry a relevance percentage
+per hit; it is left out below because the embedding scores behind it differ
+between machines and these cases are compared byte for byte.
 
 {% scenario "search_code/behavior-with-no-matching-words" /%}
 

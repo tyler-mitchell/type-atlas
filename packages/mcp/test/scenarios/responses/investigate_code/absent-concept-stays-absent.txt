@@ -1,8 +1,8 @@
 Search: where is the retry backoff for failed network requests configured
 
-3 matches · relevance is relative to the strongest match · no identifier to anchor on, so these are ranked by meaning alone
+3 matches · no identifier to anchor on, so these are ranked by meaning alone
 
-=== 1 · packages/importers/src/config.ts:1-7 · relevance 100% ===
+=== 1 · packages/importers/src/config.ts:1-7 ===
 
 Structure: defaultCurrencyCode
 Symbol: defaultCurrencyCode [variable] · selection 7:14-7:33 · range 7:14-7:72
@@ -14,7 +14,7 @@ Symbol: defaultCurrencyCode [variable] · selection 7:14-7:33 · range 7:14-7:72
 5 |
 6 | /** The currency a bank export is assumed to use when it does not say. */
 
-=== 2 · packages/accounts/src/account.ts:21-35 · relevance 92% ===
+=== 2 · packages/accounts/src/account.ts:21-35 ===
 
 Structure: AccountStore
 Symbol: AccountStore [interface] · selection 31:18-31:30 · range 31:1-35:2
@@ -26,7 +26,7 @@ Symbol: AccountStore [interface] · selection 31:18-31:30 · range 31:1-35:2
 25 |
 26 | /** Every ancestor from root to the account itself: `a`, `a:b`, `a:b:c`. */
 
-=== 3 · packages/importers/vite.config.ts:1-9 · relevance 92% ===
+=== 3 · packages/importers/vite.config.ts:1-9 ===
 
 Structure: default
 Symbol: default [variable] · selection 4:1-9:3

@@ -235,7 +235,14 @@ export const normalizeResponse = (text: string): string =>
   text
     .replace(/\n\n· \d+(?:\.\d+)?m?s[^\n]*\s*$/u, "")
     .replace(/^· \d+(?:\.\d+)?m?s[^\n]*\s*$/u, "")
-    .replace(/ · \d+(?:\.\d+)?m?s\s*$/u, "");
+    .replace(/ · \d+(?:\.\d+)?m?s\s*$/u, "")
+    // Retrieval relevance leaves for the same reason: the embedding scores it
+    // divides are not identical across CPU architectures, so the same answer
+    // reads 93% on an arm64 laptop and 92% on an x86 runner. Ranking order is
+    // stable and stays; the percentage and the sentence explaining it go, so a
+    // rendered case never advertises a number it does not show.
+    .replaceAll(/ · relevance \d+%/gu, "")
+    .replaceAll(" · relevance is relative to the strongest match", "");
 
 /**
  * One real server, one client, every scenario through the same stdio boundary

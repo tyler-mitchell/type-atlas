@@ -21,9 +21,9 @@ question: how are account balances rolled up to ancestor accounts
 ~~~text
 Search: how are account balances rolled up to ancestor accounts
 
-3 matches · relevance is relative to the strongest match · no identifier to anchor on, so these are ranked by meaning alone
+3 matches · no identifier to anchor on, so these are ranked by meaning alone
 
-=== 1 · packages/accounts/src/account.ts:21-35 · relevance 100% ===
+=== 1 · packages/accounts/src/account.ts:21-35 ===
 
 Structure: AccountStore
 Symbol: AccountStore [interface] · selection 31:18-31:30 · range 31:1-35:2
@@ -35,7 +35,7 @@ Symbol: AccountStore [interface] · selection 31:18-31:30 · range 31:1-35:2
 25 |
 26 | /** Every ancestor from root to the account itself: `a`, `a:b`, `a:b:c`. */
 
-=== 2 · packages/reports/src/balance.ts:1-23 · relevance 86% ===
+=== 2 · packages/reports/src/balance.ts:1-23 ===
 
 Structure: BalanceLine
 Symbol: BalanceLine [interface] · selection 11:18-11:29 · range 11:1-16:2
@@ -47,7 +47,7 @@ Symbol: BalanceLine [interface] · selection 11:18-11:29 · range 11:1-16:2
 5 |   lineage,
 6 |   signedAmount,
 
-=== 3 · packages/accounts/src/journal.ts:59-73 · relevance 64% ===
+=== 3 · packages/accounts/src/journal.ts:59-73 ===
 
 Structure: Journal
 Symbol: Journal [class] · selection 24:14-24:21 · range 24:1-73:2
@@ -95,9 +95,9 @@ question: where is the retry backoff for failed network requests configured
 ~~~text
 Search: where is the retry backoff for failed network requests configured
 
-3 matches · relevance is relative to the strongest match · no identifier to anchor on, so these are ranked by meaning alone
+3 matches · no identifier to anchor on, so these are ranked by meaning alone
 
-=== 1 · packages/importers/src/config.ts:1-7 · relevance 100% ===
+=== 1 · packages/importers/src/config.ts:1-7 ===
 
 Structure: defaultCurrencyCode
 Symbol: defaultCurrencyCode [variable] · selection 7:14-7:33 · range 7:14-7:72
@@ -109,7 +109,7 @@ Symbol: defaultCurrencyCode [variable] · selection 7:14-7:33 · range 7:14-7:72
 5 |
 6 | /** The currency a bank export is assumed to use when it does not say. */
 
-=== 2 · packages/accounts/src/account.ts:21-35 · relevance 92% ===
+=== 2 · packages/accounts/src/account.ts:21-35 ===
 
 Structure: AccountStore
 Symbol: AccountStore [interface] · selection 31:18-31:30 · range 31:1-35:2
@@ -121,7 +121,7 @@ Symbol: AccountStore [interface] · selection 31:18-31:30 · range 31:1-35:2
 25 |
 26 | /** Every ancestor from root to the account itself: `a`, `a:b`, `a:b:c`. */
 
-=== 3 · packages/importers/vite.config.ts:1-9 · relevance 92% ===
+=== 3 · packages/importers/vite.config.ts:1-9 ===
 
 Structure: default
 Symbol: default [variable] · selection 4:1-9:3

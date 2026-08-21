@@ -17,19 +17,19 @@ Dependency/runtime: localeCompare, entries, map, sort, get, set
 Related code · similarity is not a call or reference relationship
 Search: Related to packages/reports/src/balance.ts:23
 
-3 matches · relevance is relative to the strongest match · no identifier to anchor on, so these are ranked by meaning alone
+3 matches · no identifier to anchor on, so these are ranked by meaning alone
 
-=== 1 · packages/accounts/src/journal.ts:19-38 · relevance 100% ===
+=== 1 · packages/accounts/src/journal.ts:19-38 ===
 
 Structure: Journal
 Symbol: Journal [class] · selection 24:14-24:21 · range 24:1-73:2
 
-=== 2 · packages/rules/src/rule.ts:1-16 · relevance 90% ===
+=== 2 · packages/rules/src/rule.ts:1-16 ===
 
 Structure: RuleEvents
 Symbol: RuleEvents [interface] · selection 8:18-8:28 · range 8:1-12:2
 
-=== 3 · packages/reconcile/src/drift.ts:1-18 · relevance 86% ===
+=== 3 · packages/reconcile/src/drift.ts:1-18 ===
 
 Structure: StatementLine
 Symbol: StatementLine [interface] · selection 8:18-8:31 · range 8:1-12:2

@@ -302,8 +302,10 @@ packages/rules/src/builtin.ts
 ### `search_code`
 
 Finds code by what it does, for when you cannot guess what it is called. Hits
-are ranked against the strongest one rather than scored absolutely, and each
-carries the file range it came from, so the next call has somewhere to go.
+come back in rank order, each carrying the file range it came from, so the
+next call has somewhere to go. Live answers also carry a relevance percentage
+per hit; it is left out below because the embedding scores behind it differ
+between machines and these cases are compared byte for byte.
 
 **Agent's Input**
 
@@ -321,9 +323,9 @@ snippetLines: 6
 ~~~text
 Search: walking an account up through each of its ancestor accounts
 
-5 matches · relevance is relative to the strongest match · no identifier to anchor on, so these are ranked by meaning alone
+5 matches · no identifier to anchor on, so these are ranked by meaning alone
 
-=== 1 · packages/accounts/src/account.ts:21-35 · relevance 100% ===
+=== 1 · packages/accounts/src/account.ts:21-35 ===
 
 Structure: AccountStore
 Symbol: AccountStore [interface] · selection 31:18-31:30 · range 31:1-35:2
@@ -335,7 +337,7 @@ Symbol: AccountStore [interface] · selection 31:18-31:30 · range 31:1-35:2
 25 |
 26 | /** Every ancestor from root to the account itself: `a`, `a:b`, `a:b:c`. */
 
-=== 2 · packages/reports/src/balance.ts:1-23 · relevance 77% ===
+=== 2 · packages/reports/src/balance.ts:1-23 ===
 
 Structure: BalanceLine
 Symbol: BalanceLine [interface] · selection 11:18-11:29 · range 11:1-16:2
@@ -347,7 +349,7 @@ Symbol: BalanceLine [interface] · selection 11:18-11:29 · range 11:1-16:2
 5 |   lineage,
 6 |   signedAmount,
 
-=== 3 · packages/accounts/src/journal.ts:59-73 · relevance 73% ===
+=== 3 · packages/accounts/src/journal.ts:59-73 ===
 
 Structure: Journal
 Symbol: Journal [class] · selection 24:14-24:21 · range 24:1-73:2
@@ -359,7 +361,7 @@ Symbol: Journal [class] · selection 24:14-24:21 · range 24:1-73:2
 63 |     );
 64 |   }
 
-=== 4 · packages/reports/src/statement.ts:1-11 · relevance 66% ===
+=== 4 · packages/reports/src/statement.ts:1-11 ===
 
 Structure: statementLine
 Symbol: statementLine [variable] · selection 8:14-8:27 · range 8:14-11:2
@@ -371,7 +373,7 @@ Symbol: statementLine [variable] · selection 8:14-8:27 · range 8:14-11:2
 5 |  * One rendered statement line. The sign follows the account's normal side:
 6 |  * a liability holding a credit balance reads as positive on its statement.
 
-=== 5 · packages/accounts/src/posting.ts:1-24 · relevance 66% ===
+=== 5 · packages/accounts/src/posting.ts:1-24 ===
 
 Structure: credit
 Symbol: credit [variable] · selection 18:14-18:20 · range 18:14-22:3
