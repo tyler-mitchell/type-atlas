@@ -24,33 +24,12 @@ Search: Related to packages/reports/src/balance.ts:23
 Structure: Journal
 Symbol: Journal [class] · selection 24:14-24:21 · range 24:1-73:2
 
-19 | /**
-20 |  * An append-only journal of balanced entries. `TMeta` carries whatever a
-21 |  * consumer attaches to each entry — an import batch id, an approval trail —
-22 |  * without the journal knowing its shape.
-23 |  */
-24 | export class Journal<TMeta = undefined> {
-
 === 2 · packages/rules/src/rule.ts:1-16 · relevance 90% ===
 
 Structure: RuleEvents
 Symbol: RuleEvents [interface] · selection 8:18-8:28 · range 8:1-12:2
 
-1 | import type { AccountPath, Entry, Posting } from "@ledger/accounts";
-2 |
-3 | /**
-4 |  * The events a rule can react to, keyed by name. `TMeta` flows from the
-5 |  * journal: a rule book written for one meta shape cannot be attached to a
-6 |  * journal carrying another.
-
 === 3 · packages/reconcile/src/drift.ts:1-18 · relevance 86% ===
 
 Structure: StatementLine
 Symbol: StatementLine [interface] · selection 8:18-8:31 · range 8:1-12:2
-
-1 | // DELIBERATELY BROKEN — this file exists so diagnostics scenarios capture
-2 | // real compiler errors from realistic mistakes. Do not fix; see the fixture
-3 | // README.
-4 | import { type Posting, signedAmount } from "@ledger/accounts";
-5 | import { format, money, type Money } from "@ledger/money";
-6 |

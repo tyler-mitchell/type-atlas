@@ -1,6 +1,11 @@
 // vite-plus/test/node re-exports vitest/node, where reporters live since 4.1
 // (vite-plus/test/reporters wraps the deprecated vitest/reporters path).
-import { DefaultReporter, type UserConsoleLog } from "vite-plus/test/node";
+// UserConsoleLog itself is not re-exported by any public surface here — it
+// lives in a private vitest chunk — so the parameter type is derived from
+// the base class, which is always exactly right.
+import { DefaultReporter } from "vite-plus/test/node";
+
+type UserConsoleLog = Parameters<DefaultReporter["onUserConsoleLog"]>[0];
 
 /**
  * The run stream is the witness, so it carries witnesses and nothing else.

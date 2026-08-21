@@ -395,6 +395,23 @@ maintainer. Items already in flight are marked; the rest stand alone:
   would catch an ignored `solver: "block"` hidden behind an object spread;
   TypeScript itself cannot see that contract lie through a spread.
 
+### `list_files` conflates distinct worktree states
+
+Observed through the tool itself on 2026-08-20:
+
+- The two-character index/worktree state collapses to one editor badge, so
+  staged, unstaged, and mixed changes become indistinguishable.
+- Untracked `??` renders as `U`, reusing a letter associated with unmerged
+  state and making conflict interpretation ambiguous.
+- Tracked directories receive synthetic `N changed` badges. Ordinary
+  directories have no worktree status; only represented untracked or ignored
+  directory entries can truthfully carry `??` or `!!`.
+- `includeIgnored: true` exposes ignored paths without marking them `!!`.
+
+The tree should remain right-annotated and token-compact while preserving the
+actual two-character state. Type Atlas should make the workspace answer
+sufficient by itself; this is not a request to route agents through Git CLI.
+
 ### Generated-output discovery sees tsconfig outDirs and misses bundlers
 
 The occurrences exclusion (bcf1ef0) discovers build output from tsconfig

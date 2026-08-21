@@ -6,6 +6,7 @@
   "scripts": {
     "check:changeset": "changeset status --since=origin/main",
     "dev": "vp run @type-atlas/mcp#dev",
+    "dev:stop": "node scripts/cli.ts stop-dev-servers",
     "release:status": "node scripts/cli.ts status",
     "release:version": "node scripts/cli.ts version",
     "test": "vp run -r test"

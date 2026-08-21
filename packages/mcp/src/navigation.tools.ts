@@ -328,7 +328,7 @@ export const registerNavigationTools = (
         document: "inspect-symbol.tool.mdoc",
         variables: inspectionVariables({ result, root }),
       });
-      return appendDiagnosticContext(textResult(rendered.text), await diagnosticContext);
+      return appendDiagnosticContext(rendered.text, diagnosticContext);
     },
   );
 
@@ -468,7 +468,7 @@ export const registerNavigationTools = (
           ),
         },
       });
-      return appendDiagnosticContext(textResult(rendered.text), await diagnosticContext);
+      return appendDiagnosticContext(rendered.text, diagnosticContext);
     },
   );
 
@@ -827,7 +827,7 @@ export const registerNavigationTools = (
           groups: referenceGroups(ordered),
         },
       });
-      return appendDiagnosticContext(textResult(rendered.text), await diagnosticContext);
+      return appendDiagnosticContext(rendered.text, diagnosticContext);
     },
   );
 
@@ -913,7 +913,7 @@ export const registerNavigationTools = (
           ),
         },
       });
-      return appendDiagnosticContext(textResult(rendered.text), await diagnosticContext);
+      return appendDiagnosticContext(rendered.text, diagnosticContext);
     },
   );
 

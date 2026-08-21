@@ -360,7 +360,7 @@ export const registerDocumentTools = (server: McpServer, workspaces: VolarWorksp
             : [],
         },
       });
-      return appendDiagnosticContext(textResult(rendered.text), await diagnosticContext);
+      return appendDiagnosticContext(rendered.text, diagnosticContext);
     },
   );
 
@@ -464,7 +464,7 @@ export const registerDocumentTools = (server: McpServer, workspaces: VolarWorksp
           outline,
         },
       });
-      return appendDiagnosticContext(textResult(rendered.text), await diagnosticContext);
+      return appendDiagnosticContext(rendered.text, diagnosticContext);
     },
   );
 
@@ -526,7 +526,7 @@ export const registerDocumentTools = (server: McpServer, workspaces: VolarWorksp
           })),
         },
       });
-      return appendDiagnosticContext(textResult(rendered.text), await diagnosticContext);
+      return appendDiagnosticContext(rendered.text, diagnosticContext);
     },
   );
 

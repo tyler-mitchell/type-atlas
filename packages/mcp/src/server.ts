@@ -4,6 +4,7 @@ import { serverInfo, serverInstructions } from "./metadata.ts";
 import { developmentHost, developmentInstructions } from "./tools.ts";
 import { configurePresentation } from "atlascii";
 import { presentationFromEnvironment } from "./presentation.ts";
+import { configureIntent } from "./tool.ts";
 
 const capabilities = {
   tools: { listChanged: false },
@@ -55,11 +56,14 @@ const loadRuntime = async () => {
 };
 
 /** Starts the MCP server over standard input and output. */
-export const startMcpServer = async (): Promise<void> => {
+export const startMcpServer = async (context?: {
+  readonly args?: { readonly "require-intent"?: boolean };
+}): Promise<void> => {
   // Before anything renders, and once: how this session writes paths, draws
   // depth, and which glyphs it uses are properties of the client that launched
   // the server, not of any one answer.
   configurePresentation(presentationFromEnvironment());
+  configureIntent(context?.args?.["require-intent"] === true);
   const runtime = await loadRuntime();
   if (!runtime.ok) console.error(runtime.error);
   const handle = serveStdio(

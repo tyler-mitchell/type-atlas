@@ -129,7 +129,7 @@ export const registerAssistanceTools = (
           text: markupText(hover?.contents),
         },
       });
-      return appendDiagnosticContext(textResult(rendered.text), await diagnosticContext);
+      return appendDiagnosticContext(rendered.text, diagnosticContext);
     },
   );
 
@@ -203,7 +203,7 @@ export const registerAssistanceTools = (
           }),
         },
       });
-      return appendDiagnosticContext(textResult(rendered.text), await diagnosticContext);
+      return appendDiagnosticContext(rendered.text, diagnosticContext);
     },
   );
 
@@ -297,7 +297,7 @@ export const registerAssistanceTools = (
           })),
         },
       });
-      return appendDiagnosticContext(textResult(rendered.text), await diagnosticContext);
+      return appendDiagnosticContext(rendered.text, diagnosticContext);
     },
   );
 
@@ -368,7 +368,7 @@ export const registerAssistanceTools = (
             })),
         },
       });
-      return appendDiagnosticContext(textResult(rendered.text), await diagnosticContext);
+      return appendDiagnosticContext(rendered.text, diagnosticContext);
     },
   );
 

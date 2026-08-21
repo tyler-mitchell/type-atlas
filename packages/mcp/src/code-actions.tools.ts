@@ -16,7 +16,7 @@ import { containsPosition, rangeText, displayPath } from "atlascii";
 import { type } from "arktype";
 import { renderDocument } from "@type-atlas/core";
 import { formatPatchResult } from "./edit-result.ts";
-import { appendDiagnosticContext, textResult } from "./mcp-result.ts";
+import { appendDiagnosticContext } from "./mcp-result.ts";
 import { readOnlyToolAnnotations } from "./metadata.ts";
 import { registerTool } from "./tool.ts";
 import { observedFileInput, rangeInput } from "./tool-input.ts";
@@ -171,10 +171,10 @@ const runSourceAction = async (
     unresolvedNames > 0 && "emptyDespiteProblems" in action
       ? action.emptyDespiteProblems(unresolvedNames)
       : action.empty;
-  if (!resolved) return appendDiagnosticContext(textResult(empty), diagnosticContext);
+  if (!resolved) return appendDiagnosticContext(empty, diagnosticContext);
   if (resolved.disabled) throw new Error(resolved.disabled.reason);
   if (!resolved.edit) {
-    return appendDiagnosticContext(textResult(empty), diagnosticContext);
+    return appendDiagnosticContext(empty, diagnosticContext);
   }
   return appendDiagnosticContext(
     await formatPatchResult(
@@ -279,15 +279,12 @@ export const registerCodeActionTools = (
             diagnosticCount: diagnostics.length,
           },
         });
-        return appendDiagnosticContext(textResult(rendered.text), diagnosticContext);
+        return appendDiagnosticContext(rendered.text, diagnosticContext);
       }
       const selected = visibleActions[action - 1];
       if (!selected) throw new Error(`Code action ${action} is not available.`);
       if (Command.is(selected)) {
-        return appendDiagnosticContext(
-          textResult(`Editor command: ${selected.command}`),
-          diagnosticContext,
-        );
+        return appendDiagnosticContext(`Editor command: ${selected.command}`, diagnosticContext);
       }
       const resolved =
         selected.data === undefined
@@ -296,11 +293,9 @@ export const registerCodeActionTools = (
       if (resolved.disabled) throw new Error(resolved.disabled.reason);
       if (!resolved.edit) {
         return appendDiagnosticContext(
-          textResult(
-            resolved.command
-              ? `Editor command: ${resolved.command.command}`
-              : `${resolved.title} produced no edit.`,
-          ),
+          resolved.command
+            ? `Editor command: ${resolved.command.command}`
+            : `${resolved.title} produced no edit.`,
           diagnosticContext,
         );
       }

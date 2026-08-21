@@ -4,9 +4,35 @@ import type {
   Tool,
   ToolCallback,
 } from "@modelcontextprotocol/server";
+import { type } from "arktype";
 import { renderDocument, requestCost, takeRequestTraces } from "@type-atlas/core";
+import { editText } from "./mcp-result.ts";
 
 const toolTimeout = 30_000;
+
+// Some agents navigate far past what their change needs. This makes a
+// read-only call state its reason first. Read-only only: an edit carries its
+// own intent.
+//
+// Held like presentation: one process, one client, decided before the first
+// answer. The entrypoint sets it from the parsed CLI flag.
+const intentRequired = { current: false };
+
+export const configureIntent = (required: boolean): void => {
+  intentRequired.current = required;
+};
+
+// Must be advertised: a client strips fields its cached schema lacks, so an
+// unadvertised intent would be deleted before the server sees it.
+const intentInput = type({
+  "intent?": type("string").describe(
+    "One sentence: the implementation decision this call serves. Echoed atop the answer. Required when the session runs with --require-intent.",
+  ),
+});
+
+// Every schema here is an arktype object, which composes with `and`.
+const advertisingIntent = <Input extends StandardSchemaWithJSON>(schema: Input): Input =>
+  (schema as unknown as { readonly and: (right: unknown) => Input }).and(intentInput);
 
 /**
  * Appends what the call cost to the answer.
@@ -21,12 +47,6 @@ const withElapsed = async <Result extends object>(
   result: Result,
   started: number,
 ): Promise<Result> => {
-  // A tool may answer with an elicitation instead of content; only an answer
-  // that ends in text has somewhere to put this.
-  const content = (result as { readonly content?: readonly unknown[] }).content ?? [];
-  const last = content.at(-1);
-  const text = (last as { readonly type?: string; readonly text?: string } | undefined) ?? {};
-  if (text.type !== "text") return result;
   const rendered = await renderDocument({
     document: "request-cost.mdoc",
     variables: {
@@ -34,10 +54,7 @@ const withElapsed = async <Result extends object>(
       cost: requestCost({ traces: takeRequestTraces() }),
     },
   });
-  return {
-    ...result,
-    content: [...content.slice(0, -1), { ...text, text: `${text.text}\n\n${rendered.text}` }],
-  };
+  return editText(result, "last", (text) => `${text}\n\n${rendered.text}`);
 };
 
 /**
@@ -133,6 +150,13 @@ export const registerTool = <
 ) => {
   const boundedCallback = (async (arguments_, context) => {
     const started = performance.now();
+    const stated = (arguments_ as { readonly intent?: unknown }).intent;
+    const intent = typeof stated === "string" && stated.trim() !== "" ? stated.trim() : undefined;
+    if (intentRequired.current && config.annotations?.readOnlyHint === true && !intent) {
+      throw new Error(
+        `${name} requires intent: this session runs with --require-intent. Give one sentence naming the implementation decision this call serves and what you will do differently depending on the answer, then repeat the call with that sentence as \`intent\`. If you cannot name one, the call is the sprawl this flag exists to stop.`,
+      );
+    }
     // Whatever is in the trace buffer belongs to a call that never reported —
     // one that threw, timed out, or died with the language server. Draining only
     // on the way out left those entries to be attributed to this call: three
@@ -151,13 +175,15 @@ export const registerTool = <
     });
 
     try {
-      return withElapsed(
-        await Promise.race([
-          callback(arguments_, { ...context, mcpReq: { ...context.mcpReq, signal } }),
-          aborted,
-        ]),
-        started,
-      );
+      const answered = await Promise.race([
+        callback(arguments_, { ...context, mcpReq: { ...context.mcpReq, signal } }),
+        aborted,
+      ]);
+      // The stated intent leads the answer, so the transcript keeps the chain.
+      const stamped = intent
+        ? editText(answered as object, "first", (text) => `intent: ${intent}\n\n${text}`)
+        : answered;
+      return withElapsed(stamped, started);
     } catch (error) {
       // Operational errors go to stderr — the README's stated contract. The
       // client receives only the message; without this, a defect's throw
@@ -176,5 +202,9 @@ export const registerTool = <
     schema: config.inputSchema,
     callback: callback as unknown as ErasedToolCallback,
   });
-  return server.registerTool<Output, Input>(name, config, boundedCallback);
+  const published =
+    config.annotations?.readOnlyHint === true
+      ? { ...config, inputSchema: advertisingIntent(config.inputSchema) }
+      : config;
+  return server.registerTool<Output, Input>(name, published, boundedCallback);
 };

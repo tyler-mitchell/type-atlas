@@ -121,8 +121,6 @@ Symbol: default [variable] · selection 4:1-9:3
 5 |   build: {
 6 |     outDir: "dist",
 
-Verified relationships for structurally connected retrieved candidate 1
-
-defaultCurrencyCode [variable] · packages/importers/src/config.ts:7:14-7:33 · range 7:14-7:72 · packages/importers/tsconfig.json
+None of these declares anything the question names, so no relationship expansion follows — the matches above are retrieval's nearest neighbours, not an answer. If the concept should exist here, ask again naming an identifier from it; if you are proving absence, occurrences gives the literal zero.
 ~~~
 

@@ -8,6 +8,13 @@ const command = defineCommand({
     version: packageJson.version,
     description: "Run the Type Atlas MCP server over stdio.",
   },
+  args: {
+    "require-intent": {
+      type: "boolean",
+      default: false,
+      description: "Refuse read-only calls that state no `intent`.",
+    },
+  },
   run: startMcpServer,
 });
 

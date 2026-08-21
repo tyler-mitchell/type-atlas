@@ -83,7 +83,15 @@ const exploreOptions = {
     description: "Maximum verified relationships shown per section (1-100).",
   }),
   "relatedLimit?": investigationResultLimit,
-  "snippetLines?": investigationSnippetLines,
+  // The similarity tail is navigational — a pointer to code worth opening,
+  // not a preview worth reading — and at full snippets it was the noisiest
+  // part of the answer (Codex field report). Zero by default; the parameter
+  // opts into inline previews.
+  "snippetLines?": type("0 <= number.integer <= 30").configure({
+    default: 0,
+    description:
+      "Source lines under each similar-code match (0-30). Defaults to pointer rows — location and symbol only — since similarity is a lead to follow, not a preview; raise it to read the matches inline.",
+  }),
 } as const;
 
 const input = type.module({
@@ -318,7 +326,7 @@ export const registerIntelligenceTools = (
         includeTypeDefinitions = false,
         limit = 12,
         relatedLimit = 3,
-        snippetLines = 6,
+        snippetLines = 0,
         ...target
       },
       { mcpReq: { signal } },

@@ -264,6 +264,51 @@ const sameAnchor = (
   left.position.line === right.position.line &&
   left.position.character === right.position.character;
 
+// Words that carry no identifier signal in a question.
+const QUESTION_NOISE = new Set([
+  "and",
+  "any",
+  "are",
+  "been",
+  "code",
+  "codebase",
+  "configured",
+  "defined",
+  "does",
+  "file",
+  "for",
+  "from",
+  "handled",
+  "have",
+  "how",
+  "implemented",
+  "into",
+  "the",
+  "that",
+  "this",
+  "used",
+  "was",
+  "were",
+  "what",
+  "when",
+  "where",
+  "which",
+  "why",
+  "with",
+]);
+
+// Identifier-shaped tokens of a text: whole word plus camel/snake parts,
+// lowercased — same splits semble indexes by, so question and symbol meet on
+// the same vocabulary.
+const identifierTokens = (text: string): ReadonlySet<string> =>
+  new Set(
+    text
+      .split(/[^A-Za-z0-9_$]+/u)
+      .flatMap((word) => [word, ...word.split(/(?=[A-Z])|_/u)])
+      .map((part) => part.toLowerCase())
+      .filter((part) => part.length >= 3 && !QUESTION_NOISE.has(part)),
+  );
+
 /**
  * A retrieval page as the facts a reader needs, with nothing decided about how
  * it reads. Ranking happens here because it is selection, not presentation:
@@ -646,11 +691,33 @@ export const createRetrievalIntelligence = (dependencies: {
                 ),
             )
           : [];
-      const deepest = Math.max(...coherent.map(({ path }) => path?.length ?? 1));
-      const candidates = coherent
+      // Floor before expansion: the question must name something the
+      // candidate declares. Without it, a question the index cannot answer
+      // still expanded its nearest neighbour at relevance 100% and dressed a
+      // wrong symbol in "Verified relationships" (the ledger's standing
+      // reproducer). Retrieval scores cannot carry this floor — near-flat
+      // for natural language — so the anchor is lexical: shared identifier
+      // tokens, same splits semble itself indexes by.
+      const questionTokens = identifierTokens(request.question);
+      const namesQuestion = (candidate: (typeof coherent)[number]): boolean =>
+        [
+          ...identifierTokens(
+            [
+              candidate.selected.symbol.name,
+              ...(candidate.path?.map(({ symbol }) => symbol.name) ?? []),
+            ].join(" "),
+          ),
+        ].some((token) => questionTokens.has(token));
+      const expandable = exact ? coherent : coherent.filter(namesQuestion);
+      const deepest = Math.max(...expandable.map(({ path }) => path?.length ?? 1));
+      const candidates = expandable
         .filter(({ path }) => (path?.length ?? 1) === deepest)
         .slice(0, request.inspectionLimit);
-      if (!candidates.length) return searchText;
+      if (!candidates.length) {
+        return coherent.length === 0
+          ? searchText
+          : `${searchText}\n\nNone of these declares anything the question names, so no relationship expansion follows — the matches above are retrieval's nearest neighbours, not an answer. If the concept should exist here, ask again naming an identifier from it; if you are proving absence, occurrences gives the literal zero.`;
+      }
       const workspace = await dependencies.workspaces.get(request.root);
       const inspections = await Promise.all(
         candidates.map((candidate) =>
