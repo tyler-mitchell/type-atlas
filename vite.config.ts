@@ -23,15 +23,18 @@ export default defineConfig({
       // lines is the workspace .bin shim, which has no `env` subsystem, so
       // `vp node` fails there with "Command 'node' not found". The pinned
       // .node-version runtime strips types natively.
+      // Depends on `check`, not `build`, so it never runs beside it: `check`
+      // rebuilds each package's dist, and a pack that lands mid-clean reads a
+      // package as missing its own entrypoints.
       "check:distribution": {
         command: "node packages/mcp/scripts/verify-distribution.ts",
         cache: false,
-        dependsOn: ["build"],
+        dependsOn: ["check"],
       },
       "release:preflight": {
         command: "changeset status",
         cache: false,
-        dependsOn: ["check", "check:distribution"],
+        dependsOn: ["check:distribution"],
       },
       release: { command: "changeset publish", cache: false, dependsOn: ["release:preflight"] },
     },

@@ -88,7 +88,12 @@ const arrangeNote = (arrange: CapturedScenario["arrange"]): string | undefined =
  * record of what actually ran. `workspace` leads every call the way an
  * agent sends it; the fixture is that workspace, named by repository path.
  */
-const invocationBlock = async ({ tool, arguments: argument, arrange, elapsed }: CapturedScenario) => {
+const invocationBlock = async ({
+  tool,
+  arguments: argument,
+  arrange,
+  elapsed,
+}: CapturedScenario) => {
   const title = (await catalog()).find(({ name }) => name === tool)?.title ?? tool;
   const note = arrangeNote(arrange);
   const lines = [

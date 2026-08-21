@@ -66,6 +66,13 @@ export const scenarioTest = baseTest
       const committed = await readFile(resolve(responsesRoot, `${id}.txt`), "utf8").catch(
         () => undefined,
       );
+      // The recorded time is kept, not re-measured. Same machine, same call,
+      // a different number every run — live timing in a byte-exact snapshot
+      // fails every plain run. A case is timed once, when it is first
+      // captured; delete its .call.json to time it again.
+      const recorded = await readFile(resolve(responsesRoot, `${id}.call.json`), "utf8")
+        .then((source) => (JSON.parse(source) as { elapsed?: string }).elapsed)
+        .catch(() => undefined);
       const restore = options?.arrange ? await arrangeFixture(options.arrange) : undefined;
       try {
         const { text: response, elapsed } = await session.call(tool, argument);
@@ -92,7 +99,8 @@ export const scenarioTest = baseTest
               tool,
               arguments: argument,
               ...(options?.arrange ? { arrange: options.arrange } : {}),
-              elapsed,            },
+              elapsed: recorded ?? elapsed,
+            },
             null,
             2,
           )}\n`,
