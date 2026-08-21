@@ -123,16 +123,17 @@ export default defineCommand({
     const npmVersion = unique(published.map(({ version }) => version));
     const suiteVersion = npmVersion.length === 1 ? npmVersion[0] : undefined;
 
-    // Broken means the registry is already inconsistent — publishing more on
-    // top of it deepens the hole. Awaiting release and awaiting publish are
-    // the healthy shapes a release passes through on its way out.
+    // Broken means npm itself disagrees — publishing more on top of that
+    // deepens the hole. A lagging MCP Registry is not that: it is the state
+    // every release passes through between the npm publish and the registry
+    // step, so blocking on it would refuse the very run that resolves it.
     const [state, broken] =
       workingVersion.length !== 1
         ? ["working versions disagree across the suite", true]
         : npmVersion.length !== 1
           ? ["partial publication — npm versions disagree across the suite", true]
           : registry !== suiteVersion
-            ? ["interrupted release — the MCP Registry is behind npm", true]
+            ? ["interrupted release — the MCP Registry is behind npm", false]
             : pending.count
               ? [
                   `${pending.count} changeset${pending.count === 1 ? "" : "s"} awaiting release`,
