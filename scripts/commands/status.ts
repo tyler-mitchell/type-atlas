@@ -134,7 +134,10 @@ export default defineCommand({
           : registry !== suiteVersion
             ? ["interrupted release — the MCP Registry is behind npm", true]
             : pending.count
-              ? [`${pending.count} changeset${pending.count === 1 ? "" : "s"} awaiting release`, false]
+              ? [
+                  `${pending.count} changeset${pending.count === 1 ? "" : "s"} awaiting release`,
+                  false,
+                ]
               : workingVersion[0] !== suiteVersion
                 ? [`versioned at ${workingVersion[0]}, awaiting publish`, false]
                 : ["released and consistent", false];

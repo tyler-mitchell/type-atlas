@@ -11,6 +11,7 @@
 import { defineCommand, runMain } from "citty";
 import status from "./commands/status.ts";
 import stopDevServers from "./commands/stop-dev-servers.ts";
+import verifyPublished from "./commands/verify-published.ts";
 import version from "./commands/version.ts";
 
 const main = defineCommand({
@@ -18,7 +19,12 @@ const main = defineCommand({
     name: "repo",
     description: "Release, product, and repo-process automation for the Type Atlas suite.",
   },
-  subCommands: { status, "stop-dev-servers": stopDevServers, version },
+  subCommands: {
+    status,
+    "stop-dev-servers": stopDevServers,
+    "verify-published": verifyPublished,
+    version,
+  },
 });
 
 await runMain(main);

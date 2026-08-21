@@ -45,7 +45,20 @@ export default defineConfig({
         cache: false,
         dependsOn: ["release:consistency"],
       },
-      release: { command: "changeset publish", cache: false, dependsOn: ["release:preflight"] },
+      "release:publish": {
+        command: "changeset publish",
+        cache: false,
+        dependsOn: ["release:preflight"],
+      },
+      // Publishing is not the end of a release — resolving is. Every gate
+      // before this one reads the workspace, where a dependency resolves from
+      // disk whether or not the registry has it. This one installs what a
+      // consumer installs.
+      release: {
+        command: "node scripts/cli.ts verify-published",
+        cache: false,
+        dependsOn: ["release:publish"],
+      },
     },
   },
   lint: {
