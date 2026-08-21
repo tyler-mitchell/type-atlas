@@ -50,8 +50,8 @@ Symbol: BalanceLine [interface] · selection 11:18-11:29 · range 11:1-16:2
 
 === 3 · packages/accounts/src/journal.ts:59-73 ===
 
-Structure: Journal
-Symbol: Journal [class] · selection 24:14-24:21 · range 24:1-73:2
+Structure: Journal > history
+Symbol: history [method] · selection 60:3-60:10 · range 60:3-64:4
 
 59 |   /** Entries touching an account, oldest first. */
 60 |   history(account: AccountPath): readonly Entry<TMeta>[] {

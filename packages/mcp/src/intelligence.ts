@@ -185,9 +185,9 @@ export const enrichRetrievalPage = async (input: {
         const symbols = documentSymbols({ uri: read.textDocument.uri, source });
         const resultStartLine = result.start_line - 1;
         const resultEndLine = result.end_line - 1;
-        // The declaration that best covers a line window: most overlap first,
-        // deepest on a tie, and a name the query used wins outright.
-        const bestPath = (from: number, to: number) => {
+        // What retrieval matched: most overlap with the chunk, deepest on a
+        // tie, and a name the query used wins outright.
+        const matchedPath = (from: number, to: number) => {
           const ranked = [...overlappingSymbolPaths(symbols ?? [], from, to)].sort(
             (left, right) =>
               overlapLength(right.at(-1)!.range, from, to) -
@@ -195,7 +195,28 @@ export const enrichRetrievalPage = async (input: {
           );
           return ranked.find((path) => queryIdentifiers.has(path.at(-1)!.symbol.name)) ?? ranked[0];
         };
-        const symbolPath = bestPath(resultStartLine, resultEndLine);
+        // What the snippet shows, which is a different question. A label wants
+        // the declaration that both fills the window and does not sprawl past
+        // it, and neither half alone gets there: raw overlap named a class for
+        // six lines of one method (the method's doc comment belongs to the
+        // class, so the class overlapped by one more line), while pure
+        // containment named a one-line property for a six-line config object,
+        // because a small thing wholly inside always scores perfectly.
+        //
+        // Squaring the overlap before dividing by the declaration's own length
+        // asks both questions at once. The method beats its class, 25/5 over
+        // 36/50; the object beats its property, 9/6 over 1/1; and a nested
+        // callback inside the method loses to the method, 4/2 over 25/5.
+        const shownPathOf = (from: number, to: number) => {
+          const fit = (range: Range) =>
+            overlapLength(range, from, to) ** 2 / (range.end.line - range.start.line + 1);
+          const ranked = [...overlappingSymbolPaths(symbols ?? [], from, to)].sort(
+            (left, right) =>
+              fit(right.at(-1)!.range) - fit(left.at(-1)!.range) || left.length - right.length,
+          );
+          return ranked.find((path) => queryIdentifiers.has(path.at(-1)!.symbol.name)) ?? ranked[0];
+        };
+        const symbolPath = matchedPath(resultStartLine, resultEndLine);
         const selected = symbolPath?.at(-1);
         const exactIdentifier = !!selected && queryIdentifiers.has(selected.symbol.name);
         // The snippet is cut from the file, not from the matched chunk the
@@ -226,7 +247,7 @@ export const enrichRetrievalPage = async (input: {
         // overlapped the chunk was being named above a snippet that never
         // showed it — `AccountStore` titling six lines of `parentPath`. The
         // name a reader sees now belongs to the code beside it.
-        const shownPath = bestPath(snippetStart, snippetEnd - 1) ?? symbolPath;
+        const shownPath = shownPathOf(snippetStart, snippetEnd - 1) ?? symbolPath;
         const shown = shownPath?.at(-1);
         const hover =
           shown && input.includeTypes

@@ -813,15 +813,19 @@ them into one was the first attempt and it cost `investigate_code` its
 verified-relationships section — the tool stopped landing on a question it had
 answered. Two anchors, because two jobs.
 
-One case the fix reaches but does not sharpen: a snippet of `Journal`'s
-`history` method is still labelled `Journal [class]`, because the window opens
-on the method's doc comment, which lies inside the class and outside the
-method — six lines of overlap for the class against five for the method, so
-raw overlap picks the class. Not wrong, just coarser than the reader needs.
-Ranking by how fully a declaration sits inside the window (overlap over its
-own length, then larger overlap, then shallower) would name `history`, and
-would have to reject nested callbacks the same metric otherwise favours. It
-re-ranks every retrieval answer, so it wants its own change.
+Sharpened afterwards, because raw overlap was still too coarse: a snippet of
+`Journal`'s `history` method was labelled `Journal [class]`, the window having
+opened on the method's doc comment, which belongs to the class — six lines of
+overlap for the class against five for the method.
+
+Pure containment (overlap over the declaration's own length) fixes that and
+breaks the opposite case: a one-line `outDir` property scored a perfect 1.0
+and titled a six-line config object, because anything small and wholly inside
+the window always does. The label wants a declaration that fills the window
+_and_ does not sprawl past it, so the score squares the overlap before
+dividing by the declaration's length. The method beats its class (25/5 over
+36/50), the object beats its property (9/6 over 1/1), and a nested callback
+loses to the method that holds it (4/2 over 25/5).
 
 ### `investigate_code` titles its sections `###`
 
