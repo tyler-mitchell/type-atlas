@@ -2,6 +2,5 @@
   "tool": "diagnostics",
   "arguments": {
     "file": "packages/reconcile/src/drift.ts"
-  },
-  "elapsed": "under 1s"
+  }
 }

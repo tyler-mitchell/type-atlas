@@ -3,6 +3,5 @@
   "arguments": {
     "file": "packages/reports/src/balance.ts",
     "symbol": "balancesAsOf"
-  },
-  "elapsed": "under 1s"
+  }
 }

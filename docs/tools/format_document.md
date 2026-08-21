@@ -12,7 +12,6 @@ Return a Codex patch containing document-formatting edits. The MCP does not modi
 tool: Format document
 workspace: fixtures/ledger
 file: packages/importers/src/dedupe.ts
-# answered in under 1s
 ```
 
 **Response**

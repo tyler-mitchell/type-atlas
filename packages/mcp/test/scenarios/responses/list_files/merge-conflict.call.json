@@ -10,6 +10,5 @@
       "ours": "\n/** Ours: JPY rounds to whole yen at the statement boundary. */",
       "theirs": "\n/** Theirs: JPY carries no minor units at all. */"
     }
-  },
-  "elapsed": "under 1s"
+  }
 }

@@ -68,7 +68,7 @@ export const scenarioTest = baseTest
       );
       const restore = options?.arrange ? await arrangeFixture(options.arrange) : undefined;
       try {
-        const { text: response, elapsed } = await session.call(tool, argument);
+        const response = await session.invoke(tool, argument);
         // A capture that differs from the committed corpus prints itself into
         // the run output — new and changed responses are exactly the ones a
         // developing agent must read, and the run stream is where they are
@@ -92,7 +92,6 @@ export const scenarioTest = baseTest
               tool,
               arguments: argument,
               ...(options?.arrange ? { arrange: options.arrange } : {}),
-              ...(elapsed === undefined ? {} : { elapsed }),
             },
             null,
             2,

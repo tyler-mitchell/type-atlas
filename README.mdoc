@@ -185,10 +185,18 @@ declarations and the rest nested object properties and anonymous callbacks.
 As JSON that is 31,584 characters, 2.9x the source file. The same question here
 is 271 characters, from the same engine.
 
-On that monorepo a `references` call is about 150ms warm. The first call after
-the server starts pays for building that TypeScript program, which was 2.5s
-there. Every answer carries its own elapsed time and request count, so a cold
-project is visible rather than inferred.
+Every answer ends with what it cost, so a cold project is visible rather than
+inferred. The same `references` call, twice on that monorepo, first after the
+server started and then warm:
+
+```text
+· 2.53s · 5 language-server requests totalling 2.63s · slowest type-atlas/workspaceReferences 2.30s · first since the server started
+
+· 152ms
+```
+
+The first call pays for building that TypeScript program. Nothing after it
+does.
 [Measurements](docs/tool-latency-measurements.md), and
 [the same on a large monorepo](docs/kek-monorepo-latency.md).
 

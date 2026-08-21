@@ -2,6 +2,5 @@
   "tool": "add_missing_imports",
   "arguments": {
     "file": "packages/reconcile/src/matching.ts"
-  },
-  "elapsed": "under 1s"
+  }
 }

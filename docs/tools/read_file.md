@@ -12,7 +12,6 @@ Read one or more UTF-8 text files, including source, Markdown, and JSON, with st
 tool: Read files
 workspace: fixtures/ledger
 file: ["packages/accounts/src/journal.ts"]
-# answered in under 1s
 ```
 
 **Response**
@@ -84,7 +83,6 @@ file: ["packages/accounts/src/journal.ts"]
 tool: Read files
 workspace: fixtures/ledger
 file: ["packages/accounts/src/posting.ts","packages/money/src/rounding-mode.ts"]
-# answered in under 1s
 ```
 
 **Response**
@@ -149,7 +147,6 @@ file: ["packages/accounts/src/posting.ts","packages/money/src/rounding-mode.ts"]
 tool: Read files
 workspace: fixtures/ledger
 file: ["packages/importers/src/statement-parser.ts"]
-# answered in under 1s
 ```
 
 **Response**

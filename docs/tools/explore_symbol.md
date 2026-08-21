@@ -13,7 +13,6 @@ tool: Explore symbol
 workspace: fixtures/ledger
 file: packages/reports/src/balance.ts
 symbol: balancesAsOf
-# answered in under 1s
 ```
 
 **Response**

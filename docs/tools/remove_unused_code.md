@@ -12,7 +12,6 @@ Return TypeScript's source-wide unused-code removal as a Codex patch. The MCP do
 tool: Remove unused code
 workspace: fixtures/ledger
 file: packages/importers/src/dedupe.ts
-# answered in under 1s
 ```
 
 **Response**

@@ -3,6 +3,5 @@
   "arguments": {
     "fromFile": "packages/reports/src/balance.ts",
     "module": "@ledger/money"
-  },
-  "elapsed": "under 1s"
+  }
 }

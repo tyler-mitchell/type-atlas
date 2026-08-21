@@ -2,6 +2,5 @@
   "tool": "file_references",
   "arguments": {
     "file": "packages/money/src/money.ts"
-  },
-  "elapsed": "under 1s"
+  }
 }

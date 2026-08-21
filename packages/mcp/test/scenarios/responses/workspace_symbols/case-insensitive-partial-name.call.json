@@ -3,6 +3,5 @@
   "arguments": {
     "file": "packages/accounts/src/account.ts",
     "query": "store"
-  },
-  "elapsed": "under 1s"
+  }
 }

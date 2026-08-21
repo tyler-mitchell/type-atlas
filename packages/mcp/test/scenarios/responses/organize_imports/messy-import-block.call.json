@@ -2,6 +2,5 @@
   "tool": "organize_imports",
   "arguments": {
     "file": "packages/importers/src/csv.ts"
-  },
-  "elapsed": "under 1s"
+  }
 }

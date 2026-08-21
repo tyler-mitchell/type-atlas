@@ -2,6 +2,5 @@
   "tool": "document_symbols",
   "arguments": {
     "file": "packages/rules/src/rule.ts"
-  },
-  "elapsed": "under 1s"
+  }
 }

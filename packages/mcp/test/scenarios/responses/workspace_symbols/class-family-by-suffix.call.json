@@ -3,6 +3,5 @@
   "arguments": {
     "file": "packages/importers/src/statement-parser.ts",
     "query": "Parser"
-  },
-  "elapsed": "under 1s"
+  }
 }

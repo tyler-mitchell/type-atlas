@@ -13,7 +13,6 @@ tool: Code actions
 workspace: fixtures/ledger
 file: packages/reconcile/src/drift.ts
 range: {"start":{"line":21,"character":65},"end":{"line":21,"character":70}}
-# answered in under 1s
 ```
 
 **Response**

@@ -2,6 +2,5 @@
   "tool": "format_document",
   "arguments": {
     "file": "packages/importers/src/dedupe.ts"
-  },
-  "elapsed": "under 1s"
+  }
 }

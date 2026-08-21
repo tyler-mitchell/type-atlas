@@ -129,7 +129,6 @@ tool: Inspect symbol
 workspace: fixtures/ledger
 file: packages/accounts/src/journal.ts
 symbol: Journal
-# answered in under 1s
 ```
 
 **Response**
@@ -177,7 +176,6 @@ and an agent that just edited code usually does not think to ask.
 tool: Document symbols
 workspace: fixtures/ledger
 file: packages/reconcile/src/drift.ts
-# answered in under 1s
 ```
 
 **Response**
@@ -204,7 +202,6 @@ false` returns them.
 tool: Read files
 workspace: fixtures/ledger
 file: ["packages/accounts/src/posting.ts","packages/money/src/rounding-mode.ts"]
-# answered in under 1s
 ```
 
 **Response**
@@ -275,7 +272,6 @@ workspace: fixtures/ledger
 # working tree arranged: currency.ts edited · rounding.ts created · index.ts deleted
 directory: packages/money
 depth: 2
-# answered in under 1s
 ```
 
 **Response**
@@ -308,7 +304,6 @@ tool: References
 workspace: fixtures/ledger
 file: packages/money/src/money.ts
 position: {"line":12,"character":13}
-# answered in under 1s
 ```
 
 **Response**
@@ -358,7 +353,6 @@ teardown; a zero here comes with the same scan count, so it means something.
 tool: Occurrences
 workspace: fixtures/ledger
 text: signedAmount
-# answered in under 1s
 ```
 
 **Response**
@@ -397,7 +391,6 @@ says so and stops rather than expanding relationships around the wrong symbol.
 tool: Investigate code
 workspace: fixtures/ledger
 question: where is the retry backoff for failed network requests configured
-# answered in under 1s
 ```
 
 **Response**
@@ -458,7 +451,6 @@ tool: Impact
 workspace: fixtures/ledger
 file: packages/accounts/src/posting.ts
 position: {"line":25,"character":14}
-# answered in under 1s
 ```
 
 **Response**
@@ -480,10 +472,18 @@ declarations and the rest nested object properties and anonymous callbacks.
 As JSON that is 31,584 characters, 2.9x the source file. The same question here
 is 271 characters, from the same engine.
 
-On that monorepo a `references` call is about 150ms warm. The first call after
-the server starts pays for building that TypeScript program, which was 2.5s
-there. Every answer carries its own elapsed time and request count, so a cold
-project is visible rather than inferred.
+Every answer ends with what it cost, so a cold project is visible rather than
+inferred. The same `references` call, twice on that monorepo, first after the
+server started and then warm:
+
+```text
+· 2.53s · 5 language-server requests totalling 2.63s · slowest type-atlas/workspaceReferences 2.30s · first since the server started
+
+· 152ms
+```
+
+The first call pays for building that TypeScript program. Nothing after it
+does.
 [Measurements](docs/tool-latency-measurements.md), and
 [the same on a large monorepo](docs/kek-monorepo-latency.md).
 

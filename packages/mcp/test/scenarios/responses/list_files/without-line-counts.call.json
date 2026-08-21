@@ -3,6 +3,5 @@
   "arguments": {
     "directory": "packages/accounts",
     "loc": false
-  },
-  "elapsed": "under 1s"
+  }
 }

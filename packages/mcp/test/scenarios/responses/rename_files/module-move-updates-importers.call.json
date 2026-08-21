@@ -7,6 +7,5 @@
         "to": "packages/accounts/src/entry-side.ts"
       }
     ]
-  },
-  "elapsed": "under 1s"
+  }
 }

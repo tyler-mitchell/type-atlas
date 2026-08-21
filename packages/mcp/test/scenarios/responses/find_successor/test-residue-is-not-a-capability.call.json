@@ -3,6 +3,5 @@
   "arguments": {
     "file": "packages/money/src/money.ts",
     "name": "assertRoundingParity"
-  },
-  "elapsed": "under 1s"
+  }
 }

@@ -5,6 +5,5 @@
       "packages/accounts/src/posting.ts",
       "packages/money/src/rounding-mode.ts"
     ]
-  },
-  "elapsed": "under 1s"
+  }
 }

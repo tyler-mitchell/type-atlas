@@ -13,7 +13,6 @@ tool: Find successor
 workspace: fixtures/ledger
 file: packages/accounts/src/journal.ts
 name: postEntry
-# answered in under 1s
 ```
 
 **Response**
@@ -52,7 +51,6 @@ tool: Find successor
 workspace: fixtures/ledger
 file: packages/reports/src/balance.ts
 name: balanceOf
-# answered in under 1s
 ```
 
 **Response**
@@ -92,7 +90,6 @@ tool: Find successor
 workspace: fixtures/ledger
 file: packages/money/src/money.ts
 name: assertRoundingParity
-# answered in under 1s
 ```
 
 **Response**

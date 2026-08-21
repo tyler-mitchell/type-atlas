@@ -4,6 +4,5 @@
     "glob": [
       "**/*.test.ts"
     ]
-  },
-  "elapsed": "under 1s"
+  }
 }

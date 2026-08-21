@@ -17,6 +17,5 @@
         "to": "packages/importers/src/duplicate-rows.ts"
       }
     ]
-  },
-  "elapsed": "under 1s"
+  }
 }

@@ -13,7 +13,6 @@ tool: Implementations
 workspace: fixtures/ledger
 file: packages/accounts/src/account.ts
 position: {"line":31,"character":18}
-# answered in under 1s
 ```
 
 **Response**
@@ -31,7 +30,6 @@ tool: Implementations
 workspace: fixtures/ledger
 file: packages/importers/src/statement-parser.ts
 position: {"line":7,"character":23}
-# answered in under 1s
 ```
 
 **Response**

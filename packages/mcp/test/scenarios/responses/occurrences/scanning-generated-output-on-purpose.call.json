@@ -3,6 +3,5 @@
   "arguments": {
     "text": "signedAmount",
     "directory": "packages/importers/dist"
-  },
-  "elapsed": "under 1s"
+  }
 }

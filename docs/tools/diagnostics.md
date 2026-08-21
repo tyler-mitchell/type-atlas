@@ -12,7 +12,6 @@ Report diagnostics for the TypeScript projects you have touched — the compiler
 tool: Diagnostics
 workspace: fixtures/ledger
 file: packages/reconcile/src/drift.ts
-# answered in under 1s
 ```
 
 **Response**
@@ -67,7 +66,6 @@ error ts(2362) 21:23-21:35 — inside drift
 tool: Diagnostics
 workspace: fixtures/ledger
 file: packages/money/src/money.ts
-# answered in under 1s
 ```
 
 **Response**
@@ -84,7 +82,6 @@ No diagnostic of any severity in packages/money/src/money.ts · packages/money/t
 tool: Diagnostics
 workspace: fixtures/ledger
 file: packages/reconcile/src/matching.ts
-# answered in under 1s
 ```
 
 **Response**

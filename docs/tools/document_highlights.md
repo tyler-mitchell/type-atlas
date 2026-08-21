@@ -13,7 +13,6 @@ tool: Document highlights
 workspace: fixtures/ledger
 file: packages/accounts/src/journal.ts
 position: {"line":25,"character":20}
-# answered in under 1s
 ```
 
 **Response**

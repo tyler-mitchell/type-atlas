@@ -3,6 +3,5 @@
   "arguments": {
     "file": "packages/importers/src/bank-profiles.ts",
     "depth": 3
-  },
-  "elapsed": "under 1s"
+  }
 }
