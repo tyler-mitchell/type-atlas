@@ -83,6 +83,8 @@ export type CapturedScenario = {
   readonly tool: string;
   readonly arguments: Record<string, unknown>;
   readonly arrange?: Arrange;
+  /** What the call cost, in bands so a capture survives a slower machine. */
+  readonly elapsed?: string;
 };
 
 /**
@@ -101,7 +103,12 @@ export const capturedScenarios = async (): Promise<readonly CapturedScenario[]> 
       .map(async (id) => {
         const record = JSON.parse(
           await readFile(resolve(responsesRoot, `${id}.call.json`), "utf8"),
-        ) as { tool: string; arguments: Record<string, unknown>; arrange?: Arrange };
+        ) as {
+          tool: string;
+          arguments: Record<string, unknown>;
+          arrange?: Arrange;
+          elapsed?: string;
+        };
         return { id, name: id.slice(id.indexOf("/") + 1), ...record };
       }),
   );
@@ -223,6 +230,22 @@ export const arrangeFixture = async ({
  * language-server requests totalling 1.79s · slowest …`), and a pattern
  * anchored to the short form let exactly those runs poison comparisons.
  */
+/**
+ * What the server measured for this call, from the trailer it prints. Read
+ * before normalization strips it, and reported in coarse bands: a millisecond
+ * figure differs every run, so a byte-exact capture cannot hold one, while
+ * "under 50ms" holds across runs and is what a reader is actually asking.
+ */
+export const elapsedBand = (text: string): string | undefined => {
+  const measured = /(?:^|\n)· (\d+(?:\.\d+)?)(ms|s)\b/u.exec(text);
+  if (!measured) return undefined;
+  const ms = Number(measured[1]) * (measured[2] === "s" ? 1000 : 1);
+  // One coarse threshold, because narrow bands flip: 50ms and 250ms bands
+  // moved six cases between two back-to-back runs on the same machine.
+  if (ms < 1000) return "under 1s";
+  return `about ${Math.round(ms / 1000)}s`;
+};
+
 export const normalizeResponse = (text: string): string =>
   text
     .replace(/\n\n· \d+(?:\.\d+)?m?s[^\n]*\s*$/u, "")
@@ -239,6 +262,11 @@ export const connectScenarioSession = async (
   entrypoint: readonly string[] = ["--conditions=development", "src/cli.ts"],
   cwd: string = packageRoot,
 ): Promise<{
+  /** The answer and what the server measured for it. */
+  call: (
+    tool: string,
+    argument: Record<string, unknown>,
+  ) => Promise<{ text: string; elapsed?: string }>;
   invoke: (tool: string, argument: Record<string, unknown>) => Promise<string>;
   catalog: () => Promise<ReadonlyArray<{ name: string; title?: string; description?: string }>>;
   close: () => Promise<void>;
@@ -258,25 +286,27 @@ export const connectScenarioSession = async (
     stderrHeld.push(chunk.toString("utf8"));
     if (stderrHeld.length > 200) stderrHeld.shift();
   });
+  const call = async (tool: string, argument: Record<string, unknown>) => {
+    const result = await client.callTool({
+      name: tool,
+      arguments: { workspace: fixtureRoot, ...argument },
+    });
+    const content = result.content as ReadonlyArray<{ type: string; text?: string }>;
+    const text = content.find((item) => item.type === "text")?.text ?? "";
+    // A tool error must fail the scenario, never become its capture: an
+    // error snapshot poisons the baseline and the docs, then self-confirms
+    // on every later run. One mid-suite server death did exactly that —
+    // "Connection is disposed." was committed as a tool's documentation.
+    if (result.isError === true) {
+      throw new Error(
+        `${tool} answered with a tool error:\n${text}\n\nServer stderr tail:\n${stderrHeld.slice(-40).join("")}`,
+      );
+    }
+    return { text: normalizeResponse(text), elapsed: elapsedBand(text) };
+  };
   return {
-    invoke: async (tool, argument) => {
-      const result = await client.callTool({
-        name: tool,
-        arguments: { workspace: fixtureRoot, ...argument },
-      });
-      const content = result.content as ReadonlyArray<{ type: string; text?: string }>;
-      const text = content.find((item) => item.type === "text")?.text ?? "";
-      // A tool error must fail the scenario, never become its capture: an
-      // error snapshot poisons the baseline and the docs, then self-confirms
-      // on every later run. One mid-suite server death did exactly that —
-      // "Connection is disposed." was committed as a tool's documentation.
-      if (result.isError === true) {
-        throw new Error(
-          `${tool} answered with a tool error:\n${text}\n\nServer stderr tail:\n${stderrHeld.slice(-40).join("")}`,
-        );
-      }
-      return normalizeResponse(text);
-    },
+    call,
+    invoke: async (tool, argument) => (await call(tool, argument)).text,
     catalog: async () => {
       const { tools } = await client.listTools();
       return tools

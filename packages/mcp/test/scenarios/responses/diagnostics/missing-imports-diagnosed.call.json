@@ -2,5 +2,6 @@
   "tool": "diagnostics",
   "arguments": {
     "file": "packages/reconcile/src/matching.ts"
-  }
+  },
+  "elapsed": "under 1s"
 }

@@ -16,19 +16,17 @@ TypeScript, Markdown, and JSON. Node 22.20 or newer.
 
 ## Install
 
-Codex:
-
 ```sh
 codex mcp add type-atlas -- npx --yes @type-atlas/mcp@latest
-```
 
-Claude Code:
-
-```sh
 claude mcp add --scope user type-atlas -- npx --yes @type-atlas/mcp@latest
+
+code --add-mcp '{"name":"type-atlas","command":"npx","args":["--yes","@type-atlas/mcp@latest"]}'
 ```
 
-Claude Desktop, VS Code, Windows, and generic client config are in the
+Any other client takes the standard `mcpServers` shape with `npx` and
+`["--yes", "@type-atlas/mcp@latest"]`. Claude Desktop, Windows, and the rest
+are in the
 [install section](https://github.com/tyler-mitchell/type-atlas#install).
 Clients read MCP config at startup, so restart after. `@latest` resolves on
 every process start; pin a version if you do not want tool behavior moving
@@ -64,6 +62,7 @@ and an agent that just edited code usually does not think to ask.
 tool: Document symbols
 workspace: fixtures/ledger
 file: packages/reconcile/src/drift.ts
+# answered in under 1s
 ```
 
 **Response**

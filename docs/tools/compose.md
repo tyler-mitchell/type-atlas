@@ -32,6 +32,7 @@ document: {% ask "subject" as="what" file="packages/accounts/src/posting.ts" lin
 {% $uses.total %} uses across {% $uses.files %} files · {% $health.total %} problems in the declaring file
 
 {% tree entries=$uses.groups partial="reference-node.mdoc" /%}
+# answered in under 1s
 ```
 
 **Response**

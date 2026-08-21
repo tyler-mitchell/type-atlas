@@ -4,5 +4,6 @@
     "fromFile": "packages/reports/src/balance.ts",
     "module": "@ledger/accounts",
     "query": "balance"
-  }
+  },
+  "elapsed": "under 1s"
 }

@@ -11,6 +11,7 @@ Show a bounded workspace-relative project structure. `view: "files"` (the defaul
 ```yaml
 tool: List files
 workspace: fixtures/ledger
+# answered in under 1s
 ```
 
 **Response**
@@ -37,6 +38,7 @@ ledger/
 tool: List files
 workspace: fixtures/ledger
 expand: {"packages/*":2}
+# answered in under 1s
 ```
 
 **Response**
@@ -127,6 +129,7 @@ ledger/
 tool: List files
 workspace: fixtures/ledger
 expand: {"packages/accounts":1,"packages/reports":{"depth":2,"glob":["**/*.ts"]}}
+# answered in under 1s
 ```
 
 **Response**
@@ -164,6 +167,7 @@ tool: List files
 workspace: fixtures/ledger
 directory: packages/accounts
 loc: false
+# answered in under 1s
 ```
 
 **Response**
@@ -184,6 +188,7 @@ packages/accounts/
 tool: List files
 workspace: fixtures/ledger
 glob: ["**/*.test.ts"]
+# answered in under 1s
 ```
 
 **Response**
@@ -212,6 +217,7 @@ workspace: fixtures/ledger
 # working tree arranged: currency.ts edited · rounding.ts created · index.ts deleted
 directory: packages/money
 depth: 2
+# answered in under 1s
 ```
 
 **Response**
@@ -241,6 +247,7 @@ workspace: fixtures/ledger
 # working tree arranged: ofx.ts created and staged · dedupe.ts renamed to duplicate-rows.ts
 directory: packages/importers
 depth: 2
+# answered in under 1s
 ```
 
 **Response**
@@ -272,6 +279,7 @@ workspace: fixtures/ledger
 # working tree arranged: merge conflict on currency.ts
 directory: packages/money
 depth: 2
+# answered in under 1s
 ```
 
 **Response**
@@ -298,6 +306,7 @@ packages/money/
 tool: List files
 workspace: fixtures/ledger
 expand: {"packages/*":{"depth":2,"limit":6}}
+# answered in under 1s
 ```
 
 **Response**
@@ -381,6 +390,7 @@ tool: List files
 workspace: fixtures/ledger
 glob: ["**/*.ts"]
 limit: 12
+# answered in under 1s
 ```
 
 **Response**
@@ -427,6 +437,7 @@ tool: List files
 workspace: fixtures/ledger
 # working tree arranged: currency.ts edited · qif.ts created · index.ts deleted
 changed: true
+# answered in under 1s
 ```
 
 **Response**
@@ -452,6 +463,7 @@ tool: List files
 workspace: fixtures/ledger
 directory: packages/accounts
 changed: true
+# answered in under 1s
 ```
 
 **Response**

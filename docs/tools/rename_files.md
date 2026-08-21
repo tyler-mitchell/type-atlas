@@ -12,6 +12,7 @@ Return a Codex patch that moves files and updates affected references. The MCP d
 tool: Rename files
 workspace: fixtures/ledger
 files: [{"from":"packages/accounts/src/posting.ts","to":"packages/accounts/src/entry-side.ts"}]
+# answered in under 1s
 ```
 
 **Response**

@@ -13,6 +13,7 @@ tool: Callees
 workspace: fixtures/ledger
 file: packages/reports/src/balance.ts
 position: {"line":23,"character":14}
+# answered in under 1s
 ```
 
 **Response**
@@ -40,6 +41,7 @@ tool: Callees
 workspace: fixtures/ledger
 file: packages/accounts/src/journal.ts
 position: {"line":28,"character":3}
+# answered in under 1s
 ```
 
 **Response**
@@ -57,6 +59,7 @@ tool: Callees
 workspace: fixtures/ledger
 file: packages/rules/src/rule.ts
 position: {"line":46,"character":14}
+# answered in under 1s
 ```
 
 **Response**

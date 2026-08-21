@@ -12,6 +12,7 @@ Return the top-level document outline and source ranges. Set depth to include ne
 tool: Document symbols
 workspace: fixtures/ledger
 file: packages/accounts/src/journal.ts
+# answered in under 1s
 ```
 
 **Response**
@@ -32,6 +33,7 @@ UnbalancedEntryError [class] 13:14-13:34 · range 13:1-17:2
 tool: Document symbols
 workspace: fixtures/ledger
 file: packages/reconcile/src/drift.ts
+# answered in under 1s
 ```
 
 **Response**
@@ -54,6 +56,7 @@ statementTotal [variable] 15:14-15:28 · range 15:14-16:56
 tool: Document symbols
 workspace: fixtures/ledger
 file: packages/importers/src/csv.ts
+# answered in under 1s
 ```
 
 **Response**
@@ -77,6 +80,7 @@ StatementRow [interface] 6:18-6:30 · range 6:1-11:2
 tool: Document symbols
 workspace: fixtures/ledger
 file: packages/rules/src/rule.ts
+# answered in under 1s
 ```
 
 **Response**
@@ -104,6 +108,7 @@ tool: Document symbols
 workspace: fixtures/ledger
 file: packages/importers/src/bank-profiles.ts
 depth: 3
+# answered in under 1s
 ```
 
 **Response**

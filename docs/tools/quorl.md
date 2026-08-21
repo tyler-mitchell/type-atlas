@@ -14,6 +14,7 @@ workspace: fixtures/ledger
 file: packages/accounts/src/posting.ts
 position: {"line":25,"character":14}
 depth: 2
+# answered in under 1s
 ```
 
 **Response**
@@ -50,6 +51,7 @@ file: packages/money/src/money.ts
 position: {"line":27,"character":14}
 depth: 3
 limit: 20
+# answered in under 1s
 ```
 
 **Response**
@@ -133,6 +135,7 @@ workspace: fixtures/ledger
 file: packages/rules/src/rule.ts
 position: {"line":37,"character":14}
 depth: 2
+# answered in under 1s
 ```
 
 **Response**

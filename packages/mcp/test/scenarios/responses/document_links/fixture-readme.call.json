@@ -2,5 +2,6 @@
   "tool": "document_links",
   "arguments": {
     "file": "README.md"
-  }
+  },
+  "elapsed": "under 1s"
 }

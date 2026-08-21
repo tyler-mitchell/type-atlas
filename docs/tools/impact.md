@@ -13,6 +13,7 @@ tool: Impact
 workspace: fixtures/ledger
 file: packages/accounts/src/posting.ts
 position: {"line":25,"character":14}
+# answered in under 1s
 ```
 
 **Response**
@@ -36,6 +37,7 @@ tool: Impact
 workspace: fixtures/ledger
 file: packages/money/src/money.ts
 position: {"line":12,"character":13}
+# answered in under 1s
 ```
 
 **Response**

@@ -92,7 +92,8 @@ const invocationBlock = async ({
   tool,
   arguments: argument,
   arrange,
-}: Pick<CapturedScenario, "tool" | "arguments" | "arrange">) => {
+  elapsed,
+}: Pick<CapturedScenario, "tool" | "arguments" | "arrange" | "elapsed">) => {
   const title = (await catalog()).find(({ name }) => name === tool)?.title ?? tool;
   const note = arrangeNote(arrange);
   const lines = [
@@ -102,6 +103,9 @@ const invocationBlock = async ({
     ...Object.entries(argument).map(
       ([key, value]) => `${key}: ${typeof value === "string" ? value : JSON.stringify(value)}`,
     ),
+    // Banded, and last: what the call cost is a fact about the answer, not an
+    // argument, and an exact figure would differ every capture run.
+    ...(elapsed === undefined ? [] : [`# answered in ${elapsed}`]),
   ];
   return `\`\`\`yaml\n${lines.join("\n")}\n\`\`\``;
 };
@@ -124,7 +128,7 @@ const responseBlock = (captured: string): string => {
 
 // One case, labelled: what the agent sent, then what came back.
 const casePair = async (
-  scenario: Pick<CapturedScenario, "tool" | "arguments" | "arrange">,
+  scenario: Pick<CapturedScenario, "tool" | "arguments" | "arrange" | "elapsed">,
   captured: string,
 ): Promise<string> =>
   [

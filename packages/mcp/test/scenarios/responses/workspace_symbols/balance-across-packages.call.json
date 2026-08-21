@@ -3,5 +3,6 @@
   "arguments": {
     "file": "packages/reports/src/balance.ts",
     "query": "Balance"
-  }
+  },
+  "elapsed": "under 1s"
 }

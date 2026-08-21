@@ -7,5 +7,6 @@
       "character": 14
     },
     "newName": "InMemoryAccountStore"
-  }
+  },
+  "elapsed": "under 1s"
 }

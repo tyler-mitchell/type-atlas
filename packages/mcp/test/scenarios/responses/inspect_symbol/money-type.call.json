@@ -3,5 +3,6 @@
   "arguments": {
     "file": "packages/money/src/money.ts",
     "symbol": "Money"
-  }
+  },
+  "elapsed": "under 1s"
 }

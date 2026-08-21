@@ -13,5 +13,6 @@
     "delete": [
       "packages/money/src/index.ts"
     ]
-  }
+  },
+  "elapsed": "under 1s"
 }

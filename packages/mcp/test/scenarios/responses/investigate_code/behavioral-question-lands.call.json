@@ -2,5 +2,6 @@
   "tool": "investigate_code",
   "arguments": {
     "question": "how are account balances rolled up to ancestor accounts"
-  }
+  },
+  "elapsed": "under 1s"
 }

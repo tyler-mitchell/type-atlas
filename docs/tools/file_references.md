@@ -12,6 +12,7 @@ Return a bounded page of module references from the TypeScript project selected 
 tool: File references
 workspace: fixtures/ledger
 file: packages/money/src/money.ts
+# answered in under 1s
 ```
 
 **Response**

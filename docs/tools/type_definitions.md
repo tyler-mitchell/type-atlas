@@ -13,6 +13,7 @@ tool: Type definitions
 workspace: fixtures/ledger
 file: packages/reports/src/statement.ts
 position: {"line":8,"character":49}
+# answered in under 1s
 ```
 
 **Response**
@@ -32,6 +33,7 @@ tool: Type definitions
 workspace: fixtures/ledger
 file: packages/reports/src/balance.ts
 position: {"line":33,"character":20}
+# answered in under 1s
 ```
 
 **Response**
@@ -49,6 +51,7 @@ tool: Type definitions
 workspace: fixtures/ledger
 file: packages/rules/src/rule.ts
 position: {"line":47,"character":3}
+# answered in under 1s
 ```
 
 **Response**

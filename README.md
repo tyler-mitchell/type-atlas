@@ -16,60 +16,15 @@ TypeScript, Markdown, and JSON. Node 22.20 or newer. Apache-2.0.
 
 ## Install
 
-Codex:
-
 ```sh
 codex mcp add type-atlas -- npx --yes @type-atlas/mcp@latest
-```
 
-Writes to `~/.codex/config.toml`, so every repository Codex opens has it.
-`codex mcp list` confirms it, `codex mcp remove type-atlas` undoes it.
-
-Claude Code:
-
-```sh
 claude mcp add --scope user type-atlas -- npx --yes @type-atlas/mcp@latest
-```
 
-`--scope user` covers every repository. `--scope project` writes a checked-in
-`.mcp.json` your collaborators share, `--scope local` is one repository on one
-machine.
-
-<details>
-<summary>Claude Desktop</summary>
-
-Claude Desktop keeps a separate server list, so the Claude Code CLI does not
-reach it. Add it under `mcpServers` in `claude_desktop_config.json`, at
-`~/Library/Application Support/Claude/` on macOS or `%APPDATA%\Claude\` on
-Windows:
-
-```json
-{
-  "mcpServers": {
-    "type-atlas": {
-      "command": "npx",
-      "args": ["--yes", "@type-atlas/mcp@latest"]
-    }
-  }
-}
-```
-
-Claude Desktop starts servers without your shell `PATH`, so an nvm or Homebrew
-runtime is not found by name and the server fails to start. Use the absolute
-path from `which npx` when that happens.
-
-</details>
-
-<details>
-<summary>Other clients</summary>
-
-VS Code:
-
-```sh
 code --add-mcp '{"name":"type-atlas","command":"npx","args":["--yes","@type-atlas/mcp@latest"]}'
 ```
 
-Anything else that reads the standard shape:
+Any other client takes the standard shape:
 
 ```json
 {
@@ -82,11 +37,12 @@ Anything else that reads the standard shape:
 }
 ```
 
-Clients that cannot launch the `npx.cmd` shim need `cmd`: `"command": "cmd"`
-with `"args": ["/c", "npx", "--yes", "@type-atlas/mcp@latest"]`, or
-`codex mcp add type-atlas -- cmd /c npx --yes @type-atlas/mcp@latest`.
-
-</details>
+Claude Desktop reads its own list at
+`~/Library/Application Support/Claude/claude_desktop_config.json`, and starts
+servers without your shell `PATH`, so give the absolute path from `which npx`
+if it fails to start. On Windows, a client that cannot launch the `npx.cmd`
+shim needs `"command": "cmd"` with
+`"args": ["/c", "npx", "--yes", "@type-atlas/mcp@latest"]`.
 
 Clients read MCP config at startup, so restart after. `@latest` resolves on
 every process start; pin a version if you do not want tool behavior moving
@@ -165,6 +121,7 @@ tool: Inspect symbol
 workspace: fixtures/ledger
 file: packages/accounts/src/journal.ts
 symbol: Journal
+# answered in under 1s
 ```
 
 **Response**
@@ -212,6 +169,7 @@ and an agent that just edited code usually does not think to ask.
 tool: Document symbols
 workspace: fixtures/ledger
 file: packages/reconcile/src/drift.ts
+# answered in under 1s
 ```
 
 **Response**
@@ -238,6 +196,7 @@ false` returns them.
 tool: Read files
 workspace: fixtures/ledger
 file: ["packages/accounts/src/posting.ts","packages/money/src/rounding-mode.ts"]
+# answered in under 1s
 ```
 
 **Response**
@@ -308,6 +267,7 @@ workspace: fixtures/ledger
 # working tree arranged: currency.ts edited · rounding.ts created · index.ts deleted
 directory: packages/money
 depth: 2
+# answered in under 1s
 ```
 
 **Response**
@@ -340,6 +300,7 @@ tool: References
 workspace: fixtures/ledger
 file: packages/money/src/money.ts
 position: {"line":12,"character":13}
+# answered in under 1s
 ```
 
 **Response**
@@ -389,6 +350,7 @@ teardown; a zero here comes with the same scan count, so it means something.
 tool: Occurrences
 workspace: fixtures/ledger
 text: signedAmount
+# answered in under 1s
 ```
 
 **Response**
@@ -427,6 +389,7 @@ says so and stops rather than expanding relationships around the wrong symbol.
 tool: Investigate code
 workspace: fixtures/ledger
 question: where is the retry backoff for failed network requests configured
+# answered in under 1s
 ```
 
 **Response**
@@ -487,6 +450,7 @@ tool: Impact
 workspace: fixtures/ledger
 file: packages/accounts/src/posting.ts
 position: {"line":25,"character":14}
+# answered in under 1s
 ```
 
 **Response**
