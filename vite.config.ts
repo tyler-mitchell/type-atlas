@@ -31,10 +31,19 @@ export default defineConfig({
         cache: false,
         dependsOn: ["check"],
       },
+      // Refuses to publish onto a registry that is already inconsistent. A
+      // release once put three packages on npm depending on a fourth that had
+      // never been published, and nothing between the changesets and the
+      // publish looked at the registry at all.
+      "release:consistency": {
+        command: "node scripts/cli.ts status --strict",
+        cache: false,
+        dependsOn: ["check:distribution"],
+      },
       "release:preflight": {
         command: "changeset status",
         cache: false,
-        dependsOn: ["check:distribution"],
+        dependsOn: ["release:consistency"],
       },
       release: { command: "changeset publish", cache: false, dependsOn: ["release:preflight"] },
     },

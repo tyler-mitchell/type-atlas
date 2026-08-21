@@ -105,7 +105,13 @@ export default defineCommand({
     name: "status",
     description: "Where the release stands: working tree vs npm vs the MCP Registry.",
   },
-  run: async () => {
+  args: {
+    strict: {
+      type: "boolean",
+      description: "Exit non-zero when the published suite is already inconsistent.",
+    },
+  },
+  run: async ({ args }) => {
     const [working, pending, published, registry] = await Promise.all([
       workingVersions(),
       pendingChangesets(),
@@ -117,18 +123,21 @@ export default defineCommand({
     const npmVersion = unique(published.map(({ version }) => version));
     const suiteVersion = npmVersion.length === 1 ? npmVersion[0] : undefined;
 
-    const state =
+    // Broken means the registry is already inconsistent — publishing more on
+    // top of it deepens the hole. Awaiting release and awaiting publish are
+    // the healthy shapes a release passes through on its way out.
+    const [state, broken] =
       workingVersion.length !== 1
-        ? "working versions disagree across the suite"
+        ? ["working versions disagree across the suite", true]
         : npmVersion.length !== 1
-          ? "partial publication — npm versions disagree across the suite"
+          ? ["partial publication — npm versions disagree across the suite", true]
           : registry !== suiteVersion
-            ? "interrupted release — the MCP Registry is behind npm"
+            ? ["interrupted release — the MCP Registry is behind npm", true]
             : pending.count
-              ? `${pending.count} changeset${pending.count === 1 ? "" : "s"} awaiting release`
+              ? [`${pending.count} changeset${pending.count === 1 ? "" : "s"} awaiting release`, false]
               : workingVersion[0] !== suiteVersion
-                ? `versioned at ${workingVersion[0]}, awaiting publish`
-                : "released and consistent";
+                ? [`versioned at ${workingVersion[0]}, awaiting publish`, false]
+                : ["released and consistent", false];
 
     console.log(
       [
@@ -144,5 +153,6 @@ export default defineCommand({
         `State: ${state}`,
       ].join("\n"),
     );
+    if (args.strict && broken) process.exitCode = 1;
   },
 });
