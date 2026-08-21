@@ -648,6 +648,17 @@ describe("compose", () => {
   );
 });
 
+// ── search_code: find by meaning, anchored to real symbols ─────────────────
+describe("search_code", () => {
+  // Asked the way a person asks, not the way the code spells it.
+  scenarioTest("behavior-with-no-matching-words", ({ capture }) =>
+    capture("search_code", {
+      query: "walking an account up through each of its ancestor accounts",
+      snippetLines: 6,
+    }),
+  );
+});
+
 // ── investigate_code: ranked retrieval with verified relationships ──────────
 describe("investigate_code", () => {
   // A behavioral question the fixture genuinely answers: retrieval should

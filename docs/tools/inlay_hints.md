@@ -14,7 +14,7 @@ workspace: fixtures/ledger
 file: packages/reports/src/balance.ts
 range: {"start":{"line":28,"character":1},"end":{"line":37,"character":1}}
 
-# answered in 13ms
+# answered in 11ms
 ```
 
 **Response**

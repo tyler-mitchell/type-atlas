@@ -14,7 +14,7 @@ workspace: fixtures/ledger
 file: packages/reports/src/balance.ts
 query: Balance
 
-# answered in 764ms
+# answered in 732ms
 ```
 
 **Response**
@@ -39,7 +39,7 @@ workspace: fixtures/ledger
 file: packages/accounts/src/account.ts
 query: store
 
-# answered in 54ms
+# answered in 53ms
 ```
 
 **Response**
@@ -61,7 +61,7 @@ workspace: fixtures/ledger
 file: packages/importers/src/statement-parser.ts
 query: Parser
 
-# answered in 98ms
+# answered in 100ms
 ```
 
 **Response**

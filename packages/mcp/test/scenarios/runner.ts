@@ -83,8 +83,8 @@ export type CapturedScenario = {
   readonly tool: string;
   readonly arguments: Record<string, unknown>;
   readonly arrange?: Arrange;
-  /** What the server measured for the call that produced this capture. */
-  readonly elapsed?: string;
+  /** What the call took when this capture was recorded. */
+  readonly elapsed: string;
 };
 
 /**
@@ -103,12 +103,7 @@ export const capturedScenarios = async (): Promise<readonly CapturedScenario[]> 
       .map(async (id) => {
         const record = JSON.parse(
           await readFile(resolve(responsesRoot, `${id}.call.json`), "utf8"),
-        ) as {
-          tool: string;
-          arguments: Record<string, unknown>;
-          arrange?: Arrange;
-          elapsed?: string;
-        };
+        ) as Omit<CapturedScenario, "id" | "name">;
         return { id, name: id.slice(id.indexOf("/") + 1), ...record };
       }),
   );
@@ -222,6 +217,12 @@ export const arrangeFixture = async ({
   };
 };
 
+/** What the caller waited, rounded the way the server's own trailer reads. */
+const elapsedSince = (started: number): string => {
+  const ms = performance.now() - started;
+  return ms < 1000 ? `${Math.round(ms)}ms` : `${(ms / 1000).toFixed(2)}s`;
+};
+
 /**
  * Latency is real but not behavior: the trailing `· 12ms` line — and the
  * ` · 12ms` an ambient summary hangs on its last sentence — change every run,
@@ -230,18 +231,6 @@ export const arrangeFixture = async ({
  * language-server requests totalling 1.79s · slowest …`), and a pattern
  * anchored to the short form let exactly those runs poison comparisons.
  */
-/**
- * What the server measured for this call, from the trailer it prints, read
- * before normalization strips it. The exact figure: it differs run to run, so
- * a capture run rewrites it, and the documentation says what the call really
- * cost rather than a band that fits every call.
- */
-/** What the caller waited, rounded the way the server's own trailer reads. */
-const elapsedSince = (started: number): string => {
-  const ms = performance.now() - started;
-  return ms < 1000 ? `${Math.round(ms)}ms` : `${(ms / 1000).toFixed(2)}s`;
-};
-
 export const normalizeResponse = (text: string): string =>
   text
     .replace(/\n\n· \d+(?:\.\d+)?m?s[^\n]*\s*$/u, "")

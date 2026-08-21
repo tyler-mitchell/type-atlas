@@ -13,7 +13,7 @@ tool: Document links
 workspace: fixtures/ledger
 file: ledger.config.json
 
-# answered in 19ms
+# answered in 17ms
 ```
 
 **Response**
@@ -31,7 +31,7 @@ tool: Document links
 workspace: fixtures/ledger
 file: README.md
 
-# answered in 17ms
+# answered in 18ms
 ```
 
 **Response**

@@ -3,5 +3,5 @@
   "arguments": {
     "document": "{% ask \"subject\" as=\"what\" file=\"packages/accounts/src/posting.ts\" line=25 character=14 /%}\n{% ask \"references\" as=\"uses\" file=\"packages/accounts/src/posting.ts\" line=25 character=14 /%}\n{% ask \"diagnostics\" as=\"health\" file=\"packages/accounts/src/posting.ts\" /%}\n\n## {% $what.name %} · {% $what.file %}:{% $what.at %}\n\n{% $uses.total %} uses across {% $uses.files %} files · {% $health.total %} problems in the declaring file\n\n{% tree entries=$uses.groups partial=\"reference-node.mdoc\" /%}"
   },
-  "elapsed": "51ms"
+  "elapsed": "46ms"
 }

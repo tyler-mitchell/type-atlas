@@ -14,7 +14,7 @@ workspace: fixtures/ledger
 file: packages/money/src/money.ts
 position: {"line":12,"character":13}
 
-# answered in 93ms
+# answered in 84ms
 ```
 
 **Response**
@@ -62,7 +62,7 @@ workspace: fixtures/ledger
 file: packages/accounts/src/account.ts
 position: {"line":18,"character":14}
 
-# answered in 79ms
+# answered in 50ms
 ```
 
 **Response**
@@ -88,7 +88,7 @@ workspace: fixtures/ledger
 file: packages/money/src/rounding-mode.ts
 position: {"line":4,"character":3}
 
-# answered in 78ms
+# answered in 77ms
 ```
 
 **Response**

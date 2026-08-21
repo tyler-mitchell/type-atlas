@@ -12,7 +12,7 @@ Show a bounded workspace-relative project structure. `view: "files"` (the defaul
 tool: List files
 workspace: fixtures/ledger
 
-# answered in 95ms
+# answered in 99ms
 ```
 
 **Response**
@@ -40,7 +40,7 @@ tool: List files
 workspace: fixtures/ledger
 expand: {"packages/*":2}
 
-# answered in 68ms
+# answered in 63ms
 ```
 
 **Response**
@@ -132,7 +132,7 @@ tool: List files
 workspace: fixtures/ledger
 expand: {"packages/accounts":1,"packages/reports":{"depth":2,"glob":["**/*.ts"]}}
 
-# answered in 62ms
+# answered in 88ms
 ```
 
 **Response**
@@ -171,7 +171,7 @@ workspace: fixtures/ledger
 directory: packages/accounts
 loc: false
 
-# answered in 50ms
+# answered in 79ms
 ```
 
 **Response**
@@ -193,7 +193,7 @@ tool: List files
 workspace: fixtures/ledger
 glob: ["**/*.test.ts"]
 
-# answered in 49ms
+# answered in 47ms
 ```
 
 **Response**
@@ -223,7 +223,7 @@ workspace: fixtures/ledger
 directory: packages/money
 depth: 2
 
-# answered in 51ms
+# answered in 57ms
 ```
 
 **Response**
@@ -254,7 +254,7 @@ workspace: fixtures/ledger
 directory: packages/importers
 depth: 2
 
-# answered in 45ms
+# answered in 43ms
 ```
 
 **Response**
@@ -287,7 +287,7 @@ workspace: fixtures/ledger
 directory: packages/money
 depth: 2
 
-# answered in 45ms
+# answered in 40ms
 ```
 
 **Response**
@@ -315,7 +315,7 @@ tool: List files
 workspace: fixtures/ledger
 expand: {"packages/*":{"depth":2,"limit":6}}
 
-# answered in 57ms
+# answered in 47ms
 ```
 
 **Response**
@@ -400,7 +400,7 @@ workspace: fixtures/ledger
 glob: ["**/*.ts"]
 limit: 12
 
-# answered in 42ms
+# answered in 45ms
 ```
 
 **Response**
@@ -448,7 +448,7 @@ workspace: fixtures/ledger
 # working tree arranged: currency.ts edited · qif.ts created · index.ts deleted
 changed: true
 
-# answered in 37ms
+# answered in 36ms
 ```
 
 **Response**
@@ -475,7 +475,7 @@ workspace: fixtures/ledger
 directory: packages/accounts
 changed: true
 
-# answered in 41ms
+# answered in 35ms
 ```
 
 **Response**

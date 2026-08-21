@@ -68,7 +68,7 @@ workspace: fixtures/ledger
 file: packages/money/src/currency.ts
 position: {"line":12,"character":14}
 
-# answered in 16ms
+# answered in 17ms
 ```
 
 **Response**
@@ -91,7 +91,7 @@ workspace: fixtures/ledger
 file: packages/money/src/money.ts
 position: {"line":38,"character":14}
 
-# answered in 5ms
+# answered in 6ms
 ```
 
 **Response**

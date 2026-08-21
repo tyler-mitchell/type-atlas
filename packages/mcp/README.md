@@ -58,50 +58,45 @@ section, and the rest is unaffected.
 
 ## Tool call results
 
-An outline arrives with the file's diagnostics attached. Editors put errors in
-the gutter so a human cannot miss them. An agent only sees what it asked for,
-and an agent that just edited code usually does not think to ask.
+Paths are workspace-relative, coordinates are one-based, so a location in one
+answer is valid input to the next call. Editing tools return patches; nothing
+is written for you.
+
+Structure, line counts, and `git status` in one tree, using the badge letters
+editors already use. Deleted files get a row even though they exist only in
+git's answer. Folded directories say what they hold rather than disappearing.
 
 **Agent's Input**
 
 ```yaml
-tool: Document symbols
+tool: List files
 workspace: fixtures/ledger
-file: packages/reconcile/src/drift.ts
+# working tree arranged: currency.ts edited · rounding.ts created · index.ts deleted
+directory: packages/money
+depth: 2
 
-# answered in 34ms
+# answered in 57ms
 ```
 
 **Response**
 
 ~~~text
-=== packages/reconcile/src/drift.ts · 3 top-level symbols ===
-
-drift [variable] 19:14-19:19 · range 19:14-22:2
-StatementLine [interface] 8:18-8:31 · range 8:1-12:2
-statementTotal [variable] 15:14-15:28 · range 15:14-16:56
-
-4 problems in packages/reconcile/src/drift.ts
+packages/money/
+├  src/ · 3 changed
+│  ├  currency.ts · 21 loc · M +2
+│  ├  index.ts · D -12
+│  ├  money.ts · 58 loc
+│  ├  rounding-mode.ts · 15 loc
+│  └  rounding.ts · 11 loc · U
+├  tests/
+│  ├  money.test.ts · 15 loc
+│  └  rounding-parity.ts · 15 loc
+├  package.json · 19 loc
+└  tsconfig.json · 20 loc
 ~~~
 
 That is captured from the running server by the suite that regression-checks
 it. The [repository README](https://github.com/tyler-mitchell/type-atlas#tool-call-results)
-does the same for the other tools, with the token and latency numbers.
-
-## Tools
-
-| Question                         | Tools                                                                                                                                                                              |
-| :------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Understand a symbol, in one call | `inspect_symbol` · `explore_symbol`                                                                                                                                                |
-| Navigate a relationship in full  | `definitions` · `type_definitions` · `implementations` · `callers` · `callees` · `references` · `file_references` · `document_highlights` · `document_symbols` · `workspace_symbols` |
-| Read economically                | `read_file` · `list_files`                                                                                                                                                         |
-| Stay correct while editing       | `diagnostics` · `code_actions` · `organize_imports` · `add_missing_imports` · `remove_unused_code` · `fix_all` · `format_document` · `rename_symbol` · `rename_files`              |
-| Understand a dependency          | `list_module_exports` · `search_dependency_code`                                                                                                                                   |
-| Find code by meaning             | `search_code` · `related_code` · `investigate_code`                                                                                                                                |
-| Prove exact text                 | `occurrences`                                                                                                                                                                      |
-
-Paths are workspace-relative, coordinates are one-based, so a location in one
-answer is valid input to the next call. Editing tools return patches; nothing
-is written for you.
+does the same for the other tools.
 
 Apache-2.0 · [github.com/tyler-mitchell/type-atlas](https://github.com/tyler-mitchell/type-atlas)

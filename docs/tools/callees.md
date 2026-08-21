@@ -14,7 +14,7 @@ workspace: fixtures/ledger
 file: packages/reports/src/balance.ts
 position: {"line":23,"character":14}
 
-# answered in 21ms
+# answered in 22ms
 ```
 
 **Response**
@@ -43,7 +43,7 @@ workspace: fixtures/ledger
 file: packages/accounts/src/journal.ts
 position: {"line":28,"character":3}
 
-# answered in 6ms
+# answered in 5ms
 ```
 
 **Response**

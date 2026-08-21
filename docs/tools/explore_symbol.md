@@ -14,7 +14,7 @@ workspace: fixtures/ledger
 file: packages/reports/src/balance.ts
 symbol: balancesAsOf
 
-# answered in 44ms
+# answered in 49ms
 ```
 
 **Response**

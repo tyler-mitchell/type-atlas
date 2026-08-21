@@ -88,12 +88,7 @@ const arrangeNote = (arrange: CapturedScenario["arrange"]): string | undefined =
  * record of what actually ran. `workspace` leads every call the way an
  * agent sends it; the fixture is that workspace, named by repository path.
  */
-const invocationBlock = async ({
-  tool,
-  arguments: argument,
-  arrange,
-  elapsed,
-}: Pick<CapturedScenario, "tool" | "arguments" | "arrange" | "elapsed">) => {
+const invocationBlock = async ({ tool, arguments: argument, arrange, elapsed }: CapturedScenario) => {
   const title = (await catalog()).find(({ name }) => name === tool)?.title ?? tool;
   const note = arrangeNote(arrange);
   const lines = [
@@ -103,9 +98,9 @@ const invocationBlock = async ({
     ...Object.entries(argument).map(
       ([key, value]) => `${key}: ${typeof value === "string" ? value : JSON.stringify(value)}`,
     ),
-    // Last and set apart, because what the call cost is a fact about the
-    // answer rather than an argument.
-    ...(elapsed === undefined ? [] : ["", `# answered in ${elapsed}`]),
+    // set apart: cost is a fact about the answer, not an argument
+    "",
+    `# answered in ${elapsed}`,
   ];
   return `\`\`\`yaml\n${lines.join("\n")}\n\`\`\``;
 };
@@ -127,10 +122,7 @@ const responseBlock = (captured: string): string => {
 };
 
 // One case, labelled: what the agent sent, then what came back.
-const casePair = async (
-  scenario: Pick<CapturedScenario, "tool" | "arguments" | "arrange" | "elapsed">,
-  captured: string,
-): Promise<string> =>
+const casePair = async (scenario: CapturedScenario, captured: string): Promise<string> =>
   [
     "**Agent's Input**",
     await invocationBlock(scenario),
@@ -218,7 +210,7 @@ export const renderToolIndex = async (): Promise<string> => {
   return [
     noticeFor("the scenario captures"),
     "# Tool documentation",
-    "One page per tool, generated from the scenario suite's captured responses — every case is a real invocation against [`fixtures/ledger`](../../fixtures/ledger/), regression-checked. See [how the examples stay honest](../../README.md#how-the-examples-stay-honest).",
+    "One page per tool, generated from the scenario suite's captured responses — every case is a real invocation against [`fixtures/ledger`](../../fixtures/ledger/), regression-checked. See [the README](../../README.md#tool-call-results).",
     "| Tool | | Cases |",
     "| :--- | :--- | ---: |",
     ...rows,

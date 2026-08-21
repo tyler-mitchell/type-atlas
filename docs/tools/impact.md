@@ -14,7 +14,7 @@ workspace: fixtures/ledger
 file: packages/accounts/src/posting.ts
 position: {"line":25,"character":14}
 
-# answered in 87ms
+# answered in 84ms
 ```
 
 **Response**
@@ -39,7 +39,7 @@ workspace: fixtures/ledger
 file: packages/money/src/money.ts
 position: {"line":12,"character":13}
 
-# answered in 33ms
+# answered in 34ms
 ```
 
 **Response**

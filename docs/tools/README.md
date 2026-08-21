@@ -2,7 +2,7 @@
 
 # Tool documentation
 
-One page per tool, generated from the scenario suite's captured responses — every case is a real invocation against [`fixtures/ledger`](../../fixtures/ledger/), regression-checked. See [how the examples stay honest](../../README.md#how-the-examples-stay-honest).
+One page per tool, generated from the scenario suite's captured responses — every case is a real invocation against [`fixtures/ledger`](../../fixtures/ledger/), regression-checked. See [the README](../../README.md#tool-call-results).
 
 | Tool | | Cases |
 
@@ -69,6 +69,8 @@ One page per tool, generated from the scenario suite's captured responses — ev
 | [`rename_files`](rename_files.md) | Rename files | 1 |
 
 | [`rename_symbol`](rename_symbol.md) | Rename symbol | 2 |
+
+| [`search_code`](search_code.md) | Search code | 1 |
 
 | [`selection_ranges`](selection_ranges.md) | Selection ranges | 1 |
 

@@ -13,7 +13,7 @@ tool: Document symbols
 workspace: fixtures/ledger
 file: packages/accounts/src/journal.ts
 
-# answered in 46ms
+# answered in 45ms
 ```
 
 **Response**
@@ -35,7 +35,7 @@ tool: Document symbols
 workspace: fixtures/ledger
 file: packages/reconcile/src/drift.ts
 
-# answered in 34ms
+# answered in 33ms
 ```
 
 **Response**
@@ -59,7 +59,7 @@ tool: Document symbols
 workspace: fixtures/ledger
 file: packages/importers/src/csv.ts
 
-# answered in 34ms
+# answered in 35ms
 ```
 
 **Response**
@@ -84,7 +84,7 @@ tool: Document symbols
 workspace: fixtures/ledger
 file: packages/rules/src/rule.ts
 
-# answered in 30ms
+# answered in 29ms
 ```
 
 **Response**
@@ -113,7 +113,7 @@ workspace: fixtures/ledger
 file: packages/importers/src/bank-profiles.ts
 depth: 3
 
-# answered in 20ms
+# answered in 18ms
 ```
 
 **Response**

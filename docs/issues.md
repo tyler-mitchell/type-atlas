@@ -751,6 +751,26 @@ and `search_code` never adopted the judgment. The missing structure line on
 such a match is the tell: a snippet anchored to no declaration is usually a
 module's plumbing, not its behavior. Observed 2026-08-19, kek-monorepo.
 
+### Retrieval labels a hit with a symbol the snippet does not contain
+
+```
+search_code { query: "walking an account up through each of its ancestor accounts" }
+→ === 1 · packages/accounts/src/account.ts:21-35 · relevance 100% ===
+  Structure: AccountStore
+  Symbol: AccountStore [interface] · selection 31:18-31:30 · range 31:1-35:2
+  21 | export const parentPath = (path: AccountPath): AccountPath | undefined => {
+```
+
+The chunk is right and ranks first, but the anchor names `AccountStore` — a
+declaration that starts at line 31, below everything the snippet shows. The
+same answer's third hit labels `Journal [class] · range 24:1-73:2` for a
+snippet of its `history` method at 59-73. The anchor resolves to a declaration
+overlapping the chunk rather than the one the chunk's leading code belongs to,
+so an agent reading `Symbol:` gets a name it cannot find in the lines beside
+it, and the position it would carry into the next call points at the wrong
+declaration. Both are visible in `search_code/behavior-with-no-matching-words`,
+the case the README embeds. Observed 2026-08-21, fixtures/ledger.
+
 ### `investigate_code` titles its sections `###`
 
 Every other tool uses `##`. Caught by the document lint's heading rule only

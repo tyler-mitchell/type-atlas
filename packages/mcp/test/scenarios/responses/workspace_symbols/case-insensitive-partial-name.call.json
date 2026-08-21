@@ -4,5 +4,5 @@
     "file": "packages/accounts/src/account.ts",
     "query": "store"
   },
-  "elapsed": "54ms"
+  "elapsed": "53ms"
 }

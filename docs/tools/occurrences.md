@@ -13,7 +13,7 @@ tool: Occurrences
 workspace: fixtures/ledger
 text: signedAmount
 
-# answered in 14ms
+# answered in 12ms
 ```
 
 **Response**
@@ -49,7 +49,7 @@ tool: Occurrences
 workspace: fixtures/ledger
 text: quantumFlux
 
-# answered in 12ms
+# answered in 11ms
 ```
 
 **Response**

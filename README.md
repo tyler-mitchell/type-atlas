@@ -89,31 +89,54 @@ codex mcp add type-atlas -- npx --yes @type-atlas/mcp@latest --require-intent
 This is for agents that navigate far past what their change needs and cannot
 say why afterwards. Off by default.
 
-## Tools
-
-| Question                         | Tools                                                                                                                                                                              |
-| :------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Understand a symbol, in one call | `inspect_symbol` · `explore_symbol`                                                                                                                                                |
-| Navigate a relationship in full  | `definitions` · `type_definitions` · `implementations` · `callers` · `callees` · `references` · `file_references` · `document_highlights` · `document_symbols` · `workspace_symbols` |
-| Read economically                | `read_file` · `list_files`                                                                                                                                                         |
-| Stay correct while editing       | `diagnostics` · `code_actions` · `organize_imports` · `add_missing_imports` · `remove_unused_code` · `fix_all` · `format_document` · `rename_symbol` · `rename_files`              |
-| Understand a dependency          | `list_module_exports` · `search_dependency_code`                                                                                                                                   |
-| Find code by meaning             | `search_code` · `related_code` · `investigate_code`                                                                                                                                |
-| Prove exact text                 | `occurrences`                                                                                                                                                                      |
+## Tool call results
 
 Paths are workspace-relative, coordinates are one-based, so a location in one
 answer is valid input to the next call. Editing tools return patches; nothing
-is written for you. Per-tool pages with more cases are in
-[docs/tools](docs/tools/).
-
-## Tool call results
+is written for you.
 
 Everything below is captured from the running server against
 [`fixtures/ledger`](fixtures/ledger/) by the
 [scenario suite](packages/mcp/test/scenarios/), which replays the same calls
 and fails on drift. Nothing here is hand-written, and changing what a tool
 answers changes this file in the same commit. The source is
-[`README.mdoc`](README.mdoc).
+[`README.mdoc`](README.mdoc). Every tool has a page with more cases in
+[docs/tools](docs/tools/).
+
+### `list_files`
+
+Structure, line counts, and `git status` in one tree, using the badge letters
+editors already use. Deleted files get a row even though they exist only in
+git's answer. Folded directories say what they hold rather than disappearing.
+
+**Agent's Input**
+
+```yaml
+tool: List files
+workspace: fixtures/ledger
+# working tree arranged: currency.ts edited · rounding.ts created · index.ts deleted
+directory: packages/money
+depth: 2
+
+# answered in 57ms
+```
+
+**Response**
+
+~~~text
+packages/money/
+├  src/ · 3 changed
+│  ├  currency.ts · 21 loc · M +2
+│  ├  index.ts · D -12
+│  ├  money.ts · 58 loc
+│  ├  rounding-mode.ts · 15 loc
+│  └  rounding.ts · 11 loc · U
+├  tests/
+│  ├  money.test.ts · 15 loc
+│  └  rounding-parity.ts · 15 loc
+├  package.json · 19 loc
+└  tsconfig.json · 20 loc
+~~~
 
 ### `inspect_symbol`
 
@@ -130,7 +153,7 @@ workspace: fixtures/ledger
 file: packages/accounts/src/journal.ts
 symbol: Journal
 
-# answered in 47ms
+# answered in 49ms
 ```
 
 **Response**
@@ -164,34 +187,6 @@ packages/reports/src/balance.ts:4:8-4:15:  type Journal,
 packages/importers/src/csv.ts:1:10-1:17:  import { Journal, type Entry, credit, debit, type AccountPath } from "@ledger/accounts";
 
 references lists all 9, with paging.
-~~~
-
-### `document_symbols`
-
-An outline arrives with the file's diagnostics attached. Editors put errors in
-the gutter so a human cannot miss them. An agent only sees what it asked for,
-and an agent that just edited code usually does not think to ask.
-
-**Agent's Input**
-
-```yaml
-tool: Document symbols
-workspace: fixtures/ledger
-file: packages/reconcile/src/drift.ts
-
-# answered in 34ms
-```
-
-**Response**
-
-~~~text
-=== packages/reconcile/src/drift.ts · 3 top-level symbols ===
-
-drift [variable] 19:14-19:19 · range 19:14-22:2
-StatementLine [interface] 8:18-8:31 · range 8:1-12:2
-statementTotal [variable] 15:14-15:28 · range 15:14-16:56
-
-4 problems in packages/reconcile/src/drift.ts
 ~~~
 
 ### `read_file`
@@ -264,93 +259,6 @@ file: ["packages/accounts/src/posting.ts","packages/money/src/rounding-mode.ts"]
 15 |   bankRounding[bank] ?? RoundingMode.HalfEven;
 ~~~
 
-### `list_files`
-
-Structure, line counts, and `git status` in one tree, using the badge letters
-editors already use. Deleted files get a row even though they exist only in
-git's answer. Folded directories say what they hold rather than disappearing.
-
-**Agent's Input**
-
-```yaml
-tool: List files
-workspace: fixtures/ledger
-# working tree arranged: currency.ts edited · rounding.ts created · index.ts deleted
-directory: packages/money
-depth: 2
-
-# answered in 51ms
-```
-
-**Response**
-
-~~~text
-packages/money/
-├  src/ · 3 changed
-│  ├  currency.ts · 21 loc · M +2
-│  ├  index.ts · D -12
-│  ├  money.ts · 58 loc
-│  ├  rounding-mode.ts · 15 loc
-│  └  rounding.ts · 11 loc · U
-├  tests/
-│  ├  money.test.ts · 15 loc
-│  └  rounding-parity.ts · 15 loc
-├  package.json · 19 loc
-└  tsconfig.json · 20 loc
-~~~
-
-### `references`
-
-Answers from every project loaded in the session, and names how many that was.
-A bare count reads as complete when it is not, so the line carries the
-denominator and an agent can decide whether to widen.
-
-**Agent's Input**
-
-```yaml
-tool: References
-workspace: fixtures/ledger
-file: packages/money/src/money.ts
-position: {"line":12,"character":13}
-
-# answered in 93ms
-```
-
-**Response**
-
-~~~text
-Money [type] · packages/money/src/money.ts:12:13
-37 references · all 9 projects searched · packages/money/tsconfig.json
-
-1-20 of 37 references · pass offset: 20 for the rest
-
-packages/accounts/src/journal.ts
-├  1:28  — at module level
-├  14:35 — inside constructor
-├  31:61 — inside post
-└  36:62 — inside post
-packages/accounts/src/posting.ts
-└  25:49 — inside signedAmount
-packages/money/src/index.ts
-└  7:8 — at module level
-packages/money/src/money.ts
-├  27:73 — inside money
-├  28:53 — inside money
-├  30:43 — inside zero
-├  38:27 — inside add
-├  38:41 — inside add
-├  38:49 — inside add
-├  45:31 — inside negate
-├  45:39 — inside negate
-├  47:31 — inside isZero
-└  50:31 — inside format
-packages/money/tests/rounding-parity.ts
-├  1:15  — at module level
-├  9:44  — inside assertRoundingParity
-├  9:58  — inside assertRoundingParity
-└  15:38 — inside paritySamples
-~~~
-
 ### `occurrences`
 
 Literal text, grouped by file, with the number of files scanned. The semantic
@@ -364,7 +272,7 @@ tool: Occurrences
 workspace: fixtures/ledger
 text: signedAmount
 
-# answered in 14ms
+# answered in 12ms
 ```
 
 **Response**
@@ -391,42 +299,31 @@ packages/rules/src/builtin.ts
 └  26:12 · .map(signedAmount)
 ~~~
 
-### `investigate_code`
+### `search_code`
 
-Retrieval always returns its nearest neighbours and its top hit always shows as
-100%. When nothing retrieved declares anything the question named, the answer
-says so and stops rather than expanding relationships around the wrong symbol.
+Finds code by what it does, for when you cannot guess what it is called. Hits
+are ranked against the strongest one rather than scored absolutely, and each
+carries the file range it came from, so the next call has somewhere to go.
 
 **Agent's Input**
 
 ```yaml
-tool: Investigate code
+tool: Search code
 workspace: fixtures/ledger
-question: where is the retry backoff for failed network requests configured
+query: walking an account up through each of its ancestor accounts
+snippetLines: 6
 
-# answered in 21ms
+# answered in 20ms
 ```
 
 **Response**
 
 ~~~text
-Search: where is the retry backoff for failed network requests configured
+Search: walking an account up through each of its ancestor accounts
 
-3 matches · relevance is relative to the strongest match · no identifier to anchor on, so these are ranked by meaning alone
+5 matches · relevance is relative to the strongest match · no identifier to anchor on, so these are ranked by meaning alone
 
-=== 1 · packages/importers/src/config.ts:1-7 · relevance 100% ===
-
-Structure: defaultCurrencyCode
-Symbol: defaultCurrencyCode [variable] · selection 7:14-7:33 · range 7:14-7:72
-
-1 | import ledgerConfig from "../../../ledger.config.json" with { type: "json" };
-2 |
-3 | /** The account unmatched statement lines land in until a bookkeeper files them. */
-4 | export const suspenseAccount: string = ledgerConfig.suspenseAccount;
-5 |
-6 | /** The currency a bank export is assumed to use when it does not say. */
-
-=== 2 · packages/accounts/src/account.ts:21-35 · relevance 92% ===
+=== 1 · packages/accounts/src/account.ts:21-35 · relevance 100% ===
 
 Structure: AccountStore
 Symbol: AccountStore [interface] · selection 31:18-31:30 · range 31:1-35:2
@@ -438,86 +335,191 @@ Symbol: AccountStore [interface] · selection 31:18-31:30 · range 31:1-35:2
 25 |
 26 | /** Every ancestor from root to the account itself: `a`, `a:b`, `a:b:c`. */
 
-=== 3 · packages/importers/vite.config.ts:1-9 · relevance 92% ===
+=== 2 · packages/reports/src/balance.ts:1-23 · relevance 77% ===
 
-Structure: default
-Symbol: default [variable] · selection 4:1-9:3
+Structure: BalanceLine
+Symbol: BalanceLine [interface] · selection 11:18-11:29 · range 11:1-16:2
 
-1 | // Importers ship to the bookkeeping portal as a browser bundle; the library
-2 | // packages stay unbundled. Output lands in the default `dist` beside this
-3 | // config, which the repository commits so the portal deploy needs no build.
-4 | export default {
-5 |   build: {
-6 |     outDir: "dist",
+1 | import {
+2 |   type AccountPath,
+3 |   type Entry,
+4 |   type Journal,
+5 |   lineage,
+6 |   signedAmount,
 
-None of these declares anything the question names, so no relationship expansion follows — the matches above are retrieval's nearest neighbours, not an answer. If the concept should exist here, ask again naming an identifier from it; if you are proving absence, occurrences gives the literal zero.
+=== 3 · packages/accounts/src/journal.ts:59-73 · relevance 73% ===
+
+Structure: Journal
+Symbol: Journal [class] · selection 24:14-24:21 · range 24:1-73:2
+
+59 |   /** Entries touching an account, oldest first. */
+60 |   history(account: AccountPath): readonly Entry<TMeta>[] {
+61 |     return this.entries.filter((entry) =>
+62 |       entry.postings.some((posting) => posting.account === account),
+63 |     );
+64 |   }
+
+=== 4 · packages/reports/src/statement.ts:1-11 · relevance 66% ===
+
+Structure: statementLine
+Symbol: statementLine [variable] · selection 8:14-8:27 · range 8:14-11:2
+
+1 | import { type Account, normalBalance } from "@ledger/accounts";
+2 | import { format, type Money, negate } from "@ledger/money";
+3 |
+4 | /**
+5 |  * One rendered statement line. The sign follows the account's normal side:
+6 |  * a liability holding a credit balance reads as positive on its statement.
+
+=== 5 · packages/accounts/src/posting.ts:1-24 · relevance 66% ===
+
+Structure: credit
+Symbol: credit [variable] · selection 18:14-18:20 · range 18:14-22:3
+
+1 | import { type Money, negate } from "@ledger/money";
+2 | import type { AccountPath } from "./account.ts";
+3 |
+4 | /**
+5 |  * One side of a journal entry. The discriminant is the bookkeeping side, so
+6 |  * every consumer's switch is checked for exhaustiveness by the compiler.
 ~~~
 
-### `impact`
+### `diagnostics`
 
-What a change would touch, by package, with the test share separated and the
-unconfirmed part named.
+The compiler's own whole-program check, per project, not a per-file pass. An
+edit in one file usually breaks a different one, and this is the call that
+finds that file.
 
 **Agent's Input**
 
 ```yaml
-tool: Impact
+tool: Diagnostics
 workspace: fixtures/ledger
-file: packages/accounts/src/posting.ts
-position: {"line":25,"character":14}
+file: packages/reconcile/src/drift.ts
 
-# answered in 87ms
+# answered in 23ms
 ```
 
 **Response**
 
 ~~~text
-Changing signedAmount touches 10 uses in 6 files across 4 packages, in the projects loaded this session. No use sits in a test file.
+packages/reconcile/src/drift.ts · 4 problems · packages/reconcile/tsconfig.json
 
-package             uses  files  tests
-packages/accounts      4      3
-packages/reports       2      1
-packages/reconcile     2      1
-packages/rules         2      1
+=== packages/reconcile/src/drift.ts ===
+
+error ts(2365) 16:33-16:52 — inside lines.reduce() callback
+  Operator '+' cannot be applied to types 'number' and 'Money'.
+   14 | /** Statement total, computed by someone who forgot Money is not a number.…
+   15 | export const statementTotal = (lines: readonly StatementLine[]): number =>
+   16 |   lines.reduce((total, line) => total + line.amount, 0);
+      |                                 ^^^^^^^^^^^^^^^^^^^
+   17 |
+   18 | /** Drift between the journal's view and the bank's view of one day. */
+
+error ts(2365) 20:77-20:91 — inside reduce() callback
+  Operator '+' cannot be applied to types 'import("packages/money/src/money").Money' and 'import("packages/money/src/money").Money'.
+   18 | /** Drift between the journal's view and the bank's view of one day. */
+   19 | export const drift = (postings: readonly Posting[], statement: readonly St…
+   20 |   const journalTotal = postings.map(signedAmount).reduce((total, amount) =…
+      |                                                                             ^^^^^^^^^^^^^^
+   21 |   return format(money(journalTotal - statementTotal(statement), "usd"));
+   22 | };
+
+error ts(2345) 21:65-21:70 — inside drift
+  Argument of type '"usd"' is not assignable to parameter of type 'Currency'.
+   19 | export const drift = (postings: readonly Posting[], statement: readonly St…
+   20 |   const journalTotal = postings.map(signedAmount).reduce((total, amount) =…
+   21 |   return format(money(journalTotal - statementTotal(statement), "usd"));
+      |                                                                 ^^^^^
+   22 | };
+   23 |
+
+error ts(2362) 21:23-21:35 — inside drift
+  The left-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
+   19 | export const drift = (postings: readonly Posting[], statement: readonly St…
+   20 |   const journalTotal = postings.map(signedAmount).reduce((total, amount) =…
+   21 |   return format(money(journalTotal - statementTotal(statement), "usd"));
+      |                       ^^^^^^^^^^^^
+   22 | };
+   23 |
 ~~~
 
-## Cost
+### `workspace_symbols`
 
-`documentSymbol` for one 286-line file returns 139 nodes, 3 of them real
-declarations and the rest nested object properties and anonymous callbacks.
-As JSON that is 31,584 characters, 2.9x the source file. The same question here
-is 271 characters, from the same engine.
+Find a declaration by name across every project the session has loaded, when
+you know roughly what it is called and nothing about where it lives.
 
-On that monorepo a `references` call is about 150ms warm. The first call after
-the server starts pays for building that TypeScript program, which was 2.5s
-there, and says so in its own trailer: `· 2.53s · 5 language-server requests
-totalling 2.63s · slowest type-atlas/workspaceReferences 2.30s · first since
-the server started`.
-[Measurements](docs/tool-latency-measurements.md), and
-[the same on a large monorepo](docs/kek-monorepo-latency.md).
+**Agent's Input**
 
-The tool list is a standing cost in every session: about 15,400 tokens of
-schema, measured when there were 35 tools, and there are more now.
+```yaml
+tool: Workspace symbols
+workspace: fixtures/ledger
+file: packages/importers/src/statement-parser.ts
+query: Parser
 
-## Limits
+# answered in 100ms
+```
 
-References stop at the TypeScript project boundary. Projects the session has
-not loaded cannot contribute, which is why the answer states how many it
-searched and reading a file in another package widens the next one. No other
-code-intelligence MCP server examined resolves this either.
+**Response**
 
-Retrieval matches meaning, not text, and will not reliably find an exact
-string, error message, or comment. Use `occurrences` or your client's search.
+~~~text
+3 symbols matching Parser · 9 projects loaded · packages/importers/tsconfig.json
 
-This only does TypeScript, Markdown, and JSON.
-[Serena](https://github.com/oraios/serena) handles around 60 languages if you
-need that.
+CsvStatementParser [class] · packages/importers/src/statement-parser.ts:25:1-35:2
+FixedWidthStatementParser [class] · packages/importers/src/statement-parser.ts:41:1-64:2
+StatementParser [class] · packages/importers/src/statement-parser.ts:7:1-23:2
+~~~
 
-Claude Code's `typescript-lsp` plugin is the obvious thing to compare against,
-since it wraps the same engine. I ran both in one session against the same
-symbols and kept using this one. Those notes, and the same treatment for the
-other code-intelligence MCP servers, are in
-[the comparison](docs/code-intelligence-mcp-comparison.md).
+### `file_references`
+
+Who imports this module. The module-level question, answered without picking a
+symbol inside it first.
+
+**Agent's Input**
+
+```yaml
+tool: File references
+workspace: fixtures/ledger
+file: packages/money/src/money.ts
+
+# answered in 134ms
+```
+
+**Response**
+
+~~~text
+packages/money/src/money.ts · referenced from 90 places · 10 projects loaded · packages/money/tsconfig.json
+
+1-20 of 90 places · pass offset: 20 for the rest
+
+packages/accounts/src/journal.ts
+├  1:10  — at module level
+└  53:15 — inside post
+packages/money/src/index.ts
+├  3:3 — at module level
+└  4:3 — at module level
+packages/money/tests/money.test.ts
+├  2:10  — at module level
+├  2:15  — at module level
+├  5:10  — inside test("adds amounts of one currency exactly") callback
+├  9:16  — inside expect() callback
+├  9:67  — inside test("refuses to combine currencies") callback
+├  13:10 — inside test("formats major and minor units per currency") callback
+└  14:10 — inside test("formats major and minor units per currency") callback
+packages/reconcile/src/drift.ts
+├  5:10  — at module level
+└  21:10 — inside drift
+packages/reports/src/balance.ts
+├  8:10  — at module level
+├  34:9  — inside balancesAsOf
+└  41:28 — inside balancesAsOf
+packages/reports/src/statement.ts
+├  2:10  — at module level
+└  10:40 — inside statementLine
+packages/rules/src/builtin.ts
+├  2:10  — at module level
+└  28:58 — inside closedPeriodsBalance
+~~~
 
 ## Packages
 

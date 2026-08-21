@@ -13,7 +13,7 @@ tool: Remove unused code
 workspace: fixtures/ledger
 file: packages/importers/src/dedupe.ts
 
-# answered in 16ms
+# answered in 18ms
 ```
 
 **Response**

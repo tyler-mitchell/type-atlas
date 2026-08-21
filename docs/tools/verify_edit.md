@@ -13,7 +13,7 @@ tool: Verify edit
 workspace: fixtures/ledger
 files: [{"path":"packages/money/src/money.ts","content":"import { type Currency, currencyProfiles } from \"./currency.ts\";\n\ndeclare const brand: unique symbol;\n\nexport type Money = {\n  readonly minorUnits: bigint;\n  readonly currency: Currency;\n  readonly [brand]: \"Money\";\n};\n\nexport const money = (minorUnits: bigint, currency: Currency): Money =>\n  ({ minorUnits, currency }) as Money;\n\nexport const zero = (currency: Currency): Money => money(0n, currency);\n\nexport const profileOf = (currency: Currency) => currencyProfiles[currency];\n"}]
 
-# answered in 31ms
+# answered in 33ms
 ```
 
 **Response**

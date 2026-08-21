@@ -13,7 +13,7 @@ tool: Diagnostics
 workspace: fixtures/ledger
 file: packages/reconcile/src/drift.ts
 
-# answered in 22ms
+# answered in 23ms
 ```
 
 **Response**
@@ -69,7 +69,7 @@ tool: Diagnostics
 workspace: fixtures/ledger
 file: packages/money/src/money.ts
 
-# answered in 18ms
+# answered in 17ms
 ```
 
 **Response**
@@ -87,7 +87,7 @@ tool: Diagnostics
 workspace: fixtures/ledger
 file: packages/reconcile/src/matching.ts
 
-# answered in 20ms
+# answered in 18ms
 ```
 
 **Response**

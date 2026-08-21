@@ -13,7 +13,7 @@ tool: Investigate code
 workspace: fixtures/ledger
 question: how are account balances rolled up to ancestor accounts
 
-# answered in 32ms
+# answered in 33ms
 ```
 
 **Response**
@@ -87,7 +87,7 @@ tool: Investigate code
 workspace: fixtures/ledger
 question: where is the retry backoff for failed network requests configured
 
-# answered in 21ms
+# answered in 25ms
 ```
 
 **Response**

@@ -14,7 +14,7 @@ workspace: fixtures/ledger
 file: packages/accounts/src/journal.ts
 symbol: Journal
 
-# answered in 47ms
+# answered in 49ms
 ```
 
 **Response**
@@ -60,7 +60,7 @@ workspace: fixtures/ledger
 file: packages/money/src/money.ts
 symbol: Money
 
-# answered in 63ms
+# answered in 64ms
 ```
 
 **Response**

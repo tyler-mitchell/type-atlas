@@ -1,0 +1,8 @@
+{
+  "tool": "search_code",
+  "arguments": {
+    "query": "walking an account up through each of its ancestor accounts",
+    "snippetLines": 6
+  },
+  "elapsed": "20ms"
+}

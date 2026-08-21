@@ -14,7 +14,7 @@ workspace: fixtures/ledger
 fromFile: packages/reports/src/balance.ts
 module: @ledger/money
 
-# answered in 113ms
+# answered in 114ms
 ```
 
 **Response**
@@ -59,7 +59,7 @@ fromFile: packages/reports/src/balance.ts
 module: @ledger/accounts
 query: balance
 
-# answered in 87ms
+# answered in 85ms
 ```
 
 **Response**

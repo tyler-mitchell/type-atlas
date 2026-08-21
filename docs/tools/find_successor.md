@@ -14,7 +14,7 @@ workspace: fixtures/ledger
 file: packages/accounts/src/journal.ts
 name: postEntry
 
-# answered in 221ms
+# answered in 220ms
 ```
 
 **Response**
@@ -54,7 +54,7 @@ workspace: fixtures/ledger
 file: packages/reports/src/balance.ts
 name: balanceOf
 
-# answered in 130ms
+# answered in 135ms
 ```
 
 **Response**
@@ -95,7 +95,7 @@ workspace: fixtures/ledger
 file: packages/money/src/money.ts
 name: assertRoundingParity
 
-# answered in 70ms
+# answered in 71ms
 ```
 
 **Response**

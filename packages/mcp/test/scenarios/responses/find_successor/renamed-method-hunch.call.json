@@ -4,5 +4,5 @@
     "file": "packages/accounts/src/journal.ts",
     "name": "postEntry"
   },
-  "elapsed": "221ms"
+  "elapsed": "220ms"
 }

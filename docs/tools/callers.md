@@ -42,7 +42,7 @@ workspace: fixtures/ledger
 file: packages/accounts/src/journal.ts
 position: {"line":28,"character":3}
 
-# answered in 61ms
+# answered in 59ms
 ```
 
 **Response**

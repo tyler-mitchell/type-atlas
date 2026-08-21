@@ -15,7 +15,7 @@ file: packages/accounts/src/posting.ts
 position: {"line":25,"character":14}
 depth: 2
 
-# answered in 135ms
+# answered in 146ms
 ```
 
 **Response**
@@ -53,7 +53,7 @@ position: {"line":27,"character":14}
 depth: 3
 limit: 20
 
-# answered in 188ms
+# answered in 157ms
 ```
 
 **Response**
@@ -138,7 +138,7 @@ file: packages/rules/src/rule.ts
 position: {"line":37,"character":14}
 depth: 2
 
-# answered in 52ms
+# answered in 62ms
 ```
 
 **Response**
