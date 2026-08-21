@@ -314,6 +314,18 @@ const identifierTokens = (text: string): ReadonlySet<string> =>
  * it reads. Ranking happens here because it is selection, not presentation:
  * which hits survive the exclusion and the limit, and in what order.
  */
+/**
+ * A hit's score as a percentage of the strongest one.
+ *
+ * The ratio is quantized before the percent conversion. Embedding scores
+ * differ in the last bits across CPU architectures, and a ratio sitting on a
+ * `.5` boundary rounds one way here and the other way on a CI runner — the
+ * same answer reported as 92% and 93%. Cutting the ratio to four decimals
+ * puts both machines on the same number before rounding decides.
+ */
+export const relevanceOf = (score: number, topScore: number | undefined): number =>
+  topScore && topScore > 0 ? Math.round(Number((score / topScore).toFixed(4)) * 100) : 0;
+
 const searchPage = (input: {
   readonly retrieval: RetrievalPage;
   readonly exclude?: {
@@ -364,7 +376,7 @@ const searchPage = (input: {
         file: match.displayFile,
         startLine: lines?.length ? match.contentStartLine + 1 : match.result.start_line,
         endLine: match.result.end_line,
-        relevance: topScore > 0 ? Math.round((match.result.score / topScore) * 100) : 0,
+        relevance: relevanceOf(match.result.score, topScore),
         within: match.path?.map(({ symbol }) => symbol.name),
         name: match.selected?.symbol.name,
         kind: match.selected?.symbol.kind,

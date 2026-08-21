@@ -7,7 +7,7 @@ import {
 import { markupText, displayPath } from "atlascii";
 import * as path from "pathe";
 import { URI } from "vscode-uri";
-import { enrichRetrievalPage, type RetrievalMatch } from "./intelligence.ts";
+import { enrichRetrievalPage, relevanceOf, type RetrievalMatch } from "./intelligence.ts";
 import type { Semble, SembleSearchPage } from "./semble.ts";
 
 /**
@@ -305,10 +305,7 @@ export const createDependencySearch =
                 const lines = match.content?.split("\n") ?? [];
                 return {
                   rank: index + 1,
-                  relevance:
-                    topScore && topScore > 0
-                      ? Math.round((match.result.score / topScore) * 100)
-                      : 0,
+                  relevance: relevanceOf(match.result.score, topScore),
                   file: match.displayFile,
                   startLine: match.contentStartLine + 1,
                   endLine: match.contentStartLine + Math.max(1, lines.length),
