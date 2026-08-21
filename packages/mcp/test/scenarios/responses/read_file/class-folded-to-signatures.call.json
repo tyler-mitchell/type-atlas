@@ -4,5 +4,6 @@
     "file": [
       "packages/accounts/src/journal.ts"
     ]
-  }
+  },
+  "elapsed": "19ms"
 }

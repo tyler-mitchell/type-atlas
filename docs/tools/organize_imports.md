@@ -12,6 +12,7 @@ Return the TypeScript organize-imports action as a Codex patch. The MCP does not
 tool: Organize imports
 workspace: fixtures/ledger
 file: packages/importers/src/csv.ts
+# answered in 28ms
 ```
 
 **Response**

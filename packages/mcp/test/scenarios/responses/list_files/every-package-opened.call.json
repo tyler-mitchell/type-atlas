@@ -4,5 +4,6 @@
     "expand": {
       "packages/*": 2
     }
-  }
+  },
+  "elapsed": "127ms"
 }

@@ -83,7 +83,7 @@ export type CapturedScenario = {
   readonly tool: string;
   readonly arguments: Record<string, unknown>;
   readonly arrange?: Arrange;
-  /** What the call cost, in bands so a capture survives a slower machine. */
+  /** What the server measured for the call that produced this capture. */
   readonly elapsed?: string;
 };
 
@@ -231,20 +231,13 @@ export const arrangeFixture = async ({
  * anchored to the short form let exactly those runs poison comparisons.
  */
 /**
- * What the server measured for this call, from the trailer it prints. Read
- * before normalization strips it, and reported in coarse bands: a millisecond
- * figure differs every run, so a byte-exact capture cannot hold one, while
- * "under 50ms" holds across runs and is what a reader is actually asking.
+ * What the server measured for this call, from the trailer it prints, read
+ * before normalization strips it. The exact figure: it differs run to run, so
+ * a capture run rewrites it, and the documentation says what the call really
+ * cost rather than a band that fits every call.
  */
-export const elapsedBand = (text: string): string | undefined => {
-  const measured = /(?:^|\n)· (\d+(?:\.\d+)?)(ms|s)\b/u.exec(text);
-  if (!measured) return undefined;
-  const ms = Number(measured[1]) * (measured[2] === "s" ? 1000 : 1);
-  // One coarse threshold, because narrow bands flip: 50ms and 250ms bands
-  // moved six cases between two back-to-back runs on the same machine.
-  if (ms < 1000) return "under 1s";
-  return `about ${Math.round(ms / 1000)}s`;
-};
+export const elapsedOf = (text: string): string | undefined =>
+  /(?:^|\n)· (\d+(?:\.\d+)?(?:ms|s))\b/u.exec(text)?.[1];
 
 export const normalizeResponse = (text: string): string =>
   text
@@ -302,7 +295,7 @@ export const connectScenarioSession = async (
         `${tool} answered with a tool error:\n${text}\n\nServer stderr tail:\n${stderrHeld.slice(-40).join("")}`,
       );
     }
-    return { text: normalizeResponse(text), elapsed: elapsedBand(text) };
+    return { text: normalizeResponse(text), elapsed: elapsedOf(text) };
   };
   return {
     call,

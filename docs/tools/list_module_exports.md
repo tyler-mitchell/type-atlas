@@ -13,6 +13,7 @@ tool: Inspect module
 workspace: fixtures/ledger
 fromFile: packages/reports/src/balance.ts
 module: @ledger/money
+# answered in 183ms
 ```
 
 **Response**
@@ -56,6 +57,7 @@ workspace: fixtures/ledger
 fromFile: packages/reports/src/balance.ts
 module: @ledger/accounts
 query: balance
+# answered in 96ms
 ```
 
 **Response**

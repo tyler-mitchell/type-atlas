@@ -2,5 +2,6 @@
   "tool": "project_config",
   "arguments": {
     "file": "packages/reports/src/balance.ts"
-  }
+  },
+  "elapsed": "1ms"
 }

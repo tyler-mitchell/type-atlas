@@ -3,5 +3,6 @@
   "arguments": {
     "file": "packages/accounts/src/journal.ts",
     "name": "postEntry"
-  }
+  },
+  "elapsed": "240ms"
 }

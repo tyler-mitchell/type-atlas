@@ -3,5 +3,6 @@
   "arguments": {
     "directory": "packages/accounts",
     "changed": true
-  }
+  },
+  "elapsed": "36ms"
 }

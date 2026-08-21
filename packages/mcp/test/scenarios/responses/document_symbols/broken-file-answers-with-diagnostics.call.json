@@ -2,5 +2,6 @@
   "tool": "document_symbols",
   "arguments": {
     "file": "packages/reconcile/src/drift.ts"
-  }
+  },
+  "elapsed": "40ms"
 }

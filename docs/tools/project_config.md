@@ -12,6 +12,7 @@ Return the TypeScript configuration selected for a source file.
 tool: Project configuration
 workspace: fixtures/ledger
 file: packages/reports/src/balance.ts
+# answered in 1ms
 ```
 
 **Response**

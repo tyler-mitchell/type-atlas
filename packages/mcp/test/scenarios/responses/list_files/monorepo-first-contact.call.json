@@ -1,4 +1,5 @@
 {
   "tool": "list_files",
-  "arguments": {}
+  "arguments": {},
+  "elapsed": "126ms"
 }

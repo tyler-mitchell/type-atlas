@@ -12,6 +12,7 @@ Return resolved links discovered by the active language service in a Markdown or
 tool: Document links
 workspace: fixtures/ledger
 file: ledger.config.json
+# answered in 18ms
 ```
 
 **Response**
@@ -28,6 +29,7 @@ Nothing in ledger.config.json links anywhere. A link is a target an editor can f
 tool: Document links
 workspace: fixtures/ledger
 file: README.md
+# answered in 16ms
 ```
 
 **Response**

@@ -3,5 +3,6 @@
   "arguments": {
     "file": "packages/accounts/src/journal.ts",
     "symbol": "Journal"
-  }
+  },
+  "elapsed": "62ms"
 }

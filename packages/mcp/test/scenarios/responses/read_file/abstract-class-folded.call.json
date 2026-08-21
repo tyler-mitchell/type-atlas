@@ -4,5 +4,6 @@
     "file": [
       "packages/importers/src/statement-parser.ts"
     ]
-  }
+  },
+  "elapsed": "5ms"
 }

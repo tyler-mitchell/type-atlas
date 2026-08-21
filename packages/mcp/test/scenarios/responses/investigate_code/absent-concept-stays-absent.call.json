@@ -2,5 +2,6 @@
   "tool": "investigate_code",
   "arguments": {
     "question": "where is the retry backoff for failed network requests configured"
-  }
+  },
+  "elapsed": "23ms"
 }
