@@ -775,6 +775,14 @@ This is the concrete instance of the warmth entry below, and supersedes the
 guess in it: the variable is the build and the platform, not the warm-up.
 Observed 2026-08-21, release run 32481885260.
 
+Closed at the surface, not at the root: `inspect_symbol` no longer prints an
+implementations section for a type alias at all, because nothing implements
+one and every entry the walk returns for an alias is a variable annotated
+with it. That is correct on every platform and it takes the flake with it.
+What stays unexplained is why the packed build reaches a different answer
+from the source build on Linux for the same request — if that surfaces again
+on a kind where implementations are meaningful, this is the thread.
+
 ### Retrieval labels a hit with a symbol the snippet does not contain
 
 ```

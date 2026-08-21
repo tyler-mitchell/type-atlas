@@ -187,7 +187,14 @@ export const inspectionVariables = (input: {
   const primary = result.primary;
   if (!primary) return {};
   const additionalDefinitions = result.additionalDefinitions ?? [];
-  const implementations = result.implementations ?? [];
+  // Nothing implements a type alias — `implements` cannot name one — so the
+  // walk's answer for an alias is whatever variable happens to be annotated
+  // with it, which is noise. It is also not the same noise everywhere: a
+  // packed build on Linux listed a `readonly Money[]` constant under `Money`
+  // where the same question answered nothing on macOS, and the release gate
+  // failed on that difference (docs/issues.md).
+  const aliasSubject = /^```\w*\s*type\s/u.test(result.hover ?? "");
+  const implementations = aliasSubject ? [] : (result.implementations ?? []);
   const typeDefinitions = result.typeDefinitions ?? [];
   const callers = result.callers ?? [];
   const callees = result.callees ?? [];
@@ -218,14 +225,9 @@ export const inspectionVariables = (input: {
     // from files the session has opened — a kek interface with realisers in
     // untouched files misled exactly that way. Only for kinds a reader
     // expects the section on; a variable's absent section claims nothing —
-    // and neither does a type alias's: nature maps aliases to [interface]
-    // for the kind word, but nobody writes `implements` against a branded
-    // alias, and the walk apology under `Money` read as a promise of hidden
-    // implementors. The alias shows itself in hover's own first line.
+    // and neither does an alias's, which is why the apology skips those too.
     unansweredImplementations:
-      primary.kind === SymbolKind.Interface &&
-      implementations.length === 0 &&
-      !/^```\w*\s*type\s/u.test(result.hover ?? ""),
+      primary.kind === SymbolKind.Interface && implementations.length === 0 && !aliasSubject,
     typeDefinitions: counted(typeDefinitions, locationGroups(typeDefinitions, root)),
     callers:
       callers.length > 0
