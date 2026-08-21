@@ -39,7 +39,9 @@ jobs:
         uses: changesets/action@63a615b9cd06ba9a3e6d13796c7fbcb080a60a0b # v1
         with:
           commitMode: github-api
-          publish: pnpm release
+          # `release` is a vite.config.ts task, not a root script — a name
+          # lives in one place or the other, never both.
+          publish: pnpm exec vp run release
           setupGitUser: false
           version: pnpm release:version
         env:
