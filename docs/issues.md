@@ -751,6 +751,30 @@ and `search_code` never adopted the judgment. The missing structure line on
 such a match is the tell: a snippet anchored to no declaration is usually a
 module's plumbing, not its behavior. Observed 2026-08-19, kek-monorepo.
 
+### The packed build finds an implementation the source build does not, on Linux only
+
+```
+inspect_symbol { file: "packages/money/src/money.ts", symbol: "Money" }
+→ committed capture has no Implementations section
+→ installed answer adds:
+  ## Implementations (1)
+  paritySamples · packages/money/tests/rounding-parity.ts:15:48-15:85
+```
+
+`paritySamples` is a `readonly Money[]` constant, not an implementation of
+anything. Four facts bound it: on macOS the source build and the packed build
+agree (`check:distribution` passes); on an ubuntu runner the source build
+still answers without the section (the scenario suite passes 119/119 there)
+while the packed build adds it; the file is inside the money project either
+way, since that tsconfig declares no `include`; and forcing the file open in
+the warm-up changed nothing on either platform. So this is not warmth and not
+ordering — the same request reaches a different answer through the bundle on
+one platform. It blocks the release gate, which is where it was found.
+
+This is the concrete instance of the warmth entry below, and supersedes the
+guess in it: the variable is the build and the platform, not the warm-up.
+Observed 2026-08-21, release run 32481885260.
+
 ### Retrieval labels a hit with a symbol the snippet does not contain
 
 ```
