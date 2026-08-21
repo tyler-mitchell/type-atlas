@@ -1,7 +1,20 @@
 import { readdir, readFile } from "node:fs/promises";
 import { defineCommand } from "citty";
 
-const packageNames = ["core", "language-server", "mcp"] as const;
+/**
+ * Every package the suite publishes, by directory and registry name.
+ *
+ * `atlascii` was missing here, and this command reported a healthy release
+ * while `@type-atlas/core` and `@type-atlas/mcp` were both on npm depending
+ * on an `atlascii` that had never been published — the install was broken and
+ * the oracle said nothing. A package others depend on belongs in the check.
+ */
+const published = [
+  { directory: "packages/core", name: "@type-atlas/core" },
+  { directory: "packages/language-server", name: "@type-atlas/language-server" },
+  { directory: "packages/mcp", name: "@type-atlas/mcp" },
+  { directory: "atlascii", name: "atlascii" },
+] as const;
 const registryUrl =
   "https://registry.modelcontextprotocol.io/v0/servers?search=io.github.tyler-mitchell/type-atlas";
 const bumpOrder = ["patch", "minor", "major"] as const;
@@ -10,10 +23,10 @@ type Bump = (typeof bumpOrder)[number];
 
 const workingVersions = async () =>
   await Promise.all(
-    packageNames.map(async (name) => ({
-      name: `@type-atlas/${name}`,
+    published.map(async ({ directory, name }) => ({
+      name,
       version: JSON.parse(
-        await readFile(new URL(`../../packages/${name}/package.json`, import.meta.url), "utf8"),
+        await readFile(new URL(`../../${directory}/package.json`, import.meta.url), "utf8"),
       ).version as string,
     })),
   );
@@ -49,12 +62,11 @@ const fetchJson = async (url: string) => {
 
 const publishedVersions = async () =>
   await Promise.all(
-    packageNames.map(async (name) => {
-      const packument = await fetchJson(`https://registry.npmjs.org/@type-atlas%2F${name}/latest`);
-      return {
-        name: `@type-atlas/${name}`,
-        version: (packument as { version?: string } | undefined)?.version,
-      };
+    published.map(async ({ name }) => {
+      const packument = await fetchJson(
+        `https://registry.npmjs.org/${encodeURIComponent(name)}/latest`,
+      );
+      return { name, version: (packument as { version?: string } | undefined)?.version };
     }),
   );
 
