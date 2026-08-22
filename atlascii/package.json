@@ -10,7 +10,16 @@
     "terminal",
     "text"
   ],
+  "homepage": "https://github.com/tyler-mitchell/type-atlas#readme",
+  "bugs": {
+    "url": "https://github.com/tyler-mitchell/type-atlas/issues"
+  },
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tyler-mitchell/type-atlas.git",
+    "directory": "atlascii"
+  },
   "files": [
     "dist",
     "LICENSE",
