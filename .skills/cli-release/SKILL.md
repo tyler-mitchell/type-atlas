@@ -5,187 +5,111 @@ description: Release the Type Atlas npm package suite and MCP Registry record th
 
 # Release Type Atlas
 
-Release `@type-atlas/core`, `@type-atlas/language-server`, `@type-atlas/mcp`,
-and `@type-atlas/atlascii` as one fixed-version package suite. Keep versions, changelogs,
-tags, and npm publication under Changesets ownership.
+Release `@type-atlas/atlascii`, `@type-atlas/core`,
+`@type-atlas/language-server`, and `@type-atlas/mcp` as one fixed-version
+suite. Changesets owns versions, changelogs, dependency versions, tags, and npm
+publication. GitHub OIDC owns npm and MCP Registry authentication.
 
-`@type-atlas/atlascii` joined the suite after the others were already on npm.
-It counts: `@type-atlas/core` and `@type-atlas/mcp` depend on it, so an install
-of either resolves it from the registry.
+Follow the sequence below exactly. Never invent a command, use raw `npm`, or
+infer external state from a terminal you do not own.
 
-This process is complete. Follow it; do not extend it. Adding a gate, a
-verification step, a script, or a task — or rewriting this document to match a
-theory about the registry — is out of scope for every release.
+## Request authority
 
-When something fails, the cause is in a package or its manifest, and the first
-thing to read is the failing package's own `package.json` against the
-requirements below.
-`repository.url` must match this repository exactly, because npm matches
-trusted publishing on it and answers `E404` when it is absent — which reads
-like a missing package and is a missing field.
+- `commit`: finalize the change, add its Changeset, run the gates, and commit.
+  Do not push or publish.
+- `push`: push the finalized commit. Do not merge the version pull request.
+- `release`: complete every step below through public verification.
 
-The owner runs one command, once, for a new package:
-`vp run release:publish-and-trust-new-package <package-directory>`. Never ask them for another,
-never ask them to log in, and never ask them to publish. If an earlier turn
-already did, correct it plainly.
+## Finalize the release commit
 
-## Interpret the request
+1. Add one accurate Changeset for every consumer-visible package change.
+   Consumer-visible includes APIs, MCP tools, output, runtime behavior,
+   dependencies, executables, metadata, packed contents, installation, and
+   update behavior. Use `vp run release:changeset` when an interactive Changeset
+   is useful. Never edit versions or changelogs.
+2. Run `vp run release:check`.
+3. Stage only the intended release change.
+4. Run `vp run release:check-changeset`. The Changeset must be staged because
+   this command compares the Git change against `origin/main`.
+5. Commit with a Conventional Commit message.
+6. Run `git pull --rebase` before any owner action or push. This places the
+   release on the latest published suite version. Resolve conflicts by keeping
+   current upstream versions and changelog history while retaining the intended
+   implementation. Run `vp install` if manifests changed, rerun
+   `vp run release:check`, and amend only files changed by that reconciliation.
 
-- `commit` means finalize the in-scope source change, add its Changeset when
-  consumer-visible, stage the intended commit, run `vp run release:check-changeset`, and
-  commit. Do not push or publish unless requested.
-- `push` means push the prepared commit. Allow the version pull request to be
-  created or updated, but do not merge it unless release was requested.
-- `release` means carry the prepared change through the version pull request,
-  npm publication, MCP Registry publication, and public verification.
+The checkout is shared. Never switch branches, delete the Changesets branch,
+discard unrelated work, or rewrite remote history.
 
-## Preserve the working tree
+## First publication of a new package name
 
-The checkout is shared. Release tasks operate remotely after push; never switch
-the checkout, delete the Changesets branch, or disturb uncommitted work.
+Run this section only when npm has never published the package name. Existing
+package names already have trusted publishers and require no owner action.
 
-## Confirm the version before merging
+Before involving the owner, the package must:
 
-`changeset version` promotes a `major` on a `0.x` package straight to `1.0.0`,
-not to `0.2.0`. Read the version the pull request actually produces rather than
-predicting it, and confirm that a first stable release is intended before
-merging. Versions cannot be unpublished.
+- be public and carry complete npm metadata, repository identity, files,
+  exports, and `build`, `check-types`, `test`, and `prepack` tasks;
+- be listed in `pnpm-workspace.yaml`;
+- be in the Changesets fixed group;
+- be a workspace dependency of `@type-atlas/mcp` when the MCP consumes it;
+- have passed the finalized, rebased release commit sequence above.
 
-## Record a releasable change
-
-Run:
-
-```sh
-vp run release:changeset
-```
-
-Select every package whose public behavior changed and choose the appropriate
-SemVer impact. Write the summary for package consumers. Commit the generated
-`.changeset/*.md` file with the implementation.
-
-A change is releasable when it can alter a package's API, MCP tool contract,
-runtime behavior, output, dependencies, executable, metadata, packed contents,
-installation, or update experience. Record the Changeset before declaring the
-implementation complete; do not defer it to the version pull request.
-
-Do not add a changeset for repository-only maintenance that cannot affect a
-published package.
-
-`vp run release:check-changeset` compares against `origin/main`, so it reports the
-packages a branch changes and whether a changeset covers them. Fetch first when
-the comparison must reflect the current remote.
-
-Before merging, run:
-
-```sh
-vp run release:check
-```
-
-Do not edit package versions or changelogs manually. The fixed Changesets group
-keeps all four packages on the same version even when a change directly names
-only one package.
-
-## Publish through the release pull request
-
-After a changeset reaches `main`, `.github/workflows/release.yml` creates or
-updates the Changesets version pull request.
-
-```sh
-vp run release:pr
-```
-
-Review that pull request for:
-
-- the intended unified version;
-- accurate changelog entries;
-- updated internal dependency versions;
-- the expected lockfile changes;
-- removal of the consumed changeset files.
-
-Merge the version pull request:
-
-```sh
-vp run release:merge
-```
-
-Merging the version pull request makes the same workflow run
-`vp run release:publish`,
-which validates the repository and packed consumer experience before publishing
-the packages in dependency order. After npm succeeds, the workflow authenticates
-to the MCP Registry with GitHub OIDC and publishes the version-matched
-`server.json`. Do not publish packages individually, publish Registry metadata
-before npm, or create release tags manually.
-
-## Verify the release
-
-The Release workflow is the release record. Completion requires its npm
-publication and MCP Registry publication steps to succeed. The agent reads and
-resolves any failed workflow step; the user runs no release command.
-
-```sh
-vp run release:run
-vp run release:watch <run-id>
-vp run release:verify
-```
-
-If the workflow fails, read the failed step through the named task:
-
-```sh
-vp run release:failure <run-id>
-```
-
-Confirm that the MCP Registry exposes the same release under
-`io.github.tyler-mitchell/type-atlas`. A missing Registry entry after successful
-npm publication is an interrupted release. The agent corrects the cause and
-runs the recovery task:
-
-```sh
-vp run release:recover
-```
-
-Treat a partial suite publication as an interrupted release. Correct the
-publishing configuration, then run `vp run release:recover`. Changesets skips
-versions already present on npm and publishes only the missing packages.
-
-Never overwrite or unpublish an established release to correct application
-behavior. Publish a follow-up patch changeset instead.
-
-## When the suite gains a public package
-
-Zero-interaction releases cover package names whose trusted publisher already
-exists. At the start of a release, inspect the package graph for a new public
-npm name. When one exists, respond immediately with exactly:
+Send the owner exactly one command and wait:
 
 ```sh
 vp run release:publish-and-trust-new-package <package-directory>
 ```
 
-Wait for its result before continuing. Give no second command. The command
-validates the public manifest, runs typecheck and tests, publishes through the
-package's prepack build, then configures trust. The owner approves 2FA once and selects
-npm's five-minute skip option. After success, GitHub OIDC owns every future
-publication for that name and the agent runs every remaining release task.
+This performs the first pnpm publication and configures the GitHub trusted
+publisher in one npm 2FA window. Never split it into publish and trust commands,
+ask the owner to log in, or ask for another approval.
 
-Publish and configure trust before merging the version pull request. The package manifest must
-declare its name, version, Type Atlas repository, public access, and build,
-check-types, test, and prepack tasks. Its directory must be listed in
-`pnpm-workspace.yaml`, its name must be in the Changesets fixed group, and
-`@type-atlas/mcp` must already declare its workspace dependency.
-`release:publish-and-trust-new-package` validates all three before publishing.
+When the owner says it finished, verify the registry immediately. Do not inspect
+the thread terminal or infer whether it ran:
 
-**Never use raw `npm publish` to get moving.** It does
-not understand pnpm's workspace protocols: it uploads `catalog:` and
-`workspace:*` verbatim, and the result installs nowhere —
-`EUNSUPPORTEDPROTOCOL: Unsupported URL Type "catalog:"`. pnpm rewrites those
-specifiers at publish time. The normal workflow and `release:publish-and-trust-new-package` are the
-only sanctioned publishers.
+```sh
+vp run release:verify <package-name>@<manifest-version>
+```
 
-The publish-and-trust command's successful completion is the setup evidence; the
-first automated OIDC publication is the end-to-end verification. Do not invoke
-`npm trust list` as routine verification because npm requires another
-proof-of-presence challenge for that settings read.
+Continue only after that exact version installs anonymously. The owner never
+runs this command again for the package.
 
-The release workflow must retain `id-token: write`, use a GitHub-hosted runner,
-and install npm 11.5.1 or newer. The MCP Registry publisher also uses GitHub
-OIDC and requires no repository secret. Do not add a long-lived npm or MCP
-Registry publication token.
+## Push and create the version pull request
+
+1. Run `git push`.
+2. Run `vp run release:run` and copy the returned run ID.
+3. Run `vp run release:watch <run-id>`.
+4. Run `vp run release:pr` after the workflow creates the version pull request.
+5. Confirm the intended fixed-suite version, changelog entries, dependency
+   versions, lockfile changes, and consumed Changeset removal. A `major`
+   Changeset on `0.x` produces `1.0.0`; never predict the version.
+6. For a release request, run `vp run release:merge`.
+
+## Publish and verify
+
+1. Run `vp run release:run` and copy the new run ID.
+2. Run `vp run release:watch <run-id>` through completion. The npm publication
+   and MCP Registry publication steps must both succeed.
+3. Run `git pull --rebase` to receive the version commit and tags.
+4. Run `vp run release:verify`. Completion requires the anonymous
+   `@type-atlas/mcp@latest` install to expose the captured tool catalog and serve
+   a real source request through the official MCP client and stdio transport.
+
+The successful Registry publication step verifies
+`io.github.tyler-mitchell/type-atlas` at the same version as `server.json`.
+Never publish packages individually, publish Registry metadata before npm,
+create tags manually, or use a long-lived npm or Registry token.
+
+## Failure recovery
+
+Read a failed workflow only through:
+
+```sh
+vp run release:failure <run-id>
+```
+
+Correct the actual package, manifest, workflow, or Registry failure. For a
+partial publication, run `vp run release:recover`; Changesets skips versions
+already present on npm and publishes the missing packages. Never overwrite or
+unpublish an established release. Ship a follow-up patch instead.
