@@ -1,4 +1,4 @@
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { normalize, resolve } from "pathe";
 import { CompletionItemKind } from "vscode-languageserver-protocol";
 import { expect, test, vi } from "vite-plus/test";
@@ -18,6 +18,10 @@ import type { Semble } from "../src/semble.ts";
 const resolvedFileName = fileURLToPath(new URL("../src/index.ts", import.meta.url));
 const packageRoot = normalize(fileURLToPath(new URL("..", import.meta.url))).replace(/\/$/, "");
 const workspaceRoot = resolve(packageRoot, "../..");
+const sourceUri = pathToFileURL(resolve(workspaceRoot, "source.ts")).href;
+const dependencyUri = pathToFileURL(
+  resolve(workspaceRoot, "node_modules/example/types/index.d.ts"),
+).href;
 
 test("prefers authored package source with one search and two completion pages", async () => {
   const calls = { completion: 0, resolve: 0, search: 0 };
@@ -28,7 +32,7 @@ test("prefers authored package source with one search and two completion pages",
       source:
         "/** Creates an actor from the supplied logic. */\nexport function createActor() {}\nexport function createMachine() {}\nexport class ActorError {}\nexport function unrelated() {}",
     })),
-    getWorkspaceUri: () => "file:///workspace/source.ts",
+    getWorkspaceUri: () => sourceUri,
     sendRequest: vi.fn(async (_request: unknown, params: unknown) => {
       if (
         _request &&
@@ -38,7 +42,7 @@ test("prefers authored package source with one search and two completion pages",
       ) {
         return [
           {
-            uri: "file:///workspace/node_modules/example/types/index.d.ts",
+            uri: dependencyUri,
             range: {
               start: { line: 0, character: 0 },
               end: { line: 0, character: 0 },
@@ -89,7 +93,7 @@ test("prefers authored package source with one search and two completion pages",
     }),
     withTextDocument: vi.fn(
       async ({ task }: { task: (document: { uri: string }) => Promise<unknown> }) =>
-        await task({ uri: "file:///workspace/source.ts" }),
+        await task({ uri: sourceUri }),
     ),
   };
   const semble = {
@@ -177,7 +181,7 @@ test.each([
       textDocument: { uri },
       source: `${surface.label}\nunrelated`,
     })),
-    getWorkspaceUri: () => "file:///workspace/source.ts",
+    getWorkspaceUri: () => sourceUri,
     sendRequest: vi.fn(async (_request: unknown, params: unknown) => {
       if (
         _request &&
@@ -187,7 +191,7 @@ test.each([
       ) {
         return [
           {
-            uri: "file:///workspace/node_modules/example/types/index.d.ts",
+            uri: dependencyUri,
             range: {
               start: { line: 0, character: 0 },
               end: { line: 0, character: 0 },
@@ -231,7 +235,7 @@ test.each([
     }),
     withTextDocument: vi.fn(
       async ({ task }: { task: (document: { uri: string }) => Promise<unknown> }) =>
-        await task({ uri: "file:///workspace/source.ts" }),
+        await task({ uri: sourceUri }),
     ),
   };
   const semble = {
@@ -286,7 +290,7 @@ test.each([
 test("does not serialize independent dependency searches", async () => {
   const activity = { current: 0, maximum: 0 };
   const workspace = {
-    getWorkspaceUri: () => "file:///workspace/source.ts",
+    getWorkspaceUri: () => sourceUri,
     sendRequest: vi.fn(async (_request: unknown, params: unknown) =>
       params && typeof params === "object" && "moduleName" in params
         ? {
@@ -297,7 +301,7 @@ test("does not serialize independent dependency searches", async () => {
     ),
     withTextDocument: vi.fn(
       async ({ task }: { task: (document: { uri: string }) => Promise<unknown> }) =>
-        await task({ uri: "file:///workspace/source.ts" }),
+        await task({ uri: sourceUri }),
     ),
   };
   const semble = {

@@ -71,6 +71,17 @@ jobs:
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec vp run build
-      - run: pnpm exec vp run test
-      - if: matrix.node == '24.18.0'
+      - if: matrix.os != 'windows-latest'
+        run: pnpm exec vp run test
+      # The captured corpus is byte-exact for one TypeScript host. Windows keeps
+      # every package test and the MCP's real process/unit suite.
+      - if: matrix.os == 'windows-latest'
+        run: pnpm exec vp run "@type-atlas/atlascii#test"
+      - if: matrix.os == 'windows-latest'
+        run: pnpm exec vp run "@type-atlas/language-server#test"
+      - if: matrix.os == 'windows-latest'
+        run: pnpm exec vp run "@type-atlas/core#test"
+      - if: matrix.os == 'windows-latest'
+        run: pnpm exec vp run "@type-atlas/mcp#test:unit"
+      - if: matrix.os == 'ubuntu-latest' && matrix.node == '24.18.0'
         run: pnpm exec vp run check:distribution
