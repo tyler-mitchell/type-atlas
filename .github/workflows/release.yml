@@ -56,8 +56,29 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           BUMPY_GH_TOKEN: ${{ secrets.BUMPY_GH_TOKEN }}
 
-  publish:
+  publish-check:
     needs: plan
+    if: needs.plan.outputs.mode == 'publish'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec vp run check:distribution
+
+  publish:
+    needs:
+      - plan
+      - publish-check
     if: needs.plan.outputs.mode == 'publish'
     runs-on: ubuntu-latest
     environment: publish
@@ -78,7 +99,6 @@ jobs:
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
       - run: npm install --global npm@latest
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec vp run check:distribution
       - run: pnpm exec bumpy ci release --expect-mode publish
         env:
           GH_TOKEN: ${{ github.token }}
