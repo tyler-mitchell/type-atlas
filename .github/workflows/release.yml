@@ -60,6 +60,7 @@ jobs:
     needs: plan
     if: needs.plan.outputs.mode == 'publish'
     runs-on: ubuntu-latest
+    environment: publish
     timeout-minutes: 15
     permissions:
       contents: write
