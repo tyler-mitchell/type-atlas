@@ -1,5 +1,5 @@
 import { expect, test } from "vite-plus/test";
-import { renderDocument as renderSource } from "atlascii/document";
+import { renderDocument as renderSource } from "@type-atlas/atlascii/document";
 import { renderDocument } from "./render.ts";
 
 const span = { start: { line: 87, character: 13 }, end: { line: 87, character: 31 } };

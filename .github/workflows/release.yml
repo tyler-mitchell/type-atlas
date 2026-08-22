@@ -45,25 +45,25 @@ jobs:
           commitMode: github-api
           # `release` is a vite.config.ts task, not a root script — a name
           # lives in one place or the other, never both.
-          publish: pnpm exec vp run release
+          publish: pnpm run release:publish
           setupGitUser: false
-          version: pnpm release:version
+          version: pnpm run release:version
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Install MCP Registry publisher
-        if: steps.changesets.outputs.published == 'true'
+        if: steps.changesets.outputs.published == 'true' || github.event_name == 'workflow_dispatch'
         env:
           MCP_PUBLISHER_VERSION: v1.8.0
-        run: |
-          curl --fail --location --silent --show-error \
-            "https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}/mcp-publisher_linux_amd64.tar.gz" \
-            | tar xz mcp-publisher
+        run: curl --fail --location --silent --show-error --output mcp-publisher.tar.gz "https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}/mcp-publisher_linux_amd64.tar.gz"
+      - name: Extract MCP Registry publisher
+        if: steps.changesets.outputs.published == 'true' || github.event_name == 'workflow_dispatch'
+        run: tar xzf mcp-publisher.tar.gz mcp-publisher
       - name: Validate MCP Registry metadata
-        if: steps.changesets.outputs.published == 'true'
+        if: steps.changesets.outputs.published == 'true' || github.event_name == 'workflow_dispatch'
         run: ./mcp-publisher validate
       - name: Authenticate to the MCP Registry
-        if: steps.changesets.outputs.published == 'true'
+        if: steps.changesets.outputs.published == 'true' || github.event_name == 'workflow_dispatch'
         run: ./mcp-publisher login github-oidc
       - name: Publish to the MCP Registry
-        if: steps.changesets.outputs.published == 'true'
+        if: steps.changesets.outputs.published == 'true' || github.event_name == 'workflow_dispatch'
         run: ./mcp-publisher publish

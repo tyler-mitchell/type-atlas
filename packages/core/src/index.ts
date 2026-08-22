@@ -22,8 +22,8 @@ export {
   type InspectSymbolTarget,
 } from "./symbol-inspection.ts";
 export { renderComposition, renderDocument } from "./markdoc/render.ts";
-export { codeFrame, divider, formatTime, noun, summaryRow, truncate } from "atlascii";
-export type { Row } from "atlascii";
+export { codeFrame, divider, formatTime, noun, summaryRow, truncate } from "@type-atlas/atlascii";
+export type { Row } from "@type-atlas/atlascii";
 export { containingGitSubmodule, findGitSubmoduleRoots } from "./git-submodules.ts";
 export { projectGraph, type ProjectGraph } from "./project-graph.ts";
 export {
@@ -34,4 +34,4 @@ export {
   type SourceWindow,
 } from "./syntactic-features.ts";
 export { takeRequestTraces } from "./language-server-process.ts";
-export { requestCost, type RequestTrace, containsPosition } from "atlascii";
+export { requestCost, type RequestTrace, containsPosition } from "@type-atlas/atlascii";

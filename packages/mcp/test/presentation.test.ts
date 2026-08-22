@@ -1,4 +1,4 @@
-import { asciiFigures, configurePresentation, displayPath, resolve } from "atlascii";
+import { asciiFigures, configurePresentation, displayPath, resolve } from "@type-atlas/atlascii";
 import { afterEach, expect, test } from "vite-plus/test";
 import { presentationFromEnvironment } from "../src/presentation.ts";
 

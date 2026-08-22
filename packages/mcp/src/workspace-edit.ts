@@ -6,7 +6,7 @@ import {
 } from "vscode-languageserver-protocol";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import { URI } from "vscode-uri";
-import { codexPatch, displayPath } from "atlascii";
+import { codexPatch, displayPath } from "@type-atlas/atlascii";
 import type { VolarWorkspace } from "@type-atlas/core";
 
 export type FileMove = {

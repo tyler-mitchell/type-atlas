@@ -11,7 +11,7 @@ import { type } from "arktype";
 import * as path from "pathe";
 import { URI } from "vscode-uri";
 import { readOnlyToolAnnotations } from "./metadata.ts";
-import { displayPath, slash } from "atlascii";
+import { displayPath, slash } from "@type-atlas/atlascii";
 import { textResult } from "./mcp-result.ts";
 import { fileInput, positionInput } from "./tool-input.ts";
 import {

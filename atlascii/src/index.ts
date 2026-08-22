@@ -6,7 +6,7 @@
  * hand, fed to a template layer of their own, or written straight to a
  * terminal.
  *
- * A document layer is available from `atlascii/document` for callers who want
+ * A document layer is available from `@type-atlas/atlascii/document` for callers who want
  * one, and it is the only place a document engine is loaded. Importing it is a
  * choice; importing this is not a commitment to it.
  *

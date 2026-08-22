@@ -25,7 +25,13 @@ import { SymbolKind } from "vscode-languageserver-protocol";
 import { requestDiagnosticContext, workspaceRelativeMessage } from "./ambient-diagnostics.ts";
 import { enclosingDeclaration } from "./reference-groups.ts";
 import { readOnlyToolAnnotations } from "./metadata.ts";
-import { defaultDimensions, positionText, rangeText, sameRange, displayPath } from "atlascii";
+import {
+  defaultDimensions,
+  positionText,
+  rangeText,
+  sameRange,
+  displayPath,
+} from "@type-atlas/atlascii";
 import * as path from "pathe";
 import { URI } from "vscode-uri";
 import { appendDiagnosticContext, textResult } from "./mcp-result.ts";

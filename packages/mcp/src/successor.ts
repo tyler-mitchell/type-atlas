@@ -4,7 +4,7 @@ import {
   renderDocument,
   type VolarWorkspacePool,
 } from "@type-atlas/core";
-import { displayPath } from "atlascii";
+import { displayPath } from "@type-atlas/atlascii";
 import * as path from "pathe";
 import type { Semble } from "./semble.ts";
 

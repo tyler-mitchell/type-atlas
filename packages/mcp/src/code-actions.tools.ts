@@ -12,7 +12,7 @@ import {
   type TextDocumentIdentifier,
 } from "@volar/language-server/protocol.js";
 import type { VolarWorkspace, VolarWorkspacePool } from "@type-atlas/core";
-import { containsPosition, rangeText, displayPath } from "atlascii";
+import { containsPosition, rangeText, displayPath } from "@type-atlas/atlascii";
 import { type } from "arktype";
 import { renderDocument } from "@type-atlas/core";
 import { formatPatchResult } from "./edit-result.ts";

@@ -19,10 +19,10 @@ import {
 import { isFileInDir } from "@volar/language-server/node.js";
 import { WorkspaceReferencesRequest } from "@type-atlas/language-server/protocol";
 import type { ReferenceScope } from "./operations.ts";
-import { sourceLines } from "atlascii";
+import { sourceLines } from "@type-atlas/atlascii";
 import { documentSymbols } from "./syntactic-features.ts";
 import { URI } from "vscode-uri";
-import { markupText as hoverContentsText, rangeText } from "atlascii";
+import { markupText as hoverContentsText, rangeText } from "@type-atlas/atlascii";
 import type { VolarWorkspace } from "./volar-workspace.ts";
 
 /** Selects either an exact document-symbol name or an LSP source position. */

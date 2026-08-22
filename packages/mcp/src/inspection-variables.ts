@@ -1,5 +1,5 @@
 import type { CallSite, InspectSymbolResult, Located } from "@type-atlas/core";
-import { type LocationNode, rangeText, sameRange, displayPath } from "atlascii";
+import { type LocationNode, rangeText, sameRange, displayPath } from "@type-atlas/atlascii";
 import { isFileInDir } from "@volar/language-server/node.js";
 import { SymbolKind } from "vscode-languageserver-protocol";
 import { URI } from "vscode-uri";

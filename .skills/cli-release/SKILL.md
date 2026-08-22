@@ -6,70 +6,43 @@ description: Release the Type Atlas npm package suite and MCP Registry record th
 # Release Type Atlas
 
 Release `@type-atlas/core`, `@type-atlas/language-server`, `@type-atlas/mcp`,
-and `atlascii` as one fixed-version package suite. Keep versions, changelogs,
+and `@type-atlas/atlascii` as one fixed-version package suite. Keep versions, changelogs,
 tags, and npm publication under Changesets ownership.
 
-`atlascii` is unscoped and joined the suite after the others were already on
-npm. It counts: `@type-atlas/core` and `@type-atlas/mcp` depend on it, so an
-install of either resolves it from the registry.
+`@type-atlas/atlascii` joined the suite after the others were already on npm.
+It counts: `@type-atlas/core` and `@type-atlas/mcp` depend on it, so an install
+of either resolves it from the registry.
+
+This process is complete. Follow it; do not extend it. Adding a gate, a
+verification step, a script, or a task — or rewriting this document to match a
+theory about the registry — is out of scope for every release.
+
+When something fails, the cause is in a package or its manifest, and the first
+thing to read is the failing package's own `package.json` against the
+requirements below.
+`repository.url` must match this repository exactly, because npm matches
+trusted publishing on it and answers `E404` when it is absent — which reads
+like a missing package and is a missing field.
+
+The owner runs one command, once, for a new package:
+`vp run release:publish-and-trust-new-package <package-directory>`. Never ask them for another,
+never ask them to log in, and never ask them to publish. If an earlier turn
+already did, correct it plainly.
 
 ## Interpret the request
 
 - `commit` means finalize the in-scope source change, add its Changeset when
-  consumer-visible, stage the intended commit, run `pnpm check:changeset`, and
+  consumer-visible, stage the intended commit, run `vp run release:check-changeset`, and
   commit. Do not push or publish unless requested.
 - `push` means push the prepared commit. Allow the version pull request to be
   created or updated, but do not merge it unless release was requested.
 - `release` means carry the prepared change through the version pull request,
   npm publication, MCP Registry publication, and public verification.
 
-## Read the release state first
+## Preserve the working tree
 
-Run:
-
-```sh
-pnpm release:status
-```
-
-It reports the working version, pending changesets, the published npm version of
-every package, and the MCP Registry version, then names the state. Start here
-for any release request, and again before concluding one. The suite publishes as
-one fixed-version group, so any disagreement between those sources is an
-interrupted release rather than normal drift.
-
-## Never move the working tree
-
-The working tree is shared. Another agent may be editing it, so a release must
-not change the checked-out branch, and must not leave the repository on a branch
-it did not start on.
-
-Every step after a changeset reaches `main` is remote: creating and merging pull
-requests, watching CI, and reading npm and the Registry. None of it requires a
-local checkout.
-
-- Do not `git checkout` or `git switch` to release.
-- Do not pass `--delete-branch` to `gh pr merge`. It rewrites the local
-  checkout, and on a rebase merge it leaves the repository on a stale `main`
-  while reporting `fatal: Not possible to fast-forward`, which reads as a failed
-  merge that in fact succeeded. Delete the remote branch directly instead:
-
-  ```sh
-  gh api -X DELETE repos/tyler-mitchell/type-atlas/git/refs/heads/<branch>
-  ```
-
-- When a release genuinely needs new commits, author them in a worktree so the
-  primary checkout keeps its branch and its uncommitted work:
-
-  ```sh
-  git worktree add -b <branch> <path> origin/main
-  git worktree remove <path>
-  ```
-
-- After merging, sync the local repository without checking anything out:
-
-  ```sh
-  git fetch origin
-  ```
+The checkout is shared. Release tasks operate remotely after push; never switch
+the checkout, delete the Changesets branch, or disturb uncommitted work.
 
 ## Confirm the version before merging
 
@@ -83,7 +56,7 @@ merging. Versions cannot be unpublished.
 Run:
 
 ```sh
-pnpm changeset
+vp run release:changeset
 ```
 
 Select every package whose public behavior changed and choose the appropriate
@@ -98,19 +71,18 @@ implementation complete; do not defer it to the version pull request.
 Do not add a changeset for repository-only maintenance that cannot affect a
 published package.
 
-`pnpm check:changeset` compares against `origin/main`, so it reports the
+`vp run release:check-changeset` compares against `origin/main`, so it reports the
 packages a branch changes and whether a changeset covers them. Fetch first when
 the comparison must reflect the current remote.
 
 Before merging, run:
 
 ```sh
-pnpm install --frozen-lockfile
-pnpm release:preflight
+vp run release:check
 ```
 
 Do not edit package versions or changelogs manually. The fixed Changesets group
-keeps all three packages on the same version even when a change directly names
+keeps all four packages on the same version even when a change directly names
 only one package.
 
 ## Publish through the release pull request
@@ -118,15 +90,9 @@ only one package.
 After a changeset reaches `main`, `.github/workflows/release.yml` creates or
 updates the Changesets version pull request.
 
-GitHub may hold the first CI run from the bot-authored version pull request for
-maintainer approval. If the run reports `action_required` without creating any
-jobs, approve it, then wait for CI:
-
 ```sh
-gh api --method POST repos/tyler-mitchell/type-atlas/actions/runs/<run-id>/approve
+vp run release:pr
 ```
-
-This is an approval gate, not a failed check.
 
 Review that pull request for:
 
@@ -136,7 +102,14 @@ Review that pull request for:
 - the expected lockfile changes;
 - removal of the consumed changeset files.
 
-Merging the version pull request makes the same workflow run `pnpm release`,
+Merge the version pull request:
+
+```sh
+vp run release:merge
+```
+
+Merging the version pull request makes the same workflow run
+`vp run release:publish`,
 which validates the repository and packed consumer experience before publishing
 the packages in dependency order. After npm succeeds, the workflow authenticates
 to the MCP Registry with GitHub OIDC and publishes the version-matched
@@ -145,137 +118,72 @@ before npm, or create release tags manually.
 
 ## Verify the release
 
-Confirm that npm and the Registry agree on one version for the complete suite:
+The Release workflow is the release record. Completion requires its npm
+publication and MCP Registry publication steps to succeed. The agent reads and
+resolves any failed workflow step; the user runs no release command.
 
 ```sh
-pnpm release:status
+vp run release:run
+vp run release:watch <run-id>
+vp run release:verify
 ```
 
-A `released and consistent` state is the check. Any other state names the
-defect, and `interrupted release — the MCP Registry is behind npm` means npm
-published but Registry publication did not, which the workflow only attempts
-when Changesets reports `published == 'true'`.
-
-Confirm that a clean consumer can resolve the CLI:
+If the workflow fails, read the failed step through the named task:
 
 ```sh
-npx --yes @type-atlas/mcp@latest --help
+vp run release:failure <run-id>
 ```
-
-The release chain now asks this itself: `release` runs
-`node scripts/cli.ts verify-published` after the publish, installing the
-published server into a clean directory. Packing proves the tarball; only this
-proves the registry can resolve what the tarball declares.
 
 Confirm that the MCP Registry exposes the same release under
 `io.github.tyler-mitchell/type-atlas`. A missing Registry entry after successful
-npm publication is an interrupted release; manually dispatch the `Release`
-workflow from the version commit after correcting Registry authentication or
-metadata.
+npm publication is an interrupted release. The agent corrects the cause and
+runs the recovery task:
+
+```sh
+vp run release:recover
+```
 
 Treat a partial suite publication as an interrupted release. Correct the
-publishing configuration, then manually dispatch the `Release` workflow from
-the exact commit containing the version changes. Changesets skips versions
-already present on npm and publishes only the missing packages.
+publishing configuration, then run `vp run release:recover`. Changesets skips
+versions already present on npm and publishes only the missing packages.
 
 Never overwrite or unpublish an established release to correct application
 behavior. Publish a follow-up patch changeset instead.
 
-## One-time publisher setup
+## When the suite gains a public package
 
-Complete these owner-controlled requirements before the first automated
-release:
-
-1. Own or create the `type-atlas` organization on npm and confirm the release
-   maintainer can publish public packages under the `@type-atlas` scope.
-2. Make `tyler-mitchell/type-atlas` public and ensure every package
-   `repository.url` exactly matches it.
-3. Confirm that the Apache-2.0 license is present in every packed package.
-
-A trusted publisher can be configured for a name npm has never seen — `npm
-trust` accepts it and posts to `/-/package/<name>/trust`. What it requires is
-an authenticated session with 2FA, not an existing package (verified
-2026-08-21 against `atlascii`, which returned `E401 … You must be logged in`
-rather than a name error). So a package that has never been published needs
-one authenticated act from the maintainer, and `npm trust` is that act —
-after it, CI publishes the package through OIDC like every other.
-
-Bootstrapping the names by hand with the verified `0.0.0` suite is the older
-route, kept because it also proves the packed artifacts install:
+Zero-interaction releases cover package names whose trusted publisher already
+exists. At the start of a release, inspect the package graph for a new public
+npm name. When one exists, respond immediately with exactly:
 
 ```sh
-npm login
-pnpm install --frozen-lockfile
-pnpm check:distribution
-pnpm --recursive publish --access public
+vp run release:publish-and-trust-new-package <package-directory>
 ```
 
-Configure each package's GitHub Actions trusted publisher with npm's supported
-CLI. Use a current npm release under a supported Node LTS rather than delegating
-this routine setup to the npm website:
+Wait for its result before continuing. Give no second command. The command
+validates the public manifest, runs typecheck and tests, publishes through the
+package's prepack build, then configures trust. The owner approves 2FA once and selects
+npm's five-minute skip option. After success, GitHub OIDC owns every future
+publication for that name and the agent runs every remaining release task.
 
-```sh
-npx --yes --package=node@24 --package=npm@latest -c 'npm trust github @type-atlas/language-server --file release.yml --repository tyler-mitchell/type-atlas --allow-publish --yes'
-npx --yes --package=node@24 --package=npm@latest -c 'npm trust github @type-atlas/core --file release.yml --repository tyler-mitchell/type-atlas --allow-publish --yes'
-npx --yes --package=node@24 --package=npm@latest -c 'npm trust github @type-atlas/mcp --file release.yml --repository tyler-mitchell/type-atlas --allow-publish --yes'
-npx --yes --package=node@24 --package=npm@latest -c 'npm trust github atlascii --file release.yml --repository tyler-mitchell/type-atlas --allow-publish --yes'
-```
+Publish and configure trust before merging the version pull request. The package manifest must
+declare its name, version, Type Atlas repository, public access, and build,
+check-types, test, and prepack tasks. Its directory must be listed in
+`pnpm-workspace.yaml`, its name must be in the Changesets fixed group, and
+`@type-atlas/mcp` must already declare its workspace dependency.
+`release:publish-and-trust-new-package` validates all three before publishing.
 
-## When the suite gains a package
-
-A package that has never been published cannot be published by the release
-workflow. OIDC authenticates against a trusted publisher, and npm cannot hold
-one for a name that does not exist — the publish returns `E404`, which reads
-like a missing package rather than a refused credential.
-
-This is not theoretical. The 0.4.0 release published the three `@type-atlas`
-packages and failed on `atlascii`, leaving `@type-atlas/core@0.4.0` and
-`@type-atlas/mcp@0.4.0` on npm depending on a package that was not there. Both
-were uninstallable and every gate had been green, because the distribution
-check installs packed tarballs, where a workspace dependency resolves from
-disk.
-
-Give it a trusted publisher before that release runs, and CI does the rest:
-
-```sh
-pnpm run release:trust <name>
-```
-
-npm answers the first settings change of a session with a browser approval
-(`EOTP`); take npm's short-lived option so it does not challenge again. This is
-the one step in the whole release that a maintainer must perform, and it is
-per package, once ever.
-
-Then add the package to `published` in `scripts/commands/status.ts` so
-`pnpm release:status` counts it. A package absent from that list is a package
-the release oracle cannot see — `atlascii` was, and the oracle called the suite
-healthy while two published packages depended on one that did not exist.
-
-**Never publish the missing package by hand to get moving.** `npm publish` does
+**Never use raw `npm publish` to get moving.** It does
 not understand pnpm's workspace protocols: it uploads `catalog:` and
 `workspace:*` verbatim, and the result installs nowhere —
-`EUNSUPPORTEDPROTOCOL: Unsupported URL Type "catalog:"`. That is what happened
-to `atlascii@0.4.0`, and because `@type-atlas/core` and `@type-atlas/mcp`
-depend on it, npm died building their trees too while reporting nothing but a
-log path. Only pnpm rewrites those specifiers at publish time, which is why the
-workflow is the only sanctioned publisher. A package already broken this way is
-replaced with a follow-up patch, never unpublished.
+`EUNSUPPORTEDPROTOCOL: Unsupported URL Type "catalog:"`. pnpm rewrites those
+specifiers at publish time. The normal workflow and `release:publish-and-trust-new-package` are the
+only sanctioned publishers.
 
-Nothing before publication catches it: `pnpm run check:distribution` installs
-the packed tarballs, where a workspace dependency resolves from disk whether or
-not the registry could parse it. `pnpm run release:verify` installs the
-published package from the registry as a consumer would, and is the check that
-sees it.
-
-The first settings mutation may require a one-time npm browser approval. Select
-npm's short-lived option to skip repeated challenges and run all three commands
-inside that authenticated window. Each command's successful creation response
-is the setup evidence; the first automated OIDC publication is the end-to-end
-verification. Do not invoke `npm trust list` as routine verification because npm
-requires another proof-of-presence challenge for that settings read.
-
-After one successful OIDC release, require two-factor authentication and
-disallow token-based publication for every package.
+The publish-and-trust command's successful completion is the setup evidence; the
+first automated OIDC publication is the end-to-end verification. Do not invoke
+`npm trust list` as routine verification because npm requires another
+proof-of-presence challenge for that settings read.
 
 The release workflow must retain `id-token: write`, use a GitHub-hosted runner,
 and install npm 11.5.1 or newer. The MCP Registry publisher also uses GitHub

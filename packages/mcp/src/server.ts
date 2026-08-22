@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/server";
 import { serveStdio } from "@modelcontextprotocol/server/stdio";
 import { serverInfo, serverInstructions } from "./metadata.ts";
 import { developmentHost, developmentInstructions } from "./tools.ts";
-import { configurePresentation } from "atlascii";
+import { configurePresentation } from "@type-atlas/atlascii";
 import { presentationFromEnvironment } from "./presentation.ts";
 import { configureIntent } from "./tool.ts";
 

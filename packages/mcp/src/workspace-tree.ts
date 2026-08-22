@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { readFile, realpath, stat } from "node:fs/promises";
 import { promisify } from "node:util";
 import { containingGitSubmodule, findGitSubmoduleRoots } from "@type-atlas/core";
-import type { Row } from "atlascii";
+import type { Row } from "@type-atlas/atlascii";
 import { isFileInDir } from "@volar/language-server/node.js";
 import { fdir } from "fdir";
 import { isGitIgnored } from "globby";

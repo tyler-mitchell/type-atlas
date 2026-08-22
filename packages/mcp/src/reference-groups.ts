@@ -1,4 +1,4 @@
-import { width } from "atlascii";
+import { width } from "@type-atlas/atlascii";
 import { type Range, SymbolKind } from "vscode-languageserver-protocol";
 
 /** Declarations that hold other code, rather than merely name a value. */

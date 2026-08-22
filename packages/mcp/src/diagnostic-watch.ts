@@ -1,7 +1,7 @@
 import { fileURLToPath } from "node:url";
 import * as path from "pathe";
 import { createTypeAtlas, renderDocument, type VolarWorkspacePool } from "@type-atlas/core";
-import { displayPath } from "atlascii";
+import { displayPath } from "@type-atlas/atlascii";
 
 /**
  * How long the workspace must stop changing before diagnostics are read.

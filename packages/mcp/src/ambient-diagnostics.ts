@@ -7,7 +7,7 @@ import {
   type TextDocumentIdentifier,
 } from "@volar/language-server/protocol.js";
 import { containsPosition, declarationChainAtPosition, renderDocument } from "@type-atlas/core";
-import { displayPath } from "atlascii";
+import { displayPath } from "@type-atlas/atlascii";
 import type { VolarWorkspace } from "@type-atlas/core";
 import { enclosingDeclaration } from "./reference-groups.ts";
 

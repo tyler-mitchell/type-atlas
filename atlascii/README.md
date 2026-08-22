@@ -1,4 +1,4 @@
-# atlascii
+# @type-atlas/atlascii
 
 ASCII components for code intelligence.
 

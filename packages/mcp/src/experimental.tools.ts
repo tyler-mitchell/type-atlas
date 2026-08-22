@@ -22,8 +22,8 @@ import {
   type VolarWorkspacePool,
 } from "@type-atlas/core";
 import { type } from "arktype";
-import { displayPath, markupText, positionText, rangeText, sameRange } from "atlascii";
-import { type DocumentAsk, documentAsks, isAskReference } from "atlascii/document";
+import { displayPath, markupText, positionText, rangeText, sameRange } from "@type-atlas/atlascii";
+import { type DocumentAsk, documentAsks, isAskReference } from "@type-atlas/atlascii/document";
 import { textResult } from "./mcp-result.ts";
 import { readOnlyToolAnnotations } from "./metadata.ts";
 import { createQuorl } from "./quorl.ts";

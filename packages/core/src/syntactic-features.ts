@@ -6,7 +6,7 @@ import {
   convertNavTree,
   convertOutliningSpan,
 } from "volar-service-typescript/lib/utils/lspConverters.js";
-import { foldingAffectsView, sourceLines, truncate } from "atlascii";
+import { foldingAffectsView, sourceLines, truncate } from "@type-atlas/atlascii";
 
 /**
  * What a source file says about itself, read from its text alone.

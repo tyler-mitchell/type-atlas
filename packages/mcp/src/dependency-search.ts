@@ -4,7 +4,7 @@ import {
   renderDocument,
   type VolarWorkspacePool,
 } from "@type-atlas/core";
-import { markupText, displayPath } from "atlascii";
+import { markupText, displayPath } from "@type-atlas/atlascii";
 import * as path from "pathe";
 import { URI } from "vscode-uri";
 import { enrichRetrievalPage, relevanceOf, type RetrievalMatch } from "./intelligence.ts";

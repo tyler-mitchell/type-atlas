@@ -20,12 +20,12 @@ import {
 } from "@type-atlas/core";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { type } from "arktype";
-import { rangeText as siteText, sameRange } from "atlascii";
+import { rangeText as siteText, sameRange } from "@type-atlas/atlascii";
 import { requestDiagnosticContext } from "./ambient-diagnostics.ts";
 import { inspectionVariables } from "./inspection-variables.ts";
 import { enclosingDeclaration, referenceGroups } from "./reference-groups.ts";
 import { readOnlyToolAnnotations } from "./metadata.ts";
-import { containsPosition, displayPath } from "atlascii";
+import { containsPosition, displayPath } from "@type-atlas/atlascii";
 import { appendDiagnosticContext, textResult } from "./mcp-result.ts";
 import { registerTool } from "./tool.ts";
 import { fileInput, observedFileInput, paginationInput, positionInput } from "./tool-input.ts";

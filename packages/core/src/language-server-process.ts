@@ -22,7 +22,7 @@ import {
 } from "vscode-languageserver-protocol/node.js";
 import { URI } from "vscode-uri";
 import { clientCapabilities, getClientConfiguration } from "./language-client.ts";
-import type { RequestTrace } from "atlascii";
+import type { RequestTrace } from "@type-atlas/atlascii";
 
 const observed: { entries: RequestTrace[] } = { entries: [] };
 

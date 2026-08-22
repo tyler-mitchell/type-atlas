@@ -1,5 +1,5 @@
 {
-  "name": "atlascii",
+  "name": "@type-atlas/atlascii",
   "version": "0.4.1",
   "description": "ASCII components for code intelligence: locations, navigation targets, call hierarchies, outlines, diagnostics, and source frames as plain text.",
   "keywords": [
@@ -10,7 +10,7 @@
     "terminal",
     "text"
   ],
-  "homepage": "https://github.com/tyler-mitchell/type-atlas#readme",
+  "homepage": "https://github.com/tyler-mitchell/type-atlas/tree/main/atlascii",
   "bugs": {
     "url": "https://github.com/tyler-mitchell/type-atlas/issues"
   },
@@ -55,6 +55,7 @@
   "scripts": {
     "build": "vp pack src/index.ts src/document/index.ts",
     "check-types": "tsc --noEmit -p tsconfig.json",
+    "prepack": "vp run build",
     "test": "vp test run"
   },
   "dependencies": {

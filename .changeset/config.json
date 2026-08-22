@@ -4,7 +4,9 @@
   "baseBranch": "main",
   "changelog": "@changesets/cli/changelog",
   "commit": false,
-  "fixed": [["@type-atlas/core", "@type-atlas/language-server", "@type-atlas/mcp", "atlascii"]],
+  "fixed": [
+    ["@type-atlas/core", "@type-atlas/language-server", "@type-atlas/mcp", "@type-atlas/atlascii"]
+  ],
   "ignore": [],
   "linked": [],
   "updateInternalDependencies": "patch"

@@ -31,12 +31,7 @@ export default defineConfig({
         cache: false,
         dependsOn: ["check"],
       },
-      "release:preflight": {
-        command: "changeset status",
-        cache: false,
-        dependsOn: ["check:distribution"],
-      },
-      release: { command: "changeset publish", cache: false, dependsOn: ["release:preflight"] },
+      release: { command: "changeset publish", cache: false, dependsOn: ["check:distribution"] },
     },
   },
   lint: {

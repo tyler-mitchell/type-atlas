@@ -1,7 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { renderDocument as renderSource } from "atlascii/document";
+import { renderDocument as renderSource } from "@type-atlas/atlascii/document";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const sources = new Map<string, Promise<string>>();

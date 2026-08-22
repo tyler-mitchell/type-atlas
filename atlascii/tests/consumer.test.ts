@@ -27,7 +27,7 @@ const importsCleanly = async (specifier: string) => {
 };
 
 test("loads under plain Node, not only under a bundler", async () => {
-  await expect(importsCleanly("atlascii")).resolves.toBeGreaterThan(0);
+  await expect(importsCleanly("@type-atlas/atlascii")).resolves.toBeGreaterThan(0);
 });
 
 test("exports every subpath its package map advertises", async () => {
@@ -36,7 +36,7 @@ test("exports every subpath its package map advertises", async () => {
   const { exports: map } = await import("../package.json", { with: { type: "json" } }).then(
     (module) => module.default as { exports: Record<string, unknown> },
   );
-  const subpaths = Object.keys(map).map((key) => key.replace(/^\./, "atlascii"));
+  const subpaths = Object.keys(map).map((key) => key.replace(/^\./, "@type-atlas/atlascii"));
   for (const subpath of subpaths) {
     await expect(importsCleanly(subpath), subpath).resolves.toBeGreaterThan(0);
   }

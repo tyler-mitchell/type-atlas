@@ -1,5 +1,5 @@
 import { createTypeAtlas, renderDocument, type VolarWorkspacePool } from "@type-atlas/core";
-import { positionText, type Row, displayPath } from "atlascii";
+import { positionText, type Row, displayPath } from "@type-atlas/atlascii";
 
 /**
  * What marks a declaration the walk stopped at.

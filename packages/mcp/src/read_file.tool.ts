@@ -1,5 +1,5 @@
 import { readSourceView, renderDocument, type VolarWorkspacePool } from "@type-atlas/core";
-import { foldedSource, displayPath } from "atlascii";
+import { foldedSource, displayPath } from "@type-atlas/atlascii";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { type } from "arktype";
 import { textResult } from "./mcp-result.ts";

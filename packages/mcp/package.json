@@ -66,11 +66,11 @@
   "dependencies": {
     "@modelcontextprotocol/client": "catalog:",
     "@modelcontextprotocol/server": "catalog:",
+    "@type-atlas/atlascii": "workspace:*",
     "@type-atlas/core": "workspace:*",
     "@type-atlas/language-server": "workspace:*",
     "@volar/language-server": "catalog:",
     "arktype": "catalog:",
-    "atlascii": "workspace:*",
     "citty": "catalog:",
     "diff": "catalog:",
     "fdir": "catalog:",

@@ -1,4 +1,4 @@
-# atlascii
+# @type-atlas/atlascii
 
 ## 0.4.1
 

@@ -13,7 +13,7 @@ import {
   positionText,
   rangeText,
   truncate,
-} from "atlascii";
+} from "@type-atlas/atlascii";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { type } from "arktype";
 import { requestDiagnosticContext } from "./ambient-diagnostics.ts";

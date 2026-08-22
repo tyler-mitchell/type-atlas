@@ -9,7 +9,7 @@ import {
   renderDocument,
   type VolarWorkspacePool,
 } from "@type-atlas/core";
-import { markupText, sameRange, displayPath } from "atlascii";
+import { markupText, sameRange, displayPath } from "@type-atlas/atlascii";
 import { inspectionVariables } from "./inspection-variables.ts";
 import { isFileInDir } from "@volar/language-server/node.js";
 import { stat } from "node:fs/promises";

@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { asciiFigures, type Config, figures, guideNames, pathStyles } from "atlascii";
+import { asciiFigures, type Config, figures, guideNames, pathStyles } from "@type-atlas/atlascii";
 import { dirname, join } from "pathe";
 
 /**
