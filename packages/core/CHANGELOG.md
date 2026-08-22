@@ -1,5 +1,13 @@
 # @type-atlas/core
 
+## 0.4.1
+
+### Patch Changes
+
+- Updated dependencies [97a21a3]
+  - atlascii@0.4.1
+  - @type-atlas/language-server@0.4.1
+
 ## 0.4.0
 
 ### Minor Changes
