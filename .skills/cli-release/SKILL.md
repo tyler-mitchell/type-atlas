@@ -235,24 +235,37 @@ were uninstallable and every gate had been green, because the distribution
 check installs packed tarballs, where a workspace dependency resolves from
 disk.
 
-Give it a trusted publisher before that release runs, and CI does the rest —
-do not publish it by hand, which this document rules out for good reasons:
+Give it a trusted publisher before that release runs, and CI does the rest:
 
 ```sh
-npm login
+pnpm run release:trust <name>
 ```
 
-```sh
-npx --yes --package=node@24 --package=npm@latest -c 'npm trust github <name> --file release.yml --repository tyler-mitchell/type-atlas --allow-publish --yes'
-```
+npm answers the first settings change of a session with a browser approval
+(`EOTP`); take npm's short-lived option so it does not challenge again. This is
+the one step in the whole release that a maintainer must perform, and it is
+per package, once ever.
 
-Then add that line to the setup block above, and add the package to
-`published` in `scripts/commands/status.ts` so `pnpm release:status` counts it.
-A package absent from that list is a package the release oracle cannot see.
+Then add the package to `published` in `scripts/commands/status.ts` so
+`pnpm release:status` counts it. A package absent from that list is a package
+the release oracle cannot see — `atlascii` was, and the oracle called the suite
+healthy while two published packages depended on one that did not exist.
 
-To recover the 0.4.0 interruption specifically: run the `npm trust` command for
-`atlascii`, then dispatch the `Release` workflow. Changesets skips the three
-versions already on npm and publishes only the missing one.
+**Never publish the missing package by hand to get moving.** `npm publish` does
+not understand pnpm's workspace protocols: it uploads `catalog:` and
+`workspace:*` verbatim, and the result installs nowhere —
+`EUNSUPPORTEDPROTOCOL: Unsupported URL Type "catalog:"`. That is what happened
+to `atlascii@0.4.0`, and because `@type-atlas/core` and `@type-atlas/mcp`
+depend on it, npm died building their trees too while reporting nothing but a
+log path. Only pnpm rewrites those specifiers at publish time, which is why the
+workflow is the only sanctioned publisher. A package already broken this way is
+replaced with a follow-up patch, never unpublished.
+
+Nothing before publication catches it: `pnpm run check:distribution` installs
+the packed tarballs, where a workspace dependency resolves from disk whether or
+not the registry could parse it. `pnpm run release:verify` installs the
+published package from the registry as a consumer would, and is the check that
+sees it.
 
 The first settings mutation may require a one-time npm browser approval. Select
 npm's short-lived option to skip repeated challenges and run all three commands
