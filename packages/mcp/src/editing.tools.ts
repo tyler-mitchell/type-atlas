@@ -166,15 +166,14 @@ export const registerEditingTools = (server: McpServer, workspaces: VolarWorkspa
             at: resolved.declaredAt.selection.start,
           }
         : undefined;
+      const workspaceFsPath = URI.file(path.resolve(root)).fsPath;
       // Installed code lives under the workspace directory, so containment
       // is the wrong boundary — the first witnessed misfire resolved to a
       // file both inside the root and inside node_modules. Editable means in
       // the workspace and not installed.
       const inside = (uri: string) => {
         const fsPath = URI.parse(uri).fsPath;
-        return (
-          isFileInDir(fsPath, path.resolve(root)) && !/(^|\/)node_modules\//u.test(slash(fsPath))
-        );
+        return isFileInDir(fsPath, workspaceFsPath) && !/(^|\/)node_modules\//u.test(slash(fsPath));
       };
       // A subject declared in an installed dependency means the rename would
       // patch installed code — through pnpm's hard links, potentially every

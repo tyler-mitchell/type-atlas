@@ -1,8 +1,8 @@
-import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import { expect, test } from "vite-plus/test";
+import { normalize, resolve } from "pathe";
 
 /**
  * The settings, through the server a client actually launches.
@@ -17,7 +17,7 @@ import { expect, test } from "vite-plus/test";
  * and inert is worse than one that was never offered.
  */
 
-const packageRoot = fileURLToPath(new URL("..", import.meta.url));
+const packageRoot = normalize(fileURLToPath(new URL("..", import.meta.url)));
 const workspaceRoot = resolve(packageRoot, "../..");
 
 const answer = async (

@@ -1,11 +1,13 @@
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import type { VolarWorkspacePool } from "@type-atlas/core";
 import { expect, test, vi } from "vite-plus/test";
 import { createRetrievalIntelligence } from "../src/intelligence.ts";
 import type { Semble } from "../src/semble.ts";
 
-const root = "/workspace";
+const root = join(import.meta.dirname, "workspace");
 const file = "src/index.ts";
-const uri = "file:///workspace/src/index.ts";
+const uri = pathToFileURL(join(root, file)).href;
 const source = "export const target = () => {};\n";
 
 const documentSymbol = {
@@ -24,7 +26,8 @@ const workspaceStub = () => ({
     const method =
       request && typeof request === "object" && "method" in request ? request.method : undefined;
     if (method === "textDocument/documentSymbol") return [documentSymbol];
-    if (method === "tsserver/matchTsConfig") return { uri: "file:///workspace/tsconfig.json" };
+    if (method === "tsserver/matchTsConfig")
+      return { uri: pathToFileURL(join(root, "tsconfig.json")).href };
     return null;
   }),
 });

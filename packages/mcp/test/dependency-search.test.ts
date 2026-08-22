@@ -1,4 +1,5 @@
 import { fileURLToPath } from "node:url";
+import { normalize } from "pathe";
 import { CompletionItemKind } from "vscode-languageserver-protocol";
 import { expect, test, vi } from "vite-plus/test";
 import type { VolarWorkspacePool } from "@type-atlas/core";
@@ -15,7 +16,7 @@ import type { Semble } from "../src/semble.ts";
  * of a mock of it.
  */
 const resolvedFileName = fileURLToPath(new URL("../src/index.ts", import.meta.url));
-const packageRoot = fileURLToPath(new URL("..", import.meta.url)).replace(/\/$/, "");
+const packageRoot = normalize(fileURLToPath(new URL("..", import.meta.url))).replace(/\/$/, "");
 
 test("prefers authored package source with one search and two completion pages", async () => {
   const calls = { completion: 0, resolve: 0, search: 0 };

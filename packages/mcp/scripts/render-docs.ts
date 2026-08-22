@@ -21,9 +21,9 @@
  * writes them, a plain run fails on drift. There is no separate command.
  */
 import { readdir, readFile } from "node:fs/promises";
-import { relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import Markdoc from "@markdoc/markdoc";
+import { relative, resolve } from "pathe";
 import {
   type CapturedScenario,
   capturedScenarios,
