@@ -49,6 +49,8 @@ catalog:
   vite: npm:@voidzero-dev/vite-plus-core@0.2.9
   vite-plus: 0.2.9
   "@varlock/bumpy": 1.18.1
+  find-process: ^2.1.1
+  kill-em-all: ^0.1.0
 peerDependencyRules:
   allowAny:
     - vite

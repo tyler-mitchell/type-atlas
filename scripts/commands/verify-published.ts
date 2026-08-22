@@ -3,16 +3,17 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
+import { defineCommand } from "citty";
 import { execa } from "execa";
 
 type PackageManifest = { readonly name: string; readonly version: string };
 
 const packageManifests = await Promise.all(
   [
-    "../atlascii/package.json",
-    "../packages/core/package.json",
-    "../packages/language-server/package.json",
-    "../packages/mcp/package.json",
+    "../../atlascii/package.json",
+    "../../packages/core/package.json",
+    "../../packages/language-server/package.json",
+    "../../packages/mcp/package.json",
   ].map(
     async (path) =>
       JSON.parse(await readFile(new URL(path, import.meta.url), "utf8")) as PackageManifest,
@@ -141,7 +142,7 @@ const verify = async (packageSpec?: string) => {
       const { tools } = await client.listTools();
       const expected = JSON.parse(
         await readFile(
-          new URL("../packages/mcp/test/scenarios/responses/tool-catalog.json", import.meta.url),
+          new URL("../../packages/mcp/test/scenarios/responses/tool-catalog.json", import.meta.url),
           "utf8",
         ),
       ) as { name: string }[];
@@ -169,4 +170,14 @@ const verify = async (packageSpec?: string) => {
   }
 };
 
-await verify(process.argv[2]);
+export default defineCommand({
+  meta: { name: "release-verify", description: "Verify the public Type Atlas release." },
+  args: {
+    package: {
+      type: "positional",
+      description: "Optional package spec to verify by installation only.",
+      required: false,
+    },
+  },
+  run: ({ args }) => verify(args.package),
+});

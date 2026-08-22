@@ -5,17 +5,21 @@
   "type": "module",
   "scripts": {
     "dev": "vp run @type-atlas/mcp#dev",
-    "dev:stop": "node scripts/stop-dev-servers.ts",
+    "dev:stop": "node scripts/cli.ts dev-stop",
+    "registry:prepare": "node scripts/cli.ts registry-prepare",
     "release": "bumpy",
     "release:trust": "npm trust",
-    "release:verify": "node scripts/verify-published.ts",
+    "release:verify": "node scripts/cli.ts release-verify",
     "test": "vp run -r test"
   },
   "devDependencies": {
     "@modelcontextprotocol/client": "catalog:",
     "@types/node": "catalog:",
     "@varlock/bumpy": "catalog:",
+    "citty": "catalog:",
     "execa": "catalog:",
+    "find-process": "catalog:",
+    "kill-em-all": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:"

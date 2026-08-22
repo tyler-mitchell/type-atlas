@@ -31,10 +31,6 @@ export default defineConfig({
         cache: false,
         dependsOn: ["check", "registry:prepare"],
       },
-      "registry:prepare": {
-        command: "node scripts/prepare-registry-manifest.ts",
-        cache: false,
-      },
     },
   },
   lint: {
