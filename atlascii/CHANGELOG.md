@@ -1,5 +1,11 @@
 # @type-atlas/atlascii
 
+## 0.5.0
+
+### Minor Changes
+
+- 31b72f4: Publish Atlascii under the Type Atlas npm scope and update the suite to consume the scoped package.
+
 ## 0.4.1
 
 ### Patch Changes
