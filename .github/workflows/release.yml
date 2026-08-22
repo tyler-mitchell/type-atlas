@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - bumpy-production-check
 
 concurrency:
   group: bumpy-release-${{ github.ref }}
