@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
+import { execaSync } from "execa";
 import type { TestProject } from "vite-plus/test/node";
 import { fixtureRoot, packageRoot } from "./fixture.ts";
 import { ensureFixtureRepository, removeFixtureRepository } from "./runner.ts";
@@ -13,12 +14,11 @@ import { ensureFixtureRepository, removeFixtureRepository } from "./runner.ts";
  */
 const ensureFixtureInstalled = (): void => {
   if (existsSync(resolve(fixtureRoot, "node_modules/@ledger/money"))) return;
-  const installed = spawnSync("pnpm", ["install", "--frozen-lockfile", "--prefer-offline"], {
+  const installed = execaSync("pnpm", ["install", "--frozen-lockfile", "--prefer-offline"], {
     cwd: fixtureRoot,
-    stdio: "pipe",
-    encoding: "utf8",
+    reject: false,
   });
-  if (installed.status !== 0) {
+  if (installed.failed) {
     throw new Error(`Fixture install failed:\n${installed.stdout}\n${installed.stderr}`);
   }
 };

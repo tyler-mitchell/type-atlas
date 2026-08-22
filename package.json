@@ -7,6 +7,7 @@
     "dev": "vp run @type-atlas/mcp#dev",
     "dev:stop": "node scripts/stop-dev-servers.ts",
     "release": "bumpy",
+    "release:trust": "npm trust",
     "release:verify": "node scripts/verify-published.ts",
     "test": "vp run -r test"
   },

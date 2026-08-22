@@ -84,6 +84,7 @@
   "devDependencies": {
     "@markdoc/markdoc": "catalog:",
     "@types/node": "catalog:",
+    "execa": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:"
