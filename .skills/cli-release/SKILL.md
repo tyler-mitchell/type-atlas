@@ -192,9 +192,16 @@ release:
    `repository.url` exactly matches it.
 3. Confirm that the Apache-2.0 license is present in every packed package.
 
-npm cannot configure a trusted publisher until a package exists. Bootstrap
-the package names with the verified `0.0.0` suite rather than publishing empty
-placeholder packages:
+A trusted publisher can be configured for a name npm has never seen — `npm
+trust` accepts it and posts to `/-/package/<name>/trust`. What it requires is
+an authenticated session with 2FA, not an existing package (verified
+2026-08-21 against `atlascii`, which returned `E401 … You must be logged in`
+rather than a name error). So a package that has never been published needs
+one authenticated act from the maintainer, and `npm trust` is that act —
+after it, CI publishes the package through OIDC like every other.
+
+Bootstrapping the names by hand with the verified `0.0.0` suite is the older
+route, kept because it also proves the packed artifacts install:
 
 ```sh
 npm login
@@ -228,20 +235,24 @@ were uninstallable and every gate had been green, because the distribution
 check installs packed tarballs, where a workspace dependency resolves from
 disk.
 
-So before the first release that includes a new package, bootstrap it by hand
-and give it a trusted publisher:
+Give it a trusted publisher before that release runs, and CI does the rest —
+do not publish it by hand, which this document rules out for good reasons:
 
 ```sh
 npm login
 ```
 
 ```sh
-npm publish --access public
+npx --yes --package=node@24 --package=npm@latest -c 'npm trust github <name> --file release.yml --repository tyler-mitchell/type-atlas --allow-publish --yes'
 ```
 
-Then add its `npm trust github <name> …` line above, and add it to `published`
-in `scripts/commands/status.ts` so `pnpm release:status` counts it. A package
-absent from that list is a package the release oracle cannot see.
+Then add that line to the setup block above, and add the package to
+`published` in `scripts/commands/status.ts` so `pnpm release:status` counts it.
+A package absent from that list is a package the release oracle cannot see.
+
+To recover the 0.4.0 interruption specifically: run the `npm trust` command for
+`atlascii`, then dispatch the `Release` workflow. Changesets skips the three
+versions already on npm and publishes only the missing one.
 
 The first settings mutation may require a one-time npm browser approval. Select
 npm's short-lived option to skip repeated challenges and run all three commands

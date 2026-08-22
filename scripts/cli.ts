@@ -9,8 +9,10 @@
  * is the only sanctioned way to invoke it.
  */
 import { defineCommand, runMain } from "citty";
+import logs from "./commands/logs.ts";
 import status from "./commands/status.ts";
 import stopDevServers from "./commands/stop-dev-servers.ts";
+import trust from "./commands/trust.ts";
 import verifyPublished from "./commands/verify-published.ts";
 import version from "./commands/version.ts";
 
@@ -20,8 +22,10 @@ const main = defineCommand({
     description: "Release, product, and repo-process automation for the Type Atlas suite.",
   },
   subCommands: {
+    logs,
     status,
     "stop-dev-servers": stopDevServers,
+    trust,
     "verify-published": verifyPublished,
     version,
   },
