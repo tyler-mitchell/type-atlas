@@ -26,6 +26,11 @@ Repository-only maintenance that cannot affect packed artifacts or consumers
 does not require a bump file. Do not use that exemption for build
 changes that expose a release defect.
 
+Bumpy cannot infer a package from files above its directory. A root
+`vite.config.ts` pack-contract change must name every affected package;
+`server.template.json` and `scripts/prepare-registry-manifest.ts` changes must
+name `@type-atlas/mcp`.
+
 Before committing, verify that every changed package is covered:
 
 ```sh

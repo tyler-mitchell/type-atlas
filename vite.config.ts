@@ -71,12 +71,12 @@ export default defineConfig({
       // Byte-exact artifacts the formatter must never touch: the fixture is a
       // separate workspace whose files are deliberately shaped (a mangled file
       // is format_document's subject, and case positions point into exact
-      // lines); the captures corpus and the generated documentation are the
-      // byte-true output of their own generators, compared byte-for-byte by
-      // the scenario suite and the distribution replay.
+      // lines); captures, generated docs, and Bumpy changelogs are byte-true
+      // output of their own generators.
       "fixtures/**",
       "packages/mcp/test/scenarios/responses/**",
       "docs/tools/**",
+      "**/CHANGELOG.md",
       "README.md",
       "packages/mcp/README.md",
     ],
