@@ -1,6 +1,12 @@
 # @type-atlas/mcp
 
 
+
+## 0.5.2
+<sub>2026-08-22</sub>
+
+-  *(patch)* - Added the Type Atlas cover image to the README.
+
 ## 0.5.1
 <sub>2026-08-22</sub>
 
