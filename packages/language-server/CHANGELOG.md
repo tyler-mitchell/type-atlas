@@ -1,5 +1,11 @@
 # @type-atlas/language-server
 
+
+## 0.5.1
+<sub>2026-08-22</sub>
+
+- *(patch)* Version bump from group with `@type-atlas/mcp` v0.5.1
+
 ## 0.5.0
 
 ### Minor Changes
