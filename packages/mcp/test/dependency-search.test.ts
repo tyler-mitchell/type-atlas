@@ -1,5 +1,5 @@
 import { fileURLToPath } from "node:url";
-import { normalize } from "pathe";
+import { normalize, resolve } from "pathe";
 import { CompletionItemKind } from "vscode-languageserver-protocol";
 import { expect, test, vi } from "vite-plus/test";
 import type { VolarWorkspacePool } from "@type-atlas/core";
@@ -17,6 +17,7 @@ import type { Semble } from "../src/semble.ts";
  */
 const resolvedFileName = fileURLToPath(new URL("../src/index.ts", import.meta.url));
 const packageRoot = normalize(fileURLToPath(new URL("..", import.meta.url))).replace(/\/$/, "");
+const workspaceRoot = resolve(packageRoot, "../..");
 
 test("prefers authored package source with one search and two completion pages", async () => {
   const calls = { completion: 0, resolve: 0, search: 0 };
@@ -130,7 +131,7 @@ test("prefers authored package source with one search and two completion pages",
   });
 
   const output = await search({
-    workspace: "/workspace",
+    workspace: workspaceRoot,
     file: "source.ts",
     packages: ["example"],
     query: "create a state machine actor",
@@ -256,7 +257,7 @@ test.each([
   });
 
   const output = await search({
-    workspace: "/workspace",
+    workspace: workspaceRoot,
     file: "source.ts",
     packages: ["example"],
     query: surface.label,
@@ -313,7 +314,7 @@ test("does not serialize independent dependency searches", async () => {
     workspaces: { get: async () => workspace } as unknown as VolarWorkspacePool,
   });
   const request = {
-    workspace: "/workspace",
+    workspace: workspaceRoot,
     file: "source.ts",
     packages: ["example"],
     query: "query",

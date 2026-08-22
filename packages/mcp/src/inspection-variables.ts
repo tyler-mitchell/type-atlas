@@ -1,5 +1,5 @@
 import type { CallSite, InspectSymbolResult, Located } from "@type-atlas/core";
-import { type LocationNode, rangeText, sameRange, displayPath } from "@type-atlas/atlascii";
+import { type LocationNode, rangeText, sameRange, displayPath, slash } from "@type-atlas/atlascii";
 import { isFileInDir } from "@volar/language-server/node.js";
 import { SymbolKind } from "vscode-languageserver-protocol";
 import { URI } from "vscode-uri";
@@ -117,7 +117,7 @@ const callGroups = (calls: readonly CallSite[], root: string, sharedSiteUri?: st
 /** Outside the workspace, or inside its dependencies, is not the reader's code. */
 const isDependency = (uri: string, root: string) => {
   const parsed = URI.parse(uri);
-  return !isFileInDir(parsed.fsPath, root) || parsed.path.includes("/node_modules/");
+  return !isFileInDir(slash(parsed.fsPath), slash(root)) || parsed.path.includes("/node_modules/");
 };
 
 /**

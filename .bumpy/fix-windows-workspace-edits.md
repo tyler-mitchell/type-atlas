@@ -1,5 +1,6 @@
 ---
 "@type-atlas/mcp": patch
+"@type-atlas/core": patch
 ---
 
-Fixed workspace edit ownership checks on Windows.
+Fixed workspace path classification and diagnostic rendering on Windows.

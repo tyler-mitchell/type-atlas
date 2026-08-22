@@ -19,7 +19,7 @@ import {
 import { isFileInDir } from "@volar/language-server/node.js";
 import { WorkspaceReferencesRequest } from "@type-atlas/language-server/protocol";
 import type { ReferenceScope } from "./operations.ts";
-import { sourceLines } from "@type-atlas/atlascii";
+import { sourceLines, slash } from "@type-atlas/atlascii";
 import { documentSymbols } from "./syntactic-features.ts";
 import { URI } from "vscode-uri";
 import { markupText as hoverContentsText, rangeText } from "@type-atlas/atlascii";
@@ -528,7 +528,9 @@ const declarationAt = async (input: {
   const { definition } = input;
   if (!definition) return undefined;
   const local = definition.uri === input.document.uri;
-  if (!local && !isFileInDir(URI.parse(definition.uri).fsPath, input.root)) return undefined;
+  if (!local && !isFileInDir(slash(URI.parse(definition.uri).fsPath), slash(input.root))) {
+    return undefined;
+  }
   const symbols = local ? input.symbols : await outline(input.workspace, definition.uri);
   const wanted = key(definition);
   for (const symbol of declarations(symbols, definition.uri)) {

@@ -1,10 +1,10 @@
 import { execFile } from "node:child_process";
 import { rmSync } from "node:fs";
 import { appendFile, readdir, readFile, rm, writeFile } from "node:fs/promises";
-import { relative, resolve } from "node:path";
 import { promisify } from "node:util";
 import { Client } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
+import { relative, resolve } from "pathe";
 
 /**
  * Working-tree state a case needs, applied to the fixture before the

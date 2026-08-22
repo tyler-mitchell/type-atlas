@@ -7,7 +7,7 @@ import {
   type TextDocumentIdentifier,
 } from "@volar/language-server/protocol.js";
 import { containsPosition, declarationChainAtPosition, renderDocument } from "@type-atlas/core";
-import { displayPath } from "@type-atlas/atlascii";
+import { displayPath, slash } from "@type-atlas/atlascii";
 import type { VolarWorkspace } from "@type-atlas/core";
 import { enclosingDeclaration } from "./reference-groups.ts";
 
@@ -21,7 +21,7 @@ export type DiagnosticMode = "summary" | "verbose" | "off";
  * diagnostic's message.
  */
 export const workspaceRelativeMessage = (message: string, workspaceRoot: string): string =>
-  message.replaceAll(`${workspaceRoot.replace(/\/$/u, "")}/`, "");
+  message.replaceAll(`${slash(workspaceRoot).replace(/\/$/u, "")}/`, "");
 
 const reported = (report: DocumentDiagnosticReport | null | undefined): readonly Diagnostic[] =>
   report && "items" in report ? report.items : [];
