@@ -34,7 +34,7 @@ jobs:
       - run: pnpm exec vp run check-types
       - if: github.event_name == 'pull_request'
         run: pnpm exec bumpy ci check --strict
-      - run: pnpm exec vp pm audit --prod
+      - run: pnpm exec vp pm audit -- --prod
 
   test:
     strategy:

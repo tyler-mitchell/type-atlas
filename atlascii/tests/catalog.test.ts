@@ -27,7 +27,7 @@ const sourceFiles = async (directory: string): Promise<string[]> => {
 };
 
 const callers = async () => {
-  const files = await sourceFiles(new URL("../src", import.meta.url).pathname);
+  const files = await sourceFiles(join(import.meta.dirname, "../src"));
   return (await Promise.all(files.map((file) => readFile(file, "utf8")))).join("\n");
 };
 

@@ -26,7 +26,7 @@ const withoutComments = (source: string) =>
   source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
 
 const configurable = async () => {
-  const files = await sourceFiles(new URL("../src", import.meta.url).pathname);
+  const files = await sourceFiles(join(import.meta.dirname, "../src"));
   return Promise.all(
     files.map(async (path) => ({
       path,

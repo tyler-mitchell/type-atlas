@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { join } from "node:path";
 import { promisify } from "node:util";
 import { expect, test } from "vite-plus/test";
 
@@ -21,7 +22,7 @@ const importsCleanly = async (specifier: string) => {
       "-e",
       `import(${JSON.stringify(specifier)}).then((m) => console.log(Object.keys(m).length)).catch((error) => { console.error(error.message); process.exit(1); })`,
     ],
-    { cwd: new URL("..", import.meta.url).pathname },
+    { cwd: join(import.meta.dirname, "..") },
   );
   return Number(stdout.trim());
 };
