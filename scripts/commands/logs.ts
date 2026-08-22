@@ -32,7 +32,9 @@ export default defineCommand({
     console.log(
       `Release run ${String(run.databaseId)} on ${run.headBranch}: ${run.status}${run.conclusion ? ` · ${run.conclusion}` : ""}`,
     );
-    if (run.conclusion === "success") return;
+    // A run that has not finished has no failed step to show, and asking for
+    // one is an error rather than an answer.
+    if (run.status !== "completed" || run.conclusion === "success") return;
     await execa("gh", ["run", "view", String(run.databaseId), "--log-failed"], {
       stdio: "inherit",
     });

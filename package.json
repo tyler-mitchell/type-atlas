@@ -9,6 +9,8 @@
     "dev:stop": "node scripts/cli.ts stop-dev-servers",
     "release:dispatch": "gh workflow run release.yml --ref main",
     "release:logs": "node scripts/cli.ts logs",
+    "release:merge": "gh pr merge changeset-release/main --squash",
+    "release:pr": "gh pr view changeset-release/main",
     "release:status": "node scripts/cli.ts status",
     "release:trust": "node scripts/cli.ts trust",
     "release:verify": "node scripts/cli.ts verify-published",
