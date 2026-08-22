@@ -63,93 +63,6 @@ describe("list_files", () => {
   scenarioTest("test-files-only", ({ capture }) =>
     capture("list_files", { glob: ["**/*.test.ts"] }),
   );
-  // A mid-refactor moment: one file edited, one drafted, the barrel gone.
-  // The tree must answer with plain-word change states, a ghost row for the
-  // deletion, and per-directory changed counts.
-  scenarioTest("working-tree-changes", ({ capture }) =>
-    capture(
-      "list_files",
-      { directory: "packages/money", depth: 2 },
-      {
-        arrange: {
-          append: {
-            "packages/money/src/currency.ts":
-              "\n// TODO: JPY carries no minor units — audit format() before adding currencies.\n",
-          },
-          create: {
-            "packages/money/src/rounding.ts": [
-              'import { type Currency, currencyProfiles } from "./currency.ts";',
-              "",
-              "/** Banker's rounding for statement subtotals — draft, not yet wired in. */",
-              "export const roundToMinor = (value: number, currency: Currency): bigint => {",
-              "  const scaled = value * currencyProfiles[currency].minorUnitsPerMajor;",
-              "  const floor = Math.floor(scaled);",
-              "  const fraction = scaled - floor;",
-              "  if (fraction > 0.5) return BigInt(floor + 1);",
-              "  if (fraction < 0.5) return BigInt(floor);",
-              "  return BigInt(floor % 2 === 0 ? floor : floor + 1);",
-              "};",
-              "",
-            ].join("\n"),
-          },
-          delete: ["packages/money/src/index.ts"],
-        },
-      },
-    ),
-  );
-  // The index states pure file writes cannot reach: a drafted parser staged
-  // for commit (`added`) and a module moved through git (`renamed`, naming
-  // its origin so no follow-up git call is needed). Arranged in the
-  // fixture's own repository — the host's index is never touched.
-  scenarioTest("staged-and-renamed", ({ capture }) =>
-    capture(
-      "list_files",
-      { directory: "packages/importers", depth: 2 },
-      {
-        arrange: {
-          create: {
-            "packages/importers/src/ofx.ts": [
-              'import type { StatementRow } from "./csv.ts";',
-              "",
-              "/** OFX statements carry amounts in major units — scale before matching. */",
-              "export const parseOfx = (source: string): readonly StatementRow[] =>",
-              '  source.split("<STMTTRN>").slice(1).map((entry) => ({',
-              '    postedOn: entry.match(/<DTPOSTED>(\\d{8})/)?.[1] ?? "",',
-              '    description: entry.match(/<NAME>([^<\\r\\n]+)/)?.[1] ?? "",',
-              "    amountMinor: Math.round(Number(entry.match(/<TRNAMT>(-?[\\d.]+)/)?.[1] ?? 0) * 100),",
-              "  }));",
-              "",
-            ].join("\n"),
-          },
-          stage: ["packages/importers/src/ofx.ts"],
-          renames: [
-            {
-              from: "packages/importers/src/dedupe.ts",
-              to: "packages/importers/src/duplicate-rows.ts",
-            },
-          ],
-        },
-      },
-    ),
-  );
-  // A merge stopped by both sides editing the same region: `conflicted` is
-  // the word an agent meets mid-merge, sourced from a real both-modified
-  // index state.
-  scenarioTest("merge-conflict", ({ capture }) =>
-    capture(
-      "list_files",
-      { directory: "packages/money", depth: 2 },
-      {
-        arrange: {
-          conflict: {
-            file: "packages/money/src/currency.ts",
-            ours: "\n/** Ours: JPY rounds to whole yen at the statement boundary. */",
-            theirs: "\n/** Theirs: JPY carries no minor units at all. */",
-          },
-        },
-      },
-    ),
-  );
   // A per-subtree budget: each opened package contributes its first entries
   // and closes with `… N more` — partial and priced, never folded whole.
   scenarioTest("subtree-on-a-budget", ({ capture }) =>
@@ -160,28 +73,6 @@ describe("list_files", () => {
   // never read as complete.
   scenarioTest("bounded-glob-elides", ({ capture }) =>
     capture("list_files", { glob: ["**/*.ts"], limit: 12 }),
-  );
-  // The working-tree delta as one tree: exactly what changed, at any depth,
-  // without the clean rows around it — the two changed files in a large
-  // monorepo without the hundreds.
-  scenarioTest("only-the-delta", ({ capture }) =>
-    capture(
-      "list_files",
-      { changed: true },
-      {
-        arrange: {
-          append: {
-            "packages/money/src/currency.ts":
-              "\n// TODO: JPY carries no minor units — audit format() before adding currencies.\n",
-          },
-          create: {
-            "packages/importers/src/qif.ts":
-              'import type { StatementRow } from "./csv.ts";\n\n/** QIF is line-oriented; amounts carry no currency. */\nexport const parseQif = (source: string): readonly StatementRow[] => [];\n',
-          },
-          delete: ["packages/money/src/index.ts"],
-        },
-      },
-    ),
   );
   // The same ask against a clean tree answers with which nothing it is.
   scenarioTest("delta-of-a-clean-tree", ({ capture }) =>
@@ -766,6 +657,107 @@ describe("the hazard corner", () => {
         },
       ],
     }),
+  );
+});
+
+// These cases mutate watched files. Keep them after semantic captures so a
+// transient watcher event cannot leak an arranged state into another case.
+describe("list_files working tree states", () => {
+  scenarioTest("working-tree-changes", ({ capture }) =>
+    capture(
+      "list_files",
+      { directory: "packages/money", depth: 2 },
+      {
+        arrange: {
+          append: {
+            "packages/money/src/currency.ts":
+              "\n// TODO: JPY carries no minor units — audit format() before adding currencies.\n",
+          },
+          create: {
+            "packages/money/src/rounding.ts": [
+              'import { type Currency, currencyProfiles } from "./currency.ts";',
+              "",
+              "/** Banker's rounding for statement subtotals — draft, not yet wired in. */",
+              "export const roundToMinor = (value: number, currency: Currency): bigint => {",
+              "  const scaled = value * currencyProfiles[currency].minorUnitsPerMajor;",
+              "  const floor = Math.floor(scaled);",
+              "  const fraction = scaled - floor;",
+              "  if (fraction > 0.5) return BigInt(floor + 1);",
+              "  if (fraction < 0.5) return BigInt(floor);",
+              "  return BigInt(floor % 2 === 0 ? floor : floor + 1);",
+              "};",
+              "",
+            ].join("\n"),
+          },
+          delete: ["packages/money/src/index.ts"],
+        },
+      },
+    ),
+  );
+  scenarioTest("staged-and-renamed", ({ capture }) =>
+    capture(
+      "list_files",
+      { directory: "packages/importers", depth: 2 },
+      {
+        arrange: {
+          create: {
+            "packages/importers/src/ofx.ts": [
+              'import type { StatementRow } from "./csv.ts";',
+              "",
+              "/** OFX statements carry amounts in major units — scale before matching. */",
+              "export const parseOfx = (source: string): readonly StatementRow[] =>",
+              '  source.split("<STMTTRN>").slice(1).map((entry) => ({',
+              '    postedOn: entry.match(/<DTPOSTED>(\\d{8})/)?.[1] ?? "",',
+              '    description: entry.match(/<NAME>([^<\\r\\n]+)/)?.[1] ?? "",',
+              "    amountMinor: Math.round(Number(entry.match(/<TRNAMT>(-?[\\d.]+)/)?.[1] ?? 0) * 100),",
+              "  }));",
+              "",
+            ].join("\n"),
+          },
+          stage: ["packages/importers/src/ofx.ts"],
+          renames: [
+            {
+              from: "packages/importers/src/dedupe.ts",
+              to: "packages/importers/src/duplicate-rows.ts",
+            },
+          ],
+        },
+      },
+    ),
+  );
+  scenarioTest("merge-conflict", ({ capture }) =>
+    capture(
+      "list_files",
+      { directory: "packages/money", depth: 2 },
+      {
+        arrange: {
+          conflict: {
+            file: "packages/money/src/currency.ts",
+            ours: "\n/** Ours: JPY rounds to whole yen at the statement boundary. */",
+            theirs: "\n/** Theirs: JPY carries no minor units at all. */",
+          },
+        },
+      },
+    ),
+  );
+  scenarioTest("only-the-delta", ({ capture }) =>
+    capture(
+      "list_files",
+      { changed: true },
+      {
+        arrange: {
+          append: {
+            "packages/money/src/currency.ts":
+              "\n// TODO: JPY carries no minor units — audit format() before adding currencies.\n",
+          },
+          create: {
+            "packages/importers/src/qif.ts":
+              'import type { StatementRow } from "./csv.ts";\n\n/** QIF is line-oriented; amounts carry no currency. */\nexport const parseQif = (source: string): readonly StatementRow[] => [];\n',
+          },
+          delete: ["packages/money/src/index.ts"],
+        },
+      },
+    ),
   );
 });
 

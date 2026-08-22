@@ -212,100 +212,6 @@ ledger/
          └  index.test.ts · 6 loc
 ~~~
 
-## working tree changes
-
-**Agent's Input**
-
-```yaml
-tool: List files
-workspace: fixtures/ledger
-# working tree arranged: currency.ts edited · rounding.ts created · index.ts deleted
-directory: packages/money
-depth: 2
-
-# answered in 57ms
-```
-
-**Response**
-
-~~~text
-packages/money/
-├  src/ · 3 changed
-│  ├  currency.ts · 21 loc · M +2
-│  ├  index.ts · D -12
-│  ├  money.ts · 58 loc
-│  ├  rounding-mode.ts · 15 loc
-│  └  rounding.ts · 11 loc · U
-├  tests/
-│  ├  money.test.ts · 15 loc
-│  └  rounding-parity.ts · 15 loc
-├  package.json · 19 loc
-└  tsconfig.json · 20 loc
-~~~
-
-## staged and renamed
-
-**Agent's Input**
-
-```yaml
-tool: List files
-workspace: fixtures/ledger
-# working tree arranged: ofx.ts created and staged · dedupe.ts renamed to duplicate-rows.ts
-directory: packages/importers
-depth: 2
-
-# answered in 43ms
-```
-
-**Response**
-
-~~~text
-packages/importers/
-├  dist/
-│  └  importers.js · 1 loc
-├  src/ · 2 changed
-│  ├  bank-profiles.ts · 42 loc
-│  ├  config.ts · 7 loc
-│  ├  csv.ts · 47 loc
-│  ├  duplicate-rows.ts · 18 loc · R dedupe.ts →
-│  ├  index.ts · 7 loc
-│  ├  ofx.ts · 9 loc · A +9
-│  └  statement-parser.ts · 64 loc
-├  package.json · 23 loc
-├  tsconfig.json · 19 loc
-└  vite.config.ts · 9 loc
-~~~
-
-## merge conflict
-
-**Agent's Input**
-
-```yaml
-tool: List files
-workspace: fixtures/ledger
-# working tree arranged: merge conflict on currency.ts
-directory: packages/money
-depth: 2
-
-# answered in 40ms
-```
-
-**Response**
-
-~~~text
-packages/money/
-├  src/ · 1 changed
-│  ├  currency.ts · 25 loc · C
-│  ├  index.ts · 12 loc
-│  ├  money.ts · 58 loc
-│  └  rounding-mode.ts · 15 loc
-├  tests/
-│  ├  money.test.ts · 15 loc
-│  └  rounding-parity.ts · 15 loc
-├  package.json · 19 loc
-└  tsconfig.json · 20 loc
-~~~
-
 ## subtree on a budget
 
 **Agent's Input**
@@ -438,6 +344,119 @@ ledger/
 └  … 1 more
 ~~~
 
+## delta of a clean tree
+
+**Agent's Input**
+
+```yaml
+tool: List files
+workspace: fixtures/ledger
+directory: packages/accounts
+changed: true
+
+# answered in 35ms
+```
+
+**Response**
+
+~~~text
+Nothing here differs from HEAD — the working tree under this directory is clean.
+~~~
+
+## working tree changes
+
+**Agent's Input**
+
+```yaml
+tool: List files
+workspace: fixtures/ledger
+# working tree arranged: currency.ts edited · rounding.ts created · index.ts deleted
+directory: packages/money
+depth: 2
+
+# answered in 57ms
+```
+
+**Response**
+
+~~~text
+packages/money/
+├  src/ · 3 changed
+│  ├  currency.ts · 21 loc · M +2
+│  ├  index.ts · D -12
+│  ├  money.ts · 58 loc
+│  ├  rounding-mode.ts · 15 loc
+│  └  rounding.ts · 11 loc · U
+├  tests/
+│  ├  money.test.ts · 15 loc
+│  └  rounding-parity.ts · 15 loc
+├  package.json · 19 loc
+└  tsconfig.json · 20 loc
+~~~
+
+## staged and renamed
+
+**Agent's Input**
+
+```yaml
+tool: List files
+workspace: fixtures/ledger
+# working tree arranged: ofx.ts created and staged · dedupe.ts renamed to duplicate-rows.ts
+directory: packages/importers
+depth: 2
+
+# answered in 43ms
+```
+
+**Response**
+
+~~~text
+packages/importers/
+├  dist/
+│  └  importers.js · 1 loc
+├  src/ · 2 changed
+│  ├  bank-profiles.ts · 42 loc
+│  ├  config.ts · 7 loc
+│  ├  csv.ts · 47 loc
+│  ├  duplicate-rows.ts · 18 loc · R dedupe.ts →
+│  ├  index.ts · 7 loc
+│  ├  ofx.ts · 9 loc · A +9
+│  └  statement-parser.ts · 64 loc
+├  package.json · 23 loc
+├  tsconfig.json · 19 loc
+└  vite.config.ts · 9 loc
+~~~
+
+## merge conflict
+
+**Agent's Input**
+
+```yaml
+tool: List files
+workspace: fixtures/ledger
+# working tree arranged: merge conflict on currency.ts
+directory: packages/money
+depth: 2
+
+# answered in 40ms
+```
+
+**Response**
+
+~~~text
+packages/money/
+├  src/ · 1 changed
+│  ├  currency.ts · 25 loc · C
+│  ├  index.ts · 12 loc
+│  ├  money.ts · 58 loc
+│  └  rounding-mode.ts · 15 loc
+├  tests/
+│  ├  money.test.ts · 15 loc
+│  └  rounding-parity.ts · 15 loc
+├  package.json · 19 loc
+└  tsconfig.json · 20 loc
+~~~
+
 ## only the delta
 
 **Agent's Input**
@@ -463,24 +482,5 @@ ledger/
       └  src/ · 2 changed
          ├  currency.ts · 21 loc · M +2
          └  index.ts · D -12
-~~~
-
-## delta of a clean tree
-
-**Agent's Input**
-
-```yaml
-tool: List files
-workspace: fixtures/ledger
-directory: packages/accounts
-changed: true
-
-# answered in 35ms
-```
-
-**Response**
-
-~~~text
-Nothing here differs from HEAD — the working tree under this directory is clean.
 ~~~
 

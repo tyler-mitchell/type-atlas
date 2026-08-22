@@ -3,12 +3,8 @@ list_files/every-package-opened
 list_files/one-corner-opened-deeper
 list_files/without-line-counts
 list_files/test-files-only
-list_files/working-tree-changes
-list_files/staged-and-renamed
-list_files/merge-conflict
 list_files/subtree-on-a-budget
 list_files/bounded-glob-elides
-list_files/only-the-delta
 list_files/delta-of-a-clean-tree
 read_file/class-folded-to-signatures
 read_file/two-files-one-call
@@ -83,3 +79,7 @@ find_successor/renamed-method-hunch
 find_successor/close-miss-finds-the-successor
 find_successor/test-residue-is-not-a-capability
 verify_edit/proposed-edit-breaks-a-consumer
+list_files/working-tree-changes
+list_files/staged-and-renamed
+list_files/merge-conflict
+list_files/only-the-delta
