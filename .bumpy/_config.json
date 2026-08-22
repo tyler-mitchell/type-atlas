@@ -1,0 +1,21 @@
+{
+  "$schema": "../node_modules/@varlock/bumpy/config-schema.json",
+  "baseBranch": "main",
+  "changelog": ["github", { "internalAuthors": ["tyler-mitchell"] }],
+  "changedFilePatterns": [
+    "src/**",
+    "bin/**",
+    "assets/**",
+    "README.md",
+    "LICENSE",
+    "package.json",
+    "vite.config.ts"
+  ],
+  "fixed": [
+    ["@type-atlas/core", "@type-atlas/language-server", "@type-atlas/mcp", "@type-atlas/atlascii"]
+  ],
+  "updateInternalDependencies": "patch",
+  "publish": {
+    "provenance": true
+  }
+}

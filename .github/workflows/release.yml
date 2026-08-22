@@ -4,25 +4,65 @@ on:
   push:
     branches:
       - main
-    paths:
-      - ".changeset/**"
-      - ".github/workflows/release.yml"
-  workflow_dispatch:
 
-concurrency: release
-
-permissions:
-  contents: read
+concurrency:
+  group: bumpy-release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  release:
+  plan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      mode: ${{ steps.plan.outputs.mode }}
+      packages: ${{ steps.plan.outputs.packages }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - id: plan
+        run: pnpm exec bumpy ci plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  version-pr:
+    needs: plan
+    if: needs.plan.outputs.mode == 'version-pr'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec bumpy ci release --expect-mode version-pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  publish:
+    needs: plan
+    if: needs.plan.outputs.mode == 'publish'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: write
       id-token: write
-      pull-requests: write
-
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -33,37 +73,23 @@ jobs:
         with:
           node-version-file: .node-version
           package-manager-cache: false
-          registry-url: https://registry.npmjs.org
-      # The retrieval tools shell out to uvx. Without uv they report it
-      # missing and every answer that names the semantic index in its scope
-      # line comes back shorter than the captured corpus.
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - run: npm install --global npm@latest
       - run: pnpm install --frozen-lockfile
-      - id: changesets
-        uses: changesets/action@63a615b9cd06ba9a3e6d13796c7fbcb080a60a0b # v1
-        with:
-          commitMode: github-api
-          # `release` is a vite.config.ts task, not a root script — a name
-          # lives in one place or the other, never both.
-          publish: pnpm run release:publish
-          setupGitUser: false
-          version: pnpm run release:version
+      - run: pnpm exec vp run check:distribution
+      - run: pnpm exec bumpy ci release --expect-mode publish
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
       - name: Install MCP Registry publisher
-        if: steps.changesets.outputs.published == 'true' || github.event_name == 'workflow_dispatch'
         env:
           MCP_PUBLISHER_VERSION: v1.8.0
         run: curl --fail --location --silent --show-error --output mcp-publisher.tar.gz "https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}/mcp-publisher_linux_amd64.tar.gz"
       - name: Extract MCP Registry publisher
-        if: steps.changesets.outputs.published == 'true' || github.event_name == 'workflow_dispatch'
         run: tar xzf mcp-publisher.tar.gz mcp-publisher
       - name: Validate MCP Registry metadata
-        if: steps.changesets.outputs.published == 'true' || github.event_name == 'workflow_dispatch'
         run: ./mcp-publisher validate
       - name: Authenticate to the MCP Registry
-        if: steps.changesets.outputs.published == 'true' || github.event_name == 'workflow_dispatch'
         run: ./mcp-publisher login github-oidc
       - name: Publish to the MCP Registry
-        if: steps.changesets.outputs.published == 'true' || github.event_name == 'workflow_dispatch'
         run: ./mcp-publisher publish
+      - run: pnpm run release:verify

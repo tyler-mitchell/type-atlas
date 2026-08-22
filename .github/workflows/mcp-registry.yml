@@ -1,0 +1,41 @@
+name: MCP Registry
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: mcp-registry-recovery
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec vp run registry:prepare
+      - name: Install MCP Registry publisher
+        env:
+          MCP_PUBLISHER_VERSION: v1.8.0
+        run: curl --fail --location --silent --show-error --output mcp-publisher.tar.gz "https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}/mcp-publisher_linux_amd64.tar.gz"
+      - name: Extract MCP Registry publisher
+        run: tar xzf mcp-publisher.tar.gz mcp-publisher
+      - name: Validate MCP Registry metadata
+        run: ./mcp-publisher validate
+      - name: Authenticate to the MCP Registry
+        run: ./mcp-publisher login github-oidc
+      - name: Publish to the MCP Registry
+        run: ./mcp-publisher publish
+      - run: pnpm run release:verify

@@ -12,6 +12,7 @@ concurrency:
 
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
   quality:
@@ -31,8 +32,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec vp run lint
       - run: pnpm exec vp run check-types
-      - if: github.event_name == 'pull_request' && !startsWith(github.head_ref, 'changeset-release/')
-        run: pnpm run release:check-changeset
+      - if: github.event_name == 'pull_request'
+        run: pnpm exec bumpy ci check --strict
       - run: pnpm exec vp pm audit --prod
 
   test:

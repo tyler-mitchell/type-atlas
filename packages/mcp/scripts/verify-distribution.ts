@@ -116,10 +116,10 @@ try {
     throw new Error("package.json and server.json identities or versions differ");
   }
 
-  // The suite publishes as one fixed Changesets group. A version that differs
+  // The suite publishes as one fixed Bumpy group. A version that differs
   // between packages means versioning did not complete, and publishing would
   // release a split suite. Publication preflight runs from main, where the
-  // version pull request has already consumed the changesets, so the pending
+  // version pull request has already consumed the bump files, so the pending
   // release plan is empty and cannot carry this check.
   const suite = await Promise.all(
     packageRequirements.map(async ({ directory }) => {

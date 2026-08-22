@@ -29,9 +29,12 @@ export default defineConfig({
       "check:distribution": {
         command: "node packages/mcp/scripts/verify-distribution.ts",
         cache: false,
-        dependsOn: ["check"],
+        dependsOn: ["check", "registry:prepare"],
       },
-      release: { command: "changeset publish", cache: false, dependsOn: ["check:distribution"] },
+      "registry:prepare": {
+        command: "node scripts/prepare-registry-manifest.ts",
+        cache: false,
+      },
     },
   },
   lint: {
