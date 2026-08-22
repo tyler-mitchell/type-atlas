@@ -1,5 +1,18 @@
 # @type-atlas/mcp
 
+## 0.5.0
+
+### Minor Changes
+
+- 31b72f4: Publish Atlascii under the Type Atlas npm scope and update the suite to consume the scoped package.
+
+### Patch Changes
+
+- Updated dependencies [31b72f4]
+  - @type-atlas/atlascii@0.5.0
+  - @type-atlas/core@0.5.0
+  - @type-atlas/language-server@0.5.0
+
 ## 0.4.1
 
 ### Patch Changes
