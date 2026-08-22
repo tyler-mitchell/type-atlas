@@ -7,6 +7,7 @@
     "dev": "vp run @type-atlas/mcp#dev",
     "dev:stop": "node scripts/cli.ts dev-stop",
     "registry:prepare": "node scripts/cli.ts registry-prepare",
+    "registry:publish": "node scripts/cli.ts registry-publish",
     "release": "bumpy",
     "release:trust": "npm trust",
     "release:verify": "node scripts/cli.ts release-verify",
