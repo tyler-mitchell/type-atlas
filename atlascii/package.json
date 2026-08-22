@@ -1,6 +1,6 @@
 {
   "name": "atlascii",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "ASCII components for code intelligence: locations, navigation targets, call hierarchies, outlines, diagnostics, and source frames as plain text.",
   "keywords": [
     "ascii",
