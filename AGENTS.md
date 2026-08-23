@@ -5,7 +5,8 @@ Code Guidelines:
 
 ## Shared Agent Workflow
 
-- Daily and Bumpy base branch: `main`
+- Daily branch: `main`
+- Bumpy base branch: `release`
 - Generated version PR: `bumpy/version-packages`
 
 The human owns the checked-out branch. Agents never create, switch, rename,
@@ -24,24 +25,26 @@ branch and includes every unpushed commit already on it; report that complete
 commit set before pushing. Consumer-visible package changes include one
 maintained Bumpy bump file. Agents never create task branches or worktrees.
 
-Pushing `main` makes Bumpy create or update `bumpy/version-packages`; it does not
-publish.
+Bump files accumulate on `main`; pushing it does not invoke Bumpy's release
+workflow.
 
 If the push is rejected because the remote advanced, never force-push or rebase.
 When the worktree is clean and no parallel agent has uncommitted work, merge
 `origin/main` into the checked-out `main`, then push once.
 
-Only an explicit `release` request authorizes queuing `bumpy/version-packages`
-with `vp run release:merge`. GitHub owns publication and public verification.
+Only an explicit `release` request authorizes merging `main → release`, then
+queuing `bumpy/version-packages` with `vp run release:merge`. GitHub owns
+publication and public verification.
 Never version packages, edit generated changelogs, publish locally, dispatch
 release workflows, poll CI, or read successful-job logs.
 
 Run `vp run release:pr` once. If the PR is absent, return to useful work; GitHub
-owns the pending workflow. If it is behind `main`, run `vp run release:update`
+owns the pending workflow. If it is behind `release`, run `vp run release:update`
 once and let required checks rerun.
 
-Synchronize `main` from `origin/main` only with a clean worktree and no parallel
-uncommitted work. Fast-forward only. Never rebase or force-push shared commits.
+After publication, synchronize `main` forward from `release` only with a clean
+worktree and no parallel uncommitted work. Never rebase or force-push shared
+commits.
 
 Command Mandate:
 - The development command surface is CLOSED: every toolchain workflow is a named task — a package.json script or a `run.tasks` entry in a vite.config.ts — invoked as `vp run <task>` at the root or `vp run "<package>#<task>"` from anywhere. `vp run` with no arguments lists the whole catalog. Nothing else is a sanctioned way to lint, format, typecheck, build, test, capture, or verify in this repository, and every agent conforms to the same surface: no bespoke invocations, no per-agent command dialects.

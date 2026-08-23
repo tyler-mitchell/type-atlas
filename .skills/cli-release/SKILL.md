@@ -8,10 +8,11 @@ description: Record and release Type Atlas package changes through the repositor
 The root `AGENTS.md` owns branch, commit, push, and synchronization behavior.
 
 For a consumer-visible package change, follow `.skills/add-change/SKILL.md` and
-commit its bump file with the implementation on `main`. Pushing `main` makes
-Bumpy create or update `bumpy/version-packages`; it does not publish.
+commit its bump file with the implementation on `main`. Bump files accumulate
+until the ordinary `main → release` pull request merges; that push makes Bumpy
+create or update `bumpy/version-packages`.
 
-An explicit release request authorizes:
+An explicit release request authorizes merging `main → release`, followed by:
 
 ```sh
 vp run release:merge
