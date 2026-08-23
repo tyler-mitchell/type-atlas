@@ -64,7 +64,12 @@ const fixtureGit = (...args: readonly string[]) =>
  * `.git`, so this directory is invisible to the host repository.
  */
 export const ensureFixtureRepository = async (): Promise<void> => {
-  await rm(resolve(fixtureRoot, ".git"), { recursive: true, force: true });
+  await rm(resolve(fixtureRoot, ".git"), {
+    recursive: true,
+    force: true,
+    maxRetries: 5,
+    retryDelay: 50,
+  });
   await fixtureGit("init", "--quiet", "--initial-branch=main");
   await fixtureGit("add", "--all");
   await fixtureGit("commit", "--quiet", "--message", "baseline");
@@ -72,7 +77,7 @@ export const ensureFixtureRepository = async (): Promise<void> => {
 
 /** Removes the fixture's transient repository, leaving only working files. */
 export const removeFixtureRepository = (): Promise<void> =>
-  rm(resolve(fixtureRoot, ".git"), { recursive: true, force: true });
+  rm(resolve(fixtureRoot, ".git"), { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
 
 export const responsesRoot = resolve(packageRoot, "test/scenarios/responses");
 
