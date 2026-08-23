@@ -3,6 +3,12 @@
 
 
 
+
+## 0.6.2
+<sub>2026-08-23</sub>
+
+-  *(patch)* - Improve npm discovery for developer-tool searches.
+
 ## 0.6.1
 <sub>2026-08-23</sub>
 
