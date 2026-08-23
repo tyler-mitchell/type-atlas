@@ -18,6 +18,7 @@
     "release:pr": "gh pr list --head bumpy/version-packages --base main --state open --limit 1",
     "release:update": "gh pr update-branch bumpy/version-packages",
     "release:verify": "node scripts/cli.ts release-verify",
+    "setup:bumpy": "bumpy ci setup",
     "setup:branch-protection": "gh api --silent --method PUT repos/{owner}/{repo}/branches/main/protection --input .github/branch-protection.json",
     "setup:repository": "gh api --silent --method PATCH repos/{owner}/{repo} --field allow_auto_merge=true --field allow_update_branch=true --field delete_branch_on_merge=true",
     "test": "vp run -r test",

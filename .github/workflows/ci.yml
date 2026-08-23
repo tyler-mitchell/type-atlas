@@ -33,7 +33,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec vp run lint
       - run: pnpm exec vp run check-types
-      - if: github.event_name != 'push'
+      - if: github.event_name == 'pull_request'
         run: pnpm exec bumpy ci check
         env:
           GH_TOKEN: ${{ github.token }}
