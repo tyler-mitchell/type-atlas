@@ -24,7 +24,7 @@ branch and includes every unpushed commit already on it; report that complete
 commit set before pushing. Consumer-visible package changes include one
 maintained Bumpy bump file. Agents never create task branches or worktrees.
 
-Pushes to `develop` create or update the single `develop → main` pull request.
+Pushes to `main` create or update the single `main → release` pull request.
 Required project and Bumpy checks gate auto-merge. They do not publish packages.
 
 Only an explicit `release` request authorizes queuing
@@ -33,8 +33,8 @@ and public verification. Never version packages, edit generated changelogs, publ
 locally, dispatch release workflows, poll CI, or read successful-job logs.
 
 Synchronize `main` from `release` only with a clean worktree and no parallel
-uncommitted work. Fast-forward when possible; otherwise merge `origin/main`
-without rebasing shared commits. If a queued PR is behind `main`, update that
+uncommitted work. Fast-forward when possible; otherwise merge `origin/release`
+without rebasing shared commits. If a queued PR is behind `release`, update that
 PR branch once and let required checks rerun.
 
 Command Mandate:

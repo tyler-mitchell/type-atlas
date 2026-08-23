@@ -5,16 +5,20 @@ description: Record and release Type Atlas package changes through the repositor
 
 # Release packages
 
-For a consumer-visible package change, follow `.skills/add-change/SKILL.md` and
-commit its bump file with the implementation.
+The root `AGENTS.md` owns branch, commit, push, and synchronization behavior.
 
-An explicit release request authorizes one command after GitHub reports the
-generated `bumpy/version-packages` pull request is green:
+For a consumer-visible package change, follow `.skills/add-change/SKILL.md` and
+commit its bump file with the implementation on `main`. Pushes update the single
+`main → release` pull request; never create task branches or push release-bearing
+work directly to `release`.
+
+An explicit release request authorizes one command after Bumpy creates
+`bumpy/version-packages`:
 
 ```sh
 vp run release:merge
 ```
 
-Return to useful work. GitHub owns publication and public verification. Inspect
-the workflow only when GitHub reports failure. Never version, publish, dispatch,
-or poll locally.
+The command enables auto-merge; required checks gate the merge. Return to useful
+work. GitHub owns publication and public verification. Inspect the workflow only
+when GitHub reports failure. Never version, publish, dispatch, or poll locally.
