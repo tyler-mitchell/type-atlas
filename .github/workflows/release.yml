@@ -25,9 +25,8 @@ jobs:
         with:
           node-version-file: .node-version
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
       - id: plan
-        run: pnpm exec bumpy ci plan
+        run: pnpm dlx @varlock/bumpy@1.18.1 ci plan
         env:
           GH_TOKEN: ${{ github.token }}
 
@@ -48,11 +47,10 @@ jobs:
         with:
           node-version-file: .node-version
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
       - run: test -n "$BUMPY_GH_TOKEN"
         env:
           BUMPY_GH_TOKEN: ${{ secrets.BUMPY_GH_TOKEN }}
-      - run: pnpm exec bumpy ci release --expect-mode version-pr
+      - run: pnpm dlx @varlock/bumpy@1.18.1 ci release --expect-mode version-pr
         env:
           GH_TOKEN: ${{ github.token }}
           BUMPY_GH_TOKEN: ${{ secrets.BUMPY_GH_TOKEN }}

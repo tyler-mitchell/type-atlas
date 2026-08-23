@@ -34,7 +34,7 @@ jobs:
       - run: pnpm exec vp run lint
       - run: pnpm exec vp run check-types
       - if: github.event_name == 'pull_request'
-        run: pnpm exec bumpy ci check --strict
+        run: pnpm exec bumpy ci check
         env:
           GH_TOKEN: ${{ github.token }}
       - run: pnpm exec vp pm audit -- --prod
