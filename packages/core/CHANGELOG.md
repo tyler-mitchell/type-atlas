@@ -1,6 +1,16 @@
 # @type-atlas/core
 
 
+
+## 0.6.0
+<sub>2026-08-23</sub>
+
+-  *(patch)*
+  Added actionable ambient diagnostics to file reads, suppressed reports already shown by direct diagnostics and code actions, and made clean diagnostics silent.
+-  *(patch)*
+  Routed non-TypeScript documents through Volar's simple project, guarded cross-project references by program membership, and rebuilt native-bridge state after source creation or deletion.
+- *(minor)* Version bump from group with `@type-atlas/mcp` v0.6.0
+
 ## 0.5.1
 <sub>2026-08-22</sub>
 
