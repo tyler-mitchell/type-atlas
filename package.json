@@ -15,7 +15,7 @@
     "registry:publish": "node scripts/cli.ts registry-publish",
     "release": "bumpy",
     "release:merge": "gh pr merge bumpy/version-packages --auto --squash",
-    "release:pr": "gh pr view bumpy/version-packages",
+    "release:pr": "gh pr list --head bumpy/version-packages --base main --state open --limit 1",
     "release:update": "gh pr update-branch bumpy/version-packages",
     "release:verify": "node scripts/cli.ts release-verify",
     "setup:bumpy": "bumpy ci setup",
