@@ -3,6 +3,40 @@ Code Guidelines:
 - Programming Style: Functional Programming
 - Comments: bare minimum, caveman prose. Say the thing in the fewest plain words that still carry it — short clauses, no essays, no story of how the code got here. A comment earns its line only when the code cannot state the constraint itself. This binds every comment you write or edit; it is never an activity of its own, and never a reason to touch comments the work did not already touch.
 
+## Shared Agent Workflow
+
+- Working branch: `develop`
+- Integration branch: `main`
+- Bumpy release branch: `bumpy/version-packages`
+
+The human owns the checked-out branch. Agents never create, switch, rename,
+delete, reset, or replace branches unless the human requests that exact
+operation. If another branch is checked out, continue there and report the
+difference.
+
+Work and commit on the checked-out branch. Stage only task-owned files. If the
+index already contains another agent’s files, commit task-owned paths only and
+leave the other staged entries untouched. Never delete `.git/index.lock`; wait
+for the other Git operation to finish.
+
+`commit` authorizes a local commit only. `push` authorizes the checked-out
+branch and includes every unpushed commit already on it; report that complete
+commit set before pushing. Consumer-visible package changes include one
+maintained Bumpy bump file. Agents never create task branches or worktrees.
+
+Pushes to `develop` create or update the single `develop → main` pull request.
+Required project and Bumpy checks gate auto-merge. They do not publish packages.
+
+Only an explicit `release` request authorizes queuing
+`bumpy/version-packages` with `vp run release:merge`. GitHub owns publication
+and public verification. Never version packages, edit generated changelogs, publish
+locally, dispatch release workflows, poll CI, or read successful-job logs.
+
+Synchronize `develop` from `main` only with a clean worktree and no parallel
+uncommitted work. Fast-forward when possible; otherwise merge `origin/main`
+without rebasing shared commits. If a queued PR is behind `main`, update that
+PR branch once and let required checks rerun.
+
 Command Mandate:
 - The development command surface is CLOSED: every toolchain workflow is a named task — a package.json script or a `run.tasks` entry in a vite.config.ts — invoked as `vp run <task>` at the root or `vp run "<package>#<task>"` from anywhere. `vp run` with no arguments lists the whole catalog. Nothing else is a sanctioned way to lint, format, typecheck, build, test, capture, or verify in this repository, and every agent conforms to the same surface: no bespoke invocations, no per-agent command dialects.
 - One program per invocation, everywhere — agent shell calls, package.json script bodies, and task commands alike. No `&&`, `;`, or `|`, no redirection, no environment-variable prefixes, no `cd`, and no filtering a run's output through `tail`/`head`/`grep`: output is read whole, and narrowing happens at the source (`vp lint --quiet` exists for exactly this). A workflow that seems to need shell composition is a missing task — add the task, never improvise the invocation.
