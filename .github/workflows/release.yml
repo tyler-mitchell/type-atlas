@@ -2,7 +2,7 @@ name: Release
 
 on:
   push:
-    branches: [release]
+    branches: [main]
 
 concurrency:
   group: bumpy-release-${{ github.ref }}
