@@ -162,27 +162,23 @@ test("no default is published as an arktype marker", () => {
     .toEqual([]);
 });
 
-test(
-  "require-intent applies only to broad exploration",
-  async () => {
-    const client = new Client({ name: "type-atlas-intent-schema-test", version: "1.0.0" });
-    const transport = new StdioClientTransport({
-      command: process.execPath,
-      args: ["--conditions=development", "src/cli.ts", "--require-intent"],
-      cwd: packageRoot,
-      stderr: "pipe",
-    });
-    await client.connect(transport);
-    try {
-      const listed = (await client.listTools()).tools;
-      const broad = listed.find(({ name }) => name === "workspace_symbols")?.inputSchema;
-      const targeted = listed.find(({ name }) => name === "hover")?.inputSchema;
-      expect(broad?.required).toContain("intent");
-      expect(properties(broad ?? {}).map(([name]) => name)).toContain("intent");
-      expect(properties(targeted ?? {}).map(([name]) => name)).not.toContain("intent");
-    } finally {
-      await client.close();
-    }
-  },
-  15_000,
-);
+test("require-intent applies only to broad exploration", async () => {
+  const client = new Client({ name: "type-atlas-intent-schema-test", version: "1.0.0" });
+  const transport = new StdioClientTransport({
+    command: process.execPath,
+    args: ["--conditions=development", "src/cli.ts", "--require-intent"],
+    cwd: packageRoot,
+    stderr: "pipe",
+  });
+  await client.connect(transport);
+  try {
+    const listed = (await client.listTools()).tools;
+    const broad = listed.find(({ name }) => name === "workspace_symbols")?.inputSchema;
+    const targeted = listed.find(({ name }) => name === "hover")?.inputSchema;
+    expect(broad?.required).toContain("intent");
+    expect(properties(broad ?? {}).map(([name]) => name)).toContain("intent");
+    expect(properties(targeted ?? {}).map(([name]) => name)).not.toContain("intent");
+  } finally {
+    await client.close();
+  }
+}, 15_000);
