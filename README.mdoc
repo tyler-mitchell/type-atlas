@@ -10,18 +10,116 @@
 
 </div>
 
-Type Atlas is an MCP server for code intelligence. A Volar language server
-answers from the TypeScript project that owns each file, so definitions,
-references, types, diagnostics, and ranges match what an editor shows.
+**Type Atlas** is what I have all my code agents use across all of my TypeScript projects for all code navigation needs. Most of those projects are monorepos. Some are large and complex enough that understanding how a change fits into the rest of the system is a real part of the work. This tool was designed as a complete replacement for an agent's default code navigation methodology.
 
-Responses are written for a context window instead of a screen. A file outline
-is the declarations in it, not every nested callback. A read folds bodies to
-signatures. `inspect_symbol` composes eight language-server requests into one
-answer. Every answer states the scope it covered and what it cost.
+I've been iterating on this tool for months based on how my own coding agents actually work in my projects. Most of what **Type Atlas** does, exists because I kept seeing the same problems:
 
-I use it every day, on a large monorepo maintained almost entirely by agents.
+* **Agents reason from an incomplete view of the system.** They may understand the file they found while missing the surrounding code that determines how it is supposed to be used.
+* **Agents rebuild things that already exist.** The capability is already in the repo, but the agent never finds it because it does not know what it is called.
+* **Agents often read either too little code (Claude) or far too much (Codex).** Too little leaves them making decisions without enough surrounding context. Too much fills the context window with entire files and implementation detail that never mattered to the task.
+* **Agents repeatedly stop to run type checks just to find errors an IDE would already be showing.** That adds latency throughout implementation and pushes feedback later than it needs to arrive.
+* **Agents are fundamentally operating blind.** String-search navigation never gives them a strong internal atlas of the codebase. They are forced to make implementation decisions from fragments of files and matches they happened to retrieve, with important structure and compiler-known information still missing.
 
-TypeScript, Markdown, and JSON. Node 22.20 or newer. Apache-2.0.
+As projects grow, these problems compound and start showing up directly in the quality of the code agents write.
+
+### Semantic code navigation
+
+Coding agents navigate code through file reads and string searches by default. That gives them source text and leaves the model to reconstruct relationships that the TypeScript language service already knows.
+
+**Type Atlas** gives the agent direct access to that semantic information:
+
+* A symbol resolves to its actual definition and references rather than every occurrence of the same text.
+* Callers and implementations are identified by their relationship to the symbol.
+* Inferred types come from the language service instead of being reconstructed from nearby source.
+* Results keep their source range and owning TypeScript project attached.
+
+A text match is still useful when text is what the agent is looking for. It is a weak substitute for semantic navigation when the question is about the program itself.
+
+### Find what already exists
+
+Large codebases contain useful code that an agent has no reason to know by name. String search works best after the agent already knows enough vocabulary to formulate the search.
+
+**Type Atlas** gives it other ways in:
+
+* The agent can describe behavior in natural language and find code based on what it does.
+* A discovered result leads back to a real symbol and an exact source range.
+* From that symbol the agent can follow actual relationships through the codebase instead of guessing another identifier to search for.
+
+This is especially useful in large monorepos. Existing helpers and established implementations are easier to discover before the agent decides it needs to create another one.
+
+### Diagnostics during normal work
+
+A developer in an IDE sees compiler feedback while working. Coding agents usually get that feedback by stopping implementation to run a type-check command and then waiting for the result.
+
+**Type Atlas** moves much of that feedback into work the agent was already doing:
+
+* Relevant diagnostics can arrive with normal code-intelligence responses.
+* Errors show up while the affected code is still part of the agent's current working context.
+* A bad type assumption can be caught before it turns into several dependent edits.
+
+I still use full type checks for verification. They do not need to be the main way an agent learns about errors while it works.
+
+### Responses are built for model context
+
+Making a response smaller is useful only when the information removed was unnecessary. Models also use the organization of what remains.
+
+**Type Atlas** treats structure as part of the information:
+
+* Labels make the role of a result explicit.
+* Grouping keeps related facts together.
+* File boundaries stop unrelated source from blending together.
+* Source locations stay attached to the thing they describe.
+* Trees keep their hierarchy instead of becoming a flat sequence.
+* Diagnostics retain the source needed to understand them.
+
+The same principle determines what gets omitted. Function bodies can stay folded when the signature is enough. Repeated serialization and unrelated source do not need to occupy the context window simply because they were available.
+
+The goal is useful information density. Fewer tokens matter, but removing the structure that helps the model understand those tokens would defeat the point.
+
+### Information for the next decision
+
+Every tool call is part of the agent's reasoning process. A good response should answer the current question while leaving the agent in a better position to decide what to inspect next.
+
+**Type Atlas** keeps useful follow-up information close to the result that exposed it:
+
+* A symbol can arrive with the relationships needed to understand how it participates in the codebase.
+* Repository structure can carry line counts and working-tree state alongside the files themselves.
+* Search results include concrete source ranges that can be followed directly.
+* Project context remains attached as the agent moves from one result to another.
+
+This gives the agent better evidence at each branch in its investigation. It can follow relationships that actually exist in the program instead of treating every textual match as an equally meaningful lead.
+
+The benefit is higher-quality navigation. Each step preserves more of the information needed to choose the next one.
+
+### Project and scope awareness
+
+TypeScript questions depend on project context. That becomes especially important in a monorepo, where an answer can be correct inside one project while still being incomplete for the repository as a whole.
+
+**Type Atlas** keeps those boundaries visible:
+
+* Files are resolved through the TypeScript project that owns them.
+* Results state the project scope they came from when that scope matters.
+* Counts make the size of a result explicit.
+* Limits are stated when an answer covers less than the whole repository.
+* Source locations can be passed directly into later calls.
+
+The agent gets enough information to understand what an answer actually covers before relying on it.
+
+### Built from daily agent use
+
+I use **Type Atlas** with my own coding agents every day across all of my TypeScript projects. The current behavior came from repeated use.
+
+A lot of the design can be traced directly to recurring agent behavior:
+
+* Reads fold because agents were spending context on bodies they did not need.
+* Diagnostics travel with normal responses because repeated type-check commands were wasting implementation time.
+* Semantic relationships are grouped because agents kept reconstructing the same information through separate calls.
+* Natural-language code search exists because useful code often has a name the agent could never infer from the task.
+
+That is still how I work on **Type Atlas**. When I keep seeing agents waste time on the same navigation problem or repeatedly miss the same kind of information, I change the tool.
+
+The examples below are captured from the running server against a fixture monorepo and regression-checked with the implementation.
+
 
 ## Install
 
