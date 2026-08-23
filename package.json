@@ -4,14 +4,22 @@
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {
+    "ci:dispatch": "gh workflow run ci.yml",
+    "ci:list": "gh run list --limit 10",
+    "ci:logs": "gh run view --log-failed",
+    "ci:rerun": "gh run rerun",
+    "ci:watch": "gh run watch --exit-status",
     "dev": "vp run @type-atlas/mcp#dev",
     "dev:stop": "node scripts/cli.ts dev-stop",
     "registry:prepare": "node scripts/cli.ts registry-prepare",
     "registry:publish": "node scripts/cli.ts registry-publish",
     "release": "bumpy",
+    "release:merge": "gh pr merge bumpy/version-packages --squash",
+    "release:pr": "gh pr view bumpy/version-packages",
     "release:trust": "npm trust",
     "release:verify": "node scripts/cli.ts release-verify",
-    "test": "vp run -r test"
+    "test": "vp run -r test",
+    "workflow:check": "go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 .github/workflows/ci.yml .github/workflows/mcp-registry.yml .github/workflows/release.yml"
   },
   "devDependencies": {
     "@modelcontextprotocol/client": "catalog:",
