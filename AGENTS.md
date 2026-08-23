@@ -46,6 +46,10 @@ After publication, synchronize `main` forward from `release` only with a clean
 worktree and no parallel uncommitted work. Never rebase or force-push shared
 commits.
 
+Complete that synchronization before the next daily change and confirm Bumpy's
+consumed bump files are absent. Address review findings in code; resolve the
+thread only after the correction makes it outdated.
+
 Command Mandate:
 - The development command surface is CLOSED: every toolchain workflow is a named task — a package.json script or a `run.tasks` entry in a vite.config.ts — invoked as `vp run <task>` at the root or `vp run "<package>#<task>"` from anywhere. `vp run` with no arguments lists the whole catalog. Nothing else is a sanctioned way to lint, format, typecheck, build, test, capture, or verify in this repository, and every agent conforms to the same surface: no bespoke invocations, no per-agent command dialects.
 - One program per invocation, everywhere — agent shell calls, package.json script bodies, and task commands alike. No `&&`, `;`, or `|`, no redirection, no environment-variable prefixes, no `cd`, and no filtering a run's output through `tail`/`head`/`grep`: output is read whole, and narrowing happens at the source (`vp lint --quiet` exists for exactly this). A workflow that seems to need shell composition is a missing task — add the task, never improvise the invocation.
