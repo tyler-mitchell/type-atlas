@@ -2,6 +2,12 @@
 
 
 
+
+## 0.6.1
+<sub>2026-08-23</sub>
+
+-  *(patch)* - Expanded the README with Type Atlas's agent-navigation rationale and design principles.
+
 ## 0.6.0
 <sub>2026-08-23</sub>
 
