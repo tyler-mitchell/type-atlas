@@ -4,6 +4,12 @@
 
 
 
+
+## 0.6.3
+<sub>2026-08-23</sub>
+
+- *(patch)* Added code-navigation registry metadata.
+
 ## 0.6.2
 <sub>2026-08-23</sub>
 
