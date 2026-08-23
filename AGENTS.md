@@ -34,7 +34,7 @@ When the worktree is clean and no parallel agent has uncommitted work, merge
 Only an explicit `release` request authorizes queuing `bumpy/version-packages`
 with `vp run release:merge`. GitHub owns publication and public verification.
 Never version packages, edit generated changelogs, publish locally, dispatch
-release workflows, poll CI, read successful-job logs, or merge with `--admin`.
+release workflows, poll CI, or read successful-job logs.
 
 Run `vp run release:pr` once. If the PR is absent, return to useful work; GitHub
 owns the pending workflow. If it is behind `main`, run `vp run release:update`
