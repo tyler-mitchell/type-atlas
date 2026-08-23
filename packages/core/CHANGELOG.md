@@ -3,6 +3,12 @@
 
 
 
+
+## 0.6.2
+<sub>2026-08-23</sub>
+
+- *(patch)* Version bump from group with `@type-atlas/mcp` v0.6.2
+
 ## 0.6.1
 <sub>2026-08-23</sub>
 
