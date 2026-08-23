@@ -75,7 +75,10 @@ test("recovers the resource behind an editor command document link", async () =>
   });
   const workspace = {
     getTextDocument: async () => ({ uri: "file:///workspace/README.md" }),
+    readTextDocumentUri: async (uri: string) => ({ textDocument: { uri }, source: "# README" }),
     sendRequest,
+    withTextDocument: async ({ task }: { task: (document: { uri: string }) => unknown }) =>
+      task({ uri: "file:///workspace/README.md" }),
   } as unknown as VolarWorkspace;
 
   const { links } = await createTypeAtlas(workspace).documentLinks(

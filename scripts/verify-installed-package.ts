@@ -1,3 +1,4 @@
-const name = process.env.PACKAGE_NAME;
-if (!name) throw new Error("PACKAGE_NAME is required.");
-await import(name);
+const packageName = process.env.PACKAGE_NAME;
+if (!packageName) throw new Error("PACKAGE_NAME is required.");
+await import(packageName);
+export {};
