@@ -3,6 +3,8 @@ import { defineCommand, runMain } from "citty";
 const main = defineCommand({
   meta: { name: "type-atlas", description: "Type Atlas product automation." },
   subCommands: {
+    "github-configure": () =>
+      import("./commands/configure-github.ts").then(({ default: command }) => command),
     "dev-stop": () =>
       import("./commands/stop-dev-servers.ts").then(({ default: command }) => command),
     "registry-prepare": () =>

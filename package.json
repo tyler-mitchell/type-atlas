@@ -18,6 +18,7 @@
     "release:pr": "gh pr view bumpy/version-packages",
     "release:trust": "npm trust",
     "release:verify": "node scripts/cli.ts release-verify",
+    "setup:github": "node scripts/cli.ts github-configure",
     "test": "vp run -r test",
     "workflow:check": "go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 .github/workflows/ci.yml .github/workflows/mcp-registry.yml .github/workflows/release.yml"
   },
