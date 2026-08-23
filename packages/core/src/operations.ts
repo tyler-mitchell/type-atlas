@@ -300,20 +300,39 @@ export const createTypeAtlas = (workspace: VolarWorkspace) => {
 
     async documentLinks(file: string, signal: AbortSignal) {
       const textDocument = await workspace.getTextDocument(file);
-      const links = await workspace.sendRequest(DocumentLinkRequest.type, { textDocument }, signal);
-      const resolved = await Promise.all(
-        (links ?? []).map((link) =>
-          link.target ? link : workspace.sendRequest(DocumentLinkResolveRequest.type, link, signal),
-        ),
-      );
-      return {
-        textDocument,
-        links: resolved.flatMap((link) => {
-          if (!link?.target?.startsWith("command:")) return link ? [link] : [];
-          const target = commandTargetResource(link.target);
-          return target ? [{ ...link, target }] : [];
-        }),
+      const readLinks = async (document: { readonly uri: string }) => {
+        const links = await workspace.sendRequest(
+          DocumentLinkRequest.type,
+          { textDocument: document },
+          signal,
+        );
+        const resolved = await Promise.all(
+          (links ?? []).map(async (link) =>
+            link.target
+              ? link
+              : workspace.sendRequest(DocumentLinkResolveRequest.type, link, signal),
+          ),
+        );
+        return {
+          textDocument: document,
+          links: resolved.flatMap((link) => {
+            if (!link?.target?.startsWith("command:")) return link ? [link] : [];
+            const target = commandTargetResource(link.target);
+            return target ? [{ ...link, target }] : [];
+          }),
+        };
       };
+      if (sourceCodeUri.test(textDocument.uri) || /\.jsonc?$/iu.test(textDocument.uri)) {
+        return readLinks(textDocument);
+      }
+      const { source } = await workspace.readTextDocumentUri(textDocument.uri, signal);
+      return workspace.withTextDocument({
+        uri: textDocument.uri,
+        languageId: "markdown",
+        source,
+        signal,
+        task: readLinks,
+      });
     },
 
     selectionRanges: ask(SelectionRangeRequest.type),

@@ -6,4 +6,9 @@ packages/reconcile/src/drift.ts:21:65-21:70 · 5 actions
 4. Extract to inner function in arrow function [refactor.extract.function]
 5. Move to a new file [refactor.move.newFile]
 
+=== packages/reconcile/src/drift.ts ===
+
+error ts(2345) 21:65-21:70
+  Argument of type '"usd"' is not assignable to parameter of type 'Currency'.
+
 1 problem at this position

@@ -1,0 +1,5 @@
+=== packages/reconcile/src/drift.ts · 3 top-level symbols ===
+
+drift [variable] 19:14-19:19 · range 19:14-22:2
+StatementLine [interface] 8:18-8:31 · range 8:1-12:2
+statementTotal [variable] 15:14-15:28 · range 15:14-16:56

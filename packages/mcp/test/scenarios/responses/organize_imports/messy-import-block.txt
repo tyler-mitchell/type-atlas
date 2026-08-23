@@ -13,4 +13,9 @@ Organize Imports · 1 file · 3 edits
  export interface StatementRow {
 *** End Patch
 
-3 hints in packages/importers/src/csv.ts
+=== packages/importers/src/csv.ts ===
+
+hint ts(6133) 2:50-2:56
+  'format' is declared but its value is never read.
+
+3 hints in packages/importers/src/csv.ts · 2 more not shown · includeDiagnostics: verbose shows all

@@ -1,4 +1,4 @@
-Changing signedAmount touches 10 uses in 6 files across 4 packages, in the projects loaded this session. No use sits in a test file.
+Changing signedAmount touches 10 uses in 6 files across 4 packages, in projects whose programs contain it. No use sits in a test file.
 
 package             uses  files  tests
 packages/accounts      4      3

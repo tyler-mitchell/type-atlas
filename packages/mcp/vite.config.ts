@@ -1,5 +1,5 @@
 import { defineConfig } from "vite-plus";
-import CaptureReporter from "./test/scenarios/capture-reporter.ts";
+import ScenarioReporter from "./test/scenarios/scenario-reporter.ts";
 
 /**
  * Three projects, two ordered groups. The scenario suite captures real tool
@@ -29,12 +29,7 @@ export default defineConfig({
     sourcemap: true,
   },
   test: {
-    // Snapshot-first means the run stream IS the witness: echoes and
-    // failures, not ceremony. CaptureReporter (see its header) prints the
-    // changed-capture echoes the moment they happen and otherwise stays as
-    // quiet as the default reporter — verbose once spent ~120 passing rows
-    // per run saying nothing.
-    reporters: [new CaptureReporter()],
+    reporters: [new ScenarioReporter()],
     hideSkippedTests: true,
     // The scenario suite exercises the fixture and the tool source through a
     // spawned stdio server, which Vite's module graph cannot see — without

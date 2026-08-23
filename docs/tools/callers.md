@@ -20,7 +20,7 @@ position: {"line":25,"character":14}
 **Response**
 
 ~~~text
-signedAmount · called from 4 places · 9 projects loaded
+signedAmount · called from 4 places · 5 relevant projects searched
 
 packages/accounts/src/journal.ts
 └  post [method] 34:3-57:4 · calls 52:12-52:24
@@ -48,7 +48,7 @@ position: {"line":28,"character":3}
 **Response**
 
 ~~~text
-post · called from 3 places · 9 projects loaded
+post · called from 3 places · 5 relevant projects searched
 
 packages/accounts/tests/journal.test.ts
 ├  expect() callback [function] 18:10-27:7 · calls 19:13-19:17

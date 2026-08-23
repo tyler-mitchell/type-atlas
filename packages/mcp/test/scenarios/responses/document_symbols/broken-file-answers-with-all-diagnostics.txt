@@ -1,0 +1,21 @@
+=== packages/reconcile/src/drift.ts · 3 top-level symbols ===
+
+drift [variable] 19:14-19:19 · range 19:14-22:2
+StatementLine [interface] 8:18-8:31 · range 8:1-12:2
+statementTotal [variable] 15:14-15:28 · range 15:14-16:56
+
+=== packages/reconcile/src/drift.ts ===
+
+error ts(2345) 21:65-21:70 — inside drift
+  Argument of type '"usd"' is not assignable to parameter of type 'Currency'.
+
+error ts(2362) 21:23-21:35 — inside drift
+  The left-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
+
+error ts(2365) 20:77-20:91 — inside reduce() callback
+  Operator '+' cannot be applied to types 'import("packages/money/src/money").Money' and 'import("packages/money/src/money").Money'.
+
+error ts(2365) 16:33-16:52 — inside lines.reduce() callback
+  Operator '+' cannot be applied to types 'number' and 'Money'.
+
+4 problems in packages/reconcile/src/drift.ts

@@ -2,7 +2,7 @@
 
 # `occurrences`
 
-Experimental: every place an exact text occurs under a directory, with an honest zero — the literal proof of absence a semantic search cannot give. Scans workspace files (gitignore honored, dependencies excluded); use it for teardown checks, string keys, config references, and "is this token ever used" questions. search_code finds meaning; this finds bytes.
+Experimental: every place an exact text occurs under one or more directories, with an honest zero — the literal proof of absence a semantic search cannot give. Scans workspace files (gitignore honored, dependencies excluded); use it for teardown checks, string keys, config references, and "is this token ever used" questions. search_code finds meaning; this finds bytes.
 
 ## token found across packages
 
@@ -38,6 +38,40 @@ packages/reports/src/balance.ts
 packages/rules/src/builtin.ts
 ├  1:10  · import { signedAmount } from "@ledger/accounts";
 └  26:12 · .map(signedAmount)
+~~~
+
+## several directories one call
+
+**Agent's Input**
+
+```yaml
+tool: Occurrences
+workspace: fixtures/ledger
+text: signedAmount
+directories: ["packages/accounts/src","packages/reconcile/src"]
+
+# answered in 23ms
+```
+
+**Response**
+
+~~~text
+"signedAmount" occurs 4 times in 3 files · 4 files scanned under packages/accounts/src.
+
+packages/accounts/src/index.ts:12:39 · export { credit, debit, type Posting, signedAmount } from "./posting.ts";
+packages/accounts/src/journal.ts
+├  3:39  · import { credit, debit, type Posting, signedAmount } from "./posting.ts";
+└  52:12 · .map(signedAmount)
+packages/accounts/src/posting.ts:25:14 · export const signedAmount = (posting: Posting): Money => {
+
+"signedAmount" occurs 4 times in 2 files · 3 files scanned under packages/reconcile/src.
+
+packages/reconcile/src/drift.ts
+├  4:24  · import { type Posting, signedAmount } from "@ledger/accounts";
+└  20:37 · const journalTotal = postings.map(signedAmount).reduce((total, amount) => total + amount);
+packages/reconcile/src/matching.ts
+├  1:55  · // DELIBERATELY BROKEN — the imports for `money` and `signedAmount` are
+└  14:20 · const amount = signedAmount(posting);
 ~~~
 
 ## honest zero

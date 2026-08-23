@@ -1,0 +1,12 @@
+Whole project · 1 problem in 1 file · 8 files checked · packages/accounts/tsconfig.json
+
+=== packages/money/src/index.ts ===
+
+error typescript(2307) 11:8-11:20
+  Cannot find module './money.ts' or its corresponding type declarations.
+    9 |   negate,
+   10 |   zero,
+   11 | } from "./money.ts";
+      |        ^^^^^^^^^^^^
+   12 | export { RoundingMode, roundingModeOf } from "./rounding-mode.ts";
+   13 |

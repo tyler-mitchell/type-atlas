@@ -21,7 +21,7 @@ position: {"line":12,"character":13}
 
 ~~~text
 Money [type] · packages/money/src/money.ts:12:13
-37 references · all 9 projects searched · packages/money/tsconfig.json
+37 references · 6 relevant projects searched · packages/money/tsconfig.json
 
 1-20 of 37 references · pass offset: 20 for the rest
 
@@ -69,7 +69,7 @@ position: {"line":18,"character":14}
 
 ~~~text
 normalBalance [function] · packages/accounts/src/account.ts:18:14
-3 references · all 9 projects searched · packages/accounts/tsconfig.json
+3 references · 5 relevant projects searched · packages/accounts/tsconfig.json
 
 packages/accounts/src/index.ts
 └  8:3 — at module level
@@ -95,7 +95,7 @@ position: {"line":4,"character":3}
 
 ~~~text
 HalfEven [enum member] · inside RoundingMode · packages/money/src/rounding-mode.ts:4:3
-2 references · all 9 projects searched · packages/money/tsconfig.json
+2 references · 6 relevant projects searched · packages/money/tsconfig.json
 
 packages/money/src/rounding-mode.ts
 ├  10:34 — inside "first-national"

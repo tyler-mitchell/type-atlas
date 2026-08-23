@@ -75,10 +75,10 @@ file: packages/money/src/money.ts
 **Response**
 
 ~~~text
-No diagnostic of any severity in packages/money/src/money.ts · packages/money/tsconfig.json.
+
 ~~~
 
-## missing imports diagnosed
+## missing imports diagnosed.audit
 
 **Agent's Input**
 
@@ -87,7 +87,7 @@ tool: Diagnostics
 workspace: fixtures/ledger
 file: packages/reconcile/src/matching.ts
 
-# answered in 18ms
+# answered in 120ms
 ```
 
 **Response**

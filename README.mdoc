@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="packages/mcp/assets/type-atlas-cover.png" width="100%" alt="Type Atlas — code intelligence for agents" />
+  <img src="packages/mcp/assets/type-atlas-cover.png" width="100%" alt="Type Atlas — code intelligence for TypeScript" />
 </p>
 
 <div align="center">
@@ -77,16 +77,9 @@ exceptions. Add this to `AGENTS.md` or `CLAUDE.md`:
 
 ### `--require-intent`
 
-With this flag, a read-only call has to carry one sentence naming the decision
-it serves, and that sentence is echoed above the answer. A call without one
-fails.
-
-```sh
-codex mcp add type-atlas -- npx --yes @type-atlas/mcp@latest --require-intent
-```
-
-This is for agents that navigate far past what their change needs and cannot
-say why afterwards. Off by default.
+This opt-in flag requires one decision sentence for broad exploration tools
+such as repository search and workspace symbols. Targeted reads and semantic
+lookups stay unaffected, and intent is never echoed into tool responses.
 
 ## Tool call results
 

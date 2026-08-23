@@ -4,6 +4,28 @@
 
 Return the top-level document outline and source ranges. Set depth to include nested symbols or raw to return the complete hierarchy.
 
+## ambient diagnostics appear once.repeat
+
+**Agent's Input**
+
+```yaml
+tool: Document symbols
+workspace: fixtures/ledger
+file: packages/reconcile/src/drift.ts
+
+# answered in 6ms
+```
+
+**Response**
+
+~~~text
+=== packages/reconcile/src/drift.ts · 3 top-level symbols ===
+
+drift [variable] 19:14-19:19 · range 19:14-22:2
+StatementLine [interface] 8:18-8:31 · range 8:1-12:2
+statementTotal [variable] 15:14-15:28 · range 15:14-16:56
+~~~
+
 ## journal outline
 
 **Agent's Input**
@@ -34,6 +56,7 @@ UnbalancedEntryError [class] 13:14-13:34 · range 13:1-17:2
 tool: Document symbols
 workspace: fixtures/ledger
 file: packages/reconcile/src/drift.ts
+includeDiagnostics: summary
 
 # answered in 33ms
 ```
@@ -46,6 +69,50 @@ file: packages/reconcile/src/drift.ts
 drift [variable] 19:14-19:19 · range 19:14-22:2
 StatementLine [interface] 8:18-8:31 · range 8:1-12:2
 statementTotal [variable] 15:14-15:28 · range 15:14-16:56
+
+=== packages/reconcile/src/drift.ts ===
+
+error ts(2345) 21:65-21:70 — inside drift
+  Argument of type '"usd"' is not assignable to parameter of type 'Currency'.
+
+4 problems in packages/reconcile/src/drift.ts · 3 more not shown · includeDiagnostics: verbose shows all
+~~~
+
+## broken file answers with all diagnostics
+
+**Agent's Input**
+
+```yaml
+tool: Document symbols
+workspace: fixtures/ledger
+file: packages/reconcile/src/drift.ts
+includeDiagnostics: verbose
+
+# answered in 168ms
+```
+
+**Response**
+
+~~~text
+=== packages/reconcile/src/drift.ts · 3 top-level symbols ===
+
+drift [variable] 19:14-19:19 · range 19:14-22:2
+StatementLine [interface] 8:18-8:31 · range 8:1-12:2
+statementTotal [variable] 15:14-15:28 · range 15:14-16:56
+
+=== packages/reconcile/src/drift.ts ===
+
+error ts(2345) 21:65-21:70 — inside drift
+  Argument of type '"usd"' is not assignable to parameter of type 'Currency'.
+
+error ts(2362) 21:23-21:35 — inside drift
+  The left-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
+
+error ts(2365) 20:77-20:91 — inside reduce() callback
+  Operator '+' cannot be applied to types 'import("packages/money/src/money").Money' and 'import("packages/money/src/money").Money'.
+
+error ts(2365) 16:33-16:52 — inside lines.reduce() callback
+  Operator '+' cannot be applied to types 'number' and 'Money'.
 
 4 problems in packages/reconcile/src/drift.ts
 ~~~
@@ -72,7 +139,12 @@ importStatement [variable] 28:14-28:29 · range 28:14-47:2
 parseStatement [variable] 15:14-15:28 · range 15:14-25:2
 StatementRow [interface] 6:18-6:30 · range 6:1-11:2
 
-3 hints in packages/importers/src/csv.ts
+=== packages/importers/src/csv.ts ===
+
+hint ts(6133) 2:50-2:56
+  'format' is declared but its value is never read.
+
+3 hints in packages/importers/src/csv.ts · 2 more not shown · includeDiagnostics: verbose shows all
 ~~~
 
 ## generic module outline

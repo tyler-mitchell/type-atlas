@@ -26,7 +26,7 @@ One page per tool, generated from the scenario suite's captured responses — ev
 
 | [`document_links`](document_links.md) | Document links | 2 |
 
-| [`document_symbols`](document_symbols.md) | Document symbols | 5 |
+| [`document_symbols`](document_symbols.md) | Document symbols | 7 |
 
 | [`explore_symbol`](explore_symbol.md) | Explore symbol | 1 |
 
@@ -52,7 +52,7 @@ One page per tool, generated from the scenario suite's captured responses — ev
 
 | [`list_module_exports`](list_module_exports.md) | Inspect module | 2 |
 
-| [`occurrences`](occurrences.md) | Occurrences | 3 |
+| [`occurrences`](occurrences.md) | Occurrences | 4 |
 
 | [`organize_imports`](organize_imports.md) | Organize imports | 1 |
 
@@ -60,7 +60,7 @@ One page per tool, generated from the scenario suite's captured responses — ev
 
 | [`quorl`](quorl.md) | Quorl | 3 |
 
-| [`read_file`](read_file.md) | Read files | 3 |
+| [`read_file`](read_file.md) | Read files | 6 |
 
 | [`references`](references.md) | References | 3 |
 

@@ -26,6 +26,9 @@ export const workspaceRelativeMessage = (message: string, workspaceRoot: string)
 const reported = (report: DocumentDiagnosticReport | null | undefined): readonly Diagnostic[] =>
   report && "items" in report ? report.items : [];
 
+const diagnosticIdentity = (report: DocumentDiagnosticReport | null | undefined): string =>
+  JSON.stringify(reported(report));
+
 const focused = (entries: readonly Diagnostic[], focus: Position | Range | undefined) => {
   if (!focus) return entries;
   const position = "line" in focus ? focus : focus.start;
@@ -38,7 +41,6 @@ export const formatDiagnosticMode = async (input: {
   readonly workspaceRoot: string;
   readonly mode: DiagnosticMode;
   readonly focus?: Position | Range;
-  readonly cost?: { readonly elapsedMs: number; readonly reused: boolean };
 }): Promise<string | undefined> => {
   const entries = reported(input.report);
   if (entries.length === 0) return undefined;
@@ -53,7 +55,7 @@ export const formatDiagnosticMode = async (input: {
       groups: [
         {
           file,
-          problems: entries.map((entry) => ({
+          problems: (input.mode === "verbose" ? entries : counted.slice(0, 1)).map((entry) => ({
             ...entry,
             message: workspaceRelativeMessage(entry.message, input.workspaceRoot),
           })),
@@ -67,27 +69,40 @@ export const formatDiagnosticMode = async (input: {
       // that rightly ignores it.
       problems: counted.filter((entry) => (entry.severity ?? 1) <= 2).length,
       hints: counted.filter((entry) => (entry.severity ?? 1) >= 3).length,
+      hidden: input.mode === "verbose" ? 0 : counted.length - 1,
       file,
-      cost: input.cost,
     },
   });
   return rendered.text || undefined;
 };
 
-type CachedReport = {
-  readonly report: DocumentDiagnosticReport | null | undefined;
-  readonly elapsedMs: number;
-};
+const reports = new WeakMap<
+  VolarWorkspace,
+  Map<string, Promise<DocumentDiagnosticReport | null | undefined>>
+>();
+const announced = new WeakMap<VolarWorkspace, Map<string, string>>();
 
-const reports = new WeakMap<VolarWorkspace, Map<string, Promise<CachedReport>>>();
-
-const checked = (workspace: VolarWorkspace): Map<string, Promise<CachedReport>> => {
+const checked = (
+  workspace: VolarWorkspace,
+): Map<string, Promise<DocumentDiagnosticReport | null | undefined>> => {
   const held = reports.get(workspace);
   if (held) return held;
-  const fresh = new Map<string, Promise<CachedReport>>();
+  const fresh = new Map<string, Promise<DocumentDiagnosticReport | null | undefined>>();
   reports.set(workspace, fresh);
   workspace.observeChanges(() => fresh.clear());
   return fresh;
+};
+
+/** Records the exact document report an agent just read through another surface. */
+export const acknowledgeDiagnosticReport = (
+  workspace: VolarWorkspace,
+  uri: string,
+  report: DocumentDiagnosticReport | null | undefined,
+): void => {
+  checked(workspace).set(uri, Promise.resolve(report));
+  const notices = announced.get(workspace) ?? new Map<string, string>();
+  announced.set(workspace, notices);
+  notices.set(uri, diagnosticIdentity(report));
 };
 
 export function requestDiagnosticContext(
@@ -103,19 +118,21 @@ export function requestDiagnosticContext(
 
   const cache = checked(workspace);
   const held = cache.get(textDocument.uri);
+  if (held && includeDiagnostics === undefined) return Promise.resolve(undefined);
   const pending =
     held ??
     (() => {
-      const started = performance.now();
-      const request = workspace
-        .sendRequest(DocumentDiagnosticRequest.type, { textDocument }, signal)
-        .then((report) => ({ report, elapsedMs: Math.round(performance.now() - started) }));
+      const request = workspace.sendRequest(
+        DocumentDiagnosticRequest.type,
+        { textDocument },
+        signal,
+      );
       cache.set(textDocument.uri, request);
       void request.catch(() => cache.delete(textDocument.uri));
       return request;
     })();
   return pending.then(
-    async ({ report, elapsedMs }) => {
+    async (report) => {
       // Every located row names what stands there. A diagnostic's position
       // without its holder is a row a reader must open the file to decode —
       // the same referent every reference row already carries.
@@ -138,13 +155,18 @@ export function requestDiagnosticContext(
           return { ...entry, within: enclosingDeclaration(chain, entry.range)?.name };
         }),
       );
+      const notices = announced.get(workspace) ?? new Map<string, string>();
+      announced.set(workspace, notices);
+      const identity = diagnosticIdentity(report);
+      if (includeDiagnostics === undefined && notices.get(textDocument.uri) === identity)
+        return undefined;
+      notices.set(textDocument.uri, identity);
       return formatDiagnosticMode({
         uri: textDocument.uri,
         report: report && "items" in report ? { ...report, items: named } : report,
         workspaceRoot,
         mode,
         focus,
-        cost: { elapsedMs, reused: held !== undefined },
       });
     },
     () => undefined,

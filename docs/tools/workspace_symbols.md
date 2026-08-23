@@ -20,7 +20,7 @@ query: Balance
 **Response**
 
 ~~~text
-5 symbols matching Balance · 9 projects loaded · packages/reports/tsconfig.json
+5 symbols matching Balance · 8 projects loaded · packages/reports/tsconfig.json
 
 BalanceLine [interface] · packages/reports/src/balance.ts:11:1-16:2
 balance [property] · packages/reports/src/balance.ts:13:3-13:27 — BalanceLine
@@ -45,7 +45,7 @@ query: store
 **Response**
 
 ~~~text
-2 symbols matching store · 9 projects loaded · packages/accounts/tsconfig.json
+2 symbols matching store · 8 projects loaded · packages/accounts/tsconfig.json
 
 AccountStore [interface] · packages/accounts/src/account.ts:31:1-35:2
 MemoryAccountStore [class] · packages/accounts/src/account.ts:37:1-56:2
@@ -67,7 +67,7 @@ query: Parser
 **Response**
 
 ~~~text
-3 symbols matching Parser · 9 projects loaded · packages/importers/tsconfig.json
+3 symbols matching Parser · 8 projects loaded · packages/importers/tsconfig.json
 
 CsvStatementParser [class] · packages/importers/src/statement-parser.ts:25:1-35:2
 FixedWidthStatementParser [class] · packages/importers/src/statement-parser.ts:41:1-64:2

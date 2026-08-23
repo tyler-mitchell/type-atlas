@@ -1,0 +1,8 @@
+{
+  "tool": "document_symbols",
+  "arguments": {
+    "file": "packages/reconcile/src/drift.ts",
+    "includeDiagnostics": "verbose"
+  },
+  "elapsed": "168ms"
+}

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vite-plus/test";
 import { capturedIds, scenarioTest } from "./scenario-test.ts";
+import { arrangeFixture } from "./runner.ts";
 
 /**
  * The practical scenarios — each one a real agent question against the
@@ -9,18 +10,10 @@ import { capturedIds, scenarioTest } from "./scenario-test.ts";
  * `responses/<tool>/<name>.txt`, and the final test snapshots the manifest
  * every downstream consumer enumerates.
  *
- * The development loop is single-case, not full-suite. To iterate on one
- * tool: `vp run "@type-atlas/mcp#case" <case-name>` — watch mode filtered to
- * the case, and `watchTriggerPatterns` reruns it on edits in `packages/
- * {core,mcp,language-server}/src`, `atlascii/src`, and the fixture, which
- * the module graph cannot see. Every new or changed response prints itself,
- * with its diff, into the run output — read it there; the response in full
- * is how presentation is judged. `vp run "@type-atlas/mcp#accept"
- * <case-name>` writes the capture once it is right. Then, before any
- * commit: the full suite (`vp run "@type-atlas/mcp#test"`) — a tool change
- * ripples into sibling captures and the generated docs, and the filtered
- * loop deliberately sees neither; the full plain run is the gate that fails
- * on whatever the narrow loop left stale.
+ * The development loop is single-case, not full-suite. `case:run` prints the
+ * selected MCP response without Vitest ceremony; `accept` writes that response
+ * after review. The full `capture` task is the final gate because one tool
+ * change can alter sibling captures and generated docs.
  *
  * Positions are one-based and point at the symbol's name, the way an agent
  * sends them. They are load-bearing: editing a fixture file shifts them, so
@@ -93,6 +86,20 @@ describe("read_file", () => {
   scenarioTest("abstract-class-folded", ({ capture }) =>
     capture("read_file", { file: ["packages/importers/src/statement-parser.ts"] }),
   );
+  scenarioTest("ambient-diagnostics-appear-once", async ({ capture }) => {
+    await capture("read_file", { file: ["packages/reconcile/src/drift.ts"] }, { facet: "first" });
+    await capture(
+      "document_symbols",
+      { file: "packages/reconcile/src/drift.ts" },
+      { facet: "repeat" },
+    );
+  });
+  scenarioTest("broken-file-shows-all-diagnostics", ({ capture }) =>
+    capture("read_file", {
+      file: ["packages/reconcile/src/drift.ts"],
+      includeDiagnostics: "verbose",
+    }),
+  );
 });
 
 // ── document_symbols: what is in this file ──────────────────────────────────
@@ -101,7 +108,16 @@ describe("document_symbols", () => {
     capture("document_symbols", { file: "packages/accounts/src/journal.ts" }),
   );
   scenarioTest("broken-file-answers-with-diagnostics", ({ capture }) =>
-    capture("document_symbols", { file: "packages/reconcile/src/drift.ts" }),
+    capture("document_symbols", {
+      file: "packages/reconcile/src/drift.ts",
+      includeDiagnostics: "summary",
+    }),
+  );
+  scenarioTest("broken-file-answers-with-all-diagnostics", ({ capture }) =>
+    capture("document_symbols", {
+      file: "packages/reconcile/src/drift.ts",
+      includeDiagnostics: "verbose",
+    }),
   );
   scenarioTest("importer-module-outline", ({ capture }) =>
     capture("document_symbols", { file: "packages/importers/src/csv.ts" }),
@@ -244,9 +260,18 @@ describe("diagnostics", () => {
   scenarioTest("clean-file", ({ capture }) =>
     capture("diagnostics", { file: "packages/money/src/money.ts" }),
   );
-  scenarioTest("missing-imports-diagnosed", ({ capture }) =>
-    capture("diagnostics", { file: "packages/reconcile/src/matching.ts" }),
-  );
+  scenarioTest("missing-imports-diagnosed", async ({ capture }) => {
+    await capture(
+      "diagnostics",
+      { file: "packages/reconcile/src/matching.ts" },
+      { facet: "audit" },
+    );
+    await capture(
+      "read_file",
+      { file: ["packages/reconcile/src/matching.ts"] },
+      { facet: "repeat" },
+    );
+  });
 });
 
 // ── inspect_symbol: the whole picture in one call ───────────────────────────
@@ -444,7 +469,10 @@ describe("format_document", () => {
 // ── add_missing_imports: the names a file forgot to import ──────────────────
 describe("add_missing_imports", () => {
   scenarioTest("forgotten-imports", ({ capture }) =>
-    capture("add_missing_imports", { file: "packages/reconcile/src/matching.ts" }),
+    capture("add_missing_imports", {
+      file: "packages/reconcile/src/matching.ts",
+      includeDiagnostics: "off",
+    }),
   );
 });
 
@@ -584,6 +612,12 @@ describe("occurrences", () => {
   scenarioTest("token-found-across-packages", ({ capture }) =>
     capture("occurrences", { text: "signedAmount" }),
   );
+  scenarioTest("several-directories-one-call", ({ capture }) =>
+    capture("occurrences", {
+      text: "signedAmount",
+      directories: ["packages/accounts/src", "packages/reconcile/src"],
+    }),
+  );
   scenarioTest("honest-zero", ({ capture }) => capture("occurrences", { text: "quantumFlux" }));
   // The committed importers bundle sits in vite's default outDir, so the
   // workspace scan above excludes it and says so; naming the directory is
@@ -594,11 +628,6 @@ describe("occurrences", () => {
 });
 
 // ── the hazard corner, deliberately last ────────────────────────────────────
-// document_links on the unowned README plus find_successor put the bridge's
-// host data into a state the next program rebuild does not survive
-// (`createTsgoProgram` exits; docs/issues.md carries the minimal reproducer).
-// Until that upstream defect falls, these run after every scenario that
-// would otherwise die downstream of them — their own captures are sound.
 describe("the hazard corner", () => {
   scenarioTest("fixture-readme", ({ capture }) => capture("document_links", { file: "README.md" }));
   scenarioTest("renamed-method-hunch", ({ capture }) =>
@@ -621,6 +650,23 @@ describe("the hazard corner", () => {
       name: "assertRoundingParity",
     }),
   );
+  scenarioTest("unowned-document-does-not-poison-typescript", async ({ session }) => {
+    await session.call("document_links", { file: "README.md" });
+    await session.call("find_successor", {
+      file: "packages/accounts/src/journal.ts",
+      name: "postEntry",
+    });
+    const { text } = await session.call("list_module_exports", {
+      fromFile: "packages/accounts/src/account.ts",
+      module: "@ledger/money",
+      limit: 10,
+    });
+    console.log(`── list_module_exports/unowned-document-does-not-poison-typescript ──\n${text}\n`);
+    expect(text).toContain("=== @ledger/money · 11 exports ===");
+    await expect(text).toMatchFileSnapshot(
+      "evidence/unowned-document-does-not-poison-typescript.txt",
+    );
+  });
 
   // verify_edit lives here too: in this suite's sessions — and only in them,
   // never live over the same sequence — diagnosing a proposal leaves the
@@ -759,6 +805,43 @@ describe("list_files working tree states", () => {
       },
     ),
   );
+});
+
+scenarioTest("deleted-dependency-is-observed", async ({ session }) => {
+  const restore = await arrangeFixture({ delete: ["packages/money/src/money.ts"] });
+  const request = { project: "packages/accounts", scope: "project" } as const;
+  try {
+    await expect
+      .poll(async () => (await session.call("diagnostics", request)).text, {
+        timeout: 5_000,
+        interval: 50,
+      })
+      .toContain("Cannot find module './money.ts'");
+    const { text } = await session.call("diagnostics", request);
+    console.log(`── diagnostics/deleted-dependency-is-observed ──\n${text}\n`);
+    await expect(text).toMatchFileSnapshot("evidence/deleted-dependency-is-observed.txt");
+  } finally {
+    await restore();
+  }
+});
+
+scenarioTest("semantic-project-survives-file-changes", async ({ session }) => {
+  await expect
+    .poll(
+      async () =>
+        session
+          .call("list_module_exports", {
+            fromFile: "packages/accounts/src/account.ts",
+            module: "@ledger/money",
+            limit: 10,
+          })
+          .then(
+            ({ text }) => text,
+            () => "",
+          ),
+      { timeout: 5_000, interval: 50 },
+    )
+    .toContain("=== @ledger/money · 11 exports ===");
 });
 
 /**

@@ -23,6 +23,7 @@ import {
 import { URI } from "vscode-uri";
 import { clientCapabilities, getClientConfiguration } from "./language-client.ts";
 import type { RequestTrace } from "@type-atlas/atlascii";
+import { TypeScriptFileChangeRequest } from "@type-atlas/language-server/protocol";
 
 const observed: { entries: RequestTrace[] } = { entries: [] };
 
@@ -316,6 +317,8 @@ export const startLanguageServerProcess = (input: {
    */
   const notifyFileChanges = async (relativePath: string, types: readonly FileChangeType[]) => {
     const uri = URI.file(path.resolve(workspaceRoot, relativePath)).toString();
+    if (/\.(?:[cm]?[jt]s|[jt]sx)$/i.test(relativePath))
+      await connection.sendRequest(TypeScriptFileChangeRequest.type, uri);
     await connection.sendNotification(DidChangeWatchedFilesNotification.type, {
       changes: types.map((type) => ({ uri, type })),
     });

@@ -2,7 +2,7 @@
 
 # `impact`
 
-Experimental: weigh a change to the symbol at a position — every use, grouped by package, with how many sit in tests. Loads the projects of consumers retrieval can see, so the answer reaches past what this session happened to touch. Composed for the decision, not the enumeration; references lists the sites themselves.
+Experimental: weigh a change to the symbol at a position — uses in loaded projects, grouped by package, with how many sit in tests. Composed for the decision, not the enumeration; references lists the sites themselves.
 
 ## weigh a change to signed amount
 
@@ -20,7 +20,7 @@ position: {"line":25,"character":14}
 **Response**
 
 ~~~text
-Changing signedAmount touches 10 uses in 6 files across 4 packages, in the projects loaded this session. No use sits in a test file.
+Changing signedAmount touches 10 uses in 6 files across 4 packages, in projects whose programs contain it. No use sits in a test file.
 
 package             uses  files  tests
 packages/accounts      4      3
@@ -45,7 +45,7 @@ position: {"line":12,"character":13}
 **Response**
 
 ~~~text
-Changing Money touches 38 uses in 9 files across 5 packages, in the projects loaded this session. 4 of the uses sit in test files.
+Changing Money touches 38 uses in 9 files across 5 packages, in projects whose programs contain it. 4 of the uses sit in test files.
 
 package             uses  files  tests
 packages/money        16      3      4

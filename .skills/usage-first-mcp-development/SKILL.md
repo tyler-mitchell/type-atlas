@@ -61,16 +61,16 @@ an agent meets in production, so a probe can only measure something no agent
 will ever experience — the moment a probe feels necessary, the need it would
 serve is not practical, and the practical move has been lost sight of. The
 loop is: make the change, reload, call the tool against the real case study,
-read the answer, iterate. **Running tests is banned as a discovery or
-investigative device** — the reload gate typechecks and the live call
-witnesses behavior, and that pair is the only oracle; run a test suite only
-when an issue is otherwise completely unsolvable, never as the loop. **A test file is not the witness, and reaching for
-one first is how the work silos back into the MCP in isolation** — the
-discipline being practiced is gaining real understanding of a complex
-target (webgpu-engine-class) while iterating the tools that serve that
-understanding, and a test file serves neither track; write one much later
-as bookkeeping, if at all. A test that builds its own
-`ts.createLanguageService` is a probe wearing a test's name. When the
+read the answer, iterate. **Ordinary tests are banned as a discovery or
+investigative substitute** — importing a handler, building a private
+language service, or asserting an inferred result does not show what an agent
+receives. Scenario captures are different: they call the source-level stdio
+MCP through its real client and preserve the exact response bytes. Once live
+usage establishes a public response change, add and read captures for every
+changed branch — summary, verbose, empty, repeated, or error as applicable.
+The live call establishes usefulness; the capture makes that behavior durable.
+A test that builds its own `ts.createLanguageService` is a probe wearing a
+test's name. When the
 surface cannot show you something, either the surface should show it —
 build that — or the thing was never needed. One boundary stated honestly
 rather than routed around: the live harness pins tool schemas at connect,
@@ -313,25 +313,19 @@ replace thought — never on the guard itself.
 - **Name the proving call before the edit.** The exact tool and arguments that
   will show the change worked, chosen while the edit is still a plan. If you
   cannot name it, the change is not ready to make.
-- **Reload immediately after editing.** The next tool call, nothing between — not
-  a read, not a search, not a reply describing what the edit _will_ do. Then run
-  the call that proves it, then the neighbours that share the changed code,
-  enumerated by call rather than from memory. A turn never ends, and no
-  unrelated work begins, while an edit sits unproven. This is MDD —
-  MCP-driven development: the produce witnessed through the live tool is the
-  only "done", the way a failing-then-passing test is TDD's. A change whose
-  produce cannot be witnessed yet is not claimed; it is named as unwitnessed,
-  with what would witness it.
+- **Run the exact response case immediately after editing.** For agent-facing
+  output, `case:run <name>` is the primary loop: it prints the selected MCP
+  response without test-runner ceremony and fails on snapshot drift. Inspect
+  that complete response, then use `accept <name>` once it is right. Use the
+  attached live MCP for the final production sanity check, not as a substitute
+  for the deterministic response case.
 - **Know the code you are editing is the code that runs.** A path-proof is a
   call, not a resemblance. Editing a formatter the tool never invokes looks
   exactly like progress.
-- **A capture written is a capture unread until you read it.** `vitest -u`
-  reports every snapshot it wrote; that list is the mandatory read list, and
-  each file under `responses/` gets read cold — the whole response, as the
-  bytes an agent will receive — before the run counts as witnessed. A green
-  update run with unread captures is the file-snapshot failure mode: the
-  suite passed, the docs regenerated, and nobody ever looked at what the
-  tool actually said.
+- **A full capture is an aggregate gate, not the review surface.** It is quiet
+  when successful and may update manifests and generated docs. Review each
+  changed response through `case:run` before acceptance; a green full capture
+  proves corpus coherence only after those exact responses were read.
 - **Confirm what you newly reference exists.** A symbol used at module scope
   without its import does not fail gracefully.
 - **Every file modification goes through Edit or Write.** Never a shell command —

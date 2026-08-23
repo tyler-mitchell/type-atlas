@@ -2,10 +2,11 @@ import { readSourceView, renderDocument, type VolarWorkspacePool } from "@type-a
 import { foldedSource, displayPath } from "@type-atlas/atlascii";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { type } from "arktype";
-import { textResult } from "./mcp-result.ts";
+import { requestDiagnosticContext } from "./ambient-diagnostics.ts";
+import { appendDiagnosticContext } from "./mcp-result.ts";
 import { readOnlyToolAnnotations } from "./metadata.ts";
 import { registerTool } from "./tool.ts";
-import { fileInput } from "./tool-input.ts";
+import { diagnosticModeInput, fileInput } from "./tool-input.ts";
 
 /**
  * One entry of the batch: a path, or a path carrying its own window.
@@ -40,6 +41,7 @@ const input = type({
   "endLine?": type("number.integer >= 1").configure({
     description: "Last inclusive 1-based source line, for entries that do not set their own.",
   }),
+  "includeDiagnostics?": diagnosticModeInput,
 });
 
 /** Each entry under the call's defaults, as one shape. */
@@ -139,6 +141,7 @@ export const registerReadFileTool = (server: McpServer, workspaces: VolarWorkspa
               target.window.startLine !== undefined ||
               target.window.endLine !== undefined;
             return {
+              uri: view.uri,
               file: displayPath(view.uri, root),
               lines: view.lines,
               foldingRanges: view.foldingRanges,
@@ -176,7 +179,25 @@ export const registerReadFileTool = (server: McpServer, workspaces: VolarWorkspa
           shownLines: views.reduce((total, view) => total + view.shownLines, 0),
         },
       });
-      return textResult(rendered.text);
+      return appendDiagnosticContext(
+        rendered.text,
+        Promise.all(
+          views.flatMap((view) => {
+            const uri = "uri" in view ? view.uri : undefined;
+            return typeof uri === "string"
+              ? [
+                  requestDiagnosticContext(
+                    workspace,
+                    { uri },
+                    root,
+                    request.includeDiagnostics,
+                    signal,
+                  ),
+                ]
+              : [];
+          }),
+        ).then((contexts) => contexts.filter(Boolean).join("\n\n") || undefined),
+      );
     },
   );
 };

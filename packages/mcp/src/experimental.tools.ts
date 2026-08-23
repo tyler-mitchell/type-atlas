@@ -7,7 +7,6 @@ import {
   type Diagnostic,
   type DocumentSymbol,
   DocumentDiagnosticRequest,
-  GetMatchTsConfigRequest,
   type SymbolInformation,
 } from "@volar/language-server/protocol.js";
 import { isFileInDir } from "@volar/language-server/node.js";
@@ -28,7 +27,6 @@ import { textResult } from "./mcp-result.ts";
 import { readOnlyToolAnnotations } from "./metadata.ts";
 import { createQuorl } from "./quorl.ts";
 import { enclosingDeclaration, referenceGroups } from "./reference-groups.ts";
-import type { Semble } from "./semble.ts";
 import { registerTool } from "./tool.ts";
 import { fileInput, positionInput } from "./tool-input.ts";
 
@@ -83,6 +81,14 @@ const input = type.module({
     "directory?": type("string >= 1").configure({
       description: "Workspace-relative directory to scan. Defaults to the workspace.",
     }),
+    "directories?": type("string >= 1")
+      .array()
+      .atLeastLength(1)
+      .atMostLength(5)
+      .configure(
+        { description: "Several directories to scan in one call. Do not combine with directory." },
+        "self",
+      ),
     "limit?": type("1 <= number.integer <= 200").configure({
       default: 40,
       description: "Maximum occurrences returned; the totals count every one found.",
@@ -240,7 +246,6 @@ const scanOccurrences = async (input: {
 export const registerExperimentalTools = (
   server: McpServer,
   workspaces: VolarWorkspacePool,
-  semble: Semble,
 ): void => {
   const quorl = createQuorl({ workspaces });
 
@@ -612,7 +617,7 @@ export const registerExperimentalTools = (
     {
       title: "Impact",
       description:
-        "Experimental: weigh a change to the symbol at a position — every use, grouped by package, with how many sit in tests. Loads the projects of consumers retrieval can see, so the answer reaches past what this session happened to touch. Composed for the decision, not the enumeration; references lists the sites themselves.",
+        "Experimental: weigh a change to the symbol at a position — uses in loaded projects, grouped by package, with how many sit in tests. Composed for the decision, not the enumeration; references lists the sites themselves.",
       inputSchema: input.Impact,
       annotations: readOnlyToolAnnotations,
     },
@@ -628,60 +633,12 @@ export const registerExperimentalTools = (
         position,
         signal,
       }).catch(() => undefined);
-      // A decision needs the whole blast radius, and the reference fan-out
-      // reaches only projects something already loaded. Retrieval sees the
-      // name across the entire repository, so packages it names that no
-      // loaded project covers get loaded first — project selection for one
-      // of their files is the load — bounded to a handful so one question
-      // cannot demand every project in a monorepo.
-      const consumerBudget = 4;
-      const candidates = declaration?.name
-        ? await semble
-            .search({ repo: root, query: declaration.name, limit: 20, snippetLines: 0, signal })
-            .then(({ results }) =>
-              [
-                ...new Set(
-                  results
-                    .map(({ file_path }) => packageOf(file_path))
-                    .filter(
-                      (name) =>
-                        name !== packageOf(displayPath(workspace.getWorkspaceUri(file), root)),
-                    ),
-                ),
-              ].slice(0, consumerBudget),
-            )
-            .catch(() => [])
-        : [];
-      const loaded = await Promise.all(
-        candidates.map((name) =>
-          semble
-            .search({
-              repo: root,
-              query: `${declaration?.name ?? ""} ${name}`,
-              limit: 3,
-              snippetLines: 0,
-              signal,
-            })
-            .then(async ({ results }) => {
-              const inside = results.find(({ file_path }) => packageOf(file_path) === name);
-              if (!inside) return undefined;
-              await workspace.sendRequest(
-                GetMatchTsConfigRequest.type,
-                { uri: workspace.getWorkspaceUri(inside.file_path) },
-                signal,
-              );
-              return name;
-            })
-            .catch(() => undefined),
-        ),
-      );
       const { result: references } = await intelligence.references({
         file,
         signal,
         params: { position, context: { includeDeclaration: false }, scope: "workspace" },
       });
       const sites = (references ?? []).map(({ uri }) => displayPath(uri, root));
-      const explored = new Set(loaded.filter((name) => name !== undefined));
       const byPackage = Map.groupBy(sites, packageOf);
       const rows = [...byPackage]
         .map(([name, held]) => ({
@@ -700,11 +657,6 @@ export const registerExperimentalTools = (
           fileCount: new Set(sites).size,
           packageCount: rows.length,
           testCount: rows.reduce((total, { tests }) => total + tests, 0),
-          // Named by retrieval, not loaded or not confirming a use — the
-          // characterised remainder a decision still has to weigh.
-          beyond: candidates.filter(
-            (name) => !explored.has(name) && !rows.some((row) => row.name === name),
-          ),
           // Two bare numeric columns read as a riddle — a user weighed "4 3"
           // without knowing which was files. The component has always taken
           // headings; impact just never passed them.
@@ -732,16 +684,24 @@ export const registerExperimentalTools = (
     {
       title: "Occurrences",
       description:
-        'Experimental: every place an exact text occurs under a directory, with an honest zero — the literal proof of absence a semantic search cannot give. Scans workspace files (gitignore honored, dependencies excluded); use it for teardown checks, string keys, config references, and "is this token ever used" questions. search_code finds meaning; this finds bytes.',
+        'Experimental: every place an exact text occurs under one or more directories, with an honest zero — the literal proof of absence a semantic search cannot give. Scans workspace files (gitignore honored, dependencies excluded); use it for teardown checks, string keys, config references, and "is this token ever used" questions. search_code finds meaning; this finds bytes.',
       inputSchema: input.Occurrences,
       annotations: readOnlyToolAnnotations,
     },
-    async ({ workspace: root, text, directory = ".", limit = 40 }, { mcpReq: { signal } }) => {
-      const rendered = await renderDocument({
-        document: "occurrences.tool.mdoc",
-        variables: await scanOccurrences({ root, text, directory, limit, signal }),
-      });
-      return textResult(rendered.text);
+    async (
+      { workspace: root, text, directory, directories, limit = 40 },
+      { mcpReq: { signal } },
+    ) => {
+      if (directory && directories) throw new Error("Pass directory or directories, not both.");
+      const rendered = await Promise.all(
+        (directories ?? [directory ?? "."]).map(async (scanRoot) =>
+          renderDocument({
+            document: "occurrences.tool.mdoc",
+            variables: await scanOccurrences({ root, text, directory: scanRoot, limit, signal }),
+          }),
+        ),
+      );
+      return textResult(rendered.map(({ text }) => text).join("\n\n"));
     },
   );
 

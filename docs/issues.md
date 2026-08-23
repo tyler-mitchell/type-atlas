@@ -76,31 +76,6 @@ three times on content that legitimately contained it. The reasoning is kept at
 
 ## Correctness
 
-### 〈raised〉 Diagnostics needs scrutiny and rework in general
-
-Raised as a standing concern; this session's observations of one file
-(`packages/mcp/src/document.tools.ts`, 2026-08-19) already show three surfaces
-telling three stories: the ambient line on `document_symbols` said "1 problem
-at this position" for a request that has no position, counting a ts(6133)
-hint as a problem; `diagnostics` with default scope answered "No diagnostics ·
-Changed files · 74 files checked" anchored at `packages/core/tsconfig.json`
-for a `packages/mcp` file, without saying whether the named file was among
-the 74; `diagnostics scope: "project"` said "No diagnostics · 203 files"
-while the hint stood. A references answer also appended "6 problems in
-<file> · reused, first cost 107ms" — hints as "problems" again, plus an
-unexplained "reused" clause. Severity vocabulary, scope naming, and what the
-ambient line may claim all need one coherent design.
-
-〈raised〉 And the rows have no referent. `hint ts(6385) 419:55-419:65 ·
-'deprecated' is deprecated` names a place and never what stands there —
-deprecated _what_, inside _which_ declaration — breaking the surface's own
-location grammar (`name [kind] · path:pos`), which every reference row already
-pays for through the declaration chain (`within`). A reader must open the file
-to understand any row. The enrichment affordance exists and is in use one tool
-over; diagnostics rendering never adopted it. Applies to the ambient block and
-the diagnostics tool alike. Observed 2026-08-19, and consumed twice in passing
-before being caught — by the maintainer, not by the session.
-
 ### An absence branch asserts a conclusion the tool cannot know
 
 While the symbol index was broken (2026-08-19, since fixed),
@@ -116,23 +91,6 @@ name which nothing it is only when the tool can actually tell; otherwise the
 explanation is the part that misinforms. Observed 2026-08-19 —
 `workspace_symbols` for `indentGuide`, 32ms, empty, project demonstrably
 loaded.
-
-### The surface cannot prove a literal token absent
-
-Verifying a real architectural audit against kek (2026-08-19) required
-"`device.lost` is never handled" — a literal-occurrence question. Every
-search this surface has is semantic (semble ranks by meaning and cannot say
-no — its best match for `device.lost` was a comment about "lost substance"
-at relevance 100%) or symbolic (workspace_symbols needs a declaration;
-references needs a position). There is no tool answering "where does this
-exact text occur under this directory", and teardown work — the audit's
-delete items, alias checks, string keys, config references — lives on
-exactly that proof. Absence today is argued from ranked non-answers, which
-the confidence-for-nothing entry above shows is unreadable. A literal
-occurrence check with an honest zero ("nothing under src/ contains this
-token, N files scanned") is a missing capability, not a presentation gap.
-Observed 2026-08-19 while verifying the webgpu-engine P0 audit's device-loss
-claim through three approximating calls.
 
 ### `search_code` reports full confidence for a query that matched nothing
 
@@ -195,69 +153,6 @@ take is not decided here.
 
 ---
 
-### `references` counts a row it never lists
-
-`references` on `normalBalance` (ledger fixture) answers "4 references" and
-lists three rows; on `Money`'s earlier capture, "2 references" over one row.
-The declaration is inside the count and outside the listing, so the numbers
-never reconcile with what is on screen. Either the count should exclude the
-declaration or the declaration should be a row. Observed 2026-08-20 in the
-scenario captures (`packages/mcp/test/scenarios/responses/references/`).
-
-### One stray NUL byte refuses a whole text file
-
-`read_file` on `~/.claude/skills/guardrails/scripts/navigation-guard.ts`
-(9,317 bytes) answered "is a binary file — there is no text to read", and
-`list_files` left the same file unpriced — both NUL detectors agree the file
-carries at least one NUL somewhere, yet the default Read tool renders ~199
-lines of ordinary TypeScript from it. When a file is overwhelmingly text, an
-all-or-nothing "there is no text" is an absence lie; the honest answer reads
-the text and names the anomaly ("contains a NUL at byte N"). Observed
-2026-08-20.
-
-### The bridge dies rebuilding a program after an unowned document was opened
-
-DIAGNOSED 2026-08-20 to the frame, via the scenario suite's minimal
-reproducer (kept as the sentinel):
-
-```
-pnpm exec vitest run --project=scenarios -t "fixture-readme|renamed-method-hunch|surface-filtered-by-query"
-```
-
-`document_links` on the unowned fixture README plus `find_successor`, then
-any call whose probe reopens a document: the language server exits (code 1)
-inside typescript-native-bridge's `createTsgoProgram` during
-`synchronizeHostData` — the same frame family as the auto-import-cache
-crash, which was therefore a TRIGGER of this defect, not its root. Root:
-host data containing a document no tsconfig owns kills the bridge's next
-program rebuild. Candidate own-layer mitigation to investigate: keep unowned
-documents out of the TypeScript host entirely. Until then the corpus runs
-the two trigger scenarios last, and their own captures are sound.
-
-Found beneath it and FIXED: `withTextDocument`'s close notification threw
-"Connection is disposed" from its `finally` when the server died mid-task,
-replacing the informative exit report — every such crash surfaced as a bare
-transport sentence. The close is now owed to a live connection only, and
-unexpected tool errors log their stack to stderr (the README's operational
-contract), which is what named this frame. Observed 2026-08-20.
-
-### FIXED · the unowned-document crash was the auto-import cache
-
-`document_links { file: "README.md" }` against `fixtures/ledger` exited the
-language server (code 1), and the scenario suite captured the stack the old
-unowned-document entry never had: `typescript-auto-import-cache`'s
-`initProject` dying inside the bridge's `synchronizeHostDataWorker`
-(typescript.js:167426). The fix: `volar-service-typescript` documents a
-`disableAutoImportCache` option, now set in
-`packages/language-server/src/server.ts` — on this engine the cache crashed
-the server and provided no import fixes even when it survived, so disabling
-cost nothing. Witnessed 2026-08-20: the exact killing call answers cleanly,
-warm and repeatable; the restored `document_links/fixture-readme` capture
-stands as the regression witness. One flag re-enables the cache when the
-bridge matures. The absent-auto-import entry below remains open — that is
-the engine's gap, not the cache's, and `add_missing_imports`' capture is its
-sentinel.
-
 ### `implementations` answers empty for an interface with a same-file implementor
 
 `implementations` at `AccountStore` (ledger fixture, account.ts:31:18) answers
@@ -269,42 +164,15 @@ the bridge's goToImplementation, or the walk drops it, is undiagnosed; the
 committed capture (`responses/implementations/store-interface.txt`) pins the
 current wrong answer and will flag any change. Observed 2026-08-20.
 
-### `signature_help` never names the active parameter
+### Missing-import fixes choose a sibling package's source path
 
-The one question at a call site is "which parameter am I on", and the answer
-(`responses/signature_help/inside-a-call.txt`) renders the signature and the
-parameter list without marking the active one, though LSP supplies
-`activeParameter`. Observed 2026-08-20.
-
-### `rename_files` warns about files that need no update
-
-The move patch's honesty note lists `journal.test.ts`, `csv.ts`,
-`matching.ts`, `drift.ts` as "not updated" after moving `posting.ts` — but
-every one of them imports through the barrel or the package specifier and
-needs no change. A warning that cries wolf sends an agent to fix four files
-that need nothing. The list should contain only files whose import specifier
-actually names the moved module. Observed 2026-08-20 in
-`responses/rename_files/module-move-updates-importers.txt`.
-
-### Missing-import fixes exist but depend on session history
-
-CORRECTED 2026-08-20 (the earlier version claimed the engine offers no
-import fixes — that was cold-state absence read as an engine gap). The
-truth, witnessed both ways in scenario subset runs: `add_missing_imports` on
-`matching.ts` produced a real 4-edit patch in a session where
-`organize_imports` had run first, and produces nothing in the full suite's
-order even with every project warm — availability of the fixMissingImport
-family depends on what the session did before, which is itself the defect.
-The one witnessed patch carried its own wart: it imported a sibling
-workspace package as `../../money/src/money.ts` instead of the
-`@ledger/money` specifier the package boundary calls for. The honest-empty
-sentence covers the misses; the committed capture is the sentinel for
-whichever behavior stabilizes. Observed 2026-08-20. Now seeded: the
-determinism gate reproduces the flip on demand
-(`TYPE_ATLAS_SHUFFLE_SEED=1308991141 vp run "@type-atlas/mcp#test:determinism"`
-with the case unquarantined) — the shuffled order yields the full 4-edit
-patch, relative-path wart included, where the canonical order yields the
-honest refusal.
+`add_missing_imports` now resolves the lazy upstream action twice, so cold and
+warm sessions both return a patch. TypeScript still chooses a relative source
+path such as `../../money/src/money.ts` instead of the declared
+`@ledger/money` package surface when no import from that package already
+exists. The tool preserves the upstream workspace edit; correcting this needs
+a TypeScript/Volar module-specifier authority, not edit rewriting. Observed
+2026-08-23.
 
 ## Language grounding
 
@@ -429,18 +297,6 @@ corner (a committed vite bundle in `packages/importers/dist`), so the corpus
 now witnesses the disclosure, the widening hint, and the deliberate opt-in;
 the kek bundles are excluded the same way.
 
-### The ambient problem line races its own background check
-
-Caught by the determinism gate flapping WITHIN one seed (502862052, three
-replays: two passed the case, one appended "1 problem in
-packages/reports/src/balance.ts" to `type_definitions/call-result-to-alias`):
-the ambient diagnostics context attaches when a background check happens to
-have finished, so the same call in the same order answers differently by
-wall-clock luck. Time-dependence is worse than order-dependence — no replay
-seed pins it. The attach policy must be deterministic: await the check, or
-never attach opportunistically. Belongs to the raised diagnostics rework
-above; the case is quarantined in the gate until then. Observed 2026-08-20.
-
 ### A location is shown three ways
 
 Tree rows under a file (`references`, `file_references`,
@@ -564,33 +420,6 @@ Upstream (typescript-native-bridge) material, alongside the shell-file walks
 and the isTsgoBackedProgram-before-sync throw; reproduce by running
 `packages/language-server/test/references-probe.test.ts` whole. Observed
 2026-08-19.
-
-### `rename_symbol` will happily patch a dependency's declaration file
-
-```
-rename_symbol { newName: "workspacePackageOf" } → 12 files · 85 edits
-*** Update File: @ark/schema/out/shared/jsonSchema.d.ts
-```
-
-A rename whose resolved declaration lives in an installed package produces a
-patch that edits that package's `.d.ts` — under a header reading "Scope:
-project only". Applied, it corrupts the installed dependency (and through
-pnpm's hard links, potentially the store). A rename reaching outside the
-workspace should refuse, or at minimum lead with that fact instead of
-burying it as one file among twelve. Observed 2026-08-19: a drifted
-position landed on the word `description` inside `.configure({...})` and
-the tool renamed arktype's schema property surface-wide.
-
-### `rename_symbol` never names what it is renaming
-
-The same answer's whole preamble: "Rename to workspacePackageOf · Scope:
-project only · packages/mcp/tsconfig.json · 12 files · 85 edits". The one
-fact that would let a reader catch a mistargeted rename — the resolved
-subject, `description [property] · @ark/schema/…/jsonSchema.d.ts` in the
-location grammar every other tool pays for — is absent, so the misfire is
-only discoverable by reading 85 edits. Every rename answer should lead
-with what was resolved at the position, exactly as `references` does.
-Observed 2026-08-19, same call as above.
 
 ### `rename_files` emits a confidently incomplete patch
 
@@ -782,50 +611,6 @@ with it. That is correct on every platform and it takes the flake with it.
 What stays unexplained is why the packed build reaches a different answer
 from the source build on Linux for the same request — if that surfaces again
 on a kind where implementations are meaningful, this is the thread.
-
-### Retrieval labels a hit with a symbol the snippet does not contain
-
-```
-search_code { query: "walking an account up through each of its ancestor accounts" }
-→ === 1 · packages/accounts/src/account.ts:21-35 · relevance 100% ===
-  Structure: AccountStore
-  Symbol: AccountStore [interface] · selection 31:18-31:30 · range 31:1-35:2
-  21 | export const parentPath = (path: AccountPath): AccountPath | undefined => {
-```
-
-The chunk is right and ranks first, but the anchor names `AccountStore` — a
-declaration that starts at line 31, below everything the snippet shows. The
-same answer's third hit labels `Journal [class] · range 24:1-73:2` for a
-snippet of its `history` method at 59-73. The anchor resolves to a declaration
-overlapping the chunk rather than the one the chunk's leading code belongs to,
-so an agent reading `Symbol:` gets a name it cannot find in the lines beside
-it, and the position it would carry into the next call points at the wrong
-declaration. Both are visible in `search_code/behavior-with-no-matching-words`,
-the case the README embeds. Observed 2026-08-21, fixtures/ledger.
-
-Fixed. The anchor was chosen by largest overlap with the chunk retrieval
-matched, while the snippet re-centres on the query's own identifier — two
-different windows, so `AccountStore` (31-35) outscored `parentPath` (21-24)
-and then titled six lines that showed `parentPath`. A match now carries both:
-`selected` stays the chunk's declaration, because relationship expansion keys
-off it, and `shown` is the printed window's, which the label uses. Collapsing
-them into one was the first attempt and it cost `investigate_code` its
-verified-relationships section — the tool stopped landing on a question it had
-answered. Two anchors, because two jobs.
-
-Sharpened afterwards, because raw overlap was still too coarse: a snippet of
-`Journal`'s `history` method was labelled `Journal [class]`, the window having
-opened on the method's doc comment, which belongs to the class — six lines of
-overlap for the class against five for the method.
-
-Pure containment (overlap over the declaration's own length) fixes that and
-breaks the opposite case: a one-line `outDir` property scored a perfect 1.0
-and titled a six-line config object, because anything small and wholly inside
-the window always does. The label wants a declaration that fills the window
-_and_ does not sprawl past it, so the score squares the overlap before
-dividing by the declaration's length. The method beats its class (25/5 over
-36/50), the object beats its property (9/6 over 1/1), and a nested callback
-loses to the method that holds it (4/2 over 25/5).
 
 ### `investigate_code` titles its sections `###`
 

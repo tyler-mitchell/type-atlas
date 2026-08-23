@@ -50,7 +50,7 @@ Where accounts live and how they are found. Implemented by `MemoryAccountStore`.
 
 No implementation answered — the walk reaches only files this session has opened, so a declaration realising this in an untouched file reports nothing here. references lists every use, including those declarations.
 
-## Mentions that are not calls (1 of 3 references · 1 project loaded)
+## Mentions that are not calls (1 of 3 references · 1 relevant project searched)
 
 packages/accounts/src/index.ts:5:8-5:20:  type AccountStore,
 

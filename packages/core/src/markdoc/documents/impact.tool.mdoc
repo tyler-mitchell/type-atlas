@@ -6,10 +6,10 @@
 No provider answered for this position, so nothing can be weighed. references answers site by site once a project is loaded — reading a file in one loads it.
 {% /if %}
 {% if and($answered, equals($total, 0)) %}
-Nothing beyond its own declaration uses {% $subject %} in any project loaded this session. A change here is contained to its file as far as what has been opened can see — a project nothing has touched may still hold uses, and loading one changes this answer.
+Nothing beyond its own declaration uses {% $subject %} in the loaded projects whose programs contain it.
 {% /if %}
 {% if not(equals($total, 0)) %}
-Changing {% $subject %} touches {% if any($beyond) %}at least {% /if %}{% $total %} {% plural count=$total forms={"one": "use", "other": "uses"} /%} in {% $fileCount %} {% plural count=$fileCount forms={"one": "file", "other": "files"} /%} across {% $packageCount %} {% plural count=$packageCount forms={"one": "package", "other": "packages"} /%}, in the projects loaded this session. {% if any($testCount) %}{% $testCount %} of the uses {% plural count=$testCount forms={"one": "sits", "other": "sit"} /%} in test files.{% /if %}{% if equals($testCount, 0) %}No use sits in a test file.{% /if %}
+Changing {% $subject %} touches {% if any($beyond) %}at least {% /if %}{% $total %} {% plural count=$total forms={"one": "use", "other": "uses"} /%} in {% $fileCount %} {% plural count=$fileCount forms={"one": "file", "other": "files"} /%} across {% $packageCount %} {% plural count=$packageCount forms={"one": "package", "other": "packages"} /%}, in projects whose programs contain it. {% if any($testCount) %}{% $testCount %} of the uses {% plural count=$testCount forms={"one": "sits", "other": "sit"} /%} in test files.{% /if %}{% if equals($testCount, 0) %}No use sits in a test file.{% /if %}
 
 {% table columns=$columns rows=$rows /%}
 {% if any($beyond) %}

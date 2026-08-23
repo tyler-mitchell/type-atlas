@@ -10,7 +10,7 @@ The brand keeps a raw `{ amount, currency }` literal out of ledger math:
 every `Money` passed through the system was constructed by `money()` and is
 therefore integral and currency-tagged.
 
-## Mentions that are not calls (8 of 38 references · 9 projects loaded)
+## Mentions that are not calls (8 of 38 references · 6 relevant projects searched)
 
 packages/money/tests/rounding-parity.ts:1:15-1:20:  import { type Money, money } from "@ledger/money";
 packages/money/src/index.ts:7:8-7:13:  type Money,

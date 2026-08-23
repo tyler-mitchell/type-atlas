@@ -62,6 +62,7 @@ const startVolarWorkspace = async (workspaceRoot: string, languageServerEntry: U
    * them as they change.
    */
   const changedFiles = new Set<string>();
+  const pendingChanges: { current: Promise<void> } = { current: Promise.resolve() };
 
   const watcher = watch(workspaceRoot, {
     // Establishing watches walks the tree, and that walk is what the first call
@@ -100,19 +101,23 @@ const startVolarWorkspace = async (workspaceRoot: string, languageServerEntry: U
             : event === "add" || event === "addDir"
               ? [FileChangeType.Created]
               : [FileChangeType.Deleted];
-        // Observers see every workspace change, not only the ones a registered
-        // language-server watcher matched: a file this server ignores can still
-        // be the reason another file's diagnostics changed.
-        for (const observe of changeObservers) observe(relativePath);
         if (event === "unlink" || event === "unlinkDir") changedFiles.delete(relativePath);
         else if (sourceFile.test(relativePath)) changedFiles.add(relativePath);
-        void server
-          .notifyFileChanges(relativePath, types)
+        pendingChanges.current = pendingChanges.current
+          .then(() => server.notifyFileChanges(relativePath, types))
           .then(() =>
             path.matchesGlob(relativePath, "**/node_modules/{*,@*/*}")
               ? server.notifyFileChanges(path.join(relativePath, "package.json"), types)
               : undefined,
           )
+          .then(() => {
+            changeObservers.forEach((observe) => observe(relativePath));
+            if (
+              sourceFile.test(relativePath) &&
+              types.some((type) => type !== FileChangeType.Changed)
+            )
+              server.terminate();
+          })
           .catch((error: unknown) => {
             watcherFailure.error = error instanceof Error ? error : new Error(String(error));
           });
@@ -330,16 +335,7 @@ const startVolarWorkspace = async (workspaceRoot: string, languageServerEntry: U
      * worse than a slow one: nothing in it says which it is.
      */
     async flushChanges(): Promise<void> {
-      // Delivery is what matters, not acceptance. A server that refuses one
-      // change — an inferred project the native checker does not hold answers
-      // `project not found for update` — must not take the request with it: the
-      // watcher's own notifications were fire-and-forget, so awaiting them
-      // turned a swallowed failure into a dead call.
-      await Promise.all(
-        [...changedFiles].map((relativePath) =>
-          server.notifyFileChanges(relativePath, [FileChangeType.Changed]).catch(() => undefined),
-        ),
-      );
+      await pendingChanges.current;
     },
 
     observeChanges(observer: (relativePath: string) => void): () => void {

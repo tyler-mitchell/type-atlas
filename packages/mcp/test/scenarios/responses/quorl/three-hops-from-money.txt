@@ -1,4 +1,4 @@
-Closure of money · 23 declarations · 64 sites · depth 3
+Closure of money · 22 declarations · 61 sites · depth 3
 
 money · packages/money/src/money.ts:27:14
 ├  paritySamples · packages/money/tests/rounding-parity.ts:15:14
@@ -35,11 +35,9 @@ money · packages/money/src/money.ts:27:14
 │  │  │  ├  41:28 · rolled.set(ancestor, add(rolled.get(ancestor) ?? zero(currency), amount));
 │  │  │  ├  34:9 · add(own.get(posting.account) ?? zero(currency), signedAmount(posting)),
 │  │  │  ├  41:56 · rolled.set(ancestor, add(rolled.get(ancestor) ?? zero(currency), amount));
-│  │  │  ├  34:41 · add(own.get(posting.account) ?? zero(currency), signedAmount(posting)),
-│  │  │  └  31:33 · for (const posting of entry.postings) {
+│  │  │  └  34:41 · add(own.get(posting.account) ?? zero(currency), signedAmount(posting)),
 │  │  └  closedPeriodsBalance · packages/rules/src/builtin.ts:22:14 · …
-│  │     ├  28:58 · (held, amount) => (held === undefined ? amount : add(held, amount)),
-│  │     └  25:33 · .flatMap((entry) => entry.postings)
+│  │     └  28:58 · (held, amount) => (held === undefined ? amount : add(held, amount)),
 │  └  zero · 30:14
 │     ├  30:52 · export const zero = (currency: Currency): Money => money(0n, currency);
 │     └  own · packages/reports/src/balance.ts:48:7 · …
@@ -50,12 +48,11 @@ money · packages/money/src/money.ts:27:14
 │  │  ├  23:34 · debit("expenses:travel", money(5000, "USD")),
 │  │  ├  test("posts a balanced transfer through the overload") callback · packages/accounts/tests/journal.test.ts:5:56 · …
 │  │  │  └  12:16 · expect(entry.postings).toHaveLength(2);
-│  │  ├  packages/accounts/src/journal.ts
-│  │  │  ├  entries.filter() callback · 61:32 · …
-│  │  │  │  └  62:13 · entry.postings.some((posting) => posting.account === account),
-│  │  │  ├  postings · 44:13 · …
-│  │  │  └  postings · 9:12 · …
-│  │  └  postings · packages/importers/src/csv.ts:42:7 · …
+│  │  └  packages/accounts/src/journal.ts
+│  │     ├  entries.filter() callback · 61:32 · …
+│  │     │  └  62:13 · entry.postings.some((posting) => posting.account === account),
+│  │     ├  postings · 44:13 · …
+│  │     └  postings · 9:12 · …
 │  └  amount · 9:63 · …
 │     └  9:71 · { from: "assets:bank:checking", to: "expenses:furniture", amount: money(24900, "USD") },
 ├  drift · packages/reconcile/src/drift.ts:19:14 · …
@@ -63,4 +60,4 @@ money · packages/money/src/money.ts:27:14
 └  amount · packages/importers/src/csv.ts:34:11 · …
    └  34:20 · const amount = money(Math.abs(row.amountMinor), row.currency);
 
-14 marked … were not expanded · raise depth or limit to follow them
+13 marked … were not expanded · raise depth or limit to follow them

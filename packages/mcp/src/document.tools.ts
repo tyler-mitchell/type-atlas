@@ -22,7 +22,11 @@ import {
 import type { McpServer } from "@modelcontextprotocol/server";
 import { type } from "arktype";
 import { SymbolKind } from "vscode-languageserver-protocol";
-import { requestDiagnosticContext, workspaceRelativeMessage } from "./ambient-diagnostics.ts";
+import {
+  acknowledgeDiagnosticReport,
+  requestDiagnosticContext,
+  workspaceRelativeMessage,
+} from "./ambient-diagnostics.ts";
 import { enclosingDeclaration } from "./reference-groups.ts";
 import { readOnlyToolAnnotations } from "./metadata.ts";
 import {
@@ -138,6 +142,7 @@ export const registerDocumentTools = (server: McpServer, workspaces: VolarWorksp
                     (left.diagnostic.severity ?? 1) - (right.diagnostic.severity ?? 1) ||
                     left.diagnostic.range.start.line - right.diagnostic.range.start.line,
                 );
+              acknowledgeDiagnosticReport(workspace, uri, pulled);
               return { uri, items, project };
             })();
       const report = asked
@@ -155,6 +160,7 @@ export const registerDocumentTools = (server: McpServer, workspaces: VolarWorksp
             scope,
             signal,
           });
+      if (report.diagnostics.length === 0) return textResult("");
       const shown = page(report.diagnostics, offset, limit);
       // Every located row names what stands there — the referent reference
       // rows already carry, bounded to the page.

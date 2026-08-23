@@ -50,8 +50,6 @@ export const serverInstructions = [
   "",
   'Diagnostics: file-scoped tools already report ambient errors and warnings for the file they answer about, so `diagnostics` is for what you have changed. It defaults to the files written since this workspace opened; `scope: "project"` reports the whole project from the same check. There is no per-file mode.',
   "",
-  "`watch_diagnostics` subscribes to one file for a bounded time: it returns that file's diagnostics now, then republishes them whenever they change, including when the edit that broke it was to a different file. Delivery is your client's half — it is told the file's diagnostics resource changed and reads it back — so this reaches you only if your client acts on resource updates. If it does not, the tool's own reply is all you get and you should re-read diagnostics yourself.",
-  "",
   "The first call for a workspace pays language-server startup and may take several seconds; later calls are fast.",
 ].join("\n");
 

@@ -1,6 +1,5 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { createTwoFilesPatch } from "diff";
 import { expect, test as baseTest } from "vite-plus/test";
 import {
   type Arrange,
@@ -63,9 +62,6 @@ export const scenarioTest = baseTest
       const id = `${tool}/${task.name}${options?.facet ? `.${options.facet}` : ""}`;
       if (capturedIds.has(id)) throw new Error(`Case id "${id}" is already captured this run.`);
       capturedIds.add(id);
-      const committed = await readFile(resolve(responsesRoot, `${id}.txt`), "utf8").catch(
-        () => undefined,
-      );
       // The recorded time is kept, not re-measured. Same machine, same call,
       // a different number every run — live timing in a byte-exact snapshot
       // fails every plain run. A case is timed once, when it is first
@@ -76,23 +72,7 @@ export const scenarioTest = baseTest
       const restore = options?.arrange ? await arrangeFixture(options.arrange) : undefined;
       try {
         const { text: response, elapsed } = await session.call(tool, argument);
-        // A capture that differs from the committed corpus prints itself into
-        // the run output — new and changed responses are exactly the ones a
-        // developing agent must read, and the run stream is where they are
-        // read. Unchanged captures stay silent; echoing all of them would
-        // drown the signal in hundreds of unchanged lines. A changed capture
-        // also carries its diff: the full response is how presentation is
-        // judged, the diff is what an accepting `-u` run is agreeing to — and
-        // `-u` otherwise shows no diff at all at the one irreversible step.
-        if (committed === undefined || committed.trimEnd() !== response.trimEnd()) {
-          const diff =
-            committed === undefined
-              ? ""
-              : `\n${createTwoFilesPatch(`${id} (committed)`, `${id} (this run)`, committed, response)}`;
-          console.log(
-            `── ${id} ${committed === undefined ? "(new)" : "(changed)"} ──\n${response}\n${diff}`,
-          );
-        }
+        console.log(`── ${id} ──\n${response}\n`);
         await expect(
           `${JSON.stringify(
             {

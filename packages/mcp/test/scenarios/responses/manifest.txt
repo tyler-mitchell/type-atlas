@@ -9,8 +9,12 @@ list_files/delta-of-a-clean-tree
 read_file/class-folded-to-signatures
 read_file/two-files-one-call
 read_file/abstract-class-folded
+read_file/ambient-diagnostics-appear-once.first
+document_symbols/ambient-diagnostics-appear-once.repeat
+read_file/broken-file-shows-all-diagnostics
 document_symbols/journal-outline
 document_symbols/broken-file-answers-with-diagnostics
+document_symbols/broken-file-answers-with-all-diagnostics
 document_symbols/importer-module-outline
 document_symbols/generic-module-outline
 document_symbols/config-values-fold-to-a-count
@@ -32,7 +36,8 @@ callees/what-a-method-invokes
 callees/what-evaluate-invokes
 diagnostics/deliberately-broken-reconcile
 diagnostics/clean-file
-diagnostics/missing-imports-diagnosed
+diagnostics/missing-imports-diagnosed.audit
+read_file/missing-imports-diagnosed.repeat
 inspect_symbol/journal-class
 inspect_symbol/money-type
 workspace_symbols/balance-across-packages
@@ -72,6 +77,7 @@ investigate_code/behavioral-question-lands
 investigate_code/absent-concept-stays-absent
 explore_symbol/function-with-similarity-tail
 occurrences/token-found-across-packages
+occurrences/several-directories-one-call
 occurrences/honest-zero
 occurrences/scanning-generated-output-on-purpose
 document_links/fixture-readme

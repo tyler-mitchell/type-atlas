@@ -87,7 +87,7 @@
   {
     "name": "impact",
     "title": "Impact",
-    "description": "Experimental: weigh a change to the symbol at a position — every use, grouped by package, with how many sit in tests. Loads the projects of consumers retrieval can see, so the answer reaches past what this session happened to touch. Composed for the decision, not the enumeration; references lists the sites themselves."
+    "description": "Experimental: weigh a change to the symbol at a position — uses in loaded projects, grouped by package, with how many sit in tests. Composed for the decision, not the enumeration; references lists the sites themselves."
   },
   {
     "name": "implementations",
@@ -122,7 +122,7 @@
   {
     "name": "occurrences",
     "title": "Occurrences",
-    "description": "Experimental: every place an exact text occurs under a directory, with an honest zero — the literal proof of absence a semantic search cannot give. Scans workspace files (gitignore honored, dependencies excluded); use it for teardown checks, string keys, config references, and \"is this token ever used\" questions. search_code finds meaning; this finds bytes."
+    "description": "Experimental: every place an exact text occurs under one or more directories, with an honest zero — the literal proof of absence a semantic search cannot give. Scans workspace files (gitignore honored, dependencies excluded); use it for teardown checks, string keys, config references, and \"is this token ever used\" questions. search_code finds meaning; this finds bytes."
   },
   {
     "name": "organize_imports",
@@ -198,11 +198,6 @@
     "name": "verify_edit",
     "title": "Verify edit",
     "description": "Experimental: the diagnostics a proposed edit would introduce, before anything is written. Each file's complete proposed content is checked in memory against the file as it stands; the answer reports what the change introduces and resolves in those files. A change can also break importers — diagnostics after applying reports those."
-  },
-  {
-    "name": "watch_diagnostics",
-    "title": "Watch diagnostics",
-    "description": "Subscribe to a file's diagnostics for a bounded time. Returns the current diagnostics, then invalidates this file's diagnostics resource whenever they change, so a client that subscribes to resource updates is told without you calling anything — including when an edit to another file is what broke this one. Call it after editing a file you intend to keep working on. Requires a client that acts on resources/updated; the reply names whether this one does."
   },
   {
     "name": "workspace_symbols",

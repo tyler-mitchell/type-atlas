@@ -1,6 +1,6 @@
 <!-- Generated from README.mdoc by packages/mcp/scripts/render-docs.ts — edit the source, not this file. -->
 <p align="center">
-  <img src="packages/mcp/assets/type-atlas-cover.png" width="100%" alt="Type Atlas — code intelligence for agents" />
+  <img src="packages/mcp/assets/type-atlas-cover.png" width="100%" alt="Type Atlas — code intelligence for TypeScript" />
 </p>
 
 <div align="center">
@@ -78,16 +78,9 @@ exceptions. Add this to `AGENTS.md` or `CLAUDE.md`:
 
 ### `--require-intent`
 
-With this flag, a read-only call has to carry one sentence naming the decision
-it serves, and that sentence is echoed above the answer. A call without one
-fails.
-
-```sh
-codex mcp add type-atlas -- npx --yes @type-atlas/mcp@latest --require-intent
-```
-
-This is for agents that navigate far past what their change needs and cannot
-say why afterwards. Off by default.
+This opt-in flag requires one decision sentence for broad exploration tools
+such as repository search and workspace symbols. Targeted reads and semantic
+lookups stay unaffected, and intent is never echoed into tool responses.
 
 ## Tool call results
 
@@ -179,7 +172,7 @@ packages/reports/src/balance.ts
 packages/importers/src/csv.ts
 └  importStatement [variable] 28:14-28:29 · range 28:14-47:2 · calls 29:12-29:19
 
-## Mentions that are not calls (4 of 9 references · 9 projects loaded)
+## Mentions that are not calls (4 of 9 references · 5 relevant projects searched)
 
 packages/accounts/tests/journal.test.ts:3:25-3:32:  import { credit, debit, Journal, UnbalancedEntryError } from "../src/index.ts";
 packages/accounts/src/index.ts:11:22-11:29:  export { type Entry, Journal, UnbalancedEntryError } from "./journal.ts";
@@ -465,7 +458,7 @@ query: Parser
 **Response**
 
 ~~~text
-3 symbols matching Parser · 9 projects loaded · packages/importers/tsconfig.json
+3 symbols matching Parser · 8 projects loaded · packages/importers/tsconfig.json
 
 CsvStatementParser [class] · packages/importers/src/statement-parser.ts:25:1-35:2
 FixedWidthStatementParser [class] · packages/importers/src/statement-parser.ts:41:1-64:2
@@ -490,7 +483,7 @@ file: packages/money/src/money.ts
 **Response**
 
 ~~~text
-packages/money/src/money.ts · referenced from 90 places · 10 projects loaded · packages/money/tsconfig.json
+packages/money/src/money.ts · referenced from 90 places · 6 relevant projects searched · packages/money/tsconfig.json
 
 1-20 of 90 places · pass offset: 20 for the rest
 
@@ -499,18 +492,17 @@ packages/accounts/src/journal.ts
 └  53:15 — inside post
 packages/money/src/index.ts
 ├  3:3 — at module level
-└  4:3 — at module level
+├  4:3 — at module level
+└  5:3 — at module level
 packages/money/tests/money.test.ts
 ├  2:10  — at module level
 ├  2:15  — at module level
+├  2:38  — at module level
 ├  5:10  — inside test("adds amounts of one currency exactly") callback
 ├  9:16  — inside expect() callback
 ├  9:67  — inside test("refuses to combine currencies") callback
 ├  13:10 — inside test("formats major and minor units per currency") callback
 └  14:10 — inside test("formats major and minor units per currency") callback
-packages/reconcile/src/drift.ts
-├  5:10  — at module level
-└  21:10 — inside drift
 packages/reports/src/balance.ts
 ├  8:10  — at module level
 ├  34:9  — inside balancesAsOf

@@ -10,28 +10,32 @@ import { editText } from "./mcp-result.ts";
 
 const toolTimeout = 30_000;
 
-// Some agents navigate far past what their change needs. This makes a
-// read-only call state its reason first. Read-only only: an edit carries its
-// own intent.
-//
-// Held like presentation: one process, one client, decided before the first
-// answer. The entrypoint sets it from the parsed CLI flag.
 const intentRequired = { current: false };
 
 export const configureIntent = (required: boolean): void => {
   intentRequired.current = required;
 };
 
-// Must be advertised: a client strips fields its cached schema lacks, so an
-// unadvertised intent would be deleted before the server sees it.
+const broadTools = new Set([
+  "find_successor",
+  "impact",
+  "investigate_code",
+  "list_files",
+  "occurrences",
+  "quorl",
+  "related_code",
+  "search_code",
+  "search_dependency_code",
+  "workspace_symbols",
+]);
+
 const intentInput = type({
-  "intent?": type("string").describe(
-    "One sentence: the implementation decision this call serves. Echoed atop the answer. Required when the session runs with --require-intent.",
+  intent: type("string >= 1").describe(
+    "One sentence naming the implementation decision this broad exploration serves.",
   ),
 });
 
-// Every schema here is an arktype object, which composes with `and`.
-const advertisingIntent = <Input extends StandardSchemaWithJSON>(schema: Input): Input =>
+const withIntent = <Input extends StandardSchemaWithJSON>(schema: Input): Input =>
   (schema as unknown as { readonly and: (right: unknown) => Input }).and(intentInput);
 
 /**
@@ -148,14 +152,12 @@ export const registerTool = <
   config: ToolConfig<Input, Output>,
   callback: ToolCallback<Input>,
 ) => {
+  const requiresIntent = intentRequired.current && broadTools.has(name);
   const boundedCallback = (async (arguments_, context) => {
     const started = performance.now();
     const stated = (arguments_ as { readonly intent?: unknown }).intent;
-    const intent = typeof stated === "string" && stated.trim() !== "" ? stated.trim() : undefined;
-    if (intentRequired.current && config.annotations?.readOnlyHint === true && !intent) {
-      throw new Error(
-        `${name} requires intent: this session runs with --require-intent. Give one sentence naming the implementation decision this call serves and what you will do differently depending on the answer, then repeat the call with that sentence as \`intent\`. If you cannot name one, the call is the sprawl this flag exists to stop.`,
-      );
+    if (requiresIntent && (typeof stated !== "string" || stated.trim() === "")) {
+      throw new Error(`${name} requires one sentence of intent for this broad exploration.`);
     }
     // Whatever is in the trace buffer belongs to a call that never reported —
     // one that threw, timed out, or died with the language server. Draining only
@@ -179,11 +181,7 @@ export const registerTool = <
         callback(arguments_, { ...context, mcpReq: { ...context.mcpReq, signal } }),
         aborted,
       ]);
-      // The stated intent leads the answer, so the transcript keeps the chain.
-      const stamped = intent
-        ? editText(answered as object, "first", (text) => `intent: ${intent}\n\n${text}`)
-        : answered;
-      return withElapsed(stamped, started);
+      return withElapsed(answered as object, started);
     } catch (error) {
       // Operational errors go to stderr — the README's stated contract. The
       // client receives only the message; without this, a defect's throw
@@ -202,9 +200,9 @@ export const registerTool = <
     schema: config.inputSchema,
     callback: callback as unknown as ErasedToolCallback,
   });
-  const published =
-    config.annotations?.readOnlyHint === true
-      ? { ...config, inputSchema: advertisingIntent(config.inputSchema) }
-      : config;
-  return server.registerTool<Output, Input>(name, published, boundedCallback);
+  return server.registerTool<Output, Input>(
+    name,
+    requiresIntent ? { ...config, inputSchema: withIntent(config.inputSchema) } : config,
+    boundedCallback,
+  );
 };

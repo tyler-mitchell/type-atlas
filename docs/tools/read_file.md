@@ -198,3 +198,147 @@ file: ["packages/importers/src/statement-parser.ts"]
 64 | }
 ~~~
 
+## ambient diagnostics appear once.first
+
+**Agent's Input**
+
+```yaml
+tool: Read files
+workspace: fixtures/ledger
+file: ["packages/reconcile/src/drift.ts"]
+
+# answered in 121ms
+```
+
+**Response**
+
+~~~text
+1 file · 22 lines
+
+=== packages/reconcile/src/drift.ts · 22 lines ===
+
+ 1 | // DELIBERATELY BROKEN — this file exists so diagnostics scenarios capture
+ 2 | // real compiler errors from realistic mistakes. Do not fix; see the fixture
+ 3 | // README.
+ 4 | import { type Posting, signedAmount } from "@ledger/accounts";
+ 5 | import { format, money, type Money } from "@ledger/money";
+ 6 |
+ 7 | /** A bank statement line to reconcile against the journal. */
+ 8 | export interface StatementLine {
+ 9 |   readonly postedAt: Date;
+10 |   readonly amount: Money;
+11 |   readonly memo: string;
+12 | }
+13 |
+14 | /** Statement total, computed by someone who forgot Money is not a number. */
+15 | export const statementTotal = (lines: readonly StatementLine[]): number =>
+16 |   lines.reduce((total, line) => total + line.amount, 0);
+17 |
+18 | /** Drift between the journal's view and the bank's view of one day. */
+19 | export const drift = (postings: readonly Posting[], statement: readonly StatementLine[]) => {
+20 |   const journalTotal = postings.map(signedAmount).reduce((total, amount) => total + amount);
+21 |   return format(money(journalTotal - statementTotal(statement), "usd"));
+22 | };
+
+=== packages/reconcile/src/drift.ts ===
+
+error ts(2345) 21:65-21:70 — inside drift
+  Argument of type '"usd"' is not assignable to parameter of type 'Currency'.
+
+4 problems in packages/reconcile/src/drift.ts · 3 more not shown · includeDiagnostics: verbose shows all
+~~~
+
+## broken file shows all diagnostics
+
+**Agent's Input**
+
+```yaml
+tool: Read files
+workspace: fixtures/ledger
+file: ["packages/reconcile/src/drift.ts"]
+includeDiagnostics: verbose
+
+# answered in 8ms
+```
+
+**Response**
+
+~~~text
+1 file · 22 lines
+
+=== packages/reconcile/src/drift.ts · 22 lines ===
+
+ 1 | // DELIBERATELY BROKEN — this file exists so diagnostics scenarios capture
+ 2 | // real compiler errors from realistic mistakes. Do not fix; see the fixture
+ 3 | // README.
+ 4 | import { type Posting, signedAmount } from "@ledger/accounts";
+ 5 | import { format, money, type Money } from "@ledger/money";
+ 6 |
+ 7 | /** A bank statement line to reconcile against the journal. */
+ 8 | export interface StatementLine {
+ 9 |   readonly postedAt: Date;
+10 |   readonly amount: Money;
+11 |   readonly memo: string;
+12 | }
+13 |
+14 | /** Statement total, computed by someone who forgot Money is not a number. */
+15 | export const statementTotal = (lines: readonly StatementLine[]): number =>
+16 |   lines.reduce((total, line) => total + line.amount, 0);
+17 |
+18 | /** Drift between the journal's view and the bank's view of one day. */
+19 | export const drift = (postings: readonly Posting[], statement: readonly StatementLine[]) => {
+20 |   const journalTotal = postings.map(signedAmount).reduce((total, amount) => total + amount);
+21 |   return format(money(journalTotal - statementTotal(statement), "usd"));
+22 | };
+
+=== packages/reconcile/src/drift.ts ===
+
+error ts(2345) 21:65-21:70 — inside drift
+  Argument of type '"usd"' is not assignable to parameter of type 'Currency'.
+
+error ts(2362) 21:23-21:35 — inside drift
+  The left-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
+
+error ts(2365) 20:77-20:91 — inside reduce() callback
+  Operator '+' cannot be applied to types 'import("packages/money/src/money").Money' and 'import("packages/money/src/money").Money'.
+
+error ts(2365) 16:33-16:52 — inside lines.reduce() callback
+  Operator '+' cannot be applied to types 'number' and 'Money'.
+
+4 problems in packages/reconcile/src/drift.ts
+~~~
+
+## missing imports diagnosed.repeat
+
+**Agent's Input**
+
+```yaml
+tool: Read files
+workspace: fixtures/ledger
+file: ["packages/reconcile/src/matching.ts"]
+
+# answered in 8ms
+```
+
+**Response**
+
+~~~text
+1 file · 13 lines · 12 folded to signatures, pass fold: false for the bodies
+
+=== packages/reconcile/src/matching.ts · 24 lines ===
+
+ 1 | // DELIBERATELY BROKEN — the imports for `money` and `signedAmount` are
+ 2 | // missing, so `add_missing_imports` scenarios have real work to do. Do not
+ 3 | // fix; see the fixture README.
+ 4 | import type { Posting } from "@ledger/accounts";
+ 5 | import type { StatementLine } from "./drift.ts";
+ 6 |
+ 7 | /** Pair journal postings with the statement lines they explain. */
+ 8 | export const matchPostings = (
+   |   ... 9-20 folded
+21 | };
+22 |
+23 | /** The zero of a matching pass, for currencies the statement never names. */
+24 | export const emptyRemainder = () => money(0, "USD");
+~~~
+

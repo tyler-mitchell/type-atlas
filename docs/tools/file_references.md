@@ -19,7 +19,7 @@ file: packages/money/src/money.ts
 **Response**
 
 ~~~text
-packages/money/src/money.ts · referenced from 90 places · 10 projects loaded · packages/money/tsconfig.json
+packages/money/src/money.ts · referenced from 90 places · 6 relevant projects searched · packages/money/tsconfig.json
 
 1-20 of 90 places · pass offset: 20 for the rest
 
@@ -28,18 +28,17 @@ packages/accounts/src/journal.ts
 └  53:15 — inside post
 packages/money/src/index.ts
 ├  3:3 — at module level
-└  4:3 — at module level
+├  4:3 — at module level
+└  5:3 — at module level
 packages/money/tests/money.test.ts
 ├  2:10  — at module level
 ├  2:15  — at module level
+├  2:38  — at module level
 ├  5:10  — inside test("adds amounts of one currency exactly") callback
 ├  9:16  — inside expect() callback
 ├  9:67  — inside test("refuses to combine currencies") callback
 ├  13:10 — inside test("formats major and minor units per currency") callback
 └  14:10 — inside test("formats major and minor units per currency") callback
-packages/reconcile/src/drift.ts
-├  5:10  — at module level
-└  21:10 — inside drift
 packages/reports/src/balance.ts
 ├  8:10  — at module level
 ├  34:9  — inside balancesAsOf

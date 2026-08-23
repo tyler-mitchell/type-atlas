@@ -12,15 +12,29 @@ Return TypeScript's source-wide missing-import fixes as a Codex patch. The MCP d
 tool: Add missing imports
 workspace: fixtures/ledger
 file: packages/reconcile/src/matching.ts
+includeDiagnostics: off
 
-# answered in 56ms
+# answered in 307ms
 ```
 
 **Response**
 
 ~~~text
-The language service offered no import fixes, although 2 names in this file do not resolve. If an import should exist for them, write it by hand — the engine proposed none.
+Add all missing imports · 1 file · 4 edits
 
-2 problems in packages/reconcile/src/matching.ts
+*** Begin Patch
+*** Update File: packages/reconcile/src/matching.ts
+@@
+ // DELIBERATELY BROKEN — the imports for `money` and `signedAmount` are
+ // missing, so `add_missing_imports` scenarios have real work to do. Do not
+ // fix; see the fixture README.
+-import type { Posting } from "@ledger/accounts";
++import { signedAmount, type Posting } from "@ledger/accounts";
+ import type { StatementLine } from "./drift.ts";
++import { money } from "../../money/src/money.ts";
+ 
+ /** Pair journal postings with the statement lines they explain. */
+ export const matchPostings = (
+*** End Patch
 ~~~
 

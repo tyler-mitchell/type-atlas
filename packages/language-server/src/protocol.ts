@@ -10,6 +10,11 @@ import type { Declaration } from "./workspace-declarations.ts";
 
 export type { Declaration } from "./workspace-declarations.ts";
 
+/** Records a disk change for the native bridge's next overlay collection. */
+export const TypeScriptFileChangeRequest = {
+  type: new RequestType<string, void, never>("type-atlas/typescriptFileChange"),
+} as const;
+
 /** One project's whole-program diagnostics. */
 export type ProjectDiagnostics = {
   readonly configFile: string | null;

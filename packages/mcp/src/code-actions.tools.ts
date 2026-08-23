@@ -21,7 +21,11 @@ import { readOnlyToolAnnotations } from "./metadata.ts";
 import { registerTool } from "./tool.ts";
 import { observedFileInput, rangeInput } from "./tool-input.ts";
 import { renderWorkspaceEdit } from "./workspace-edit.ts";
-import { type DiagnosticMode, formatDiagnosticMode } from "./ambient-diagnostics.ts";
+import {
+  acknowledgeDiagnosticReport,
+  type DiagnosticMode,
+  formatDiagnosticMode,
+} from "./ambient-diagnostics.ts";
 
 const formattingInput = {
   "tabSize?": type("number.integer >= 1").configure({
@@ -126,32 +130,36 @@ const runSourceAction = async (
   const { kind } = action;
   const workspace = await workspaces.get(root);
   const textDocument = await workspace.getTextDocument(file);
-  const diagnosticReportRequest = workspace.sendRequest(
+  const diagnosticReport = await workspace.sendRequest(
     DocumentDiagnosticRequest.type,
     { textDocument },
     signal,
   );
+  acknowledgeDiagnosticReport(workspace, textDocument.uri, diagnosticReport);
   await setFormattingOptions(workspace, textDocument, options, signal);
-  const actions =
-    (await workspace.sendRequest(
-      CodeActionRequest.type,
-      {
-        textDocument,
-        range: Range.create(0, 0, 0, 0),
-        context: {
-          diagnostics: [],
-          only: [kind],
-          triggerKind: CodeActionTriggerKind.Invoked,
+  const requestAction = async () => {
+    const actions =
+      (await workspace.sendRequest(
+        CodeActionRequest.type,
+        {
+          textDocument,
+          range: Range.create(0, 0, 0, 0),
+          context: {
+            diagnostics:
+              diagnosticReport && "items" in diagnosticReport ? diagnosticReport.items : [],
+            only: [kind],
+            triggerKind: CodeActionTriggerKind.Invoked,
+          },
         },
-      },
-      signal,
-    )) ?? [];
-  const selected = actions.find((action): action is CodeAction => !Command.is(action));
-  const resolved =
-    !selected || selected.data === undefined
+        signal,
+      )) ?? [];
+    const selected = actions.find((candidate): candidate is CodeAction => !Command.is(candidate));
+    return !selected || selected.data === undefined
       ? selected
-      : await workspace.sendRequest(CodeActionResolveRequest.type, selected, signal);
-  const diagnosticReport = await diagnosticReportRequest;
+      : workspace.sendRequest(CodeActionResolveRequest.type, selected, signal);
+  };
+  const first = await requestAction();
+  const resolved = action.name === "add_missing_imports" ? await requestAction() : first;
   const diagnosticContext =
     includeDiagnostics === "off"
       ? undefined

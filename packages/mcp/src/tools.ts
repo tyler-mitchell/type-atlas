@@ -1,7 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { registerAssistanceTools } from "./assistance.tools.ts";
 import { registerCodeActionTools } from "./code-actions.tools.ts";
-import { registerDiagnosticWatchTool } from "./diagnostic-watch.tool.ts";
 import { registerDocumentTools } from "./document.tools.ts";
 import { registerEditingTools } from "./editing.tools.ts";
 import { registerExperimentalTools } from "./experimental.tools.ts";
@@ -43,8 +42,7 @@ export const registerTools = (
   registerEditingTools(server, workspaces);
   registerCodeActionTools(server, workspaces);
   registerIntelligenceTools(server, workspaces, semble);
-  registerExperimentalTools(server, workspaces, semble);
-  registerDiagnosticWatchTool(server, workspaces);
+  registerExperimentalTools(server, workspaces);
   // A client pins tool schemas at connect, so a tool or parameter born after
   // that is stripped or refused before the server sees it — which blocks the
   // edit → reload → use loop this repository develops by. This door is the

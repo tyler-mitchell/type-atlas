@@ -99,9 +99,7 @@ const missedSpecifierEdits = async (input: {
     (uri) => uri !== input.move.oldUri && !input.edited.has(uri),
   );
   if (importers.length === 0) return { changes: [], missed: [] };
-  if (path.dirname(from) !== path.dirname(to)) {
-    return { changes: [], missed: importers };
-  }
+  const sameDirectory = path.dirname(from) === path.dirname(to);
   const oldName = path.basename(from);
   const newName = path.basename(to);
   const bare = (name: string) => name.replace(/\.[cm]?[jt]sx?$/u, "");
@@ -128,8 +126,8 @@ const missedSpecifierEdits = async (input: {
     }),
   );
   const flat = changes.flat();
-  const covered = new Set(flat.map(({ textDocument }) => textDocument.uri));
-  return { changes: flat, missed: importers.filter((uri) => !covered.has(uri)) };
+  const direct = [...new Set(flat.map(({ textDocument }) => textDocument.uri))];
+  return sameDirectory ? { changes: flat, missed: [] } : { changes: [], missed: direct };
 };
 
 export const registerEditingTools = (server: McpServer, workspaces: VolarWorkspacePool): void => {

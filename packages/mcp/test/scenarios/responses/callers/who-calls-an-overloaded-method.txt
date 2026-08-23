@@ -1,4 +1,4 @@
-post · called from 3 places · 9 projects loaded
+post · called from 3 places · 5 relevant projects searched
 
 packages/accounts/tests/journal.test.ts
 ├  expect() callback [function] 18:10-27:7 · calls 19:13-19:17

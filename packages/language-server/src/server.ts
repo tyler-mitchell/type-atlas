@@ -2,6 +2,7 @@ import {
   type Connection,
   type LanguagePlugin,
   type LanguageServer,
+  createSimpleProject,
   createServer,
   createTypeScriptProject,
 } from "@volar/language-server/node.js";
@@ -22,11 +23,13 @@ import {
 } from "volar-service-typescript";
 import { withEffectLanguageService } from "./effect-language-service.ts";
 import { withReferencesAtPosition } from "./references-at-position.ts";
+import { createRoutedProject } from "./routed-project.ts";
 import {
   isProbeDocument,
   type ProjectDiagnostics,
   ProjectDiagnosticsRequest,
   ResolveDependencySourceRequest,
+  TypeScriptFileChangeRequest,
   WorkspaceDeclarationsRequest,
   WorkspaceReferencesRequest,
 } from "./protocol.ts";
@@ -196,11 +199,25 @@ export const registerLanguageServer = (connection: Connection): void => {
           (await Promise.resolve(server.project.getExistingLanguageServices()).catch(
             () => undefined,
           )) ?? [];
-        // One project that cannot answer must not delete the answer the others
-        // have. A service resolves a URI it does not own by pulling the file
-        // into its own program, and that resolution is what fails here.
+        const services = [owner, ...loaded.filter((service) => service !== owner)].filter(
+          (service) => {
+            if (service === owner) return true;
+            try {
+              return (
+                service.context
+                  .inject<TypeScriptService, "typescript/languageService">(
+                    "typescript/languageService",
+                  )
+                  ?.getProgram()
+                  ?.getSourceFile(uri.fsPath) !== undefined
+              );
+            } catch {
+              return false;
+            }
+          },
+        );
         const found = await Promise.all(
-          [owner, ...loaded.filter((service) => service !== owner)].map((service) =>
+          services.map((service) =>
             Promise.resolve(service.getReferences(uri, position, context, token)).catch(
               () => undefined,
             ),
@@ -227,7 +244,7 @@ export const registerLanguageServer = (connection: Connection): void => {
                     other.range.end.character === location.range.end.character,
                 ) === index,
             ),
-          projects: new Set([owner, ...loaded]).size,
+          projects: services.length,
         };
       },
     );
@@ -334,29 +351,31 @@ export const registerLanguageServer = (connection: Connection): void => {
     );
   });
 
-  connection.onInitialize((params) =>
-    server.initialize(
+  connection.onInitialize((params) => {
+    const scripts = createTypeScriptProject(projectTypeScript, undefined, () => ({
+      languagePlugins: [],
+    }));
+    return server.initialize(
       params,
-      createTypeScriptProject(projectTypeScript, undefined, () => ({
-        languagePlugins: [documentLanguagePlugin],
-      })),
+      createRoutedProject(
+        scripts,
+        createSimpleProject([documentLanguagePlugin]),
+        (uri) => documentLanguagePlugin.getLanguageId(uri) !== undefined,
+      ),
       withReferencesAtPosition([
-        // The auto-import cache is disabled deliberately: its `initProject`
-        // dies inside typescript-native-bridge's `synchronizeHostData`,
-        // killing the server when an unowned document's request first
-        // touches it — and on this engine it yields no import fixes even
-        // when it survives (docs/issues.md, the auto-import entries). Under
-        // the bridge it costs a crash class and provides nothing; one flag
-        // re-enables it when the engine matures, and the committed
-        // `add_missing_imports` capture flags any behavior change.
+        // typescript-auto-import-cache crashes the native bridge when a new
+        // source file first enters a project; the stock service stays valid.
         ...createTypeScriptServices(projectTypeScript, { disableAutoImportCache: true }),
         createJsonService(),
         createMarkdownService({
           fileExtensions: [...markdownFileExtensions],
         }),
       ]),
-    ),
-  );
+    );
+  });
+  connection.onRequest(TypeScriptFileChangeRequest.type, (uri) => {
+    ts.tnbNoteExternalFileChange(URI.parse(uri).fsPath);
+  });
   connection.onInitialized(async () => {
     server.initialized();
     // Volar exposes `watchFiles` and never calls it: no feature in

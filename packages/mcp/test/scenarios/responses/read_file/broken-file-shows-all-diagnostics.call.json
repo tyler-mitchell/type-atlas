@@ -1,0 +1,10 @@
+{
+  "tool": "read_file",
+  "arguments": {
+    "file": [
+      "packages/reconcile/src/drift.ts"
+    ],
+    "includeDiagnostics": "verbose"
+  },
+  "elapsed": "8ms"
+}
