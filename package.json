@@ -16,7 +16,6 @@
     "release": "bumpy",
     "release:merge": "gh pr merge bumpy/version-packages --squash",
     "release:pr": "gh pr view bumpy/version-packages",
-    "release:trust": "npm trust",
     "release:verify": "node scripts/cli.ts release-verify",
     "setup:github": "node scripts/cli.ts github-configure",
     "test": "vp run -r test",
