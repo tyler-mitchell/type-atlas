@@ -5,8 +5,8 @@ Code Guidelines:
 
 ## Shared Agent Workflow
 
-- Working branch: `develop`
-- Integration branch: `main`
+- Working branch: `main`
+- Integration branch: `release`
 - Bumpy release branch: `bumpy/version-packages`
 
 The human owns the checked-out branch. Agents never create, switch, rename,
@@ -32,7 +32,7 @@ Only an explicit `release` request authorizes queuing
 and public verification. Never version packages, edit generated changelogs, publish
 locally, dispatch release workflows, poll CI, or read successful-job logs.
 
-Synchronize `develop` from `main` only with a clean worktree and no parallel
+Synchronize `main` from `release` only with a clean worktree and no parallel
 uncommitted work. Fast-forward when possible; otherwise merge `origin/main`
 without rebasing shared commits. If a queued PR is behind `main`, update that
 PR branch once and let required checks rerun.
