@@ -1,6 +1,12 @@
 # @type-atlas/atlascii
 
 
+
+## 0.6.0
+<sub>2026-08-23</sub>
+
+- *(minor)* Version bump from group with `@type-atlas/mcp` v0.6.0
+
 ## 0.5.1
 <sub>2026-08-22</sub>
 

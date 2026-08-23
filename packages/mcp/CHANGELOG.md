@@ -1,6 +1,19 @@
 # @type-atlas/mcp
 
 
+
+## 0.6.0
+<sub>2026-08-23</sub>
+
+-  *(minor)* - Removed the diagnostic watcher because Codex does not deliver its resource updates.
+-  *(patch)* - Added the Type Atlas cover image to the README.
+-  *(patch)*
+  Added actionable ambient diagnostics to file reads, suppressed reports already shown by direct diagnostics and code actions, and made clean diagnostics silent.
+-  *(patch)*
+  Routed non-TypeScript documents through Volar's simple project, guarded cross-project references by program membership, and rebuilt native-bridge state after source creation or deletion.
+-  *(patch)*
+  Made lazy TypeScript missing-import actions resolve reliably without enabling the native-bridge-incompatible auto-import cache.
+
 ## 0.5.1
 <sub>2026-08-22</sub>
 
