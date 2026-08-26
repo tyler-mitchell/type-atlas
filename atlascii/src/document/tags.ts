@@ -97,6 +97,8 @@ export const tags: Config["tags"] = {
       file: { type: String },
       /** Files from an earlier ask's answer: `files=$uses.paths`. */
       files: { type: Array },
+      /** A list from an earlier ask: the ask runs once per item of it. */
+      each: { type: Array },
       line: { type: Number },
       character: { type: Number },
       /** A declaration by name, for an ask that would otherwise need a position. */

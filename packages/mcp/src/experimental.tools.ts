@@ -198,7 +198,7 @@ export const registerExperimentalTools = (
     {
       title: "Compose",
       description:
-        'Answer several questions about code in one call, laid out how you want. `{% ask %}` tags declare data and render nothing; the body you write is the whole answer.\n\nEach ask is named for the tool that answers it and answers as that tool does. Point one at a declaration by name with `symbol="foo"`, or at `line`/`character` (one-based). Every ask also binds `.text`, already rendered, so the shortest useful composition is two lines and needs nothing memorised:\n\n{% ask "references" as="uses" file="src/x.ts" symbol="foo" /%}\n{% $uses.text %}\n\nAsks, and the fields each binds besides `.text`:\n- hover → {text}: signature and documentation\n- subject → {name, kind, file, at}: what a position resolves to\n- references → {total, files, paths, projects, groups}; also takes `tests="only"` or `tests="exclude"` to narrow the uses it already found — "which tests cover this" against "what breaks if I change it". That split is a path heuristic (a `tests/` directory, a `.test.`/`.spec.` name), not something the compiler knows\n- definitions | type_definitions | implementations → {total, files, paths, groups}\n- callers | callees → {name, total, groups, dependencies}; calls into dependencies are named in `dependencies` rather than listed as rows\n- document_symbols → {total, tree}; `depth` opens nested levels, `raw` keeps everything\n- diagnostics → {total, groups, checked, of}; takes `file`, or `files=$uses.paths` from an earlier ask\n- read_file → {lines, startLine}; `from` and `to`\n- occurrences → {text, …}: exact identifiers resolved to their references, with an honest zero when a name occurs nowhere; takes `query`, and `path`, `limit`, `symbolLimit`\n- search_code → {text}: find code by what it does when the name is unknown, each hit anchored to a language-server symbol; takes `query`, and `directory`, `limit`, `snippetLines`\n- workspace_symbols → {total, projects, hits, file, line, character}: find a declaration by `query` across loaded projects, where `file` only picks which project to search from. Binds the first hit\'s location, so the next ask can point at it: `file=$found.file line=$found.line character=$found.character`\n\nTo guard a section, use the boolean: `{% if $uses.any %}` on its own line, with the heading and body under it. A count does not work — `{% if $uses.total %}` renders on zero, because the engine asks whether the value is there, not whether it is nonzero. Every countable ask binds `any`.\n\n`paths` is a list to hand to another ask, not text to print — interpolating it runs the paths together. The file list is already in `.text`.\n\nFor a layout of your own, use the fields with the shipped tags: {% tree entries=$uses.groups partial="reference-node.mdoc" /%}, {% tree entries=$calledBy.groups partial="call-node.mdoc" /%}, {% tree entries=$shape.tree partial="symbol-node.mdoc" /%}, {% each items=$problems.groups as="group" partial="diagnostic-group.mdoc" /%}, {% source lines=$body.lines startLine=$body.startLine /%}.\n\nAsks fulfil in document order and a later one may read an earlier bind. A failing ask is named in a line under the answer; the rest still render.',
+        'Answer several questions about code in one call, laid out how you want. `{% ask %}` tags declare data and render nothing; the body you write is the whole answer.\n\nEach ask is named for the tool that answers it and answers as that tool does. Point one at a declaration by name with `symbol="foo"`, or at `line`/`character` (one-based). Every ask also binds `.text`, already rendered, so the shortest useful composition is two lines and needs nothing memorised:\n\n{% ask "references" as="uses" file="src/x.ts" symbol="foo" /%}\n{% $uses.text %}\n\nAsks, and the fields each binds besides `.text`:\n- hover → {text}: signature and documentation\n- subject → {name, kind, file, at}: what a position resolves to\n- references → {total, files, paths, projects, groups}; also takes `tests="only"` or `tests="exclude"` to narrow the uses it already found — "which tests cover this" against "what breaks if I change it". That split is a path heuristic (a `tests/` directory, a `.test.`/`.spec.` name), not something the compiler knows\n- definitions | type_definitions | implementations → {total, files, paths, groups}\n- callers | callees → {name, total, groups, dependencies}; calls into dependencies are named in `dependencies` rather than listed as rows\n- document_symbols → {total, tree}; `depth` opens nested levels, `raw` keeps everything\n- diagnostics → {total, groups, checked, of}; takes `file`, or `files=$uses.paths` from an earlier ask\n- read_file → {lines, startLine}; `from` and `to`\n- occurrences → {text, …}: exact identifiers resolved to their references, with an honest zero when a name occurs nowhere; takes `query`, and `path`, `limit`, `symbolLimit`\n- search_code → {text}: find code by what it does when the name is unknown, each hit anchored to a language-server symbol; takes `query`, and `directory`, `limit`, `snippetLines`\n- workspace_symbols → {total, projects, hits, file, line, character}: find a declaration by `query` across loaded projects, where `file` only picks which project to search from. Binds the first hit\'s location, so the next ask can point at it: `file=$found.file line=$found.line character=$found.character`\n\nAn ask can also run once per item of a list an earlier ask bound, instead of once at one place: `each=$found.hits` hovers every candidate a search returned, `each=$uses.paths` outlines every file using a symbol. A string item fills `file`; an object item fills the attributes it has fields for; anything you write on the tag yourself stays fixed. It binds {items, total, of, text}, and each item carries its own answer plus a `title` — so `{% $heads.text %}` is already a titled block per item, and `{% sections items=$heads.items /%}` is that same thing when you want to lay it out yourself. Bounded to 10 items; `of` is how many the list held.\n\nTo guard a section, use the boolean: `{% if $uses.any %}` on its own line, with the heading and body under it. A count does not work — `{% if $uses.total %}` renders on zero, because the engine asks whether the value is there, not whether it is nonzero. Every countable ask binds `any`.\n\n`paths` is a list to hand to another ask, not text to print — interpolating it runs the paths together. The file list is already in `.text`.\n\nFor a layout of your own, use the fields with the shipped tags: {% tree entries=$uses.groups partial="reference-node.mdoc" /%}, {% tree entries=$calledBy.groups partial="call-node.mdoc" /%}, {% tree entries=$shape.tree partial="symbol-node.mdoc" /%}, {% each items=$problems.groups as="group" partial="diagnostic-group.mdoc" /%}, {% source lines=$body.lines startLine=$body.startLine /%}.\n\nAsks fulfil in document order and a later one may read an earlier bind. A failing ask is named in a line under the answer; the rest still render.',
       inputSchema: input.Compose,
       annotations: readOnlyToolAnnotations,
     },
@@ -641,6 +641,69 @@ export const registerExperimentalTools = (
           };
         },
       };
+      // An ask pointed at a list runs once per item of it. Every ask above
+      // anchors on one place, so "hover each candidate that search returned"
+      // or "outline every file using this" could only be spelled as N calls —
+      // the round trip a composition exists to remove. The answers land as
+      // `{title, text}`, which is what `sections` already renders.
+      const fanned = async (ask: DocumentAsk, items: unknown, asked: unknown) => {
+        // Fanning over something that is not a list is a broken composition,
+        // never a reason to answer about nothing. Degrading to a single call
+        // ran the operation with no anchor at all and reported "File is
+        // outside the workspace: " — a hole wearing an answer's clothes.
+        if (!Array.isArray(items)) {
+          throw new Error(
+            `each=${
+              isAskReference(asked) ? `$${asked.reference.join(".")}` : "…"
+            } is not a list — the ask it reads either failed above or binds no such field.`,
+          );
+        }
+        // A language-server request per item, so the list is bounded — and
+        // says how much of it it covered, because a silent cut reads as the
+        // whole answer.
+        const taken = items.slice(0, 10);
+        const answers = await Promise.all(
+          taken.map(async (item) => {
+            // A string is a path; an object supplies its own fields. What the
+            // composer wrote stays fixed — those attributes are the part that
+            // is deliberately not varying.
+            const { each, ...written } = ask.attributes;
+            const fields =
+              typeof item === "object" && item !== null
+                ? (item as Record<string, unknown>)
+                : { file: String(item) };
+            const answer = (await operations[ask.operation]!({
+              ...ask,
+              attributes: { ...fields, ...written },
+            }).catch((cause: unknown) => ({
+              text: `Failed: ${cause instanceof Error ? cause.message : String(cause)}`,
+            }))) as Record<string, unknown>;
+            // What this answer is about. The name alone is not enough to tell
+            // the blocks apart — a search for `render` returned four
+            // candidates all named `rendered`, which read as one heading
+            // repeated four times until the place each was found came with it.
+            const file = fields.file === undefined ? "" : String(fields.file);
+            const at = file && fields.line !== undefined ? `${file}:${String(fields.line)}` : file;
+            return {
+              ...answer,
+              title: [fields.name, at].filter(Boolean).map(String).join(" · ") || String(item),
+              // Not every operation answers with prose — `subject` binds
+              // fields only — and a section with no text is a crash. An empty
+              // one is worse than a crash: `index.ts` re-exports and declares
+              // nothing, and its heading sat blank among six that were full,
+              // reading exactly like an ask that had failed.
+              text: String(answer.text ?? "") || "Nothing to report.",
+            };
+          }),
+        );
+        return {
+          items: answers,
+          total: answers.length,
+          any: answers.length > 0,
+          of: items.length,
+          text: await asText("{% sections items=$items /%}", { items: answers }),
+        };
+      };
       const asks = documentAsks(document);
       const unfulfillable = asks.filter(({ operation }) => !(operation in operations));
       if (unfulfillable.length > 0) {
@@ -681,7 +744,10 @@ export const registerExperimentalTools = (
         };
         // One ask's failure is that ask's sentence, never the composition's:
         // a dossier missing one section it names honestly beats no dossier.
-        bound[ask.bind] = await operations[ask.operation]!(resolved).catch((cause: unknown) => ({
+        bound[ask.bind] = await (ask.attributes.each === undefined
+          ? operations[ask.operation]!(resolved)
+          : fanned(resolved, resolved.attributes.each, ask.attributes.each)
+        ).catch((cause: unknown) => ({
           failed: cause instanceof Error ? cause.message : String(cause),
         }));
       }
