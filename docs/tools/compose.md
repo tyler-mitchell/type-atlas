@@ -16,7 +16,7 @@ Asks, and the fields each binds besides `.text`:
 - references → {total, files, paths, projects, groups}; also takes `tests="only"` or `tests="exclude"` to narrow the uses it already found — "which tests cover this" against "what breaks if I change it". That split is a path heuristic (a `tests/` directory, a `.test.`/`.spec.` name), not something the compiler knows
 - definitions | type_definitions | implementations → {total, files, paths, groups}
 - file_references → {total, files, paths, projects, groups}: who imports this module, which is not what the uses of any symbol in it answer — ask it before moving or deleting a file
-- callers | callees → {name, total, groups, dependencies}; calls into dependencies are named in `dependencies` rather than listed as rows
+- callers | callees → {text, name, total, any, groups, standardLibrary}: incoming and outgoing execution flow, answered as those tools answer — including the project scope a call hierarchy is bounded to, which is narrower than references. Standard-library calls fold into one line of names
 - document_symbols → {total, tree}; `depth` opens nested levels, `raw` keeps everything
 - diagnostics → {total, groups, checked, of}; takes `file`, or `files=$uses.paths` from an earlier ask
 - read_file → {lines, startLine}; `from` and `to`

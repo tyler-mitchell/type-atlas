@@ -20,9 +20,9 @@ import {
 } from "@type-atlas/core";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { type } from "arktype";
-import { rangeText as siteText, sameRange } from "@type-atlas/atlascii";
+import { sameRange } from "@type-atlas/atlascii";
 import { requestDiagnosticContext } from "./ambient-diagnostics.ts";
-import { inspectionVariables } from "./inspection-variables.ts";
+import { callHierarchyVariables, inspectionVariables } from "./inspection-variables.ts";
 import { enclosingDeclaration, referenceGroups } from "./reference-groups.ts";
 import { readOnlyToolAnnotations } from "./metadata.ts";
 import { containsPosition, displayPath } from "@type-atlas/atlascii";
@@ -107,74 +107,6 @@ const navigationTargets = async (input: {
         };
       }),
     ),
-  };
-};
-
-/**
- * Shapes one call-hierarchy direction into the variables both call documents read.
- *
- * The two directions carry the same parts — a prepared callable, and calls that
- * each name another callable with the ranges where the relationship shows — and
- * differ only in which side of a call that other callable sits on.
- */
-const callHierarchyVariables = <Call extends { readonly fromRanges: readonly Range[] }>(input: {
-  readonly items: readonly CallHierarchyItem[] | null;
-  readonly calls: readonly (readonly Call[] | null)[] | null;
-  readonly root: string;
-  readonly callable: (call: Call) => CallHierarchyItem;
-}) => {
-  const subject = input.items?.[0];
-  const flat = (input.calls ?? []).flatMap((group) => group ?? []);
-  // The default TypeScript libraries are real callables and pure noise: they
-  // outnumber a function's own calls, repeat once per overload declaration,
-  // and their paths name whatever directory the compiler is installed under —
-  // which differs between this repository and a consumer install. They fold
-  // to one line of distinct names, so the answer stays about the project.
-  const standardLibrary = (call: Call) =>
-    /\/lib\/lib\.[^/]+\.d\.ts$/u.test(input.callable(call).uri);
-  const libraryCalls = flat.filter(standardLibrary);
-  const grouped = flat
-    .filter((call) => !standardLibrary(call))
-    .reduce((files, call) => {
-      const file = displayPath(input.callable(call).uri, input.root);
-      return files.set(file, [...(files.get(file) ?? []), call]);
-    }, new Map<string, Call[]>());
-  return {
-    name: subject?.name,
-    total: flat.length,
-    standardLibrary:
-      libraryCalls.length > 0
-        ? {
-            count: libraryCalls.length,
-            names: [...new Set(libraryCalls.map((call) => input.callable(call).name))]
-              .sort()
-              .join(", "),
-          }
-        : undefined,
-    origin: subject
-      ? [
-          {
-            file: displayPath(subject.uri, input.root),
-            selection: subject.selectionRange,
-            range: subject.range,
-          },
-        ]
-      : [],
-    groups: [...grouped].map(([file, entries]) => ({
-      file,
-      children: entries.map((call) => {
-        const callable = input.callable(call);
-        return {
-          name: callable.name,
-          kind: callable.kind,
-          selection: callable.selectionRange,
-          extent: sameRange(callable.range, callable.selectionRange) ? undefined : callable.range,
-          // One position per site: a call hierarchy reports the same range once
-          // per overload it resolved through.
-          sites: [...new Set(call.fromRanges.map((site) => siteText(site)))],
-        };
-      }),
-    })),
   };
 };
 
