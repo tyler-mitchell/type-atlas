@@ -14,10 +14,13 @@ Asks, and the fields each binds besides `.text`:
 - subject → {name, kind, file, at}: what a position resolves to
 - references → {total, files, paths, projects, groups}; answers exactly as the `references` tool, scope line and anchor included
 - definitions | types | implementations → {total, files, paths, groups}
+- search → {text}: find code by what it does when the name is unknown, each hit anchored to a language-server symbol; takes `query`, and `directory`, `limit`, `snippetLines`
 - symbols → {total, projects, hits, file, line, character}: find a declaration by `query` across loaded projects. `file` here only picks which project to search from. Binds the first hit's location, so the next ask can point at it: `file=$found.file line=$found.line character=$found.character`
 - callers | callees → {name, total, groups, dependencies}; calls into dependencies are named in `dependencies` rather than listed as rows
 - outline → {total, tree}; `depth` opens nested levels, `raw` keeps everything
 - diagnostics → {total, groups, checked, of}; takes `file`, or `files=$uses.paths` from an earlier ask
+
+`references` also takes `tests="only"` or `tests="exclude"`, which narrows the uses it already found — "which tests cover this" against "what breaks if I change it". That split is a path heuristic (a `tests/` directory, a `.test.`/`.spec.` name), not something the compiler knows.
 
 `paths` is a list to hand to another ask, not text to print — interpolating it runs the paths together. The file list is already in `.text`.
 - source → {lines, startLine}; `from` and `to`

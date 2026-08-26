@@ -29,6 +29,8 @@ import { textResult } from "./mcp-result.ts";
 import { readOnlyToolAnnotations } from "./metadata.ts";
 import { createQuorl } from "./quorl.ts";
 import { isDependency } from "./inspection-variables.ts";
+import { createRetrievalIntelligence } from "./intelligence.ts";
+import type { Semble } from "./semble.ts";
 import { enclosingDeclaration, referenceGroups } from "./reference-groups.ts";
 import { registerTool } from "./tool.ts";
 import { fileInput, positionInput } from "./tool-input.ts";
@@ -101,8 +103,10 @@ const isTestSite = (file: string) => /(^|\/)tests?\/|\.(test|spec|check)\./u.tes
 export const registerExperimentalTools = (
   server: McpServer,
   workspaces: VolarWorkspacePool,
+  semble: Semble,
 ): void => {
   const quorl = createQuorl({ workspaces });
+  const retrieval = createRetrievalIntelligence({ semble, workspaces });
 
   registerTool(
     server,
@@ -193,7 +197,7 @@ export const registerExperimentalTools = (
     {
       title: "Compose",
       description:
-        'Answer several questions about code in one call, laid out how you want. `{% ask %}` tags declare data and render nothing; the body you write is the whole answer.\n\nPoint an ask at a declaration by name with `symbol="foo"`, or at `line`/`character` (one-based). Every ask also binds `.text`, already rendered, so the shortest useful composition is two lines and needs nothing memorised:\n\n{% ask "references" as="uses" file="src/x.ts" symbol="foo" /%}\n{% $uses.text %}\n\nAsks, and the fields each binds besides `.text`:\n- hover → {text}: signature and documentation\n- subject → {name, kind, file, at}: what a position resolves to\n- references → {total, files, paths, projects, groups}; answers exactly as the `references` tool, scope line and anchor included\n- definitions | types | implementations → {total, files, paths, groups}\n- symbols → {total, projects, hits, file, line, character}: find a declaration by `query` across loaded projects. `file` here only picks which project to search from. Binds the first hit\'s location, so the next ask can point at it: `file=$found.file line=$found.line character=$found.character`\n- callers | callees → {name, total, groups, dependencies}; calls into dependencies are named in `dependencies` rather than listed as rows\n- outline → {total, tree}; `depth` opens nested levels, `raw` keeps everything\n- diagnostics → {total, groups, checked, of}; takes `file`, or `files=$uses.paths` from an earlier ask\n\n`paths` is a list to hand to another ask, not text to print — interpolating it runs the paths together. The file list is already in `.text`.\n- source → {lines, startLine}; `from` and `to`\n\nFor a layout of your own, use the fields with the shipped tags: {% tree entries=$uses.groups partial="reference-node.mdoc" /%}, {% tree entries=$calledBy.groups partial="call-node.mdoc" /%}, {% tree entries=$shape.tree partial="symbol-node.mdoc" /%}, {% each items=$problems.groups as="group" partial="diagnostic-group.mdoc" /%}, {% source lines=$body.lines startLine=$body.startLine /%}.\n\nAsks fulfil in document order and a later one may read an earlier bind. A failing ask is named in a line under the answer; the rest still render.',
+        'Answer several questions about code in one call, laid out how you want. `{% ask %}` tags declare data and render nothing; the body you write is the whole answer.\n\nPoint an ask at a declaration by name with `symbol="foo"`, or at `line`/`character` (one-based). Every ask also binds `.text`, already rendered, so the shortest useful composition is two lines and needs nothing memorised:\n\n{% ask "references" as="uses" file="src/x.ts" symbol="foo" /%}\n{% $uses.text %}\n\nAsks, and the fields each binds besides `.text`:\n- hover → {text}: signature and documentation\n- subject → {name, kind, file, at}: what a position resolves to\n- references → {total, files, paths, projects, groups}; answers exactly as the `references` tool, scope line and anchor included\n- definitions | types | implementations → {total, files, paths, groups}\n- search → {text}: find code by what it does when the name is unknown, each hit anchored to a language-server symbol; takes `query`, and `directory`, `limit`, `snippetLines`\n- symbols → {total, projects, hits, file, line, character}: find a declaration by `query` across loaded projects. `file` here only picks which project to search from. Binds the first hit\'s location, so the next ask can point at it: `file=$found.file line=$found.line character=$found.character`\n- callers | callees → {name, total, groups, dependencies}; calls into dependencies are named in `dependencies` rather than listed as rows\n- outline → {total, tree}; `depth` opens nested levels, `raw` keeps everything\n- diagnostics → {total, groups, checked, of}; takes `file`, or `files=$uses.paths` from an earlier ask\n\n`references` also takes `tests="only"` or `tests="exclude"`, which narrows the uses it already found — "which tests cover this" against "what breaks if I change it". That split is a path heuristic (a `tests/` directory, a `.test.`/`.spec.` name), not something the compiler knows.\n\n`paths` is a list to hand to another ask, not text to print — interpolating it runs the paths together. The file list is already in `.text`.\n- source → {lines, startLine}; `from` and `to`\n\nFor a layout of your own, use the fields with the shipped tags: {% tree entries=$uses.groups partial="reference-node.mdoc" /%}, {% tree entries=$calledBy.groups partial="call-node.mdoc" /%}, {% tree entries=$shape.tree partial="symbol-node.mdoc" /%}, {% each items=$problems.groups as="group" partial="diagnostic-group.mdoc" /%}, {% source lines=$body.lines startLine=$body.startLine /%}.\n\nAsks fulfil in document order and a later one may read an earlier bind. A failing ask is named in a line under the answer; the rest still render.',
       inputSchema: input.Compose,
       annotations: readOnlyToolAnnotations,
     },
@@ -243,9 +247,23 @@ export const registerExperimentalTools = (
       // Every ask that answers with places binds this one shape, so a composer
       // learns it once: references, definitions, types, and implementations all
       // render through `reference-node.mdoc`.
-      const places = async (locations: readonly { uri: string; range: Range }[]) => {
+      // Narrowing what an ask already fetched, the way a shell pipeline
+      // narrows a result set — but over a fact the surface knows rather than
+      // text. `tests="only"` reads as "which tests cover this", `"exclude"` as
+      // "what actually breaks if I change it", and a symbol with sixty uses is
+      // unreadable without one of them.
+      const testFilter = (ask: DocumentAsk) => {
+        const wanted = attributeText(ask.attributes.tests);
+        return (file: string) =>
+          wanted === "only" ? isTestSite(file) : wanted === "exclude" ? !isTestSite(file) : true;
+      };
+      const places = async (
+        locations: readonly { uri: string; range: Range }[],
+        keep: (file: string) => boolean = () => true,
+      ) => {
         const sites = [];
         for (const { uri, range } of locations) {
+          if (!keep(displayPath(uri, root))) continue;
           const chain = await declarationChainAtPosition({
             workspace,
             uri,
@@ -398,6 +416,7 @@ export const registerExperimentalTools = (
                 site.range.start.line !== declaredAt.selection.start.line ||
                 site.range.start.character !== declaredAt.selection.start.character,
             ),
+            testFilter(ask),
           );
           // Rendered through the `references` tool's own document, so composing
           // is never less honest than calling it. A reference count without the
@@ -423,6 +442,19 @@ export const registerExperimentalTools = (
             }),
           };
         },
+        // Find code by what it does, for when the name is unknown — the other
+        // half of orientation, where `symbols` needs a name to search for.
+        search: async (ask) => ({
+          text: await retrieval.search({
+            root,
+            directory: attributeText(ask.attributes.directory) || undefined,
+            includeTypes: false,
+            query: attributeText(ask.attributes.query),
+            limit: Number(ask.attributes.limit ?? 5),
+            snippetLines: Number(ask.attributes.snippetLines ?? 10),
+            signal,
+          }),
+        }),
         // Find a declaration by name before anything can be asked about it.
         // Without this a composition could only ever explain a symbol whose
         // file the composer already knew, so orientation stayed a separate

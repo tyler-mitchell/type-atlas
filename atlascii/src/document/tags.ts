@@ -105,6 +105,12 @@ export const tags: Config["tags"] = {
       raw: { type: Boolean },
       /** How many levels of nested declarations an outline opens. */
       depth: { type: Number },
+      /** Narrows located results to or away from test files: "only", "exclude". */
+      tests: { type: String },
+      /** Where a search looks, and how much it returns. */
+      directory: { type: String },
+      limit: { type: Number },
+      snippetLines: { type: Number },
       query: { type: String },
       /** Exact text for a literal ask, as distinct from a query by meaning. */
       text: { type: String },
