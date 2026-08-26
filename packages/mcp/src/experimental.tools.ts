@@ -652,33 +652,60 @@ export const registerExperimentalTools = (
         // composable. Binds `file`, `line`, and `character` of the first hit,
         // so a later ask can point at it: file=$found.file line=$found.line.
         workspace_symbols: async (ask) => {
-          const { symbols, projects } = await intelligence.workspaceSymbols({
+          const query = attributeText(ask.attributes.query);
+          const { project, projects, symbols } = await intelligence.workspaceSymbols({
             file: askedFile(ask),
-            query: attributeText(ask.attributes.query),
+            query,
             signal,
           });
-          const hits = (symbols ?? []).map((symbol) => ({
-            name: symbol.name,
-            kind: symbol.kind,
-            word: "word" in symbol ? (symbol as { word?: string }).word : undefined,
-            file: displayPath(symbol.location.uri, root),
-            range: symbol.location.range,
-            container: symbol.containerName || undefined,
-            line: symbol.location.range.start.line + 1,
-            character: symbol.location.range.start.character + 1,
-          }));
+          const limit = Number(ask.attributes.limit ?? 20);
+          const all = (symbols ?? []).map((symbol) => {
+            const range =
+              "range" in symbol.location && symbol.location.range
+                ? symbol.location.range
+                : undefined;
+            return {
+              name: symbol.name,
+              kind: symbol.kind,
+              // TypeScript's own word when the server carried it — the number
+              // cannot say "type".
+              word: "word" in symbol ? (symbol as { word?: string }).word : undefined,
+              file: displayPath(symbol.location.uri, root),
+              range,
+              container: symbol.containerName || undefined,
+              line: (range?.start.line ?? 0) + 1,
+              character: (range?.start.character ?? 0) + 1,
+            };
+          });
+          const hits = all.slice(0, limit);
           const [first] = hits;
           return {
-            total: hits.length,
-            any: hits.length > 0,
+            total: all.length,
+            shown: hits.length,
+            any: all.length > 0,
+            // A provider that did not answer and one that searched and found
+            // nothing both arrive as zero and mean opposite things — the
+            // second says the name is absent, the first says nothing at all.
+            // Collapsing them is how a cold session reports an empty
+            // workspace as fact.
+            answered: symbols !== null,
             projects,
             file: first?.file,
             line: first?.line,
             character: first?.character,
             hits,
-            text: await asText('{% each items=$hits as="item" partial="workspace-symbol.mdoc" /%}', {
-              hits,
-            }),
+            text: withRest(
+              await asDocument("workspace-symbols.tool.mdoc", {
+                query,
+                anchor: project ? displayPath(project.uri, root) : undefined,
+                answered: symbols !== null,
+                projects,
+                total: all.length,
+                items: hits,
+              }),
+              all.length - hits.length,
+              limit,
+            ),
           };
         },
         document_symbols: async (ask) => {
