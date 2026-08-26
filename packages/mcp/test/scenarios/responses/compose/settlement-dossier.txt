@@ -1,14 +1,12 @@
 ## signedAmount · packages/accounts/src/posting.ts:25:14
 
-10 uses across 6 files · 0 problems in the declaring file
+9 uses across 5 files · 0 problems in the declaring file
 
 packages/accounts/src/index.ts
 └  12:39 — at module level
 packages/accounts/src/journal.ts
 ├  3:39  — at module level
 └  52:12 — inside post
-packages/accounts/src/posting.ts
-└  25:14 — at module level
 packages/reconcile/src/drift.ts
 ├  4:24  — at module level
 └  20:37 — inside journalTotal

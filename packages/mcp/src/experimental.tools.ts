@@ -7,6 +7,7 @@ import {
   type LocationLink,
   type Range,
   type SymbolInformation,
+  GetMatchTsConfigRequest,
 } from "@volar/language-server/protocol.js";
 import {
   createTypeAtlas,
@@ -233,6 +234,10 @@ export const registerExperimentalTools = (
       // hand-written tree produce the same lines.
       const asText = async (source: string, variables: Record<string, unknown>) =>
         (await renderComposition({ source, variables })).text;
+      // A dedicated tool's own document, so an ask that stands in for a tool
+      // answers exactly as that tool does — scope disclosures included.
+      const asDocument = async (document: string, variables: Record<string, unknown>) =>
+        (await renderDocument({ document, variables })).text;
       // Every ask that answers with places binds this one shape, so a composer
       // learns it once: references, definitions, types, and implementations all
       // render through `reference-node.mdoc`.
@@ -333,16 +338,58 @@ export const registerExperimentalTools = (
           };
         },
         references: async (ask) => {
+          const position = await askedPosition(ask);
+          const uri = workspace.getWorkspaceUri(askedFile(ask));
           const { result, projects } = await intelligence.references({
             file: askedFile(ask),
             signal,
-            params: {
-              position: await askedPosition(ask),
-              context: { includeDeclaration: false },
-              scope: "workspace",
-            },
+            params: { position, context: { includeDeclaration: false }, scope: "workspace" },
           });
-          return { ...(await places(result ?? [])), projects };
+          // Which tsconfig answered, because "widen this search" means opening
+          // a file in a project this one did not cover.
+          const matched = (await workspace
+            .sendRequest(GetMatchTsConfigRequest.type, { uri }, signal)
+            .catch(() => undefined)) as { uri?: string } | undefined;
+          const resolved = await subjectAtPosition({ workspace, uri, position, signal }).catch(
+            () => undefined,
+          );
+          // The declaration is not a use of itself. `includeDeclaration: false`
+          // asks the server to leave it out and the server returns it anyway,
+          // which reported one more reference than the `references` tool for
+          // the same symbol.
+          const declaredAt = resolved?.declaredAt;
+          const found = await places(
+            (result ?? []).filter(
+              (site) =>
+                !declaredAt ||
+                site.uri !== declaredAt.uri ||
+                site.range.start.line !== declaredAt.selection.start.line ||
+                site.range.start.character !== declaredAt.selection.start.character,
+            ),
+          );
+          // Rendered through the `references` tool's own document, so composing
+          // is never less honest than calling it. A reference count without the
+          // scope it covered reads as complete when it is not — and the tree
+          // alone said "3 uses" for a symbol whose other users live in a
+          // project this session had not loaded.
+          return {
+            ...found,
+            projects,
+            text: await asDocument("references.tool.mdoc", {
+              subject: resolved?.name,
+              kind: resolved?.kind,
+              found: resolved !== undefined || found.total > 0,
+              declaredAt: resolved
+                ? { file: displayPath(resolved.declaredAt.uri, root), at: positionText(resolved.declaredAt.selection.start) }
+                : undefined,
+              everyProject: true,
+              projects,
+              anchor: matched?.uri ? displayPath(matched.uri, root) : undefined,
+              total: found.total,
+              noUses: found.total === 0,
+              groups: found.groups,
+            }),
+          };
         },
         outline: async (ask) => {
           const uri = workspace.getWorkspaceUri(askedFile(ask));
