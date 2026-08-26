@@ -30,6 +30,7 @@ import { textResult } from "./mcp-result.ts";
 import { readOnlyToolAnnotations } from "./metadata.ts";
 import { createQuorl } from "./quorl.ts";
 import { callHierarchyVariables, inspectionVariables } from "./inspection-variables.ts";
+import { navigationTargets } from "./navigation-targets.ts";
 import { createRetrievalIntelligence } from "./intelligence.ts";
 import { semanticOccurrences } from "./occurrences.tool.ts";
 import type { Semble } from "./semble.ts";
@@ -499,11 +500,31 @@ export const registerExperimentalTools = (
         // of its own, and "what depends on this file" is the question asked
         // before moving or deleting one.
         file_references: async (ask) => {
-          const { result, projects } = await intelligence.fileReferences({
-            file: askedFile(ask),
-            signal,
-          });
-          return { ...(await places(result ?? [], ask)), projects };
+          const file = askedFile(ask);
+          const uri = workspace.getWorkspaceUri(file);
+          const { result, projects } = await intelligence.fileReferences({ file, signal });
+          const found = await places(result ?? [], ask);
+          // Which tsconfig answered. "Nothing imports this" is a decision to
+          // move or delete a file, and it is only as true as the reach behind
+          // it — a bare list of importers states no reach at all.
+          const matched = (await workspace
+            .sendRequest(GetMatchTsConfigRequest.type, { uri }, signal)
+            .catch(() => undefined)) as { uri?: string } | undefined;
+          return {
+            ...found,
+            projects,
+            text: withRest(
+              await asDocument("file-references.tool.mdoc", {
+                file: displayPath(uri, root),
+                anchor: matched?.uri ? displayPath(matched.uri, root) : undefined,
+                projects,
+                total: found.total,
+                groups: found.groups,
+              }),
+              found.beyond,
+              found.limit,
+            ),
+          };
         },
         // Whether a dossier wants literal proof is the composer's call, not
         // this tool's. Answers as `occurrences` does, through its own document.
@@ -749,27 +770,90 @@ export const registerExperimentalTools = (
         ...Object.fromEntries(
           (
             [
-              ["definitions", intelligence.definitions],
-              ["type_definitions", intelligence.typeDefinitions],
-              ["implementations", intelligence.implementations],
+              {
+                name: "definitions",
+                request: intelligence.definitions,
+                document: "definitions.tool.mdoc",
+                // The implementation request answers with the declaration
+                // itself for anything nothing overrides, so a lone target
+                // covering the asked position means none — counting it would
+                // report every plain function as implementing itself.
+                fromOrigin: false,
+                // Where the answer's subject is a target's own identifier
+                // rather than the symbol asked about. A type definition's
+                // subject is the value you asked about, not the type it
+                // resolved to, so only definitions reads it off the targets.
+                subjectFromTargets: true,
+              },
+              {
+                name: "type_definitions",
+                request: intelligence.typeDefinitions,
+                document: "type-definitions.tool.mdoc",
+                fromOrigin: false,
+                subjectFromTargets: false,
+              },
+              {
+                name: "implementations",
+                request: intelligence.implementations,
+                document: "implementations.tool.mdoc",
+                fromOrigin: true,
+                subjectFromTargets: false,
+              },
             ] as const
-          ).map(([name, request]) => [
+          ).map(({ name, request, document, fromOrigin, subjectFromTargets }) => [
             name,
             async (ask: DocumentAsk) => {
+              const position = await askedPosition(ask);
+              const uri = workspace.getWorkspaceUri(askedFile(ask));
               const { result } = await request({
                 file: askedFile(ask),
                 signal,
-                params: { position: await askedPosition(ask) },
+                params: { position },
               });
-              return await places(
-                (Array.isArray(result) ? result : result ? [result] : []).map(
-                  (entry: Location | LocationLink) =>
-                    "targetUri" in entry
-                      ? { uri: entry.targetUri, range: entry.targetSelectionRange }
-                      : { uri: entry.uri, range: entry.range },
-                ),
-                ask,
+              const targets = await navigationTargets({
+                result,
+                root,
+                workspace,
+                signal,
+                origin: fromOrigin ? { uri, position } : undefined,
+              });
+              const resolved = await subjectAtPosition({ workspace, uri, position, signal }).catch(
+                () => undefined,
               );
+              const subject = subjectFromTargets
+                ? (targets.items.find(({ name: named }) => named)?.name ?? resolved?.name)
+                : resolved?.name;
+              const paths = [...new Set(targets.items.map(({ file }) => file))];
+              return {
+                total: targets.total,
+                any: targets.total > 0,
+                files: paths.length,
+                paths,
+                // Places, so a composition can ask about each target it found.
+                hits: targets.items.map((item) => ({
+                  name: item.name,
+                  file: item.file,
+                  line: item.selection.start.line + 1,
+                  character: item.selection.start.character + 1,
+                })),
+                // Through the tool's own document, because the empty case is
+                // where these three carry their weight: an implementation
+                // walk reaches only files this session has opened, and a bare
+                // tree said nothing at all where the tool spends a paragraph
+                // saying so — silence a composer would read as "there are
+                // none".
+                text: await asDocument(document, {
+                  subject,
+                  kind: resolved?.kind,
+                  root,
+                  ...targets,
+                  // A row naming the subject repeats the line above it; a row
+                  // naming anything else is information.
+                  items: targets.items.map((item) =>
+                    item.name === subject ? { ...item, name: undefined } : item,
+                  ),
+                }),
+              };
             },
           ]),
         ),
