@@ -30,6 +30,7 @@ import { readOnlyToolAnnotations } from "./metadata.ts";
 import { createQuorl } from "./quorl.ts";
 import { isDependency } from "./inspection-variables.ts";
 import { createRetrievalIntelligence } from "./intelligence.ts";
+import { semanticOccurrences } from "./occurrences.tool.ts";
 import type { Semble } from "./semble.ts";
 import { enclosingDeclaration, referenceGroups } from "./reference-groups.ts";
 import { registerTool } from "./tool.ts";
@@ -197,7 +198,7 @@ export const registerExperimentalTools = (
     {
       title: "Compose",
       description:
-        'Answer several questions about code in one call, laid out how you want. `{% ask %}` tags declare data and render nothing; the body you write is the whole answer.\n\nPoint an ask at a declaration by name with `symbol="foo"`, or at `line`/`character` (one-based). Every ask also binds `.text`, already rendered, so the shortest useful composition is two lines and needs nothing memorised:\n\n{% ask "references" as="uses" file="src/x.ts" symbol="foo" /%}\n{% $uses.text %}\n\nAsks, and the fields each binds besides `.text`:\n- hover → {text}: signature and documentation\n- subject → {name, kind, file, at}: what a position resolves to\n- references → {total, files, paths, projects, groups}; answers exactly as the `references` tool, scope line and anchor included\n- definitions | types | implementations → {total, files, paths, groups}\n- search → {text}: find code by what it does when the name is unknown, each hit anchored to a language-server symbol; takes `query`, and `directory`, `limit`, `snippetLines`\n- symbols → {total, projects, hits, file, line, character}: find a declaration by `query` across loaded projects. `file` here only picks which project to search from. Binds the first hit\'s location, so the next ask can point at it: `file=$found.file line=$found.line character=$found.character`\n- callers | callees → {name, total, groups, dependencies}; calls into dependencies are named in `dependencies` rather than listed as rows\n- outline → {total, tree}; `depth` opens nested levels, `raw` keeps everything\n- diagnostics → {total, groups, checked, of}; takes `file`, or `files=$uses.paths` from an earlier ask\n\n`references` also takes `tests="only"` or `tests="exclude"`, which narrows the uses it already found — "which tests cover this" against "what breaks if I change it". That split is a path heuristic (a `tests/` directory, a `.test.`/`.spec.` name), not something the compiler knows.\n\n`paths` is a list to hand to another ask, not text to print — interpolating it runs the paths together. The file list is already in `.text`.\n- source → {lines, startLine}; `from` and `to`\n\nFor a layout of your own, use the fields with the shipped tags: {% tree entries=$uses.groups partial="reference-node.mdoc" /%}, {% tree entries=$calledBy.groups partial="call-node.mdoc" /%}, {% tree entries=$shape.tree partial="symbol-node.mdoc" /%}, {% each items=$problems.groups as="group" partial="diagnostic-group.mdoc" /%}, {% source lines=$body.lines startLine=$body.startLine /%}.\n\nAsks fulfil in document order and a later one may read an earlier bind. A failing ask is named in a line under the answer; the rest still render.',
+        'Answer several questions about code in one call, laid out how you want. `{% ask %}` tags declare data and render nothing; the body you write is the whole answer.\n\nEach ask is named for the tool that answers it and answers as that tool does. Point one at a declaration by name with `symbol="foo"`, or at `line`/`character` (one-based). Every ask also binds `.text`, already rendered, so the shortest useful composition is two lines and needs nothing memorised:\n\n{% ask "references" as="uses" file="src/x.ts" symbol="foo" /%}\n{% $uses.text %}\n\nAsks, and the fields each binds besides `.text`:\n- hover → {text}: signature and documentation\n- subject → {name, kind, file, at}: what a position resolves to\n- references → {total, files, paths, projects, groups}; also takes `tests="only"` or `tests="exclude"` to narrow the uses it already found — "which tests cover this" against "what breaks if I change it". That split is a path heuristic (a `tests/` directory, a `.test.`/`.spec.` name), not something the compiler knows\n- definitions | type_definitions | implementations → {total, files, paths, groups}\n- callers | callees → {name, total, groups, dependencies}; calls into dependencies are named in `dependencies` rather than listed as rows\n- document_symbols → {total, tree}; `depth` opens nested levels, `raw` keeps everything\n- diagnostics → {total, groups, checked, of}; takes `file`, or `files=$uses.paths` from an earlier ask\n- read_file → {lines, startLine}; `from` and `to`\n- occurrences → {text, …}: exact identifiers resolved to their references, with an honest zero when a name occurs nowhere; takes `query`, and `path`, `limit`, `symbolLimit`\n- search_code → {text}: find code by what it does when the name is unknown, each hit anchored to a language-server symbol; takes `query`, and `directory`, `limit`, `snippetLines`\n- workspace_symbols → {total, projects, hits, file, line, character}: find a declaration by `query` across loaded projects, where `file` only picks which project to search from. Binds the first hit\'s location, so the next ask can point at it: `file=$found.file line=$found.line character=$found.character`\n\n`paths` is a list to hand to another ask, not text to print — interpolating it runs the paths together. The file list is already in `.text`.\n\nFor a layout of your own, use the fields with the shipped tags: {% tree entries=$uses.groups partial="reference-node.mdoc" /%}, {% tree entries=$calledBy.groups partial="call-node.mdoc" /%}, {% tree entries=$shape.tree partial="symbol-node.mdoc" /%}, {% each items=$problems.groups as="group" partial="diagnostic-group.mdoc" /%}, {% source lines=$body.lines startLine=$body.startLine /%}.\n\nAsks fulfil in document order and a later one may read an earlier bind. A failing ask is named in a line under the answer; the rest still render.',
       inputSchema: input.Compose,
       annotations: readOnlyToolAnnotations,
     },
@@ -442,9 +443,24 @@ export const registerExperimentalTools = (
             }),
           };
         },
+        // Whether a dossier wants literal proof is the composer's call, not
+        // this tool's. Answers as `occurrences` does, through its own document.
+        occurrences: async (ask) => {
+          const result = await semanticOccurrences({
+            root,
+            workspace,
+            queries: [attributeText(ask.attributes.query)],
+            paths: [attributeText(ask.attributes.path) || "."],
+            symbolLimit: Number(ask.attributes.symbolLimit ?? 5),
+            offset: 0,
+            limit: Number(ask.attributes.limit ?? 20),
+            signal,
+          });
+          return { ...result, text: await asDocument("occurrences.tool.mdoc", result) };
+        },
         // Find code by what it does, for when the name is unknown — the other
         // half of orientation, where `symbols` needs a name to search for.
-        search: async (ask) => ({
+        search_code: async (ask) => ({
           text: await retrieval.search({
             root,
             directory: attributeText(ask.attributes.directory) || undefined,
@@ -461,7 +477,7 @@ export const registerExperimentalTools = (
         // call and the first move in an unfamiliar repository was never
         // composable. Binds `file`, `line`, and `character` of the first hit,
         // so a later ask can point at it: file=$found.file line=$found.line.
-        symbols: async (ask) => {
+        workspace_symbols: async (ask) => {
           const { symbols, projects } = await intelligence.workspaceSymbols({
             file: askedFile(ask),
             query: attributeText(ask.attributes.query),
@@ -490,7 +506,7 @@ export const registerExperimentalTools = (
             }),
           };
         },
-        outline: async (ask) => {
+        document_symbols: async (ask) => {
           const uri = workspace.getWorkspaceUri(askedFile(ask));
           const { source } = await workspace.readTextDocumentUri(uri, signal);
           // Folded and depth-limited exactly like `document_symbols`: an
@@ -578,7 +594,7 @@ export const registerExperimentalTools = (
           (
             [
               ["definitions", intelligence.definitions],
-              ["types", intelligence.typeDefinitions],
+              ["type_definitions", intelligence.typeDefinitions],
               ["implementations", intelligence.implementations],
             ] as const
           ).map(([name, request]) => [
@@ -600,7 +616,7 @@ export const registerExperimentalTools = (
             },
           ]),
         ),
-        source: async (ask) => {
+        read_file: async (ask) => {
           const uri = workspace.getWorkspaceUri(askedFile(ask));
           const { source } = await workspace.readTextDocumentUri(uri, signal);
           const all = source.split("\n");

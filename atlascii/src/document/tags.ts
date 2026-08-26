@@ -109,7 +109,9 @@ export const tags: Config["tags"] = {
       tests: { type: String },
       /** Where a search looks, and how much it returns. */
       directory: { type: String },
+      path: { type: String },
       limit: { type: Number },
+      symbolLimit: { type: Number },
       snippetLines: { type: Number },
       query: { type: String },
       /** Exact text for a literal ask, as distinct from a query by meaning. */

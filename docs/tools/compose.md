@@ -4,7 +4,7 @@
 
 Answer several questions about code in one call, laid out how you want. `{% ask %}` tags declare data and render nothing; the body you write is the whole answer.
 
-Point an ask at a declaration by name with `symbol="foo"`, or at `line`/`character` (one-based). Every ask also binds `.text`, already rendered, so the shortest useful composition is two lines and needs nothing memorised:
+Each ask is named for the tool that answers it and answers as that tool does. Point one at a declaration by name with `symbol="foo"`, or at `line`/`character` (one-based). Every ask also binds `.text`, already rendered, so the shortest useful composition is two lines and needs nothing memorised:
 
 {% ask "references" as="uses" file="src/x.ts" symbol="foo" /%}
 {% $uses.text %}
@@ -12,18 +12,17 @@ Point an ask at a declaration by name with `symbol="foo"`, or at `line`/`charact
 Asks, and the fields each binds besides `.text`:
 - hover → {text}: signature and documentation
 - subject → {name, kind, file, at}: what a position resolves to
-- references → {total, files, paths, projects, groups}; answers exactly as the `references` tool, scope line and anchor included
-- definitions | types | implementations → {total, files, paths, groups}
-- search → {text}: find code by what it does when the name is unknown, each hit anchored to a language-server symbol; takes `query`, and `directory`, `limit`, `snippetLines`
-- symbols → {total, projects, hits, file, line, character}: find a declaration by `query` across loaded projects. `file` here only picks which project to search from. Binds the first hit's location, so the next ask can point at it: `file=$found.file line=$found.line character=$found.character`
+- references → {total, files, paths, projects, groups}; also takes `tests="only"` or `tests="exclude"` to narrow the uses it already found — "which tests cover this" against "what breaks if I change it". That split is a path heuristic (a `tests/` directory, a `.test.`/`.spec.` name), not something the compiler knows
+- definitions | type_definitions | implementations → {total, files, paths, groups}
 - callers | callees → {name, total, groups, dependencies}; calls into dependencies are named in `dependencies` rather than listed as rows
-- outline → {total, tree}; `depth` opens nested levels, `raw` keeps everything
+- document_symbols → {total, tree}; `depth` opens nested levels, `raw` keeps everything
 - diagnostics → {total, groups, checked, of}; takes `file`, or `files=$uses.paths` from an earlier ask
-
-`references` also takes `tests="only"` or `tests="exclude"`, which narrows the uses it already found — "which tests cover this" against "what breaks if I change it". That split is a path heuristic (a `tests/` directory, a `.test.`/`.spec.` name), not something the compiler knows.
+- read_file → {lines, startLine}; `from` and `to`
+- occurrences → {text, …}: exact identifiers resolved to their references, with an honest zero when a name occurs nowhere; takes `query`, and `path`, `limit`, `symbolLimit`
+- search_code → {text}: find code by what it does when the name is unknown, each hit anchored to a language-server symbol; takes `query`, and `directory`, `limit`, `snippetLines`
+- workspace_symbols → {total, projects, hits, file, line, character}: find a declaration by `query` across loaded projects, where `file` only picks which project to search from. Binds the first hit's location, so the next ask can point at it: `file=$found.file line=$found.line character=$found.character`
 
 `paths` is a list to hand to another ask, not text to print — interpolating it runs the paths together. The file list is already in `.text`.
-- source → {lines, startLine}; `from` and `to`
 
 For a layout of your own, use the fields with the shipped tags: {% tree entries=$uses.groups partial="reference-node.mdoc" /%}, {% tree entries=$calledBy.groups partial="call-node.mdoc" /%}, {% tree entries=$shape.tree partial="symbol-node.mdoc" /%}, {% each items=$problems.groups as="group" partial="diagnostic-group.mdoc" /%}, {% source lines=$body.lines startLine=$body.startLine /%}.
 

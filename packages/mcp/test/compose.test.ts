@@ -33,8 +33,8 @@ test("compose renders a dossier from ask declarations", async () => {
         document: [
           '{% ask "hover" as="head" file="packages/core/src/projection.ts" line=28 character=14 /%}',
           '{% ask "references" as="uses" file="packages/core/src/projection.ts" line=28 character=14 /%}',
-          '{% ask "outline" as="shape" file="packages/core/src/projection.ts" /%}',
-          '{% ask "source" as="body" file="packages/core/src/projection.ts" from=28 to=30 /%}',
+          '{% ask "document_symbols" as="shape" file="packages/core/src/projection.ts" /%}',
+          '{% ask "read_file" as="body" file="packages/core/src/projection.ts" from=28 to=30 /%}',
           "",
           "## page, before the edit",
           "",
@@ -83,7 +83,7 @@ test("compose renders a dossier from ask declarations", async () => {
       arguments: {
         workspace: workspaceRoot,
         document:
-          '{% ask "outline" as="shape" file="packages/core/src/projection.ts" /%}\nTotal: {% $shpae.total %}',
+          '{% ask "document_symbols" as="shape" file="packages/core/src/projection.ts" /%}\nTotal: {% $shpae.total %}',
       },
     });
     const holedText = holed.content.find((item) => item.type === "text")?.text ?? "";
@@ -134,7 +134,7 @@ test("compose renders a dossier from ask declarations", async () => {
         document: [
           '{% ask "subject" as="what" file="packages/core/src/projection.ts" line=28 character=14 /%}',
           '{% ask "callers" as="calledBy" file="packages/core/src/markdoc/render.ts" line=69 character=14 /%}',
-          '{% ask "outline" as="broken" file="packages/core/src/does-not-exist.ts" /%}',
+          '{% ask "document_symbols" as="broken" file="packages/core/src/does-not-exist.ts" /%}',
           "",
           "## {% $what.name %}",
           "",
@@ -149,7 +149,7 @@ test("compose renders a dossier from ask declarations", async () => {
     expect(fleshedText).toContain("page [");
     expect(fleshedText).toContain("packages/core/src/projection.ts:28:14");
     expect(fleshedText).toMatch(/renderDocument is called from \d+ places\./u);
-    expect(fleshedText).toContain("The outline ask binding broken failed:");
+    expect(fleshedText).toContain("The document_symbols ask binding broken failed:");
     const reversed = await client.callTool({
       name: "compose",
       arguments: {
@@ -170,8 +170,8 @@ test("compose renders a dossier from ask declarations", async () => {
       arguments: {
         workspace: workspaceRoot,
         document: [
-          '{% ask "outline" as="o" file="packages/core/src/projection.ts" /%}',
-          '{% ask "source" as="body" file="packages/core/src/projection.ts" from=28 to=29 /%}',
+          '{% ask "document_symbols" as="o" file="packages/core/src/projection.ts" /%}',
+          '{% ask "read_file" as="body" file="packages/core/src/projection.ts" from=28 to=29 /%}',
           "## Declared here",
           '{% tree entries=$o.tree partial="symbol-node.mdoc" /%}',
           "## The declaration line",
