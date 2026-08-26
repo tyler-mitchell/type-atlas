@@ -29,6 +29,8 @@ An ask can also run once per item of a list an earlier ask bound, instead of onc
 
 To guard a section, use the boolean: `{% if $uses.any %}` on its own line, with the heading and body under it. A count does not work — `{% if $uses.total %}` renders on zero, because the engine asks whether the value is there, not whether it is nonzero. Every countable ask binds `any`.
 
+Every ask that answers with places — references, definitions, type_definitions, implementations, file_references — lists at most `limit` sites (50 by default) and binds {shown, beyond} beside {total}. The text says what it cut, and `tests="only"`/`"exclude"` narrows before the bound applies.
+
 `paths` is a list to hand to another ask, not text to print — interpolating it runs the paths together. The file list is already in `.text`.
 
 For a layout of your own, use the fields with the shipped tags: {% tree entries=$uses.groups partial="reference-node.mdoc" /%}, {% tree entries=$calledBy.groups partial="call-node.mdoc" /%}, {% tree entries=$shape.tree partial="symbol-node.mdoc" /%}, {% each items=$problems.groups as="group" partial="diagnostic-group.mdoc" /%}, {% source lines=$body.lines startLine=$body.startLine /%}.

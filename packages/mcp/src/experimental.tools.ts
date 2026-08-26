@@ -200,7 +200,7 @@ export const registerExperimentalTools = (
     {
       title: "Compose",
       description:
-        'Answer several questions about code in one call, laid out how you want. `{% ask %}` tags declare data and render nothing; the body you write is the whole answer.\n\nEach ask is named for the tool that answers it and answers as that tool does. Point one at a declaration by name with `symbol="foo"`, or at `line`/`character` (one-based). Every ask also binds `.text`, already rendered, so the shortest useful composition is two lines and needs nothing memorised:\n\n{% ask "references" as="uses" file="src/x.ts" symbol="foo" /%}\n{% $uses.text %}\n\nAsks, and the fields each binds besides `.text`:\n- inspect_symbol → {text, symbol, documentation, mentions, callers, callees, implementations, typeDefinitions}: the whole working view of one symbol in one ask — what it is, who uses it, what it calls. Start here; reach for the single-relationship asks below when you want one of them in full. `includeSource=true` adds its body\n- hover → {text}: signature and documentation\n- subject → {name, kind, file, at}: what a position resolves to\n- references → {total, files, paths, projects, groups}; also takes `tests="only"` or `tests="exclude"` to narrow the uses it already found — "which tests cover this" against "what breaks if I change it". That split is a path heuristic (a `tests/` directory, a `.test.`/`.spec.` name), not something the compiler knows\n- definitions | type_definitions | implementations → {total, files, paths, groups}\n- file_references → {total, files, paths, projects, groups}: who imports this module, which is not what the uses of any symbol in it answer — ask it before moving or deleting a file\n- callers | callees → {name, total, groups, dependencies}; calls into dependencies are named in `dependencies` rather than listed as rows\n- document_symbols → {total, tree}; `depth` opens nested levels, `raw` keeps everything\n- diagnostics → {total, groups, checked, of}; takes `file`, or `files=$uses.paths` from an earlier ask\n- read_file → {lines, startLine}; `from` and `to`\n- occurrences → {text, subjects, total, any}: exact identifiers resolved to their references, with an honest zero when a name occurs nowhere; takes `query`, and `path`, `limit`, `symbolLimit`. `subjects` are the declarations it resolved, as places, so `each=$found.subjects` asks about each one\n- list_files → {text, files, total, any}: the file tree, for orienting before you know any path; takes `directory`, `glob`, `depth`, `limit`, `changed=true` for the working-tree delta. `files` is workspace-relative, so `each=$tree.files` walks what it found\n- search_code → {text, hits, total, of, any, file, line, character}: find code by what it does when the name is unknown, each hit anchored to a language-server symbol; takes `query`, and `directory`, `limit`, `snippetLines`. `hits` are places, so `each=$found.hits` asks about everything it found, and `file`/`line`/`character` point at the first. `of` is how many matched before anchoring — a hit landing in import statements has no declaration to ask about\n- workspace_symbols → {total, projects, hits, file, line, character}: find a declaration by `query` across loaded projects, where `file` only picks which project to search from. Binds the first hit\'s location, so the next ask can point at it: `file=$found.file line=$found.line character=$found.character`\n\nAn ask can also run once per item of a list an earlier ask bound, instead of once at one place: `each=$found.hits` hovers every candidate a search returned, `each=$uses.paths` outlines every file using a symbol. A string item fills `file`; an object item fills the attributes it has fields for; anything you write on the tag yourself stays fixed. It binds {items, total, of, text}, and each item carries its own answer plus a `title` — so `{% $heads.text %}` is already a titled block per item, and `{% sections items=$heads.items /%}` is that same thing when you want to lay it out yourself. Bounded to 10 items; `of` is how many the list held.\n\nTo guard a section, use the boolean: `{% if $uses.any %}` on its own line, with the heading and body under it. A count does not work — `{% if $uses.total %}` renders on zero, because the engine asks whether the value is there, not whether it is nonzero. Every countable ask binds `any`.\n\n`paths` is a list to hand to another ask, not text to print — interpolating it runs the paths together. The file list is already in `.text`.\n\nFor a layout of your own, use the fields with the shipped tags: {% tree entries=$uses.groups partial="reference-node.mdoc" /%}, {% tree entries=$calledBy.groups partial="call-node.mdoc" /%}, {% tree entries=$shape.tree partial="symbol-node.mdoc" /%}, {% each items=$problems.groups as="group" partial="diagnostic-group.mdoc" /%}, {% source lines=$body.lines startLine=$body.startLine /%}.\n\nAsks fulfil in document order and a later one may read an earlier bind. A failing ask is named in a line under the answer; the rest still render.',
+        'Answer several questions about code in one call, laid out how you want. `{% ask %}` tags declare data and render nothing; the body you write is the whole answer.\n\nEach ask is named for the tool that answers it and answers as that tool does. Point one at a declaration by name with `symbol="foo"`, or at `line`/`character` (one-based). Every ask also binds `.text`, already rendered, so the shortest useful composition is two lines and needs nothing memorised:\n\n{% ask "references" as="uses" file="src/x.ts" symbol="foo" /%}\n{% $uses.text %}\n\nAsks, and the fields each binds besides `.text`:\n- inspect_symbol → {text, symbol, documentation, mentions, callers, callees, implementations, typeDefinitions}: the whole working view of one symbol in one ask — what it is, who uses it, what it calls. Start here; reach for the single-relationship asks below when you want one of them in full. `includeSource=true` adds its body\n- hover → {text}: signature and documentation\n- subject → {name, kind, file, at}: what a position resolves to\n- references → {total, files, paths, projects, groups}; also takes `tests="only"` or `tests="exclude"` to narrow the uses it already found — "which tests cover this" against "what breaks if I change it". That split is a path heuristic (a `tests/` directory, a `.test.`/`.spec.` name), not something the compiler knows\n- definitions | type_definitions | implementations → {total, files, paths, groups}\n- file_references → {total, files, paths, projects, groups}: who imports this module, which is not what the uses of any symbol in it answer — ask it before moving or deleting a file\n- callers | callees → {name, total, groups, dependencies}; calls into dependencies are named in `dependencies` rather than listed as rows\n- document_symbols → {total, tree}; `depth` opens nested levels, `raw` keeps everything\n- diagnostics → {total, groups, checked, of}; takes `file`, or `files=$uses.paths` from an earlier ask\n- read_file → {lines, startLine}; `from` and `to`\n- occurrences → {text, subjects, total, any}: exact identifiers resolved to their references, with an honest zero when a name occurs nowhere; takes `query`, and `path`, `limit`, `symbolLimit`. `subjects` are the declarations it resolved, as places, so `each=$found.subjects` asks about each one\n- list_files → {text, files, total, any}: the file tree, for orienting before you know any path; takes `directory`, `glob`, `depth`, `limit`, `changed=true` for the working-tree delta. `files` is workspace-relative, so `each=$tree.files` walks what it found\n- search_code → {text, hits, total, of, any, file, line, character}: find code by what it does when the name is unknown, each hit anchored to a language-server symbol; takes `query`, and `directory`, `limit`, `snippetLines`. `hits` are places, so `each=$found.hits` asks about everything it found, and `file`/`line`/`character` point at the first. `of` is how many matched before anchoring — a hit landing in import statements has no declaration to ask about\n- workspace_symbols → {total, projects, hits, file, line, character}: find a declaration by `query` across loaded projects, where `file` only picks which project to search from. Binds the first hit\'s location, so the next ask can point at it: `file=$found.file line=$found.line character=$found.character`\n\nAn ask can also run once per item of a list an earlier ask bound, instead of once at one place: `each=$found.hits` hovers every candidate a search returned, `each=$uses.paths` outlines every file using a symbol. A string item fills `file`; an object item fills the attributes it has fields for; anything you write on the tag yourself stays fixed. It binds {items, total, of, text}, and each item carries its own answer plus a `title` — so `{% $heads.text %}` is already a titled block per item, and `{% sections items=$heads.items /%}` is that same thing when you want to lay it out yourself. Bounded to 10 items; `of` is how many the list held.\n\nTo guard a section, use the boolean: `{% if $uses.any %}` on its own line, with the heading and body under it. A count does not work — `{% if $uses.total %}` renders on zero, because the engine asks whether the value is there, not whether it is nonzero. Every countable ask binds `any`.\n\nEvery ask that answers with places — references, definitions, type_definitions, implementations, file_references — lists at most `limit` sites (50 by default) and binds {shown, beyond} beside {total}. The text says what it cut, and `tests="only"`/`"exclude"` narrows before the bound applies.\n\n`paths` is a list to hand to another ask, not text to print — interpolating it runs the paths together. The file list is already in `.text`.\n\nFor a layout of your own, use the fields with the shipped tags: {% tree entries=$uses.groups partial="reference-node.mdoc" /%}, {% tree entries=$calledBy.groups partial="call-node.mdoc" /%}, {% tree entries=$shape.tree partial="symbol-node.mdoc" /%}, {% each items=$problems.groups as="group" partial="diagnostic-group.mdoc" /%}, {% source lines=$body.lines startLine=$body.startLine /%}.\n\nAsks fulfil in document order and a later one may read an earlier bind. A failing ask is named in a line under the answer; the rest still render.',
       inputSchema: input.Compose,
       annotations: readOnlyToolAnnotations,
     },
@@ -260,40 +260,57 @@ export const registerExperimentalTools = (
         return (file: string) =>
           wanted === "only" ? isTestSite(file) : wanted === "exclude" ? !isTestSite(file) : true;
       };
+      // A cut list that says nothing about the cut reads as the whole answer.
+      const withRest = (text: string, beyond: number, limit: number) =>
+        beyond > 0 ? `${text}\n\n… ${String(beyond)} more, past limit ${String(limit)}.` : text;
       const places = async (
         locations: readonly { uri: string; range: Range }[],
-        keep: (file: string) => boolean = () => true,
+        ask: DocumentAsk,
       ) => {
-        const sites = [];
-        for (const { uri, range } of locations) {
-          if (!keep(displayPath(uri, root))) continue;
-          const chain = await declarationChainAtPosition({
-            workspace,
-            uri,
-            position: range.start,
-          }).catch(() => []);
-          sites.push({
-            file: displayPath(uri, root),
-            line: range.start.line + 1,
-            character: range.start.character + 1,
-            within: enclosingDeclaration(chain, range)?.name,
-          });
-        }
+        const keep = testFilter(ask);
+        const kept = locations.filter(({ uri }) => keep(displayPath(uri, root)));
+        // Bounded, and concurrent inside the bound. Naming the declaration
+        // that holds each site costs a language-server round trip, and these
+        // ran one after another over everything found — a symbol with five
+        // hundred uses was five hundred serial requests for one answer.
+        const limit = Number(ask.attributes.limit ?? 50);
+        const sites = await Promise.all(
+          kept.slice(0, limit).map(async ({ uri, range }) => {
+            const chain = await declarationChainAtPosition({
+              workspace,
+              uri,
+              position: range.start,
+            }).catch(() => []);
+            return {
+              file: displayPath(uri, root),
+              line: range.start.line + 1,
+              character: range.start.character + 1,
+              within: enclosingDeclaration(chain, range)?.name,
+            };
+          }),
+        );
         const ordered = [...sites].sort(
           (left, right) =>
             left.file.localeCompare(right.file) ||
             left.line - right.line ||
             left.character - right.character,
         );
-        const paths = [...new Set(ordered.map(({ file }) => file))];
+        // Over everything kept, not only what is listed: this is the list a
+        // later ask reads, and a file holding a use past the bound still
+        // holds one.
+        const paths = [...new Set(kept.map(({ uri }) => displayPath(uri, root)))];
         const groups = referenceGroups(ordered);
+        const beyond = kept.length - ordered.length;
         return {
-          total: ordered.length,
+          beyond,
+          limit,
+          shown: ordered.length,
+          total: kept.length,
           // A count cannot guard a section: `{% if $uses.total %}` renders on
           // zero, because the engine asks whether the value is there rather
           // than whether it is nonzero. Every countable ask binds this so a
           // composer can write `{% if $uses.any %}` and mean it.
-          any: ordered.length > 0,
+          any: kept.length > 0,
           files: paths.length,
           // The list behind the count, so a later ask can compose over it:
           // {% ask "diagnostics" files=$uses.paths /%}.
@@ -302,9 +319,11 @@ export const registerExperimentalTools = (
           // Rendered here so the shortest useful composition is `{% $uses.text %}`
           // — a composer who wants their own layout still has the fields, but
           // nobody has to learn a partial's filename to get an answer out.
-          text: await asText('{% tree entries=$groups partial="reference-node.mdoc" /%}', {
-            groups,
-          }),
+          text: withRest(
+            await asText('{% tree entries=$groups partial="reference-node.mdoc" /%}', { groups }),
+            beyond,
+            limit,
+          ),
         };
       };
       // Both directions of the call graph render the same rows; only which end
@@ -457,7 +476,7 @@ export const registerExperimentalTools = (
                 site.range.start.line !== declaredAt.selection.start.line ||
                 site.range.start.character !== declaredAt.selection.start.character,
             ),
-            testFilter(ask),
+            ask,
           );
           // Rendered through the `references` tool's own document, so composing
           // is never less honest than calling it. A reference count without the
@@ -467,20 +486,29 @@ export const registerExperimentalTools = (
           return {
             ...found,
             projects,
-            text: await asDocument("references.tool.mdoc", {
-              subject: resolved?.name,
-              kind: resolved?.kind,
-              found: resolved !== undefined || found.total > 0,
-              declaredAt: resolved
-                ? { file: displayPath(resolved.declaredAt.uri, root), at: positionText(resolved.declaredAt.selection.start) }
-                : undefined,
-              everyProject: true,
-              projects,
-              anchor: matched?.uri ? displayPath(matched.uri, root) : undefined,
-              total: found.total,
-              noUses: found.total === 0,
-              groups: found.groups,
-            }),
+            // The document renders the sites it was given and states the
+            // scope it covered; it cannot know a bound cut the list first.
+            text: withRest(
+              await asDocument("references.tool.mdoc", {
+                subject: resolved?.name,
+                kind: resolved?.kind,
+                found: resolved !== undefined || found.total > 0,
+                declaredAt: resolved
+                  ? {
+                      file: displayPath(resolved.declaredAt.uri, root),
+                      at: positionText(resolved.declaredAt.selection.start),
+                    }
+                  : undefined,
+                everyProject: true,
+                projects,
+                anchor: matched?.uri ? displayPath(matched.uri, root) : undefined,
+                total: found.total,
+                noUses: found.total === 0,
+                groups: found.groups,
+              }),
+              found.beyond,
+              found.limit,
+            ),
           };
         },
         // Who imports this module, which is not what any symbol's references
@@ -492,7 +520,7 @@ export const registerExperimentalTools = (
             file: askedFile(ask),
             signal,
           });
-          return { ...(await places(result ?? [], testFilter(ask))), projects };
+          return { ...(await places(result ?? [], ask)), projects };
         },
         // Whether a dossier wants literal proof is the composer's call, not
         // this tool's. Answers as `occurrences` does, through its own document.
@@ -757,6 +785,7 @@ export const registerExperimentalTools = (
                       ? { uri: entry.targetUri, range: entry.targetSelectionRange }
                       : { uri: entry.uri, range: entry.range },
                 ),
+                ask,
               );
             },
           ]),
