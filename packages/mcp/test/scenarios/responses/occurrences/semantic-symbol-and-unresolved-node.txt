@@ -1,0 +1,31 @@
+Identifiers: "money"
+
+Scope: workspace · 33 project files
+
+Showing 1–12 of 22 references · next offset: 12
+
+=== money [function] · packages/money/src/money.ts:27:14 · 12/22 references shown ===
+
+24 exact-name locations across 8 files · 1 without a workspace declaration
+
+Locations without a workspace declaration (1):
+
+packages/reconcile/src/matching.ts:24:37 — inside emptyRemainder · export const emptyRemainder = () => money(0, "USD");
+
+packages/importers/src/csv.ts
+├  2:37  — at module level · import { type Currency, isCurrency, money, zero, format } from "@ledger/money";
+└  34:20 — inside amount · const amount = money(Math.abs(row.amountMinor), row.currency);
+packages/money/src/index.ts
+└  8:3 — at module level · money,
+packages/money/src/money.ts
+├  30:52 — inside zero · export const zero = (currency: Currency): Money => money(0n, currency);
+├  42:10 — inside add · return money(left.minorUnits + right.minorUnits, left.currency);
+└  45:48 — inside negate · export const negate = (value: Money): Money => money(-value.minorUnits, value.currency);
+packages/reconcile/src/drift.ts
+├  5:18  — at module level · import { format, money, type Money } from "@ledger/money";
+└  21:17 — inside drift · return format(money(journalTotal - statementTotal(statement), "usd"));
+packages/accounts/tests/journal.test.ts
+├  1:10  — at module level · import { money } from "@ledger/money";
+├  9:71  — inside test("posts a balanced transfer through the overload") callback · { from: "assets:bank:checking", to: "expenses:furniture", amount: money(24900, "USD") },
+├  23:34 — inside expect() callback · debit("expenses:travel", money(5000, "USD")),
+└  24:40 — inside expect() callback · credit("assets:bank:checking", money(500, "USD")),

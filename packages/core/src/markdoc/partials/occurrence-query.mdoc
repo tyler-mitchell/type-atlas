@@ -1,0 +1,24 @@
+{% if equals($query.candidateTotal, 0) %}
+{% banner %}{% $query.name %} · no exact {% $query.kind %}{% /banner %}
+{% /if %}
+{% if and(not(equals($query.candidateTotal, 0)), equals($query.subjectCount, 0)) %}
+{% banner %}{% $query.name %} · no workspace declaration{% /banner %}
+{% /if %}
+{% if and(not(equals($query.candidateTotal, 0)), not(equals($query.subjectCount, 0)), or(not(equals($query.subjectCount, 1)), not(equals($query.remainingCandidates, 0)), equals($query.presentedCount, 0))) %}
+{% banner %}{% $query.name %} · {% $query.subjectCount %} {% plural count=$query.subjectCount forms={"one": "symbol", "other": "symbols"} /%} · {% $query.references %} {% plural count=$query.references forms={"one": "reference", "other": "references"} /%}{% /banner %}
+{% /if %}
+
+{% if and(not(equals($query.candidateTotal, 0)), equals($query.subjectCount, 0)) %}
+{% if equals($query.kind, "expression") %}{% $query.candidateTotal %} structural {% plural count=$query.candidateTotal forms={"one": "match", "other": "matches"} /%}{% /if %}{% if equals($query.kind, "identifier") %}{% $query.candidateTotal %} exact-name {% plural count=$query.candidateTotal forms={"one": "location", "other": "locations"} /%}{% /if %} across {% $query.candidateFiles %} {% plural count=$query.candidateFiles forms={"one": "file", "other": "files"} /%} · no workspace declaration
+{% /if %}
+{% if and(not(equals($query.subjectCount, 0)), or(not(equals($query.subjectCount, 1)), not(equals($query.remainingCandidates, 0)))) %}
+{% if equals($query.kind, "expression") %}{% $query.candidateTotal %} structural {% plural count=$query.candidateTotal forms={"one": "match", "other": "matches"} /%}{% /if %}{% if equals($query.kind, "identifier") %}{% $query.candidateTotal %} exact-name {% plural count=$query.candidateTotal forms={"one": "location", "other": "locations"} /%}{% /if %} across {% $query.candidateFiles %} {% plural count=$query.candidateFiles forms={"one": "file", "other": "files"} /%}{% if not(equals($query.unresolved, 0)) %} · {% $query.unresolved %} without a workspace declaration{% /if %}{% if not(equals($query.remainingCandidates, 0)) %} · {% $query.remainingCandidates %} remain after the first {% $query.subjectCount %} symbols; narrow path or raise symbolLimit{% /if %}
+{% /if %}
+
+{% if and(not(equals($query.unresolved, 0)), or(not(equals($query.subjectCount, 1)), not(equals($query.remainingCandidates, 0)))) %}
+Locations without a workspace declaration ({% $query.unresolved %}):
+
+{% tree entries=$query.unresolvedGroups partial="reference-node.mdoc" /%}
+{% /if %}
+
+{% each items=$query.subjects as="subject" partial="occurrence-subject.mdoc" /%}

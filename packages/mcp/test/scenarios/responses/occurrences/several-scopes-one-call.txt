@@ -1,0 +1,25 @@
+Identifiers: "money"
+
+Scope: packages/money + packages/accounts · 11 project files
+
+Showing 1–12 of 18 references · next offset: 12
+
+=== money [function] · packages/money/src/money.ts:27:14 · 12/18 references shown ===
+
+19 exact-name locations across 5 files
+
+packages/money/src/index.ts
+└  8:3 — at module level · money,
+packages/money/src/money.ts
+├  30:52 — inside zero · export const zero = (currency: Currency): Money => money(0n, currency);
+├  42:10 — inside add · return money(left.minorUnits + right.minorUnits, left.currency);
+└  45:48 — inside negate · export const negate = (value: Money): Money => money(-value.minorUnits, value.currency);
+packages/accounts/tests/journal.test.ts
+├  1:10  — at module level · import { money } from "@ledger/money";
+├  9:71  — inside test("posts a balanced transfer through the overload") callback · { from: "assets:bank:checking", to: "expenses:furniture", amount: money(24900, "USD") },
+├  23:34 — inside expect() callback · debit("expenses:travel", money(5000, "USD")),
+└  24:40 — inside expect() callback · credit("assets:bank:checking", money(500, "USD")),
+packages/money/tests/money.test.ts
+├  2:46    — at module level · import { add, CurrencyMismatchError, format, money, negate } from "../src/index.ts";
+├  5:14,34 — inside test("adds amounts of one currency exactly") callback · expect(add(money(1050, "USD"), money(25, "USD")).minorUnits).toBe(1075n);
+└  9:20    — inside expect() callback · expect(() => add(money(100, "USD"), money(100, "EUR"))).toThrow(CurrencyMismatchError);

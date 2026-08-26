@@ -6,6 +6,7 @@ import { registerEditingTools } from "./editing.tools.ts";
 import { registerExperimentalTools } from "./experimental.tools.ts";
 import { registerIntelligenceTools } from "./intelligence.tools.ts";
 import { registerNavigationTools } from "./navigation.tools.ts";
+import { registerOccurrenceTool } from "./occurrences.tool.ts";
 import { registerReadFileTool } from "./read_file.tool.ts";
 import { registerWorkspaceTools } from "./workspace.tools.ts";
 import type { Semble } from "./semble.ts";
@@ -39,6 +40,7 @@ export const registerTools = (
   registerDocumentTools(server, workspaces);
   registerAssistanceTools(server, workspaces);
   registerNavigationTools(server, workspaces);
+  registerOccurrenceTool(server, workspaces);
   registerEditingTools(server, workspaces);
   registerCodeActionTools(server, workspaces);
   registerIntelligenceTools(server, workspaces, semble);

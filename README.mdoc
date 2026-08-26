@@ -220,11 +220,13 @@ false` returns them.
 
 ### `occurrences`
 
-Literal text, grouped by file, with the number of files scanned. The semantic
-tools rank what exists, which is useless for confirming a token is gone after a
-teardown; a zero here comes with the same scan count, so it means something.
+Starts from an exact identifier when the agent knows its name but not its file.
+Identifier syntax nodes activate the relevant projects; TypeScript resolves
+canonical declarations and semantic references. Same-name symbols stay
+separate, overloads collapse, and unresolved identifiers are called out rather
+than mixed into the reference list.
 
-{% scenario "occurrences/token-found-across-packages" /%}
+{% scenario "occurrences/semantic-symbol-and-unresolved-node" /%}
 
 ### `search_code`
 

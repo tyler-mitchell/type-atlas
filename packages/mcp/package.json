@@ -67,6 +67,7 @@
     "test:scenarios": "vp test run --project=scenarios"
   },
   "dependencies": {
+    "@ast-grep/napi": "catalog:",
     "@modelcontextprotocol/client": "catalog:",
     "@modelcontextprotocol/server": "catalog:",
     "@type-atlas/atlascii": "workspace:*",
@@ -79,7 +80,6 @@
     "fdir": "catalog:",
     "globby": "catalog:",
     "pathe": "catalog:",
-    "picomatch": "catalog:",
     "vscode-languageserver-protocol": "catalog:",
     "vscode-languageserver-textdocument": "catalog:",
     "vscode-uri": "catalog:"

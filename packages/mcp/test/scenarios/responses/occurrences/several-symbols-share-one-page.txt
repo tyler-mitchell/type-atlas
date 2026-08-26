@@ -1,0 +1,37 @@
+Identifiers: "money", "signedAmount"
+
+Scope: workspace · 33 project files
+
+Showing 1–8 of 31 references · next offset: 8
+
+=== money [function] · packages/money/src/money.ts:27:14 · 4/22 references shown ===
+
+24 exact-name locations across 8 files · 1 without a workspace declaration
+
+Locations without a workspace declaration (1):
+
+packages/reconcile/src/matching.ts:24:37 — inside emptyRemainder · export const emptyRemainder = () => money(0, "USD");
+
+packages/importers/src/csv.ts
+├  2:37  — at module level · import { type Currency, isCurrency, money, zero, format } from "@ledger/money";
+└  34:20 — inside amount · const amount = money(Math.abs(row.amountMinor), row.currency);
+packages/money/src/index.ts
+└  8:3 — at module level · money,
+packages/money/src/money.ts
+└  30:52 — inside zero · export const zero = (currency: Currency): Money => money(0n, currency);
+
+=== signedAmount [function] · packages/accounts/src/posting.ts:25:14 · 4/9 references shown ===
+
+11 exact-name locations across 7 files · 1 without a workspace declaration
+
+Locations without a workspace declaration (1):
+
+packages/reconcile/src/matching.ts:14:20 — inside amount · const amount = signedAmount(posting);
+
+packages/accounts/src/index.ts
+└  12:39 — at module level · export { credit, debit, type Posting, signedAmount } from "./posting.ts";
+packages/accounts/src/journal.ts
+├  3:39  — at module level · import { credit, debit, type Posting, signedAmount } from "./posting.ts";
+└  52:12 — inside post · .map(signedAmount)
+packages/reconcile/src/drift.ts
+└  4:24 — at module level · import { type Posting, signedAmount } from "@ledger/accounts";

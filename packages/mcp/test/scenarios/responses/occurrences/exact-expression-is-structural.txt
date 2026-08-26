@@ -1,0 +1,9 @@
+Expression: "currencyProfiles[value.currency]"
+
+Scope: workspace · 33 project files
+
+=== currencyProfiles [const] · packages/money/src/currency.ts:12:14 · 1 reference ===
+
+1 structural match across 1 file
+
+packages/money/src/money.ts:51:42 — inside format · const { minorUnitsPerMajor, symbol } = currencyProfiles[value.currency];

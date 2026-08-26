@@ -1,0 +1,13 @@
+Identifiers: "post"
+
+Scope: workspace · 33 project files
+
+=== post [method] · Journal · packages/accounts/src/journal.ts:34:3 · 3 declarations · 3 references ===
+
+6 exact-name locations across 3 files
+
+packages/importers/src/csv.ts
+└  39:13 — inside importStatement · journal.post({
+packages/accounts/tests/journal.test.ts
+├  7:25  — inside test("posts a balanced transfer through the overload") callback · const entry = journal.post(
+└  19:13 — inside expect() callback · journal.post({

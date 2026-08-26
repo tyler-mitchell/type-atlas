@@ -1,0 +1,12 @@
+{
+  "tool": "occurrences",
+  "arguments": {
+    "queries": [
+      "money",
+      "signedAmount"
+    ],
+    "symbolLimit": 5,
+    "limit": 8
+  },
+  "elapsed": "271ms"
+}

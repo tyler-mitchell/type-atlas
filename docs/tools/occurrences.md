@@ -2,117 +2,400 @@
 
 # `occurrences`
 
-Experimental: every place an exact text occurs under one or more directories, with an honest zero — the literal proof of absence a semantic search cannot give. Scans workspace files (gitignore honored, dependencies excluded); use it for teardown checks, string keys, config references, and "is this token ever used" questions. search_code finds meaning; this finds bytes.
+Find exact identifiers or expressions without knowing their files. Identifier queries resolve semantic references; expression queries match AST structure and receive Volar annotations. Use search_code for meaning-based retrieval.
 
-## token found across packages
+## semantic symbol and unresolved node
 
 **Agent's Input**
 
 ```yaml
 tool: Occurrences
 workspace: fixtures/ledger
-text: signedAmount
+query: money
+limit: 12
 
-# answered in 12ms
+# answered in 244ms
 ```
 
 **Response**
 
 ~~~text
-"signedAmount" occurs 12 times in 7 files · 67 files scanned under the workspace · 1 file of declared build output not scanned.
+Identifiers: "money"
 
-packages/accounts/src/index.ts:12:39 · export { credit, debit, type Posting, signedAmount } from "./posting.ts";
-packages/accounts/src/journal.ts
-├  3:39  · import { credit, debit, type Posting, signedAmount } from "./posting.ts";
-└  52:12 · .map(signedAmount)
-packages/accounts/src/posting.ts:25:14 · export const signedAmount = (posting: Posting): Money => {
+Scope: workspace · 33 project files
+
+Showing 1–12 of 22 references · next offset: 12
+
+=== money [function] · packages/money/src/money.ts:27:14 · 12/22 references shown ===
+
+24 exact-name locations across 8 files · 1 without a workspace declaration
+
+Locations without a workspace declaration (1):
+
+packages/reconcile/src/matching.ts:24:37 — inside emptyRemainder · export const emptyRemainder = () => money(0, "USD");
+
+packages/importers/src/csv.ts
+├  2:37  — at module level · import { type Currency, isCurrency, money, zero, format } from "@ledger/money";
+└  34:20 — inside amount · const amount = money(Math.abs(row.amountMinor), row.currency);
+packages/money/src/index.ts
+└  8:3 — at module level · money,
+packages/money/src/money.ts
+├  30:52 — inside zero · export const zero = (currency: Currency): Money => money(0n, currency);
+├  42:10 — inside add · return money(left.minorUnits + right.minorUnits, left.currency);
+└  45:48 — inside negate · export const negate = (value: Money): Money => money(-value.minorUnits, value.currency);
 packages/reconcile/src/drift.ts
-├  4:24  · import { type Posting, signedAmount } from "@ledger/accounts";
-└  20:37 · const journalTotal = postings.map(signedAmount).reduce((total, amount) => total + amount);
-packages/reconcile/src/matching.ts
-├  1:55  · // DELIBERATELY BROKEN — the imports for `money` and `signedAmount` are
-└  14:20 · const amount = signedAmount(posting);
-packages/reports/src/balance.ts
-├  6:3   · signedAmount,
-└  34:57 · add(own.get(posting.account) ?? zero(currency), signedAmount(posting)),
-packages/rules/src/builtin.ts
-├  1:10  · import { signedAmount } from "@ledger/accounts";
-└  26:12 · .map(signedAmount)
+├  5:18  — at module level · import { format, money, type Money } from "@ledger/money";
+└  21:17 — inside drift · return format(money(journalTotal - statementTotal(statement), "usd"));
+packages/accounts/tests/journal.test.ts
+├  1:10  — at module level · import { money } from "@ledger/money";
+├  9:71  — inside test("posts a balanced transfer through the overload") callback · { from: "assets:bank:checking", to: "expenses:furniture", amount: money(24900, "USD") },
+├  23:34 — inside expect() callback · debit("expenses:travel", money(5000, "USD")),
+└  24:40 — inside expect() callback · credit("assets:bank:checking", money(500, "USD")),
 ~~~
 
-## several directories one call
+## same name symbols stay separate
 
 **Agent's Input**
 
 ```yaml
 tool: Occurrences
 workspace: fixtures/ledger
-text: signedAmount
-directories: ["packages/accounts/src","packages/reconcile/src"]
+query: value
+symbolLimit: 5
+limit: 12
 
-# answered in 23ms
+# answered in 239ms
 ```
 
 **Response**
 
 ~~~text
-"signedAmount" occurs 4 times in 3 files · 4 files scanned under packages/accounts/src.
+Identifiers: "value"
 
-packages/accounts/src/index.ts:12:39 · export { credit, debit, type Posting, signedAmount } from "./posting.ts";
+Scope: workspace · 33 project files
+
+=== value · 4 symbols · 10 references ===
+
+14 exact-name locations across 2 files
+
+=== value [parameter] · isCurrency · packages/money/src/currency.ts:19:28 · 2 references ===
+
+packages/money/src/currency.ts:19:44,65 — inside isCurrency · export const isCurrency = (value: string): value is Currency => value in currencyProfiles;
+
+=== value [parameter] · negate · packages/money/src/money.ts:45:24 · 2 references ===
+
+packages/money/src/money.ts:45:55,73 — inside negate · export const negate = (value: Money): Money => money(-value.minorUnits, value.currency);
+
+=== value [parameter] · isZero · packages/money/src/money.ts:47:24 · 1 reference ===
+
+packages/money/src/money.ts:47:50 — inside isZero · export const isZero = (value: Money): boolean => value.minorUnits === 0n;
+
+=== value [parameter] · format · packages/money/src/money.ts:50:24 · 5 references ===
+
+packages/money/src/money.ts
+├  51:59       — inside format · const { minorUnitsPerMajor, symbol } = currencyProfiles[value.currency];
+├  52:16       — inside sign · const sign = value.minorUnits < 0n ? "-" : "";
+└  53:21,46,65 — inside magnitude · const magnitude = value.minorUnits < 0n ? -value.minorUnits : value.minorUnits;
+~~~
+
+## small page stays compact
+
+**Agent's Input**
+
+```yaml
+tool: Occurrences
+workspace: fixtures/ledger
+query: value
+symbolLimit: 2
+limit: 1
+
+# answered in 30ms
+```
+
+**Response**
+
+~~~text
+Identifiers: "value"
+
+Scope: workspace · 33 project files
+
+Showing 1–1 of 4 references · next offset: 1
+
+=== value · 2 symbols · 4 references ===
+
+14 exact-name locations across 2 files · 8 remain after the first 2 symbols; narrow path or raise symbolLimit
+
+=== value [parameter] · isCurrency · packages/money/src/currency.ts:19:28 · 1/2 references shown ===
+
+packages/money/src/currency.ts:19:44 — inside isCurrency · export const isCurrency = (value: string): value is Currency => value in currencyProfiles;
+~~~
+
+## overloads are one symbol
+
+**Agent's Input**
+
+```yaml
+tool: Occurrences
+workspace: fixtures/ledger
+query: post
+symbolLimit: 10
+
+# answered in 271ms
+```
+
+**Response**
+
+~~~text
+Identifiers: "post"
+
+Scope: workspace · 33 project files
+
+=== post [method] · Journal · packages/accounts/src/journal.ts:34:3 · 3 declarations · 3 references ===
+
+6 exact-name locations across 3 files
+
+packages/importers/src/csv.ts
+└  39:13 — inside importStatement · journal.post({
+packages/accounts/tests/journal.test.ts
+├  7:25  — inside test("posts a balanced transfer through the overload") callback · const entry = journal.post(
+└  19:13 — inside expect() callback · journal.post({
+~~~
+
+## several symbols share one page
+
+**Agent's Input**
+
+```yaml
+tool: Occurrences
+workspace: fixtures/ledger
+queries: ["money","signedAmount"]
+symbolLimit: 5
+limit: 8
+
+# answered in 271ms
+```
+
+**Response**
+
+~~~text
+Identifiers: "money", "signedAmount"
+
+Scope: workspace · 33 project files
+
+Showing 1–8 of 31 references · next offset: 8
+
+=== money [function] · packages/money/src/money.ts:27:14 · 4/22 references shown ===
+
+24 exact-name locations across 8 files · 1 without a workspace declaration
+
+Locations without a workspace declaration (1):
+
+packages/reconcile/src/matching.ts:24:37 — inside emptyRemainder · export const emptyRemainder = () => money(0, "USD");
+
+packages/importers/src/csv.ts
+├  2:37  — at module level · import { type Currency, isCurrency, money, zero, format } from "@ledger/money";
+└  34:20 — inside amount · const amount = money(Math.abs(row.amountMinor), row.currency);
+packages/money/src/index.ts
+└  8:3 — at module level · money,
+packages/money/src/money.ts
+└  30:52 — inside zero · export const zero = (currency: Currency): Money => money(0n, currency);
+
+=== signedAmount [function] · packages/accounts/src/posting.ts:25:14 · 4/9 references shown ===
+
+11 exact-name locations across 7 files · 1 without a workspace declaration
+
+Locations without a workspace declaration (1):
+
+packages/reconcile/src/matching.ts:14:20 — inside amount · const amount = signedAmount(posting);
+
+packages/accounts/src/index.ts
+└  12:39 — at module level · export { credit, debit, type Posting, signedAmount } from "./posting.ts";
 packages/accounts/src/journal.ts
-├  3:39  · import { credit, debit, type Posting, signedAmount } from "./posting.ts";
-└  52:12 · .map(signedAmount)
-packages/accounts/src/posting.ts:25:14 · export const signedAmount = (posting: Posting): Money => {
-
-"signedAmount" occurs 4 times in 2 files · 3 files scanned under packages/reconcile/src.
-
+├  3:39  — at module level · import { credit, debit, type Posting, signedAmount } from "./posting.ts";
+└  52:12 — inside post · .map(signedAmount)
 packages/reconcile/src/drift.ts
-├  4:24  · import { type Posting, signedAmount } from "@ledger/accounts";
-└  20:37 · const journalTotal = postings.map(signedAmount).reduce((total, amount) => total + amount);
-packages/reconcile/src/matching.ts
-├  1:55  · // DELIBERATELY BROKEN — the imports for `money` and `signedAmount` are
-└  14:20 · const amount = signedAmount(posting);
+└  4:24 — at module level · import { type Posting, signedAmount } from "@ledger/accounts";
 ~~~
 
-## honest zero
+## several scopes one call
 
 **Agent's Input**
 
 ```yaml
 tool: Occurrences
 workspace: fixtures/ledger
-text: quantumFlux
+query: money
+paths: ["packages/money","packages/accounts"]
+limit: 12
 
-# answered in 11ms
+# answered in 31ms
 ```
 
 **Response**
 
 ~~~text
-Nothing under the workspace contains "quantumFlux" · 67 files scanned · 1 file of declared build output not scanned — scan a generated directory directly to include it. This is a literal answer: the exact text does not occur in what was scanned, which is the proof a semantic search cannot give.
+Identifiers: "money"
+
+Scope: packages/money + packages/accounts · 11 project files
+
+Showing 1–12 of 18 references · next offset: 12
+
+=== money [function] · packages/money/src/money.ts:27:14 · 12/18 references shown ===
+
+19 exact-name locations across 5 files
+
+packages/money/src/index.ts
+└  8:3 — at module level · money,
+packages/money/src/money.ts
+├  30:52 — inside zero · export const zero = (currency: Currency): Money => money(0n, currency);
+├  42:10 — inside add · return money(left.minorUnits + right.minorUnits, left.currency);
+└  45:48 — inside negate · export const negate = (value: Money): Money => money(-value.minorUnits, value.currency);
+packages/accounts/tests/journal.test.ts
+├  1:10  — at module level · import { money } from "@ledger/money";
+├  9:71  — inside test("posts a balanced transfer through the overload") callback · { from: "assets:bank:checking", to: "expenses:furniture", amount: money(24900, "USD") },
+├  23:34 — inside expect() callback · debit("expenses:travel", money(5000, "USD")),
+└  24:40 — inside expect() callback · credit("assets:bank:checking", money(500, "USD")),
+packages/money/tests/money.test.ts
+├  2:46    — at module level · import { add, CurrencyMismatchError, format, money, negate } from "../src/index.ts";
+├  5:14,34 — inside test("adds amounts of one currency exactly") callback · expect(add(money(1050, "USD"), money(25, "USD")).minorUnits).toBe(1075n);
+└  9:20    — inside expect() callback · expect(() => add(money(100, "USD"), money(100, "EUR"))).toThrow(CurrencyMismatchError);
 ~~~
 
-## scanning generated output on purpose
+## exact expression is structural
 
 **Agent's Input**
 
 ```yaml
 tool: Occurrences
 workspace: fixtures/ledger
-text: signedAmount
-directory: packages/importers/dist
+query: currencyProfiles[value.currency]
 
-# answered in 4ms
+# answered in 25ms
 ```
 
 **Response**
 
 ~~~text
-"signedAmount" occurs 3 times in 1 file · 1 file scanned under packages/importers/dist.
+Expression: "currencyProfiles[value.currency]"
 
-packages/importers/dist/importers.js
-├  1:83  · … {account:e.account,amount:t}}var g=(e,t)=>e.reduce((n,r)=>n+signedAmount(r,t),0);function signedAmount(e,t){return e.side==="debit"? …
-├  1:113 · … ar g=(e,t)=>e.reduce((n,r)=>n+signedAmount(r,t),0);function signedAmount(e,t){return e.side==="debit"?e.amount:-e.amount}export{d as …
-└  1:205 · … =="debit"?e.amount:-e.amount}export{d as posting,g as total,signedAmount}; …
+Scope: workspace · 33 project files
+
+=== currencyProfiles [const] · packages/money/src/currency.ts:12:14 · 1 reference ===
+
+1 structural match across 1 file
+
+packages/money/src/money.ts:51:42 — inside format · const { minorUnitsPerMajor, symbol } = currencyProfiles[value.currency];
+~~~
+
+## semantic absence names the source corpus
+
+**Agent's Input**
+
+```yaml
+tool: Occurrences
+workspace: fixtures/ledger
+query: quantumFlux
+
+# answered in 30ms
+```
+
+**Response**
+
+~~~text
+Identifiers: "quantumFlux"
+
+Scope: workspace · 33 project files
+
+=== quantumFlux · no exact identifier ===
+~~~
+
+## warm repeat is identical.first
+
+**Agent's Input**
+
+```yaml
+tool: Occurrences
+workspace: fixtures/ledger
+query: value
+symbolLimit: 5
+limit: 12
+
+# answered in 38ms
+```
+
+**Response**
+
+~~~text
+Identifiers: "value"
+
+Scope: workspace · 33 project files
+
+=== value · 4 symbols · 10 references ===
+
+14 exact-name locations across 2 files
+
+=== value [parameter] · isCurrency · packages/money/src/currency.ts:19:28 · 2 references ===
+
+packages/money/src/currency.ts:19:44,65 — inside isCurrency · export const isCurrency = (value: string): value is Currency => value in currencyProfiles;
+
+=== value [parameter] · negate · packages/money/src/money.ts:45:24 · 2 references ===
+
+packages/money/src/money.ts:45:55,73 — inside negate · export const negate = (value: Money): Money => money(-value.minorUnits, value.currency);
+
+=== value [parameter] · isZero · packages/money/src/money.ts:47:24 · 1 reference ===
+
+packages/money/src/money.ts:47:50 — inside isZero · export const isZero = (value: Money): boolean => value.minorUnits === 0n;
+
+=== value [parameter] · format · packages/money/src/money.ts:50:24 · 5 references ===
+
+packages/money/src/money.ts
+├  51:59       — inside format · const { minorUnitsPerMajor, symbol } = currencyProfiles[value.currency];
+├  52:16       — inside sign · const sign = value.minorUnits < 0n ? "-" : "";
+└  53:21,46,65 — inside magnitude · const magnitude = value.minorUnits < 0n ? -value.minorUnits : value.minorUnits;
+~~~
+
+## warm repeat is identical.repeat
+
+**Agent's Input**
+
+```yaml
+tool: Occurrences
+workspace: fixtures/ledger
+query: value
+symbolLimit: 5
+limit: 12
+
+# answered in 37ms
+```
+
+**Response**
+
+~~~text
+Identifiers: "value"
+
+Scope: workspace · 33 project files
+
+=== value · 4 symbols · 10 references ===
+
+14 exact-name locations across 2 files
+
+=== value [parameter] · isCurrency · packages/money/src/currency.ts:19:28 · 2 references ===
+
+packages/money/src/currency.ts:19:44,65 — inside isCurrency · export const isCurrency = (value: string): value is Currency => value in currencyProfiles;
+
+=== value [parameter] · negate · packages/money/src/money.ts:45:24 · 2 references ===
+
+packages/money/src/money.ts:45:55,73 — inside negate · export const negate = (value: Money): Money => money(-value.minorUnits, value.currency);
+
+=== value [parameter] · isZero · packages/money/src/money.ts:47:24 · 1 reference ===
+
+packages/money/src/money.ts:47:50 — inside isZero · export const isZero = (value: Money): boolean => value.minorUnits === 0n;
+
+=== value [parameter] · format · packages/money/src/money.ts:50:24 · 5 references ===
+
+packages/money/src/money.ts
+├  51:59       — inside format · const { minorUnitsPerMajor, symbol } = currencyProfiles[value.currency];
+├  52:16       — inside sign · const sign = value.minorUnits < 0n ? "-" : "";
+└  53:21,46,65 — inside magnitude · const magnitude = value.minorUnits < 0n ? -value.minorUnits : value.minorUnits;
 ~~~
 

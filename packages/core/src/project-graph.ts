@@ -7,12 +7,11 @@
 // programs — and static for the life of a process, so answers can say
 // "searched N of M projects" with M being a property of the repository.
 //
-// The same discovery yields the authored/generated boundary: each config's
-// `outDir` names build output, which literal scans (occurrences) must be able
-// to separate from source — a committed dist/ bundle otherwise drowns every
-// string-id search in minified noise.
+// The same discovery yields the authored/generated boundary and the inputs to
+// TypeScript's own config parser when a caller needs the actual source corpus.
 
 import { existsSync } from "node:fs";
+import { isFileInDir } from "@volar/language-server/node.js";
 import { dirname, join, relative, resolve } from "pathe";
 import ts from "typescript";
 
@@ -24,6 +23,11 @@ export type ProjectGraph = {
 };
 
 const graphs = new Map<string, ProjectGraph>();
+
+export type ProjectSources = {
+  readonly config: string;
+  readonly files: readonly string[];
+};
 
 const discover = (root: string): ProjectGraph => {
   // TypeScript's own directory walk: glob include/exclude, no crawl
@@ -78,4 +82,28 @@ export const projectGraph = (root: string): ProjectGraph => {
   const graph = existsSync(key) ? discover(key) : { configs: [], outDirs: [] };
   graphs.set(key, graph);
   return graph;
+};
+
+/** Source files selected by every configured TypeScript project. */
+export const projectSources = (root: string): readonly ProjectSources[] => {
+  const key = resolve(root);
+  const configs = existsSync(key) ? discover(key).configs : [];
+  return configs.map((config): ProjectSources => {
+    const absolute = resolve(key, config);
+    const commandLine = ts.getParsedCommandLineOfConfigFile(
+      absolute,
+      {},
+      {
+        ...ts.sys,
+        onUnRecoverableConfigFileDiagnostic: () => undefined,
+      },
+    );
+    return {
+      config,
+      files:
+        commandLine?.fileNames
+          .filter((file) => (file === key || isFileInDir(file, key)) && existsSync(file))
+          .map((file) => resolve(file)) ?? [],
+    };
+  });
 };

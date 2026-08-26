@@ -10,7 +10,6 @@ Operations and what each binds:
 - {% ask "outline" as="shape" file="src/x.ts" /%} → {total, tree}; render with {% tree entries=$shape.tree partial="symbol-node.mdoc" /%}
 - {% ask "diagnostics" as="problems" file="src/x.ts" /%} → {total, groups}; render with {% each items=$problems.groups as="group" partial="diagnostic-group.mdoc" /%}
 - {% ask "source" as="body" file="src/x.ts" from=10 to=40 /%} → {lines, startLine}; render with {% source lines=$body.lines startLine=$body.startLine /%}
-- {% ask "occurrences" as="hits" text="device.lost" file="src" /%} (file is the directory to scan) → {total, fileCount, scanned, groups}: every place the exact text occurs, or an honest zero with the scan count
 - {% ask "subject" as="what" file="src/x.ts" line=5 character=10 /%} → {name, kind, file, at}: what the position resolves to, and where it is declared
 - {% ask "callers" as="calledBy" file="src/x.ts" line=5 character=10 /%} → {name, total, projects, groups}; render with {% tree entries=$calledBy.groups partial="call-node.mdoc" /%}
 

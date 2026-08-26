@@ -1,0 +1,8 @@
+{
+  "tool": "occurrences",
+  "arguments": {
+    "query": "money",
+    "limit": 12
+  },
+  "elapsed": "244ms"
+}

@@ -352,42 +352,57 @@ file: ["packages/accounts/src/posting.ts","packages/money/src/rounding-mode.ts"]
 
 ### `occurrences`
 
-Literal text, grouped by file, with the number of files scanned. The semantic
-tools rank what exists, which is useless for confirming a token is gone after a
-teardown; a zero here comes with the same scan count, so it means something.
+Starts from an exact identifier when the agent knows its name but not its file.
+Identifier syntax nodes activate the relevant projects; TypeScript resolves
+canonical declarations and semantic references. Same-name symbols stay
+separate, overloads collapse, and unresolved identifiers are called out rather
+than mixed into the reference list.
 
 **Agent's Input**
 
 ```yaml
 tool: Occurrences
 workspace: fixtures/ledger
-text: signedAmount
+query: money
+limit: 12
 
-# answered in 12ms
+# answered in 244ms
 ```
 
 **Response**
 
 ~~~text
-"signedAmount" occurs 12 times in 7 files · 67 files scanned under the workspace · 1 file of declared build output not scanned.
+Identifiers: "money"
 
-packages/accounts/src/index.ts:12:39 · export { credit, debit, type Posting, signedAmount } from "./posting.ts";
-packages/accounts/src/journal.ts
-├  3:39  · import { credit, debit, type Posting, signedAmount } from "./posting.ts";
-└  52:12 · .map(signedAmount)
-packages/accounts/src/posting.ts:25:14 · export const signedAmount = (posting: Posting): Money => {
+Scope: workspace · 33 project files
+
+Showing 1–12 of 22 references · next offset: 12
+
+=== money [function] · packages/money/src/money.ts:27:14 · 12/22 references shown ===
+
+24 exact-name locations across 8 files · 1 without a workspace declaration
+
+Locations without a workspace declaration (1):
+
+packages/reconcile/src/matching.ts:24:37 — inside emptyRemainder · export const emptyRemainder = () => money(0, "USD");
+
+packages/importers/src/csv.ts
+├  2:37  — at module level · import { type Currency, isCurrency, money, zero, format } from "@ledger/money";
+└  34:20 — inside amount · const amount = money(Math.abs(row.amountMinor), row.currency);
+packages/money/src/index.ts
+└  8:3 — at module level · money,
+packages/money/src/money.ts
+├  30:52 — inside zero · export const zero = (currency: Currency): Money => money(0n, currency);
+├  42:10 — inside add · return money(left.minorUnits + right.minorUnits, left.currency);
+└  45:48 — inside negate · export const negate = (value: Money): Money => money(-value.minorUnits, value.currency);
 packages/reconcile/src/drift.ts
-├  4:24  · import { type Posting, signedAmount } from "@ledger/accounts";
-└  20:37 · const journalTotal = postings.map(signedAmount).reduce((total, amount) => total + amount);
-packages/reconcile/src/matching.ts
-├  1:55  · // DELIBERATELY BROKEN — the imports for `money` and `signedAmount` are
-└  14:20 · const amount = signedAmount(posting);
-packages/reports/src/balance.ts
-├  6:3   · signedAmount,
-└  34:57 · add(own.get(posting.account) ?? zero(currency), signedAmount(posting)),
-packages/rules/src/builtin.ts
-├  1:10  · import { signedAmount } from "@ledger/accounts";
-└  26:12 · .map(signedAmount)
+├  5:18  — at module level · import { format, money, type Money } from "@ledger/money";
+└  21:17 — inside drift · return format(money(journalTotal - statementTotal(statement), "usd"));
+packages/accounts/tests/journal.test.ts
+├  1:10  — at module level · import { money } from "@ledger/money";
+├  9:71  — inside test("posts a balanced transfer through the overload") callback · { from: "assets:bank:checking", to: "expenses:furniture", amount: money(24900, "USD") },
+├  23:34 — inside expect() callback · debit("expenses:travel", money(5000, "USD")),
+└  24:40 — inside expect() callback · credit("assets:bank:checking", money(500, "USD")),
 ~~~
 
 ### `search_code`

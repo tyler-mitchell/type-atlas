@@ -1,0 +1,8 @@
+{
+  "tool": "occurrences",
+  "arguments": {
+    "query": "post",
+    "symbolLimit": 10
+  },
+  "elapsed": "271ms"
+}

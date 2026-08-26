@@ -1,7 +1,7 @@
 {
   "tool": "occurrences",
   "arguments": {
-    "text": "quantumFlux"
+    "query": "quantumFlux"
   },
-  "elapsed": "11ms"
+  "elapsed": "30ms"
 }

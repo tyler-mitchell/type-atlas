@@ -192,8 +192,9 @@ export const registerLanguageServer = (connection: Connection): void => {
   server.onInitialize(() => {
     connection.onRequest(
       WorkspaceReferencesRequest.type,
-      async ({ textDocument, position, context }, token) => {
+      async ({ textDocument, position, context, projectDocuments }, token) => {
         const uri = URI.parse(textDocument.uri);
+        projectDocuments?.forEach(({ uri }) => server.project.getLanguageService(URI.parse(uri)));
         const owner = await server.project.getLanguageService(uri);
         const loaded =
           (await Promise.resolve(server.project.getExistingLanguageServices()).catch(

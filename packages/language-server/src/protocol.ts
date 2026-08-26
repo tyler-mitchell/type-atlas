@@ -42,22 +42,14 @@ export const ProjectDiagnosticsRequest = {
   >("type-atlas/projectDiagnostics"),
 } as const;
 
-/**
- * References to a symbol from every TypeScript project loaded in this session.
- *
- * `textDocument/references` answers from the one project owning the file, which
- * is the whole answer only when nothing outside it imports the symbol. Volar
- * exposes no workspace-scoped variant, and the projects that could hold the rest
- * are the ones this server has already built, so this asks each of them and
- * merges. The answer is bounded by what the session has opened, which is why the
- * caller labels it as loaded projects rather than the workspace.
- */
+/** References from the owner and every selected or already-loaded project. */
 export const WorkspaceReferencesRequest = {
   type: new RequestType<
     {
       readonly textDocument: TextDocumentIdentifier;
       readonly position: Position;
       readonly context: { readonly includeDeclaration: boolean };
+      readonly projectDocuments?: readonly TextDocumentIdentifier[];
     },
     {
       readonly locations: readonly Location[];

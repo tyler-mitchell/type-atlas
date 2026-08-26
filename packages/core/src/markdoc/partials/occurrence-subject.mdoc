@@ -1,0 +1,12 @@
+{% banner %}{% $subject.name %}{% if $subject.word %} [{% $subject.word %}]{% /if %}{% if $subject.container %} · {% $subject.container %}{% /if %} · {% $subject.file %}:{% $subject.at %}{% if not(equals($subject.declarations, 1)) %} · {% $subject.declarations %} declarations{% /if %} · {% if not(equals($subject.total, $subject.shown)) %}{% $subject.shown %}/{% $subject.total %} references shown{% /if %}{% if equals($subject.total, $subject.shown) %}{% $subject.total %} {% plural count=$subject.total forms={"one": "reference", "other": "references"} /%}{% /if %}{% /banner %}
+
+{% if $subject.candidateTotal %}
+{% if equals($subject.kind, "expression") %}{% $subject.candidateTotal %} structural {% plural count=$subject.candidateTotal forms={"one": "match", "other": "matches"} /%}{% /if %}{% if equals($subject.kind, "identifier") %}{% $subject.candidateTotal %} exact-name {% plural count=$subject.candidateTotal forms={"one": "location", "other": "locations"} /%}{% /if %} across {% $subject.candidateFiles %} {% plural count=$subject.candidateFiles forms={"one": "file", "other": "files"} /%}{% if not(equals($subject.unresolved, 0)) %} · {% $subject.unresolved %} without a workspace declaration{% /if %}
+{% /if %}
+{% if and($subject.candidateTotal, not(equals($subject.unresolved, 0))) %}
+Locations without a workspace declaration ({% $subject.unresolved %}):
+
+{% tree entries=$subject.unresolvedGroups partial="reference-node.mdoc" /%}
+{% /if %}
+
+{% tree entries=$subject.groups partial="reference-node.mdoc" /%}

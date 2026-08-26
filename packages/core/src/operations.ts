@@ -438,15 +438,23 @@ export const createTypeAtlas = (workspace: VolarWorkspace) => {
         readonly position: Position;
         readonly context: { readonly includeDeclaration: boolean };
         readonly scope: ReferenceScope;
+        readonly projectFiles?: readonly string[];
       };
     }) {
       const textDocument = await workspace.getTextDocument(input.file);
-      const { position, context, scope } = input.params;
+      const { position, context, scope, projectFiles } = input.params;
       const answer =
         scope === "workspace"
           ? await workspace.sendRequest(
               WorkspaceReferencesRequest.type,
-              { textDocument, position, context },
+              {
+                textDocument,
+                position,
+                context,
+                projectDocuments: projectFiles?.map((file) => ({
+                  uri: workspace.getWorkspaceUri(file),
+                })),
+              },
               input.signal,
             )
           : {

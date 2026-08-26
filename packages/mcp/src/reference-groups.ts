@@ -48,8 +48,10 @@ export type ReferenceSite = {
   readonly file: string;
   readonly line: number;
   readonly character: number;
+  readonly characters?: readonly number[];
   /** The declaration holding this use. Absent at the top level of a module. */
   readonly within?: string;
+  readonly text?: string;
 };
 
 /**
@@ -79,17 +81,20 @@ export type ReferenceSite = {
  * built.
  */
 export const referenceGroups = (sites: readonly ReferenceSite[]) => {
+  const position = (site: ReferenceSite) =>
+    `${site.line}:${(site.characters ?? [site.character]).join(",")}`;
   const byFile = [...Map.groupBy(sites, (site) => site.file)];
   const worthGrouping = byFile.some(([, held]) => held.length > 1);
   if (!worthGrouping) {
     return sites.map((site) => ({
       file: site.file,
-      at: `${site.line}:${site.character}`,
+      at: position(site),
       within: site.within,
+      text: site.text,
     }));
   }
   return byFile.map(([file, grouped]) => {
-    const at = grouped.map((site) => `${site.line}:${site.character}`);
+    const at = grouped.map(position);
     const column = Math.max(...at.map((value) => width(value)));
     return {
       file,
@@ -97,6 +102,7 @@ export const referenceGroups = (sites: readonly ReferenceSite[]) => {
         at: at[index] ?? "",
         column,
         within: site.within,
+        text: site.text,
       })),
     };
   });

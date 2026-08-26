@@ -1,0 +1,13 @@
+Identifiers: "value"
+
+Scope: workspace · 33 project files
+
+Showing 1–1 of 4 references · next offset: 1
+
+=== value · 2 symbols · 4 references ===
+
+14 exact-name locations across 2 files · 8 remain after the first 2 symbols; narrow path or raise symbolLimit
+
+=== value [parameter] · isCurrency · packages/money/src/currency.ts:19:28 · 1/2 references shown ===
+
+packages/money/src/currency.ts:19:44 — inside isCurrency · export const isCurrency = (value: string): value is Currency => value in currencyProfiles;

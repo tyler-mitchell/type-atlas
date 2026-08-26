@@ -16,6 +16,7 @@ overrides:
   vitest: "catalog:"
 catalog:
   "@arethetypeswrong/core": ^0.18.5
+  "@ast-grep/napi": ^0.45.1
   "@effect/language-service": ^0.87.1
   "@markdoc/markdoc": ^0.5.7
   "@modelcontextprotocol/client": 2.0.0

@@ -1,8 +1,0 @@
-{
-  "tool": "occurrences",
-  "arguments": {
-    "text": "signedAmount",
-    "directory": "packages/importers/dist"
-  },
-  "elapsed": "4ms"
-}

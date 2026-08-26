@@ -1,0 +1,26 @@
+Identifiers: "value"
+
+Scope: workspace · 33 project files
+
+=== value · 4 symbols · 10 references ===
+
+14 exact-name locations across 2 files
+
+=== value [parameter] · isCurrency · packages/money/src/currency.ts:19:28 · 2 references ===
+
+packages/money/src/currency.ts:19:44,65 — inside isCurrency · export const isCurrency = (value: string): value is Currency => value in currencyProfiles;
+
+=== value [parameter] · negate · packages/money/src/money.ts:45:24 · 2 references ===
+
+packages/money/src/money.ts:45:55,73 — inside negate · export const negate = (value: Money): Money => money(-value.minorUnits, value.currency);
+
+=== value [parameter] · isZero · packages/money/src/money.ts:47:24 · 1 reference ===
+
+packages/money/src/money.ts:47:50 — inside isZero · export const isZero = (value: Money): boolean => value.minorUnits === 0n;
+
+=== value [parameter] · format · packages/money/src/money.ts:50:24 · 5 references ===
+
+packages/money/src/money.ts
+├  51:59       — inside format · const { minorUnitsPerMajor, symbol } = currencyProfiles[value.currency];
+├  52:16       — inside sign · const sign = value.minorUnits < 0n ? "-" : "";
+└  53:21,46,65 — inside magnitude · const magnitude = value.minorUnits < 0n ? -value.minorUnits : value.minorUnits;

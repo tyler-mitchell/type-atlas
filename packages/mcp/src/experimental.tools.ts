@@ -1,20 +1,14 @@
-import { readFile, stat } from "node:fs/promises";
 import type { McpServer } from "@modelcontextprotocol/server";
-import { fdir } from "fdir";
-import { isGitIgnored } from "globby";
-import * as path from "pathe";
 import {
   type Diagnostic,
   type DocumentSymbol,
   DocumentDiagnosticRequest,
   type SymbolInformation,
 } from "@volar/language-server/protocol.js";
-import { isFileInDir } from "@volar/language-server/node.js";
 import {
   createTypeAtlas,
   declarationChainAtPosition,
   documentSymbols,
-  projectGraph,
   renderComposition,
   renderDocument,
   subjectAtPosition,
@@ -73,27 +67,6 @@ const input = type.module({
       description: "Markdoc source: ask declarations followed by a body composing what they bind.",
     }),
   }),
-  Occurrences: type({
-    workspace: fileInput.workspace,
-    text: type("string >= 1").configure({
-      description: "The exact text to find — literal, not a pattern or a meaning.",
-    }),
-    "directory?": type("string >= 1").configure({
-      description: "Workspace-relative directory to scan. Defaults to the workspace.",
-    }),
-    "directories?": type("string >= 1")
-      .array()
-      .atLeastLength(1)
-      .atMostLength(5)
-      .configure(
-        { description: "Several directories to scan in one call. Do not combine with directory." },
-        "self",
-      ),
-    "limit?": type("1 <= number.integer <= 200").configure({
-      default: 40,
-      description: "Maximum occurrences returned; the totals count every one found.",
-    }),
-  }),
 });
 
 /** One diagnostic's identity across an edit, where ranges shift but meaning holds. */
@@ -115,133 +88,6 @@ const packageOf = (file: string) => {
 
 /** Whether a use sits in a test file, by the paths tests conventionally hold. */
 const isTestSite = (file: string) => /(^|\/)tests?\/|\.(test|spec|check)\./u.test(file);
-
-/**
- * Every place an exact text occurs under a directory, and the honest scan
- * count behind an absence claim. One owner, two askers: the occurrences tool
- * and the compose op — the gateway that reaches a live session no schema
- * change can.
- */
-const scanOccurrences = async (input: {
-  readonly root: string;
-  readonly text: string;
-  readonly directory: string;
-  readonly limit: number;
-  readonly signal: AbortSignal;
-}) => {
-  const workspaceRoot = path.resolve(input.root);
-  const scanRoot = path.resolve(workspaceRoot, input.directory);
-  if (scanRoot !== workspaceRoot && !isFileInDir(scanRoot, workspaceRoot)) {
-    throw new Error(`Directory is outside the workspace: ${input.directory}`);
-  }
-  // A wrong argument answers about the argument: without this, a file passed
-  // as the directory surfaced as `ENOTDIR … lstat …/.gitignore` from the
-  // ignore walk — an errno about a file nobody named.
-  if (!(await stat(scanRoot).catch(() => undefined))?.isDirectory()) {
-    throw new Error(
-      `No directory at ${input.directory} in this workspace. Pass a directory to scan, and check the path.`,
-    );
-  }
-  // The same walk list_files answers from: gitignore honored, dependency
-  // and VCS internals excluded — an absence claim is only as strong as
-  // the set it scanned, and this is the set a reader expects.
-  const isIgnored = await isGitIgnored({
-    cwd: scanRoot,
-    followSymbolicLinks: false,
-    ignore: ["**/.git/**", "**/node_modules/**"],
-  });
-  const fileBudget = 4000;
-  const files = await new fdir()
-    .withPathSeparator("/")
-    .withRelativePaths()
-    .withMaxFiles(fileBudget + 1)
-    .withErrors()
-    .withAbortSignal(input.signal)
-    .filter((file) => !isIgnored(file))
-    .exclude((name) => name === ".git" || name === "node_modules" || name.startsWith("."))
-    .crawl(scanRoot)
-    .withPromise();
-  // Generated output is not source: a committed dist/ drowned a string-id
-  // search in minified bundle hits (kek-monorepo, 2026-08-20). The tsconfig
-  // outDirs discovered from the workspace's own configuration are excluded —
-  // and disclosed, because an absence claim is only as strong as its scan
-  // set. Scanning inside an outDir on purpose still works: the exclusion
-  // applies only when the scan root is outside them all.
-  const outDirs = projectGraph(workspaceRoot).outDirs.map((dir) =>
-    path.resolve(workspaceRoot, dir),
-  );
-  const insideGenerated = outDirs.some((dir) => scanRoot === dir || isFileInDir(scanRoot, dir));
-  const generatedFile = (relative: string): boolean => {
-    const absolute = path.resolve(scanRoot, relative);
-    return outDirs.some((dir) => isFileInDir(absolute, dir));
-  };
-  const authored = insideGenerated ? files : files.filter((file) => !generatedFile(file));
-  const generatedExcluded = files.length - authored.length;
-  const over = authored.length > fileBudget;
-  // Lexicographic, not crawl order: the filesystem's traversal order is not
-  // deterministic, and an answer that reorders between identical runs cannot
-  // be compared across changes — the same file set must read the same way.
-  const scanned = [...authored].sort().slice(0, fileBudget);
-  const sites: { file: string; line: number; character: number; text: string }[] = [];
-  let total = 0;
-  const seenFiles = new Set<string>();
-  for (const relative of scanned) {
-    const source = await readFile(path.resolve(scanRoot, relative), "utf8").catch(() => undefined);
-    // A NUL byte marks content no reader lines up; skipped, not counted.
-    if (source === undefined || source.includes("\0")) continue;
-    if (!source.includes(input.text)) continue;
-    const display = path.relative(workspaceRoot, path.resolve(scanRoot, relative));
-    for (const [index, line] of source.split("\n").entries()) {
-      for (
-        let at = line.indexOf(input.text);
-        at !== -1;
-        at = line.indexOf(input.text, at + Math.max(1, input.text.length))
-      ) {
-        total += 1;
-        seenFiles.add(display);
-        if (sites.length < input.limit) {
-          // Windowed around the match, never the whole line: a minified
-          // bundle carries one line of half a megabyte, and fifteen matched
-          // rows once rendered a 600KB answer no client would deliver.
-          const window =
-            line.trim().length <= 160
-              ? line.trim()
-              : line.slice(Math.max(0, at - 60), at + input.text.length + 60).trim();
-          sites.push({
-            file: display,
-            line: index + 1,
-            character: at + 1,
-            text: line.trim().length <= 160 ? window : `… ${window} …`,
-          });
-        }
-      }
-    }
-  }
-  const groups = [...Map.groupBy(sites, ({ file }) => file)].map(([file, held]) =>
-    held.length === 1 && held[0]
-      ? { file, at: `${held[0].line}:${held[0].character}`, text: held[0].text }
-      : {
-          file,
-          children: held.map((site) => ({
-            at: `${site.line}:${site.character}`,
-            column: Math.max(...held.map(({ line, character }) => `${line}:${character}`.length)),
-            text: site.text,
-          })),
-        },
-  );
-  return {
-    text: input.text,
-    directory: path.relative(workspaceRoot, scanRoot) === "" ? "the workspace" : input.directory,
-    total,
-    fileCount: seenFiles.size,
-    scanned: scanned.length,
-    over,
-    generatedExcluded: generatedExcluded > 0 ? generatedExcluded : undefined,
-    groups,
-    page:
-      total > sites.length ? { from: 1, to: sites.length, total, unit: "occurrences" } : undefined,
-  };
-};
 
 export const registerExperimentalTools = (
   server: McpServer,
@@ -338,7 +184,7 @@ export const registerExperimentalTools = (
     {
       title: "Compose",
       description:
-        'Experimental: author your own code-intelligence answer as one markup document. You define all of it: self-closing ask tags declare the data and render nothing; the body you write is the entire answer, composing what the asks bind with the shipped tags and partials — {% $uses.total %}, {% tree entries=$uses.groups partial="reference-node.mdoc" /%}, headings, prose. Asks chain: a later ask reads an earlier answer, e.g. {% ask "diagnostics" as="health" files=$uses.paths /%} checks the files the reference search found. A document with no body renders nothing — the markup is yours, not the tool\'s.\n\nOperations and what each binds:\n- {% ask "hover" as="head" file="src/x.ts" line=5 character=10 /%} (one-based, on the symbol\'s name) → {text}: the signature and documentation, rendered with {% $head.text %}\n- {% ask "references" as="uses" file="src/x.ts" line=5 character=10 /%} → {total, files, paths, projects, groups}; render sites with {% tree entries=$uses.groups partial="reference-node.mdoc" /%}\n- {% ask "outline" as="shape" file="src/x.ts" /%} → {total, tree}; render with {% tree entries=$shape.tree partial="symbol-node.mdoc" /%}\n- {% ask "diagnostics" as="problems" file="src/x.ts" /%} → {total, groups}; render with {% each items=$problems.groups as="group" partial="diagnostic-group.mdoc" /%}\n- {% ask "source" as="body" file="src/x.ts" from=10 to=40 /%} → {lines, startLine}; render with {% source lines=$body.lines startLine=$body.startLine /%}\n- {% ask "occurrences" as="hits" text="device.lost" file="src" /%} (file is the directory to scan) → {total, fileCount, scanned, groups}: every place the exact text occurs, or an honest zero with the scan count\n- {% ask "subject" as="what" file="src/x.ts" line=5 character=10 /%} → {name, kind, file, at}: what the position resolves to, and where it is declared\n- {% ask "callers" as="calledBy" file="src/x.ts" line=5 character=10 /%} → {name, total, projects, groups}; render with {% tree entries=$calledBy.groups partial="call-node.mdoc" /%}\n\nOne ask failing binds {failed} and is stated in a feedback line under your answer; the rest of the composition still answers.',
+        'Experimental: author your own code-intelligence answer as one markup document. You define all of it: self-closing ask tags declare the data and render nothing; the body you write is the entire answer, composing what the asks bind with the shipped tags and partials — {% $uses.total %}, {% tree entries=$uses.groups partial="reference-node.mdoc" /%}, headings, prose. Asks chain: a later ask reads an earlier answer, e.g. {% ask "diagnostics" as="health" files=$uses.paths /%} checks the files the reference search found. A document with no body renders nothing — the markup is yours, not the tool\'s.\n\nOperations and what each binds:\n- {% ask "hover" as="head" file="src/x.ts" line=5 character=10 /%} (one-based, on the symbol\'s name) → {text}: the signature and documentation, rendered with {% $head.text %}\n- {% ask "references" as="uses" file="src/x.ts" line=5 character=10 /%} → {total, files, paths, projects, groups}; render sites with {% tree entries=$uses.groups partial="reference-node.mdoc" /%}\n- {% ask "outline" as="shape" file="src/x.ts" /%} → {total, tree}; render with {% tree entries=$shape.tree partial="symbol-node.mdoc" /%}\n- {% ask "diagnostics" as="problems" file="src/x.ts" /%} → {total, groups}; render with {% each items=$problems.groups as="group" partial="diagnostic-group.mdoc" /%}\n- {% ask "source" as="body" file="src/x.ts" from=10 to=40 /%} → {lines, startLine}; render with {% source lines=$body.lines startLine=$body.startLine /%}\n- {% ask "subject" as="what" file="src/x.ts" line=5 character=10 /%} → {name, kind, file, at}: what the position resolves to, and where it is declared\n- {% ask "callers" as="calledBy" file="src/x.ts" line=5 character=10 /%} → {name, total, projects, groups}; render with {% tree entries=$calledBy.groups partial="call-node.mdoc" /%}\n\nOne ask failing binds {failed} and is stated in a feedback line under your answer; the rest of the composition still answers.',
       inputSchema: input.Compose,
       annotations: readOnlyToolAnnotations,
     },
@@ -520,14 +366,6 @@ export const registerExperimentalTools = (
             startLine: from,
           };
         },
-        occurrences: async (ask) =>
-          scanOccurrences({
-            root,
-            text: attributeText(ask.attributes.text) || attributeText(ask.attributes.query),
-            directory: askedFile(ask) || ".",
-            limit: 40,
-            signal,
-          }),
       };
       const asks = documentAsks(document);
       const unfulfillable = asks.filter(({ operation }) => !(operation in operations));
@@ -675,33 +513,6 @@ export const registerExperimentalTools = (
         },
       });
       return textResult(rendered.text);
-    },
-  );
-
-  registerTool(
-    server,
-    "occurrences",
-    {
-      title: "Occurrences",
-      description:
-        'Experimental: every place an exact text occurs under one or more directories, with an honest zero — the literal proof of absence a semantic search cannot give. Scans workspace files (gitignore honored, dependencies excluded); use it for teardown checks, string keys, config references, and "is this token ever used" questions. search_code finds meaning; this finds bytes.',
-      inputSchema: input.Occurrences,
-      annotations: readOnlyToolAnnotations,
-    },
-    async (
-      { workspace: root, text, directory, directories, limit = 40 },
-      { mcpReq: { signal } },
-    ) => {
-      if (directory && directories) throw new Error("Pass directory or directories, not both.");
-      const rendered = await Promise.all(
-        (directories ?? [directory ?? "."]).map(async (scanRoot) =>
-          renderDocument({
-            document: "occurrences.tool.mdoc",
-            variables: await scanOccurrences({ root, text, directory: scanRoot, limit, signal }),
-          }),
-        ),
-      );
-      return textResult(rendered.map(({ text }) => text).join("\n\n"));
     },
   );
 

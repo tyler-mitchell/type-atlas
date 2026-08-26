@@ -1,0 +1,12 @@
+{
+  "tool": "occurrences",
+  "arguments": {
+    "query": "money",
+    "paths": [
+      "packages/money",
+      "packages/accounts"
+    ],
+    "limit": 12
+  },
+  "elapsed": "31ms"
+}

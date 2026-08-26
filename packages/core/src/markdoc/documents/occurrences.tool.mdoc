@@ -2,15 +2,11 @@
 { "tool": "occurrences" }
 ---
 
-{% if and(equals($total, 0), equals($scanned, 0)) %}
-No files were scanned under {% $directory %} — it holds nothing this scan reads, so this answer is not evidence of absence. Check the directory, or scan its parent.
-{% /if %}
-{% if and(equals($total, 0), not(equals($scanned, 0))) %}
-Nothing under {% $directory %} contains "{% $text %}" · {% $scanned %} {% plural count=$scanned forms={"one": "file", "other": "files"} /%} scanned{% if $over %} — the first {% $scanned %}; narrow the directory to scan the rest{% /if %}{% if $generatedExcluded %} · {% $generatedExcluded %} {% plural count=$generatedExcluded forms={"one": "file", "other": "files"} /%} of declared build output not scanned — scan a generated directory directly to include it{% /if %}. This is a literal answer: the exact text does not occur in what was scanned, which is the proof a semantic search cannot give.
-{% /if %}
-{% if not(equals($total, 0)) %}
-"{% $text %}" occurs {% $total %} {% plural count=$total forms={"one": "time", "other": "times"} /%} in {% $fileCount %} {% plural count=$fileCount forms={"one": "file", "other": "files"} /%} · {% $scanned %} {% plural count=$scanned forms={"one": "file", "other": "files"} /%} scanned under {% $directory %}{% if $over %} — the first {% $scanned %}; narrow the directory to scan the rest{% /if %}{% if $generatedExcluded %} · {% $generatedExcluded %} {% plural count=$generatedExcluded forms={"one": "file", "other": "files"} /%} of declared build output not scanned{% /if %}.
-{% partial file="page.mdoc" /%}
+{% $queryLabel %}: {% $queryText %}
 
-{% tree entries=$groups partial="occurrence-node.mdoc" /%}
+Scope: {% $scopes %} · {% $sourceFiles %} project {% plural count=$sourceFiles forms={"one": "file", "other": "files"} /%}
+{% if $page %}
+Showing {% $page.from %}–{% $page.to %} of {% $page.total %} references{% if $page.next %} · next offset: {% $page.next %}{% /if %}
 {% /if %}
+
+{% each items=$queries as="query" partial="occurrence-query.mdoc" /%}

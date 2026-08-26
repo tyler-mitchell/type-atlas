@@ -1,0 +1,9 @@
+{
+  "tool": "occurrences",
+  "arguments": {
+    "query": "value",
+    "symbolLimit": 2,
+    "limit": 1
+  },
+  "elapsed": "30ms"
+}

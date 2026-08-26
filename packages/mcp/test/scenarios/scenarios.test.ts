@@ -607,24 +607,46 @@ describe("explore_symbol", () => {
   );
 });
 
-// ── occurrences: literal proof of presence and absence ──────────────────────
+// ── occurrences: names resolved into canonical symbols and references ────────
 describe("occurrences", () => {
-  scenarioTest("token-found-across-packages", ({ capture }) =>
-    capture("occurrences", { text: "signedAmount" }),
+  scenarioTest("semantic-symbol-and-unresolved-node", ({ capture }) =>
+    capture("occurrences", { query: "money", limit: 12 }),
   );
-  scenarioTest("several-directories-one-call", ({ capture }) =>
+  scenarioTest("same-name-symbols-stay-separate", ({ capture }) =>
+    capture("occurrences", { query: "value", symbolLimit: 5, limit: 12 }),
+  );
+  scenarioTest("small-page-stays-compact", ({ capture }) =>
+    capture("occurrences", { query: "value", symbolLimit: 2, limit: 1 }),
+  );
+  scenarioTest("overloads-are-one-symbol", ({ capture }) =>
+    capture("occurrences", { query: "post", symbolLimit: 10 }),
+  );
+  scenarioTest("several-symbols-share-one-page", ({ capture }) =>
     capture("occurrences", {
-      text: "signedAmount",
-      directories: ["packages/accounts/src", "packages/reconcile/src"],
+      queries: ["money", "signedAmount"],
+      symbolLimit: 5,
+      limit: 8,
     }),
   );
-  scenarioTest("honest-zero", ({ capture }) => capture("occurrences", { text: "quantumFlux" }));
-  // The committed importers bundle sits in vite's default outDir, so the
-  // workspace scan above excludes it and says so; naming the directory is
-  // the deliberate opt-in that scans generated output anyway.
-  scenarioTest("scanning-generated-output-on-purpose", ({ capture }) =>
-    capture("occurrences", { text: "signedAmount", directory: "packages/importers/dist" }),
+  scenarioTest("several-scopes-one-call", ({ capture }) =>
+    capture("occurrences", {
+      query: "money",
+      paths: ["packages/money", "packages/accounts"],
+      limit: 12,
+    }),
   );
+  scenarioTest("exact-expression-is-structural", ({ capture }) =>
+    capture("occurrences", { query: "currencyProfiles[value.currency]" }),
+  );
+  scenarioTest("semantic-absence-names-the-source-corpus", ({ capture }) =>
+    capture("occurrences", { query: "quantumFlux" }),
+  );
+  scenarioTest("warm-repeat-is-identical", async ({ capture }) => {
+    const input = { query: "value", symbolLimit: 5, limit: 12 };
+    const first = await capture("occurrences", input, { facet: "first" });
+    const repeat = await capture("occurrences", input, { facet: "repeat" });
+    expect(repeat).toBe(first);
+  });
 });
 
 // ── the hazard corner, deliberately last ────────────────────────────────────

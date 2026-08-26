@@ -1,0 +1,7 @@
+{
+  "tool": "occurrences",
+  "arguments": {
+    "query": "currencyProfiles[value.currency]"
+  },
+  "elapsed": "25ms"
+}
