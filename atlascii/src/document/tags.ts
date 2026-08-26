@@ -109,6 +109,10 @@ export const tags: Config["tags"] = {
       depth: { type: Number },
       /** Narrows located results to or away from test files: "only", "exclude". */
       tests: { type: String },
+      /** Picomatch patterns a listing is narrowed to. */
+      glob: { type: Array },
+      /** Lists only what git reports changed. */
+      changed: { type: Boolean },
       /** Where a search looks, and how much it returns. */
       directory: { type: String },
       path: { type: String },

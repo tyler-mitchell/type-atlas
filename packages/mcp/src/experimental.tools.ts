@@ -35,6 +35,7 @@ import type { Semble } from "./semble.ts";
 import { enclosingDeclaration, referenceGroups } from "./reference-groups.ts";
 import { registerTool } from "./tool.ts";
 import { fileInput, positionInput } from "./tool-input.ts";
+import { workspaceTree } from "./workspace-tree.ts";
 
 const input = type.module({
   Quorl: type({
@@ -198,7 +199,7 @@ export const registerExperimentalTools = (
     {
       title: "Compose",
       description:
-        'Answer several questions about code in one call, laid out how you want. `{% ask %}` tags declare data and render nothing; the body you write is the whole answer.\n\nEach ask is named for the tool that answers it and answers as that tool does. Point one at a declaration by name with `symbol="foo"`, or at `line`/`character` (one-based). Every ask also binds `.text`, already rendered, so the shortest useful composition is two lines and needs nothing memorised:\n\n{% ask "references" as="uses" file="src/x.ts" symbol="foo" /%}\n{% $uses.text %}\n\nAsks, and the fields each binds besides `.text`:\n- hover → {text}: signature and documentation\n- subject → {name, kind, file, at}: what a position resolves to\n- references → {total, files, paths, projects, groups}; also takes `tests="only"` or `tests="exclude"` to narrow the uses it already found — "which tests cover this" against "what breaks if I change it". That split is a path heuristic (a `tests/` directory, a `.test.`/`.spec.` name), not something the compiler knows\n- definitions | type_definitions | implementations → {total, files, paths, groups}\n- callers | callees → {name, total, groups, dependencies}; calls into dependencies are named in `dependencies` rather than listed as rows\n- document_symbols → {total, tree}; `depth` opens nested levels, `raw` keeps everything\n- diagnostics → {total, groups, checked, of}; takes `file`, or `files=$uses.paths` from an earlier ask\n- read_file → {lines, startLine}; `from` and `to`\n- occurrences → {text, …}: exact identifiers resolved to their references, with an honest zero when a name occurs nowhere; takes `query`, and `path`, `limit`, `symbolLimit`\n- search_code → {text}: find code by what it does when the name is unknown, each hit anchored to a language-server symbol; takes `query`, and `directory`, `limit`, `snippetLines`\n- workspace_symbols → {total, projects, hits, file, line, character}: find a declaration by `query` across loaded projects, where `file` only picks which project to search from. Binds the first hit\'s location, so the next ask can point at it: `file=$found.file line=$found.line character=$found.character`\n\nAn ask can also run once per item of a list an earlier ask bound, instead of once at one place: `each=$found.hits` hovers every candidate a search returned, `each=$uses.paths` outlines every file using a symbol. A string item fills `file`; an object item fills the attributes it has fields for; anything you write on the tag yourself stays fixed. It binds {items, total, of, text}, and each item carries its own answer plus a `title` — so `{% $heads.text %}` is already a titled block per item, and `{% sections items=$heads.items /%}` is that same thing when you want to lay it out yourself. Bounded to 10 items; `of` is how many the list held.\n\nTo guard a section, use the boolean: `{% if $uses.any %}` on its own line, with the heading and body under it. A count does not work — `{% if $uses.total %}` renders on zero, because the engine asks whether the value is there, not whether it is nonzero. Every countable ask binds `any`.\n\n`paths` is a list to hand to another ask, not text to print — interpolating it runs the paths together. The file list is already in `.text`.\n\nFor a layout of your own, use the fields with the shipped tags: {% tree entries=$uses.groups partial="reference-node.mdoc" /%}, {% tree entries=$calledBy.groups partial="call-node.mdoc" /%}, {% tree entries=$shape.tree partial="symbol-node.mdoc" /%}, {% each items=$problems.groups as="group" partial="diagnostic-group.mdoc" /%}, {% source lines=$body.lines startLine=$body.startLine /%}.\n\nAsks fulfil in document order and a later one may read an earlier bind. A failing ask is named in a line under the answer; the rest still render.',
+        'Answer several questions about code in one call, laid out how you want. `{% ask %}` tags declare data and render nothing; the body you write is the whole answer.\n\nEach ask is named for the tool that answers it and answers as that tool does. Point one at a declaration by name with `symbol="foo"`, or at `line`/`character` (one-based). Every ask also binds `.text`, already rendered, so the shortest useful composition is two lines and needs nothing memorised:\n\n{% ask "references" as="uses" file="src/x.ts" symbol="foo" /%}\n{% $uses.text %}\n\nAsks, and the fields each binds besides `.text`:\n- hover → {text}: signature and documentation\n- subject → {name, kind, file, at}: what a position resolves to\n- references → {total, files, paths, projects, groups}; also takes `tests="only"` or `tests="exclude"` to narrow the uses it already found — "which tests cover this" against "what breaks if I change it". That split is a path heuristic (a `tests/` directory, a `.test.`/`.spec.` name), not something the compiler knows\n- definitions | type_definitions | implementations → {total, files, paths, groups}\n- file_references → {total, files, paths, projects, groups}: who imports this module, which is not what the uses of any symbol in it answer — ask it before moving or deleting a file\n- callers | callees → {name, total, groups, dependencies}; calls into dependencies are named in `dependencies` rather than listed as rows\n- document_symbols → {total, tree}; `depth` opens nested levels, `raw` keeps everything\n- diagnostics → {total, groups, checked, of}; takes `file`, or `files=$uses.paths` from an earlier ask\n- read_file → {lines, startLine}; `from` and `to`\n- occurrences → {text, …}: exact identifiers resolved to their references, with an honest zero when a name occurs nowhere; takes `query`, and `path`, `limit`, `symbolLimit`\n- list_files → {text, files, total, any}: the file tree, for orienting before you know any path; takes `directory`, `glob`, `depth`, `limit`, `changed=true` for the working-tree delta. `files` is workspace-relative, so `each=$tree.files` walks what it found\n- search_code → {text}: find code by what it does when the name is unknown, each hit anchored to a language-server symbol; takes `query`, and `directory`, `limit`, `snippetLines`\n- workspace_symbols → {total, projects, hits, file, line, character}: find a declaration by `query` across loaded projects, where `file` only picks which project to search from. Binds the first hit\'s location, so the next ask can point at it: `file=$found.file line=$found.line character=$found.character`\n\nAn ask can also run once per item of a list an earlier ask bound, instead of once at one place: `each=$found.hits` hovers every candidate a search returned, `each=$uses.paths` outlines every file using a symbol. A string item fills `file`; an object item fills the attributes it has fields for; anything you write on the tag yourself stays fixed. It binds {items, total, of, text}, and each item carries its own answer plus a `title` — so `{% $heads.text %}` is already a titled block per item, and `{% sections items=$heads.items /%}` is that same thing when you want to lay it out yourself. Bounded to 10 items; `of` is how many the list held.\n\nTo guard a section, use the boolean: `{% if $uses.any %}` on its own line, with the heading and body under it. A count does not work — `{% if $uses.total %}` renders on zero, because the engine asks whether the value is there, not whether it is nonzero. Every countable ask binds `any`.\n\n`paths` is a list to hand to another ask, not text to print — interpolating it runs the paths together. The file list is already in `.text`.\n\nFor a layout of your own, use the fields with the shipped tags: {% tree entries=$uses.groups partial="reference-node.mdoc" /%}, {% tree entries=$calledBy.groups partial="call-node.mdoc" /%}, {% tree entries=$shape.tree partial="symbol-node.mdoc" /%}, {% each items=$problems.groups as="group" partial="diagnostic-group.mdoc" /%}, {% source lines=$body.lines startLine=$body.startLine /%}.\n\nAsks fulfil in document order and a later one may read an earlier bind. A failing ask is named in a line under the answer; the rest still render.',
       inputSchema: input.Compose,
       annotations: readOnlyToolAnnotations,
     },
@@ -449,6 +450,17 @@ export const registerExperimentalTools = (
             }),
           };
         },
+        // Who imports this module, which is not what any symbol's references
+        // answer: a barrel re-exporting everything has importers and no uses
+        // of its own, and "what depends on this file" is the question asked
+        // before moving or deleting one.
+        file_references: async (ask) => {
+          const { result, projects } = await intelligence.fileReferences({
+            file: askedFile(ask),
+            signal,
+          });
+          return { ...(await places(result ?? [], testFilter(ask))), projects };
+        },
         // Whether a dossier wants literal proof is the composer's call, not
         // this tool's. Answers as `occurrences` does, through its own document.
         occurrences: async (ask) => {
@@ -463,6 +475,39 @@ export const registerExperimentalTools = (
             signal,
           });
           return { ...result, text: await asDocument("occurrences.tool.mdoc", result) };
+        },
+        // The first move in an unfamiliar repository, and the one thing a
+        // composition could not do: every other ask needs a path the composer
+        // already has. Orientation stayed outside compose, so the first call
+        // was always a plain listing and the composition began at call two.
+        // Binds `files` as well as the tree, so a listing can feed a fan-out
+        // — `each=$tree.files` reads every file it found.
+        list_files: async (ask) => {
+          const glob = Array.isArray(ask.attributes.glob)
+            ? ask.attributes.glob.map(String)
+            : undefined;
+          const listing = await workspaceTree({
+            workspace: root,
+            directory: attributeText(ask.attributes.directory) || ".",
+            // A glob is already a narrowing, so it walks deep; a bare listing
+            // opens one level, exactly as `list_files` decides it.
+            depth: Number(ask.attributes.depth ?? (glob ? 10 : 1)),
+            glob,
+            includeHidden: false,
+            includeIgnored: false,
+            includeSubmodules: false,
+            limit: Number(ask.attributes.limit ?? 500),
+            loc: true,
+            git: true,
+            changed: ask.attributes.changed === true,
+            signal,
+          });
+          return {
+            ...listing,
+            total: listing.files.length,
+            any: listing.files.length > 0,
+            text: await asDocument("list-files.tool.mdoc", listing),
+          };
         },
         // Find code by what it does, for when the name is unknown — the other
         // half of orientation, where `symbols` needs a name to search for.

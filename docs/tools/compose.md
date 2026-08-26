@@ -14,11 +14,13 @@ Asks, and the fields each binds besides `.text`:
 - subject → {name, kind, file, at}: what a position resolves to
 - references → {total, files, paths, projects, groups}; also takes `tests="only"` or `tests="exclude"` to narrow the uses it already found — "which tests cover this" against "what breaks if I change it". That split is a path heuristic (a `tests/` directory, a `.test.`/`.spec.` name), not something the compiler knows
 - definitions | type_definitions | implementations → {total, files, paths, groups}
+- file_references → {total, files, paths, projects, groups}: who imports this module, which is not what the uses of any symbol in it answer — ask it before moving or deleting a file
 - callers | callees → {name, total, groups, dependencies}; calls into dependencies are named in `dependencies` rather than listed as rows
 - document_symbols → {total, tree}; `depth` opens nested levels, `raw` keeps everything
 - diagnostics → {total, groups, checked, of}; takes `file`, or `files=$uses.paths` from an earlier ask
 - read_file → {lines, startLine}; `from` and `to`
 - occurrences → {text, …}: exact identifiers resolved to their references, with an honest zero when a name occurs nowhere; takes `query`, and `path`, `limit`, `symbolLimit`
+- list_files → {text, files, total, any}: the file tree, for orienting before you know any path; takes `directory`, `glob`, `depth`, `limit`, `changed=true` for the working-tree delta. `files` is workspace-relative, so `each=$tree.files` walks what it found
 - search_code → {text}: find code by what it does when the name is unknown, each hit anchored to a language-server symbol; takes `query`, and `directory`, `limit`, `snippetLines`
 - workspace_symbols → {total, projects, hits, file, line, character}: find a declaration by `query` across loaded projects, where `file` only picks which project to search from. Binds the first hit's location, so the next ask can point at it: `file=$found.file line=$found.line character=$found.character`
 
