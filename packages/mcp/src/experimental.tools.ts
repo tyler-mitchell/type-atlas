@@ -3,12 +3,18 @@ import {
   type Diagnostic,
   type DocumentSymbol,
   DocumentDiagnosticRequest,
+  type Location,
+  type LocationLink,
+  type Range,
   type SymbolInformation,
 } from "@volar/language-server/protocol.js";
 import {
   createTypeAtlas,
   declarationChainAtPosition,
+  declarationsNamed,
   documentSymbols,
+  foldValueSymbols,
+  projectDocumentSymbols,
   renderComposition,
   renderDocument,
   subjectAtPosition,
@@ -197,11 +203,77 @@ export const registerExperimentalTools = (
       const attributeText = (value: unknown): string =>
         typeof value === "string" || typeof value === "number" ? String(value) : "";
       const askedFile = (ask: DocumentAsk) => attributeText(ask.attributes.file);
-      // Ask positions are one-based, like every position this surface accepts.
-      const askedPosition = (ask: DocumentAsk) => ({
-        line: Number(ask.attributes.line ?? 1) - 1,
-        character: Number(ask.attributes.character ?? 1) - 1,
-      });
+      // Where an ask points: a name in the file, or a one-based position.
+      // Naming the symbol is the ergonomic form — a composer that had to supply
+      // line and character first ran another tool to find them, which is the
+      // round trip a composition exists to remove.
+      const askedPosition = async (ask: DocumentAsk) => {
+        const symbol = attributeText(ask.attributes.symbol);
+        if (!symbol) {
+          return {
+            line: Number(ask.attributes.line ?? 1) - 1,
+            character: Number(ask.attributes.character ?? 1) - 1,
+          };
+        }
+        const uri = workspace.getWorkspaceUri(askedFile(ask));
+        const { source } = await workspace.readTextDocumentUri(uri, signal);
+        const matches = declarationsNamed(documentSymbols({ uri, source }) ?? [], uri, symbol);
+        const only = matches.length === 1 ? matches[0] : undefined;
+        if (!only) {
+          throw new Error(
+            matches.length === 0
+              ? `${askedFile(ask)} declares no "${symbol}".`
+              : `${askedFile(ask)} declares "${symbol}" ${String(matches.length)} times; ask by line and character instead.`,
+          );
+        }
+        return only.selectionRange.start;
+      };
+      // An ask renders its own text through the same partial an author would
+      // reach for, so the two forms cannot drift: `{% $uses.text %}` and the
+      // hand-written tree produce the same lines.
+      const asText = async (source: string, variables: Record<string, unknown>) =>
+        (await renderComposition({ source, variables })).text;
+      // Every ask that answers with places binds this one shape, so a composer
+      // learns it once: references, definitions, types, and implementations all
+      // render through `reference-node.mdoc`.
+      const places = async (locations: readonly { uri: string; range: Range }[]) => {
+        const sites = [];
+        for (const { uri, range } of locations) {
+          const chain = await declarationChainAtPosition({
+            workspace,
+            uri,
+            position: range.start,
+          }).catch(() => []);
+          sites.push({
+            file: displayPath(uri, root),
+            line: range.start.line + 1,
+            character: range.start.character + 1,
+            within: enclosingDeclaration(chain, range)?.name,
+          });
+        }
+        const ordered = [...sites].sort(
+          (left, right) =>
+            left.file.localeCompare(right.file) ||
+            left.line - right.line ||
+            left.character - right.character,
+        );
+        const paths = [...new Set(ordered.map(({ file }) => file))];
+        const groups = referenceGroups(ordered);
+        return {
+          total: ordered.length,
+          files: paths.length,
+          // The list behind the count, so a later ask can compose over it:
+          // {% ask "diagnostics" files=$uses.paths /%}.
+          paths,
+          groups,
+          // Rendered here so the shortest useful composition is `{% $uses.text %}`
+          // — a composer who wants their own layout still has the fields, but
+          // nobody has to learn a partial's filename to get an answer out.
+          text: await asText('{% tree entries=$groups partial="reference-node.mdoc" /%}', {
+            groups,
+          }),
+        };
+      };
       // The operations a composition can ask for, each binding the shape its
       // partial reads — the same shapes the dedicated tools compose from.
       const operations: Record<string, (ask: DocumentAsk) => Promise<unknown>> = {
@@ -209,7 +281,7 @@ export const registerExperimentalTools = (
           const { result } = await intelligence.hover({
             file: askedFile(ask),
             signal,
-            params: { position: askedPosition(ask) },
+            params: { position: await askedPosition(ask) },
           });
           return { text: markupText(result?.contents) ?? "" };
         },
@@ -217,7 +289,7 @@ export const registerExperimentalTools = (
           const resolved = await subjectAtPosition({
             workspace,
             uri: workspace.getWorkspaceUri(askedFile(ask)),
-            position: askedPosition(ask),
+            position: await askedPosition(ask),
             signal,
           });
           return resolved
@@ -235,27 +307,29 @@ export const registerExperimentalTools = (
         callers: async (ask) => {
           const { items, calls, projects } = await intelligence.callers({
             file: askedFile(ask),
-            position: askedPosition(ask),
+            position: await askedPosition(ask),
             signal,
           });
           const flat = (calls ?? []).flatMap((group) => group ?? []);
           const grouped = Map.groupBy(flat, (call) => displayPath(call.from.uri, root));
+          const groups = [...grouped].map(([file, entries]) => ({
+            file,
+            children: entries.map((call) => ({
+              name: call.from.name,
+              kind: call.from.kind,
+              selection: call.from.selectionRange,
+              extent: sameRange(call.from.range, call.from.selectionRange)
+                ? undefined
+                : call.from.range,
+              sites: [...new Set(call.fromRanges.map((site) => rangeText(site)))],
+            })),
+          }));
           return {
             name: items?.[0]?.name,
             total: flat.length,
             projects,
-            groups: [...grouped].map(([file, entries]) => ({
-              file,
-              children: entries.map((call) => ({
-                name: call.from.name,
-                kind: call.from.kind,
-                selection: call.from.selectionRange,
-                extent: sameRange(call.from.range, call.from.selectionRange)
-                  ? undefined
-                  : call.from.range,
-                sites: [...new Set(call.fromRanges.map((site) => rangeText(site)))],
-              })),
-            })),
+            groups,
+            text: await asText('{% tree entries=$groups partial="call-node.mdoc" /%}', { groups }),
           };
         },
         references: async (ask) => {
@@ -263,46 +337,28 @@ export const registerExperimentalTools = (
             file: askedFile(ask),
             signal,
             params: {
-              position: askedPosition(ask),
+              position: await askedPosition(ask),
               context: { includeDeclaration: false },
               scope: "workspace",
             },
           });
-          const sites = [];
-          for (const { uri, range } of result ?? []) {
-            const chain = await declarationChainAtPosition({
-              workspace,
-              uri,
-              position: range.start,
-            }).catch(() => []);
-            sites.push({
-              file: displayPath(uri, root),
-              line: range.start.line + 1,
-              character: range.start.character + 1,
-              within: enclosingDeclaration(chain, range)?.name,
-            });
-          }
-          const ordered = [...sites].sort(
-            (left, right) =>
-              left.file.localeCompare(right.file) ||
-              left.line - right.line ||
-              left.character - right.character,
-          );
-          const paths = [...new Set(ordered.map(({ file }) => file))];
-          return {
-            total: ordered.length,
-            files: paths.length,
-            // The list behind the count, so a later ask can compose over it:
-            // {% ask "diagnostics" files=$uses.paths /%}.
-            paths,
-            projects,
-            groups: referenceGroups(ordered),
-          };
+          return { ...(await places(result ?? [])), projects };
         },
         outline: async (ask) => {
           const uri = workspace.getWorkspaceUri(askedFile(ask));
           const { source } = await workspace.readTextDocumentUri(uri, signal);
-          const parsed = documentSymbols({ uri, source }) ?? [];
+          // Folded and depth-limited exactly like `document_symbols`: an
+          // outline that prints every local and callback answers a question
+          // nobody asked — this file alone rendered 14 declarations as 90
+          // rows. `depth` opens it a level at a time; `raw=true` keeps
+          // everything.
+          const raw = ask.attributes.raw === true;
+          const folded = (documentSymbols({ uri, source }) ?? []).map((entry) =>
+            raw ? entry : foldValueSymbols(entry),
+          );
+          const parsed = raw
+            ? folded
+            : projectDocumentSymbols([...folded], Number(ask.attributes.depth ?? 0));
           const nest = (
             entries: readonly (DocumentSymbol | SymbolInformation)[],
           ): readonly Record<string, unknown>[] =>
@@ -315,10 +371,18 @@ export const registerExperimentalTools = (
                 selection,
                 extent: sameRange(extent, selection) ? undefined : extent,
                 detail: "detail" in entry ? entry.detail : undefined,
+                // What folding collapsed, so a folded row still prices itself
+                // — `· 4 entries` rather than a row that looks childless.
+                folded: (entry as { readonly folded?: number }).folded,
                 children: "range" in entry ? nest(entry.children ?? []) : [],
               };
             });
-          return { total: parsed.length, tree: nest(parsed) };
+          const tree = nest(parsed);
+          return {
+            total: parsed.length,
+            tree,
+            text: await asText('{% tree entries=$tree partial="symbol-node.mdoc" /%}', { tree }),
+          };
         },
         diagnostics: async (ask) => {
           // One file named directly, or the files an earlier ask answered
@@ -349,21 +413,60 @@ export const registerExperimentalTools = (
               return { file: displayPath(uri, root), problems };
             }),
           );
+          const groups = perFile.filter(({ problems }) => problems.length > 0);
           return {
             total: perFile.reduce((sum, { problems }) => sum + problems.length, 0),
-            groups: perFile.filter(({ problems }) => problems.length > 0),
+            groups,
             checked: checked.length,
             of: named.length,
+            text: await asText(
+              '{% each items=$groups as="group" partial="diagnostic-group.mdoc" /%}',
+              { groups },
+            ),
           };
         },
+        // Definitions, types, and implementations answer the same shape — a
+        // list of places — so they share one binding rather than three that
+        // differ only in which request they send.
+        ...Object.fromEntries(
+          (
+            [
+              ["definitions", intelligence.definitions],
+              ["types", intelligence.typeDefinitions],
+              ["implementations", intelligence.implementations],
+            ] as const
+          ).map(([name, request]) => [
+            name,
+            async (ask: DocumentAsk) => {
+              const { result } = await request({
+                file: askedFile(ask),
+                signal,
+                params: { position: await askedPosition(ask) },
+              });
+              return await places(
+                (Array.isArray(result) ? result : result ? [result] : []).map(
+                  (entry: Location | LocationLink) =>
+                    "targetUri" in entry
+                      ? { uri: entry.targetUri, range: entry.targetSelectionRange }
+                      : { uri: entry.uri, range: entry.range },
+                ),
+              );
+            },
+          ]),
+        ),
         source: async (ask) => {
           const uri = workspace.getWorkspaceUri(askedFile(ask));
           const { source } = await workspace.readTextDocumentUri(uri, signal);
-          const lines = source.split("\n");
+          const all = source.split("\n");
           const from = Number(ask.attributes.from ?? 1);
+          const lines = all.slice(from - 1, Number(ask.attributes.to ?? all.length));
           return {
-            lines: lines.slice(from - 1, Number(ask.attributes.to ?? lines.length)),
+            lines,
             startLine: from,
+            text: await asText("{% source lines=$lines startLine=$startLine /%}", {
+              lines,
+              startLine: from,
+            }),
           };
         },
       };

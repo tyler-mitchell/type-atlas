@@ -14,6 +14,7 @@ export {
   type CallSite,
   declarationAtPosition,
   declarationChainAtPosition,
+  declarationsNamed,
   inspectSymbol,
   subjectAtPosition,
   type InspectSymbolOptions,
@@ -34,7 +35,9 @@ export {
 export {
   documentSymbols,
   foldingRanges,
+  foldValueSymbols,
   readSourceView,
+  type FoldedSymbol,
   type SourceView,
   type SourceWindow,
 } from "./syntactic-features.ts";

@@ -255,6 +255,25 @@ const outline = async (workspace: VolarWorkspace, uri: string) =>
   documentSymbols({ uri, source: (await workspace.readTextDocumentUri(uri)).source }) ?? [];
 
 /**
+ * The declarations a bare name means in one file.
+ *
+ * Outermost wins when exactly one match is top level. A spread —
+ * `...defaultMarks` inside another object — appears in the outline as a
+ * property named for what it spreads, which made a symbol declared exactly
+ * once read as ambiguous. Genuine ambiguity, two declarations at the same
+ * level, stays ambiguous and returns both for the caller to choose between.
+ */
+export const declarationsNamed = (
+  symbols: readonly DocumentSymbol[],
+  uri: string,
+  symbol: string,
+): readonly Located[] => {
+  const named = [...declarations(symbols, uri)].filter(({ name }) => name === symbol);
+  const outermost = named.filter(({ within }) => within === undefined);
+  return outermost.length === 1 ? outermost : named;
+};
+
+/**
  * The declaration a position sits in, named and kinded, from one syntactic outline.
  *
  * A result that reports only a count answers a question the reader has to
@@ -563,20 +582,8 @@ export const inspectSymbol = async (input: {
   // one parse.
   const fileSymbols = await outline(workspace, textDocument.uri);
   // Walked once, keeping only what a name asked for. A position needs no walk.
-  const named =
-    "symbol" in target
-      ? [...declarations(fileSymbols, textDocument.uri)].filter(
-          ({ name }) => name === target.symbol,
-        )
-      : [];
-  // A nested entry carrying the same name is usually not a second declaration.
-  // A spread — `...defaultMarks` inside another object — appears in the outline
-  // as a property named for what it spreads, which made a symbol declared
-  // exactly once report as ambiguous and refuse to answer. When one match sits
-  // at the top level, that is what a bare name means; genuine ambiguity, two
-  // declarations at the same level, still asks.
-  const outermost = named.filter(({ within }) => within === undefined);
-  const matches = outermost.length === 1 ? outermost : named;
+  const matches =
+    "symbol" in target ? declarationsNamed(fileSymbols, textDocument.uri, target.symbol) : [];
   if ("symbol" in target && matches.length !== 1) {
     const wanted = target.symbol.toLowerCase();
     const all = [...declarations(fileSymbols, textDocument.uri)];

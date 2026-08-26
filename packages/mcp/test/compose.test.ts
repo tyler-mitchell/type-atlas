@@ -186,20 +186,9 @@ test("compose renders a dossier from ask declarations", async () => {
       "## Declared here
 
       page [variable] 28:14-28:18 · range 28:14-36:2
-      ├  ...(end < items.length ? { nextOffset: … [property] 34:5-34:55
-      ├  end [variable] 29:9-29:12 · range 29:9-29:53
-      ├  items [property] 33:5-33:10 · range 33:5-33:36
-      ├  offset [property] 32:5-32:11
-      └  total [property] 31:5-31:10 · range 31:5-31:24
       Page [interface] 4:13-4:17 · range 4:1-9:3
       projectDocumentSymbol [variable] 11:7-11:28 · range 11:7-19:2
-      ├  item [property] 15:12-15:16 · range 15:9-15:16
-      ├  children [variable] 12:11-12:19
-      ├  children [property] 16:9-16:17 · range 16:9-16:83
-      │  └  children.map() callback [function] 16:32-16:82
-      └  item [variable] 12:24-12:28 · range 12:21-12:28
       projectDocumentSymbols [variable] 22:14-22:36 · range 22:14-25:98
-      └  symbols.map() callback [function] 25:18-25:97
 
       ## The declaration line
 

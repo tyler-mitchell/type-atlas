@@ -99,6 +99,12 @@ export const tags: Config["tags"] = {
       files: { type: Array },
       line: { type: Number },
       character: { type: Number },
+      /** A declaration by name, for an ask that would otherwise need a position. */
+      symbol: { type: String },
+      /** Keeps an outline's full hierarchy instead of folding value insides. */
+      raw: { type: Boolean },
+      /** How many levels of nested declarations an outline opens. */
+      depth: { type: Number },
       query: { type: String },
       /** Exact text for a literal ask, as distinct from a query by meaning. */
       text: { type: String },
