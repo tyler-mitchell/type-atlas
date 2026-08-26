@@ -610,8 +610,14 @@ export const createRetrievalIntelligence = (dependencies: {
   };
 
   return {
-    search: async (request: Parameters<typeof search>[0]) =>
-      renderSearchPage({ retrieval: await search(request) }),
+    // Both halves of one search. A tool renders the page and stops; a
+    // composition has to point its next question at what the search found,
+    // and the rendered text is prose it would have to parse back. Returning
+    // only one of the two meant running the search twice to get the other.
+    search: async (request: Parameters<typeof search>[0]) => {
+      const retrieval = await search(request);
+      return { text: await renderSearchPage({ retrieval }), matches: retrieval.matches };
+    },
     findRelated: async (request: Parameters<typeof findRelated>[0]) =>
       renderSearchPage({ retrieval: await findRelated(request) }),
     exploreSymbol: async (request: {
