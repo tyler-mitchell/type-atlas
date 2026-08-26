@@ -2,18 +2,28 @@
 
 # `compose`
 
-Experimental: author your own code-intelligence answer as one markup document. You define all of it: self-closing ask tags declare the data and render nothing; the body you write is the entire answer, composing what the asks bind with the shipped tags and partials — {% $uses.total %}, {% tree entries=$uses.groups partial="reference-node.mdoc" /%}, headings, prose. Asks chain: a later ask reads an earlier answer, e.g. {% ask "diagnostics" as="health" files=$uses.paths /%} checks the files the reference search found. A document with no body renders nothing — the markup is yours, not the tool's.
+Answer several questions about code in one call, laid out how you want. `{% ask %}` tags declare data and render nothing; the body you write is the whole answer.
 
-Operations and what each binds:
-- {% ask "hover" as="head" file="src/x.ts" line=5 character=10 /%} (one-based, on the symbol's name) → {text}: the signature and documentation, rendered with {% $head.text %}
-- {% ask "references" as="uses" file="src/x.ts" line=5 character=10 /%} → {total, files, paths, projects, groups}; render sites with {% tree entries=$uses.groups partial="reference-node.mdoc" /%}
-- {% ask "outline" as="shape" file="src/x.ts" /%} → {total, tree}; render with {% tree entries=$shape.tree partial="symbol-node.mdoc" /%}
-- {% ask "diagnostics" as="problems" file="src/x.ts" /%} → {total, groups}; render with {% each items=$problems.groups as="group" partial="diagnostic-group.mdoc" /%}
-- {% ask "source" as="body" file="src/x.ts" from=10 to=40 /%} → {lines, startLine}; render with {% source lines=$body.lines startLine=$body.startLine /%}
-- {% ask "subject" as="what" file="src/x.ts" line=5 character=10 /%} → {name, kind, file, at}: what the position resolves to, and where it is declared
-- {% ask "callers" as="calledBy" file="src/x.ts" line=5 character=10 /%} → {name, total, projects, groups}; render with {% tree entries=$calledBy.groups partial="call-node.mdoc" /%}
+Point an ask at a declaration by name with `symbol="foo"`, or at `line`/`character` (one-based). Every ask also binds `.text`, already rendered, so the shortest useful composition is two lines and needs nothing memorised:
 
-One ask failing binds {failed} and is stated in a feedback line under your answer; the rest of the composition still answers.
+{% ask "references" as="uses" file="src/x.ts" symbol="foo" /%}
+{% $uses.text %}
+
+Asks, and the fields each binds besides `.text`:
+- hover → {text}: signature and documentation
+- subject → {name, kind, file, at}: what a position resolves to
+- references → {total, files, paths, projects, groups}; answers exactly as the `references` tool, scope line and anchor included
+- definitions | types | implementations → {total, files, paths, groups}
+- callers → {name, total, projects, groups}
+- outline → {total, tree}; `depth` opens nested levels, `raw` keeps everything
+- diagnostics → {total, groups, checked, of}; takes `file`, or `files=$uses.paths` from an earlier ask
+
+`paths` is a list to hand to another ask, not text to print — interpolating it runs the paths together. The file list is already in `.text`.
+- source → {lines, startLine}; `from` and `to`
+
+For a layout of your own, use the fields with the shipped tags: {% tree entries=$uses.groups partial="reference-node.mdoc" /%}, {% tree entries=$calledBy.groups partial="call-node.mdoc" /%}, {% tree entries=$shape.tree partial="symbol-node.mdoc" /%}, {% each items=$problems.groups as="group" partial="diagnostic-group.mdoc" /%}, {% source lines=$body.lines startLine=$body.startLine /%}.
+
+Asks fulfil in document order and a later one may read an earlier bind. A failing ask is named in a line under the answer; the rest still render.
 
 ## settlement dossier
 
