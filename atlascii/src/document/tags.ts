@@ -105,6 +105,10 @@ export const tags: Config["tags"] = {
       symbol: { type: String },
       /** Keeps an outline's full hierarchy instead of folding value insides. */
       raw: { type: Boolean },
+      /** Includes a symbol's own source in its inspection. */
+      includeSource: { type: Boolean },
+      /** Includes where a symbol's type is declared, built-ins included. */
+      includeTypeDefinitions: { type: Boolean },
       /** How many levels of nested declarations an outline opens. */
       depth: { type: Number },
       /** Narrows located results to or away from test files: "only", "exclude". */

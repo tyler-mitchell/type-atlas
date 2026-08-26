@@ -10,6 +10,7 @@ Each ask is named for the tool that answers it and answers as that tool does. Po
 {% $uses.text %}
 
 Asks, and the fields each binds besides `.text`:
+- inspect_symbol → {text, symbol, documentation, mentions, callers, callees, implementations, typeDefinitions}: the whole working view of one symbol in one ask — what it is, who uses it, what it calls. Start here; reach for the single-relationship asks below when you want one of them in full. `includeSource=true` adds its body
 - hover → {text}: signature and documentation
 - subject → {name, kind, file, at}: what a position resolves to
 - references → {total, files, paths, projects, groups}; also takes `tests="only"` or `tests="exclude"` to narrow the uses it already found — "which tests cover this" against "what breaks if I change it". That split is a path heuristic (a `tests/` directory, a `.test.`/`.spec.` name), not something the compiler knows
