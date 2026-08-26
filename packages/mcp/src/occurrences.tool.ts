@@ -392,6 +392,11 @@ export const semanticOccurrences = async (input: {
         container: subject.container === subject.name ? undefined : subject.container,
         file: displayPath(subject.declaration.uri, root),
         at: `${subject.declaration.range.start.line + 1}:${subject.declaration.range.start.character + 1}`,
+        // The same anchor as `at`, as numbers. `at` is printed for a reader;
+        // a caller that must point another request at this declaration
+        // cannot take a position back out of a formatted string.
+        line: subject.declaration.range.start.line + 1,
+        character: subject.declaration.range.start.character + 1,
         declarations: subject.declarations.length,
         total: subject.references.length,
         shown: named.filter((site) => site.subject === subject).length,
