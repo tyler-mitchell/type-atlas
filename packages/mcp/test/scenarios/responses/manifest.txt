@@ -35,9 +35,7 @@ callees/what-balances-as-of-invokes
 callees/what-a-method-invokes
 callees/what-evaluate-invokes
 diagnostics/deliberately-broken-reconcile
-diagnostics/clean-file
-diagnostics/missing-imports-diagnosed.audit
-read_file/missing-imports-diagnosed.repeat
+diagnostics/clean-project
 inspect_symbol/journal-class
 inspect_symbol/money-type
 workspace_symbols/balance-across-packages

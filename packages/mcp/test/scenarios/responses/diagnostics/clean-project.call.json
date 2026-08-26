@@ -1,8 +1,8 @@
 {
   "tool": "diagnostics",
   "arguments": {
-    "project": "packages/reconcile",
+    "project": "packages/money",
     "scope": "project"
   },
-  "elapsed": "23ms"
+  "elapsed": "40ms"
 }

@@ -20,7 +20,7 @@ One page per tool, generated from the scenario suite's captured responses — ev
 
 | [`definitions`](definitions.md) | Definitions | 2 |
 
-| [`diagnostics`](diagnostics.md) | Diagnostics | 3 |
+| [`diagnostics`](diagnostics.md) | Diagnostics | 2 |
 
 | [`document_highlights`](document_highlights.md) | Document highlights | 1 |
 
@@ -60,7 +60,7 @@ One page per tool, generated from the scenario suite's captured responses — ev
 
 | [`quorl`](quorl.md) | Quorl | 3 |
 
-| [`read_file`](read_file.md) | Read files | 6 |
+| [`read_file`](read_file.md) | Read files | 5 |
 
 | [`references`](references.md) | References | 3 |
 

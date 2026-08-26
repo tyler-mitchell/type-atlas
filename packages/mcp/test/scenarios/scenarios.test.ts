@@ -255,23 +255,30 @@ describe("callees", () => {
 // ── diagnostics: the errors an agent forgot to ask about ────────────────────
 describe("diagnostics", () => {
   scenarioTest("deliberately-broken-reconcile", ({ capture }) =>
-    capture("diagnostics", { file: "packages/reconcile/src/drift.ts" }),
+    capture("diagnostics", { project: "packages/reconcile", scope: "project" }),
   );
-  scenarioTest("clean-file", ({ capture }) =>
-    capture("diagnostics", { file: "packages/money/src/money.ts" }),
+  scenarioTest("clean-project", ({ capture }) =>
+    capture("diagnostics", { project: "packages/money", scope: "project" }),
   );
-  scenarioTest("missing-imports-diagnosed", async ({ capture }) => {
-    await capture(
-      "diagnostics",
-      { file: "packages/reconcile/src/matching.ts" },
-      { facet: "audit" },
-    );
-    await capture(
-      "read_file",
-      { file: ["packages/reconcile/src/matching.ts"] },
-      { facet: "repeat" },
-    );
-  });
+  // File-scoped scenarios are disabled with the public schema.
+  // scenarioTest("deliberately-broken-reconcile", ({ capture }) =>
+  //   capture("diagnostics", { file: "packages/reconcile/src/drift.ts" }),
+  // );
+  // scenarioTest("clean-file", ({ capture }) =>
+  //   capture("diagnostics", { file: "packages/money/src/money.ts" }),
+  // );
+  // scenarioTest("missing-imports-diagnosed", async ({ capture }) => {
+  //   await capture(
+  //     "diagnostics",
+  //     { file: "packages/reconcile/src/matching.ts" },
+  //     { facet: "audit" },
+  //   );
+  //   await capture(
+  //     "read_file",
+  //     { file: ["packages/reconcile/src/matching.ts"] },
+  //     { facet: "repeat" },
+  //   );
+  // });
 });
 
 // ── inspect_symbol: the whole picture in one call ───────────────────────────

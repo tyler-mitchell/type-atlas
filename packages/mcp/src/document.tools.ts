@@ -46,10 +46,10 @@ import type { VolarWorkspacePool } from "@type-atlas/core";
 const input = type.module({
   Diagnostics: type({
     workspace: fileInput.workspace,
-    "file?": type("string >= 1").configure({
-      description:
-        "Report on this one file instead: every diagnostic of every severity, problems before hints. project and scope are ignored when this is given.",
-    }),
+    // "file?": type("string >= 1").configure({
+    //   description:
+    //     "Report on this one file instead: every diagnostic of every severity, problems before hints. project and scope are ignored when this is given.",
+    // }),
     "project?": type("string >= 1").configure({
       description:
         "Which TypeScript project to check, named by its directory or by any path inside it. Only needed when nothing has changed yet; the changed files choose the project otherwise.",
@@ -110,14 +110,26 @@ export const registerDocumentTools = (server: McpServer, workspaces: VolarWorksp
       annotations: readOnlyToolAnnotations,
     },
     async (
-      { workspace: root, file, project: named, scope = "changed", offset = 0, limit = 100 },
+      {
+        workspace: root,
+        project: named,
+        scope = "changed",
+        offset = 0,
+        limit = 100,
+        ...unsupported
+      },
       { mcpReq: { signal } },
     ) => {
+      const file =
+        "file" in unsupported && typeof unsupported.file === "string"
+          ? unsupported.file
+          : undefined;
+      if (file !== undefined) {
+        throw new Error(
+          "File-scoped diagnostics are deprecated and unavailable. Run diagnostics for a project with the project argument.",
+        );
+      }
       const workspace = await workspaces.get(root);
-      // One file is a different question with the same answer shape: the
-      // document pull the ambient context reads, every severity kept, worst
-      // first — asked directly instead of by hovering whitespace for the
-      // ambient block, which is what real audit work resorted to twice.
       const asked =
         file === undefined
           ? undefined

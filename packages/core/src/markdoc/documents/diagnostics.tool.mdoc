@@ -26,8 +26,6 @@ No project has been loaded yet, and nothing has changed. Name one with project, 
 {% if $checked %}
 {% if equals($total, 0) %}
 No problems · {% if $wholeProject %}Whole project{% /if %}{% if not($wholeProject) %}Changed files{% /if %} · {% $fileCount %} {% plural count=$fileCount forms={"one": "file", "other": "files"} /%} checked · {% if $manyProjects %}{% $projectCount %} projects{% /if %}{% if not($manyProjects) %}{% if $configFile %}{% $configFile %}{% /if %}{% if not($configFile) %}inferred project{% /if %}{% /if %}
-
-A program check reports problems; hints and suggestions exist only per file — pass file for one file's complete report.
 {% /if %}
 
 {% if not(equals($total, 0)) %}

@@ -308,37 +308,3 @@ error ts(2365) 16:33-16:52 — inside lines.reduce() callback
 4 problems in packages/reconcile/src/drift.ts
 ~~~
 
-## missing imports diagnosed.repeat
-
-**Agent's Input**
-
-```yaml
-tool: Read files
-workspace: fixtures/ledger
-file: ["packages/reconcile/src/matching.ts"]
-
-# answered in 8ms
-```
-
-**Response**
-
-~~~text
-1 file · 13 lines · 12 folded to signatures, pass fold: false for the bodies
-
-=== packages/reconcile/src/matching.ts · 24 lines ===
-
- 1 | // DELIBERATELY BROKEN — the imports for `money` and `signedAmount` are
- 2 | // missing, so `add_missing_imports` scenarios have real work to do. Do not
- 3 | // fix; see the fixture README.
- 4 | import type { Posting } from "@ledger/accounts";
- 5 | import type { StatementLine } from "./drift.ts";
- 6 |
- 7 | /** Pair journal postings with the statement lines they explain. */
- 8 | export const matchPostings = (
-   |   ... 9-20 folded
-21 | };
-22 |
-23 | /** The zero of a matching pass, for currencies the statement never names. */
-24 | export const emptyRemainder = () => money(0, "USD");
-~~~
-

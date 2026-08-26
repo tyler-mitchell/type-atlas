@@ -1,7 +1,0 @@
-{
-  "tool": "diagnostics",
-  "arguments": {
-    "file": "packages/money/src/money.ts"
-  },
-  "elapsed": "17ms"
-}

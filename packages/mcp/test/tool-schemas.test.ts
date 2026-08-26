@@ -168,6 +168,13 @@ test("list_files publishes one tree surface", () => {
   expect(properties(schema ?? {}).map(([name]) => name)).not.toContain("view");
 });
 
+test("diagnostics publishes project scope only", () => {
+  const schema = tools.find(({ name }) => name === "diagnostics")?.inputSchema;
+  const names = properties(schema ?? {}).map(([name]) => name);
+  expect(names).toContain("project");
+  expect(names).not.toContain("file");
+});
+
 test("require-intent applies to information-gathering tools", async () => {
   const client = new Client({ name: "type-atlas-intent-schema-test", version: "1.0.0" });
   const transport = new StdioClientTransport({
