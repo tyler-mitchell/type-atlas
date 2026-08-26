@@ -14,7 +14,8 @@ Asks, and the fields each binds besides `.text`:
 - subject → {name, kind, file, at}: what a position resolves to
 - references → {total, files, paths, projects, groups}; answers exactly as the `references` tool, scope line and anchor included
 - definitions | types | implementations → {total, files, paths, groups}
-- callers → {name, total, projects, groups}
+- symbols → {total, projects, hits, file, line, character}: find a declaration by `query` across loaded projects. `file` here only picks which project to search from. Binds the first hit's location, so the next ask can point at it: `file=$found.file line=$found.line character=$found.character`
+- callers | callees → {name, total, groups, dependencies}; calls into dependencies are named in `dependencies` rather than listed as rows
 - outline → {total, tree}; `depth` opens nested levels, `raw` keeps everything
 - diagnostics → {total, groups, checked, of}; takes `file`, or `files=$uses.paths` from an earlier ask
 

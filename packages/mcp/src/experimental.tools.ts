@@ -193,7 +193,7 @@ export const registerExperimentalTools = (
     {
       title: "Compose",
       description:
-        'Answer several questions about code in one call, laid out how you want. `{% ask %}` tags declare data and render nothing; the body you write is the whole answer.\n\nPoint an ask at a declaration by name with `symbol="foo"`, or at `line`/`character` (one-based). Every ask also binds `.text`, already rendered, so the shortest useful composition is two lines and needs nothing memorised:\n\n{% ask "references" as="uses" file="src/x.ts" symbol="foo" /%}\n{% $uses.text %}\n\nAsks, and the fields each binds besides `.text`:\n- hover → {text}: signature and documentation\n- subject → {name, kind, file, at}: what a position resolves to\n- references → {total, files, paths, projects, groups}; answers exactly as the `references` tool, scope line and anchor included\n- definitions | types | implementations → {total, files, paths, groups}\n- callers → {name, total, projects, groups}\n- outline → {total, tree}; `depth` opens nested levels, `raw` keeps everything\n- diagnostics → {total, groups, checked, of}; takes `file`, or `files=$uses.paths` from an earlier ask\n\n`paths` is a list to hand to another ask, not text to print — interpolating it runs the paths together. The file list is already in `.text`.\n- source → {lines, startLine}; `from` and `to`\n\nFor a layout of your own, use the fields with the shipped tags: {% tree entries=$uses.groups partial="reference-node.mdoc" /%}, {% tree entries=$calledBy.groups partial="call-node.mdoc" /%}, {% tree entries=$shape.tree partial="symbol-node.mdoc" /%}, {% each items=$problems.groups as="group" partial="diagnostic-group.mdoc" /%}, {% source lines=$body.lines startLine=$body.startLine /%}.\n\nAsks fulfil in document order and a later one may read an earlier bind. A failing ask is named in a line under the answer; the rest still render.',
+        'Answer several questions about code in one call, laid out how you want. `{% ask %}` tags declare data and render nothing; the body you write is the whole answer.\n\nPoint an ask at a declaration by name with `symbol="foo"`, or at `line`/`character` (one-based). Every ask also binds `.text`, already rendered, so the shortest useful composition is two lines and needs nothing memorised:\n\n{% ask "references" as="uses" file="src/x.ts" symbol="foo" /%}\n{% $uses.text %}\n\nAsks, and the fields each binds besides `.text`:\n- hover → {text}: signature and documentation\n- subject → {name, kind, file, at}: what a position resolves to\n- references → {total, files, paths, projects, groups}; answers exactly as the `references` tool, scope line and anchor included\n- definitions | types | implementations → {total, files, paths, groups}\n- symbols → {total, projects, hits, file, line, character}: find a declaration by `query` across loaded projects. `file` here only picks which project to search from. Binds the first hit\'s location, so the next ask can point at it: `file=$found.file line=$found.line character=$found.character`\n- callers | callees → {name, total, groups, dependencies}; calls into dependencies are named in `dependencies` rather than listed as rows\n- outline → {total, tree}; `depth` opens nested levels, `raw` keeps everything\n- diagnostics → {total, groups, checked, of}; takes `file`, or `files=$uses.paths` from an earlier ask\n\n`paths` is a list to hand to another ask, not text to print — interpolating it runs the paths together. The file list is already in `.text`.\n- source → {lines, startLine}; `from` and `to`\n\nFor a layout of your own, use the fields with the shipped tags: {% tree entries=$uses.groups partial="reference-node.mdoc" /%}, {% tree entries=$calledBy.groups partial="call-node.mdoc" /%}, {% tree entries=$shape.tree partial="symbol-node.mdoc" /%}, {% each items=$problems.groups as="group" partial="diagnostic-group.mdoc" /%}, {% source lines=$body.lines startLine=$body.startLine /%}.\n\nAsks fulfil in document order and a later one may read an earlier bind. A failing ask is named in a line under the answer; the rest still render.',
       inputSchema: input.Compose,
       annotations: readOnlyToolAnnotations,
     },
@@ -420,6 +420,41 @@ export const registerExperimentalTools = (
               total: found.total,
               noUses: found.total === 0,
               groups: found.groups,
+            }),
+          };
+        },
+        // Find a declaration by name before anything can be asked about it.
+        // Without this a composition could only ever explain a symbol whose
+        // file the composer already knew, so orientation stayed a separate
+        // call and the first move in an unfamiliar repository was never
+        // composable. Binds `file`, `line`, and `character` of the first hit,
+        // so a later ask can point at it: file=$found.file line=$found.line.
+        symbols: async (ask) => {
+          const { symbols, projects } = await intelligence.workspaceSymbols({
+            file: askedFile(ask),
+            query: attributeText(ask.attributes.query),
+            signal,
+          });
+          const hits = (symbols ?? []).map((symbol) => ({
+            name: symbol.name,
+            kind: symbol.kind,
+            word: "word" in symbol ? (symbol as { word?: string }).word : undefined,
+            file: displayPath(symbol.location.uri, root),
+            range: symbol.location.range,
+            container: symbol.containerName || undefined,
+            line: symbol.location.range.start.line + 1,
+            character: symbol.location.range.start.character + 1,
+          }));
+          const [first] = hits;
+          return {
+            total: hits.length,
+            projects,
+            file: first?.file,
+            line: first?.line,
+            character: first?.character,
+            hits,
+            text: await asText('{% each items=$hits as="item" partial="workspace-symbol.mdoc" /%}', {
+              hits,
             }),
           };
         },
