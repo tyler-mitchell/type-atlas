@@ -1,5 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import {
+  type CallHierarchyItem,
   type Diagnostic,
   type DocumentSymbol,
   DocumentDiagnosticRequest,
@@ -27,6 +28,7 @@ import { type DocumentAsk, documentAsks, isAskReference } from "@type-atlas/atla
 import { textResult } from "./mcp-result.ts";
 import { readOnlyToolAnnotations } from "./metadata.ts";
 import { createQuorl } from "./quorl.ts";
+import { isDependency } from "./inspection-variables.ts";
 import { enclosingDeclaration, referenceGroups } from "./reference-groups.ts";
 import { registerTool } from "./tool.ts";
 import { fileInput, positionInput } from "./tool-input.ts";
@@ -279,6 +281,37 @@ export const registerExperimentalTools = (
           }),
         };
       };
+      // Both directions of the call graph render the same rows; only which end
+      // of each call they name differs.
+      const callSites = async (
+        all: readonly { item: CallHierarchyItem; sites: readonly Range[] }[],
+      ) => {
+        // A call into a dependency is named, not located: `registerDocumentTools`
+        // answered with 43 rows, most of them `map` and `then` pointing into
+        // `lib.es5.d.ts`, burying the three calls a reader could act on.
+        const entries = all.filter(({ item }) => !isDependency(item.uri, root));
+        const dependencies = [
+          ...new Set(all.filter(({ item }) => isDependency(item.uri, root)).map(({ item }) => item.name)),
+        ];
+        const groups = [
+          ...Map.groupBy(entries, ({ item }) => displayPath(item.uri, root)),
+        ].map(([file, rows]) => ({
+          file,
+          children: rows.map(({ item, sites }) => ({
+            name: item.name,
+            kind: item.kind,
+            selection: item.selectionRange,
+            extent: sameRange(item.range, item.selectionRange) ? undefined : item.range,
+            sites: [...new Set(sites.map((site) => rangeText(site)))],
+          })),
+        }));
+        return {
+          total: entries.length,
+          groups,
+          dependencies,
+          text: await asText('{% tree entries=$groups partial="call-node.mdoc" /%}', { groups }),
+        };
+      };
       // The operations a composition can ask for, each binding the shape its
       // partial reads — the same shapes the dedicated tools compose from.
       const operations: Record<string, (ask: DocumentAsk) => Promise<unknown>> = {
@@ -316,25 +349,24 @@ export const registerExperimentalTools = (
             signal,
           });
           const flat = (calls ?? []).flatMap((group) => group ?? []);
-          const grouped = Map.groupBy(flat, (call) => displayPath(call.from.uri, root));
-          const groups = [...grouped].map(([file, entries]) => ({
-            file,
-            children: entries.map((call) => ({
-              name: call.from.name,
-              kind: call.from.kind,
-              selection: call.from.selectionRange,
-              extent: sameRange(call.from.range, call.from.selectionRange)
-                ? undefined
-                : call.from.range,
-              sites: [...new Set(call.fromRanges.map((site) => rangeText(site)))],
-            })),
-          }));
           return {
             name: items?.[0]?.name,
-            total: flat.length,
             projects,
-            groups,
-            text: await asText('{% tree entries=$groups partial="call-node.mdoc" /%}', { groups }),
+            ...(await callSites(
+              flat.map((call) => ({ item: call.from, sites: call.fromRanges })),
+            )),
+          };
+        },
+        callees: async (ask) => {
+          const { items, calls } = await intelligence.callees({
+            file: askedFile(ask),
+            position: await askedPosition(ask),
+            signal,
+          });
+          const flat = (calls ?? []).flatMap((group) => group ?? []);
+          return {
+            name: items?.[0]?.name,
+            ...(await callSites(flat.map((call) => ({ item: call.to, sites: call.fromRanges })))),
           };
         },
         references: async (ask) => {

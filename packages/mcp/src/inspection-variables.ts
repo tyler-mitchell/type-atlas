@@ -115,7 +115,7 @@ const callGroups = (calls: readonly CallSite[], root: string, sharedSiteUri?: st
 };
 
 /** Outside the workspace, or inside its dependencies, is not the reader's code. */
-const isDependency = (uri: string, root: string) => {
+export const isDependency = (uri: string, root: string) => {
   const parsed = URI.parse(uri);
   return !isFileInDir(slash(parsed.fsPath), slash(root)) || parsed.path.includes("/node_modules/");
 };
