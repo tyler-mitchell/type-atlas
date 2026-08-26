@@ -12,7 +12,7 @@ const command = defineCommand({
     "require-intent": {
       type: "boolean",
       default: false,
-      description: "Require intent for broad exploratory tools.",
+      description: "Require concise intent for information-gathering tools.",
     },
   },
   run: startMcpServer,

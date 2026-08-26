@@ -2,6 +2,7 @@ import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import { beforeAll, expect, test } from "vite-plus/test";
+import { intentDescription, toolPolicies } from "../src/tool.ts";
 
 const packageRoot = fileURLToPath(new URL("..", import.meta.url));
 
@@ -173,11 +174,16 @@ test("require-intent applies only to broad exploration", async () => {
   await client.connect(transport);
   try {
     const listed = (await client.listTools()).tools;
-    const broad = listed.find(({ name }) => name === "workspace_symbols")?.inputSchema;
-    const targeted = listed.find(({ name }) => name === "hover")?.inputSchema;
-    expect(broad?.required).toContain("intent");
-    expect(properties(broad ?? {}).map(([name]) => name)).toContain("intent");
-    expect(properties(targeted ?? {}).map(([name]) => name)).not.toContain("intent");
+    expect(Object.keys(toolPolicies).sort()).toEqual(listed.map(({ name }) => name).sort());
+    for (const { name, inputSchema } of listed) {
+      const policy = toolPolicies[name as keyof typeof toolPolicies];
+      expect(inputSchema.required?.includes("intent") ?? false).toBe(policy.requireIntent);
+      if (!policy.requireIntent) continue;
+      expect(properties(inputSchema).find(([name]) => name === "intent")?.[1]).toMatchObject({
+        maxLength: 160,
+        description: intentDescription,
+      });
+    }
   } finally {
     await client.close();
   }

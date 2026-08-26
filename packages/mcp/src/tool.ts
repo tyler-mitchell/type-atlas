@@ -16,27 +16,73 @@ export const configureIntent = (required: boolean): void => {
   intentRequired.current = required;
 };
 
-const broadTools = new Set([
-  "find_successor",
-  "impact",
-  "investigate_code",
-  "list_files",
-  "occurrences",
-  "quorl",
-  "related_code",
-  "search_code",
-  "search_dependency_code",
-  "workspace_symbols",
-]);
+export const intentDescription = [
+  "In one short sentence, state the specific decision-relevant information missing from your current context that this call will obtain.",
+  "Rules:",
+  "- Name one fact absent from current context that blocks that decision.",
+  "- Never describe the tool operation or its expected output.",
+  "- Do not call when no such fact is missing.",
+].join("\n");
 
 const intentInput = type({
-  intent: type("string >= 1").describe(
-    "One sentence naming the implementation decision this broad exploration serves.",
-  ),
+  intent: type("1 <= string <= 160").configure({
+    description: intentDescription,
+  }),
 });
+
+type ToolPolicy = { readonly requireIntent: boolean };
+
+export const toolPolicies = {
+  add_missing_imports: { requireIntent: false },
+  callees: { requireIntent: true },
+  callers: { requireIntent: true },
+  code_actions: { requireIntent: true },
+  completions: { requireIntent: true },
+  compose: { requireIntent: true },
+  definitions: { requireIntent: true },
+  diagnostics: { requireIntent: true },
+  document_highlights: { requireIntent: true },
+  document_links: { requireIntent: true },
+  document_symbols: { requireIntent: true },
+  explore_symbol: { requireIntent: true },
+  file_references: { requireIntent: true },
+  find_successor: { requireIntent: true },
+  fix_all: { requireIntent: false },
+  format_document: { requireIntent: false },
+  hover: { requireIntent: true },
+  impact: { requireIntent: true },
+  implementations: { requireIntent: true },
+  inlay_hints: { requireIntent: true },
+  inspect_symbol: { requireIntent: true },
+  investigate_code: { requireIntent: true },
+  list_files: { requireIntent: true },
+  list_module_exports: { requireIntent: true },
+  occurrences: { requireIntent: true },
+  organize_imports: { requireIntent: false },
+  project_config: { requireIntent: true },
+  quorl: { requireIntent: true },
+  read_file: { requireIntent: true },
+  references: { requireIntent: true },
+  related_code: { requireIntent: true },
+  remove_unused_code: { requireIntent: false },
+  rename_files: { requireIntent: false },
+  rename_symbol: { requireIntent: false },
+  search_code: { requireIntent: true },
+  search_dependency_code: { requireIntent: true },
+  selection_ranges: { requireIntent: true },
+  signature_help: { requireIntent: true },
+  type_definitions: { requireIntent: true },
+  verify_edit: { requireIntent: true },
+  workspace_symbols: { requireIntent: true },
+} as const satisfies Readonly<Record<string, ToolPolicy>>;
 
 const withIntent = <Input extends StandardSchemaWithJSON>(schema: Input): Input =>
   (schema as unknown as { readonly and: (right: unknown) => Input }).and(intentInput);
+
+const showIntent = <Result extends object>(result: Result, intent: unknown): Result =>
+  typeof intent === "string" && intent.trim() !== ""
+    ? editText(result, "first", (text) => `Intent: ${intent.trim()}\n\n${text}`)
+    : result;
 
 /**
  * Appends what the call cost to the answer.
@@ -152,12 +198,15 @@ export const registerTool = <
   config: ToolConfig<Input, Output>,
   callback: ToolCallback<Input>,
 ) => {
-  const requiresIntent = intentRequired.current && broadTools.has(name);
+  const policy = toolPolicies[name as keyof typeof toolPolicies];
+  if (policy === undefined) throw new Error(`Tool "${name}" has no declared policy.`);
+  const requiresIntent = intentRequired.current && policy.requireIntent;
+  const inputSchema = requiresIntent ? withIntent(config.inputSchema) : config.inputSchema;
   const boundedCallback = (async (arguments_, context) => {
     const started = performance.now();
     const stated = (arguments_ as { readonly intent?: unknown }).intent;
     if (requiresIntent && (typeof stated !== "string" || stated.trim() === "")) {
-      throw new Error(`${name} requires one sentence of intent for this broad exploration.`);
+      throw new Error(`${name} requires one short sentence naming the missing information.`);
     }
     // Whatever is in the trace buffer belongs to a call that never reported —
     // one that threw, timed out, or died with the language server. Draining only
@@ -181,7 +230,10 @@ export const registerTool = <
         callback(arguments_, { ...context, mcpReq: { ...context.mcpReq, signal } }),
         aborted,
       ]);
-      return withElapsed(answered as object, started);
+      return withElapsed(
+        requiresIntent ? showIntent(answered as object, stated) : (answered as object),
+        started,
+      );
     } catch (error) {
       // Operational errors go to stderr — the README's stated contract. The
       // client receives only the message; without this, a defect's throw
@@ -197,12 +249,14 @@ export const registerTool = <
   // one timeout and one elapsed trailer, and a doubly-wrapped target would
   // print two.
   registered.set(name, {
-    schema: config.inputSchema,
-    callback: callback as unknown as ErasedToolCallback,
+    schema: inputSchema,
+    callback: requiresIntent
+      ? async (argument, context) =>
+          showIntent(
+            (await (callback as unknown as ErasedToolCallback)(argument, context)) as object,
+            (argument as { readonly intent?: unknown }).intent,
+          )
+      : (callback as unknown as ErasedToolCallback),
   });
-  return server.registerTool<Output, Input>(
-    name,
-    requiresIntent ? { ...config, inputSchema: withIntent(config.inputSchema) } : config,
-    boundedCallback,
-  );
+  return server.registerTool<Output, Input>(name, { ...config, inputSchema }, boundedCallback);
 };
