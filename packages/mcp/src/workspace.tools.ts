@@ -73,13 +73,6 @@ const input = type({
     description:
       "Mark git changes with the editor-standard badge letters: `· M +2 -1` modified, `· A +8` added (staged), `· U` untracked, `· R old.ts →` renamed, `· C` conflicted, `· D -12` deleted (ghost rows for deletions), `· N changed` on directories holding changes. Silent outside a repository.",
   }),
-  "view?": type.enumerated("directories", "files").configure(
-    {
-      description:
-        "One of: files (edit targets grouped by directory, the default), directories (compact architecture orientation).",
-    },
-    "self",
-  ),
 });
 
 export const registerWorkspaceTools = (server: McpServer): void => {
@@ -89,7 +82,7 @@ export const registerWorkspaceTools = (server: McpServer): void => {
     {
       title: "List files",
       description:
-        'Show a bounded workspace-relative project structure. `view: "files"` (the default) is the file tree rooted at the directory, directories first; `view: "directories"` is a compact directory list for architecture orientation. Rows carry `git status` inline with editor-standard letters — `· M +2 -1`, `· R old.ts →`, `· U`, `· 2 changed` on directories — so one call answers structure, reading cost, and working-tree state together; no separate git call is needed to see what changed. Results honor .gitignore, omit dependency and VCS internals, and treat Git submodules as separate workspaces by default.',
+        "Show one bounded workspace-relative file tree rooted at the selected directory, with directories before files. Rows carry `git status` inline with editor-standard letters — `· M +2 -1`, `· R old.ts →`, `· U`, `· 2 changed` on directories — so one call answers structure, reading cost, and working-tree state together; no separate git call is needed to see what changed. Results honor .gitignore, omit dependency and VCS internals, and treat Git submodules as separate workspaces by default.",
       inputSchema: input,
       annotations: readOnlyToolAnnotations,
     },
@@ -107,7 +100,6 @@ export const registerWorkspaceTools = (server: McpServer): void => {
         limit,
         loc,
         git,
-        view,
       },
       { mcpReq: { signal } },
     ) => {
@@ -125,7 +117,6 @@ export const registerWorkspaceTools = (server: McpServer): void => {
         git: git ?? true,
         changed: changed ?? false,
         signal,
-        view: view ?? "files",
       });
       const rendered = await renderDocument({
         document: "list-files.tool.mdoc",

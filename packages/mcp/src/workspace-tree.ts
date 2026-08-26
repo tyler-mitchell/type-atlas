@@ -393,7 +393,6 @@ export const workspaceTree = async (input: {
   /** Only paths git reports changed — the whole working-tree delta, any depth. */
   readonly changed: boolean;
   readonly signal: AbortSignal;
-  readonly view: "directories" | "files";
 }): Promise<WorkspaceListing> => {
   const { root, directory, realRoot } = await resolveListingDirectory(input);
   const changesHeld = input.git
@@ -428,27 +427,6 @@ export const workspaceTree = async (input: {
     // depth, without the hundreds of clean rows around them. Depth, glob,
     // and expand describe a structural walk and do not apply here — the walk
     // is git's own answer, which already carries deletions as ghost rows.
-    if (input.view === "directories") {
-      const holders = [
-        ...new Set(
-          [...changed.keys()].flatMap((file) => {
-            const segments = file.split("/").slice(0, -1);
-            return segments.map((_, held) => `${segments.slice(0, held + 1).join("/")}/`);
-          }),
-        ),
-      ].sort();
-      const shown = holders.slice(0, input.limit);
-      return {
-        entries: [
-          ...shown.map((name) => ({ name: `${name}${directoryMark(name.replace(/\/$/u, ""))}` })),
-          ...(holders.length > shown.length
-            ? [{ name: `… ${holders.length - shown.length} more` }]
-            : []),
-        ],
-        filtered: false,
-        changedOnly: true,
-      };
-    }
     const relatives = [...changed.keys()].sort();
     const { assembled, renderedFiles, elided } = assembleTree(relatives, input.limit);
     const lineCounts = input.loc
@@ -516,9 +494,7 @@ export const workspaceTree = async (input: {
     const dir = path.resolve(directory, scope.at);
     const within = (relative: string) => (scope.at === "." ? relative : `${scope.at}/${relative}`);
     const depthLimited =
-      scope.depth === undefined
-        ? new fdir()
-        : new fdir().withMaxDepth(input.view === "directories" ? scope.depth : scope.depth - 1);
+      scope.depth === undefined ? new fdir() : new fdir().withMaxDepth(scope.depth - 1);
     return {
       dir,
       crawler: depthLimited
@@ -529,12 +505,7 @@ export const workspaceTree = async (input: {
         // A directory is matched against the path it is reported under, which
         // ends in a separator, so a caller's `pkg-*` matches nothing until it
         // becomes `pkg-*/` — an empty answer that reads as "no such package".
-        .globWithOptions(
-          (scope.glob ?? ["**/*"]).map((pattern) =>
-            input.view === "directories" && !pattern.endsWith("/") ? `${pattern}/` : pattern,
-          ),
-          { dot: hidden },
-        )
+        .globWithOptions([...(scope.glob ?? ["**/*"])], { dot: hidden })
         .filter((file) => file === "." || file.length === 0 || !skip(within(file)))
         .exclude((name, absolute) => {
           const relative = path.relative(directory, absolute);
@@ -555,13 +526,7 @@ export const workspaceTree = async (input: {
   const lookahead = input.limit + 500;
   const crawlScope = async (scope: Parameters<typeof scoped>[0]): Promise<readonly string[]> => {
     const { dir, crawler } = scoped(scope);
-    const crawled = await (
-      input.view === "directories"
-        ? crawler.withMaxFiles(lookahead).onlyDirs()
-        : crawler.withDirs().withMaxFiles(lookahead)
-    )
-      .crawl(dir)
-      .withPromise();
+    const crawled = await crawler.withDirs().withMaxFiles(lookahead).crawl(dir).withPromise();
     return crawled.filter((entry) => entry !== "." && entry.length > 0);
   };
 
@@ -632,29 +597,6 @@ export const workspaceTree = async (input: {
     baseCrawl.length >= lookahead ||
     expansionCrawls.some(({ entries }) => entries.length >= lookahead);
 
-  if (input.view === "directories") {
-    const submodules = input.glob
-      ? []
-      : submoduleRoots.flatMap((submoduleRoot) => {
-          if (!isFileInDir(submoduleRoot, directory)) return [];
-          const relative = path.relative(directory, submoduleRoot);
-          return relative.split("/").length <= input.depth ? [`${relative}/ [submodule]`] : [];
-        });
-    const directories = [...crawled, ...submodules].sort();
-    const shown = directories.slice(0, input.limit);
-    return {
-      entries: [
-        ...shown.map((name) => ({
-          name: `${name}${directoryMark(name.replace(/ \[submodule\]$/u, "").replace(/\/$/u, ""))}`,
-        })),
-        ...(directories.length > shown.length
-          ? [{ name: lookaheadFull ? "… more" : `… ${directories.length - shown.length} more` }]
-          : []),
-      ],
-      filtered: input.glob !== undefined,
-      changedOnly: false,
-    };
-  }
   const submodulePaths = input.glob
     ? []
     : submoduleRoots.flatMap((submoduleRoot) => {

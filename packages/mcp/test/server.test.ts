@@ -61,21 +61,6 @@ test("serves workspace files through the packaged stdio entrypoint", async () =>
     expect(filteredText).toContain("workspace-tree.ts");
     expect(filteredText).not.toContain("ambient-diagnostics.ts");
 
-    const directories = await client.callTool({
-      name: "list_files",
-      arguments: {
-        workspace: workspaceRoot,
-        directory: "packages/mcp",
-        depth: 1,
-        limit: 100,
-        view: "directories",
-      },
-    });
-    expect(directories.content.find((item) => item.type === "text")).toMatchObject({
-      type: "text",
-      text: expect.stringContaining("src/"),
-    });
-
     const root = await client.callTool({
       name: "list_files",
       arguments: { workspace: workspaceRoot },

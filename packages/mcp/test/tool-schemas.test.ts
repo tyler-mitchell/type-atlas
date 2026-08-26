@@ -163,7 +163,12 @@ test("no default is published as an arktype marker", () => {
     .toEqual([]);
 });
 
-test("require-intent applies only to broad exploration", async () => {
+test("list_files publishes one tree surface", () => {
+  const schema = tools.find(({ name }) => name === "list_files")?.inputSchema;
+  expect(properties(schema ?? {}).map(([name]) => name)).not.toContain("view");
+});
+
+test("require-intent applies to information-gathering tools", async () => {
   const client = new Client({ name: "type-atlas-intent-schema-test", version: "1.0.0" });
   const transport = new StdioClientTransport({
     command: process.execPath,

@@ -2,7 +2,7 @@
 
 # `list_files`
 
-Show a bounded workspace-relative project structure. `view: "files"` (the default) is the file tree rooted at the directory, directories first; `view: "directories"` is a compact directory list for architecture orientation. Rows carry `git status` inline with editor-standard letters — `· M +2 -1`, `· R old.ts →`, `· U`, `· 2 changed` on directories — so one call answers structure, reading cost, and working-tree state together; no separate git call is needed to see what changed. Results honor .gitignore, omit dependency and VCS internals, and treat Git submodules as separate workspaces by default.
+Show one bounded workspace-relative file tree rooted at the selected directory, with directories before files. Rows carry `git status` inline with editor-standard letters — `· M +2 -1`, `· R old.ts →`, `· U`, `· 2 changed` on directories — so one call answers structure, reading cost, and working-tree state together; no separate git call is needed to see what changed. Results honor .gitignore, omit dependency and VCS internals, and treat Git submodules as separate workspaces by default.
 
 ## monorepo first contact
 
