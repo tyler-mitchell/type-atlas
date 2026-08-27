@@ -39,16 +39,15 @@ TAGS
   {% tree entries partial? as?="node" /%}   {% each items as partial tight? /%}   {% sections items level? /%}
   {% source lines startLine? from? to? /%}  {% section title level? %}  {% tight %}  {% indent by? %}
   {% table rows columns /%}  {% banner %}  {% divider text? /%}  {% frame source line character /%}
-  {% summary %} / {% row label value /%}  {% truncate value /%}  {% pad value columns /%}
-  {% plural count forms /%}  {% label name /%}  {% counts states /%}  {% severity value /%}
+  {% summary %} / {% row label value /%}  {% truncate value columns? /%}  {% pad value columns /%}
 
 PARTIALS — pass the variable each reads as `as`
 
-  reference-node.mdoc    $node    groups from references, definitions, file_references
+  reference-node.mdoc    $node    groups from references, file_references
   call-node.mdoc         $node    groups from callers, callees
   symbol-node.mdoc       $node    tree from document_symbols
-  location-node.mdoc     $node
-  target.mdoc            $target
+  location-node.mdoc     $node    groups inside inspect_symbol: mentions, implementations, typeDefinitions
+  target.mdoc            $target  the same groups, location only
   workspace-symbol.mdoc  $item    hits from workspace_symbols
   diagnostic-group.mdoc  $group   groups from diagnostics
 
