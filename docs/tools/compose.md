@@ -2,40 +2,67 @@
 
 # `compose`
 
-Answer several questions about code in one call, laid out how you want. `{% ask %}` tags declare data and render nothing; the body you write is the whole answer.
+Answer several questions about code in one call, laid out how you want. `{% ask %}` declares data and renders nothing; the body you write is the answer. Every ask binds `.text`, already rendered exactly as that tool renders it.
 
-Each ask is named for the tool that answers it and answers as that tool does. Point one at a declaration by name with `symbol="foo"`, or at `line`/`character` (one-based). Every ask also binds `.text`, already rendered, so the shortest useful composition is two lines and needs nothing memorised:
+    {% ask "references" as="uses" file="src/x.ts" symbol="foo" /%}
+    {% $uses.text %}
 
-{% ask "references" as="uses" file="src/x.ts" symbol="foo" /%}
-{% $uses.text %}
+Every ask takes `as` (required), `file`, and either `symbol` or `line`+`character` (one-based). Add `each=<an earlier bind>` to run it once per item, max 10 → { items, total, of, text }, each item also carrying `title`.
 
-Asks, and the fields each binds besides `.text`:
-- inspect_symbol → {text, symbol, documentation, mentions, callers, callees, implementations, typeDefinitions}: the whole working view of one symbol in one ask — what it is, who uses it, what it calls. Start here; reach for the single-relationship asks below when you want one of them in full. `includeSource=true` adds its body
-- hover → {text}: signature and documentation
-- subject → {name, kind, file, at}: what a position resolves to
-- references → {total, files, paths, projects, groups}; also takes `tests="only"` or `tests="exclude"` to narrow the uses it already found — "which tests cover this" against "what breaks if I change it". That split is a path heuristic (a `tests/` directory, a `.test.`/`.spec.` name), not something the compiler knows
-- definitions | type_definitions | implementations → {total, files, paths, hits, any}: where something is declared, what type it has, what realises it. `hits` are places, so `each=$def.hits` asks about each target. Read the text on a zero — an implementation walk reaches only files this session has opened, so "none" there means none found, not none existing
-- file_references → {total, files, paths, projects, groups}: who imports this module, which is not what the uses of any symbol in it answer — ask it before moving or deleting a file
-- callers | callees → {text, name, total, any, groups, standardLibrary}: incoming and outgoing execution flow, answered as those tools answer — including the project scope a call hierarchy is bounded to, which is narrower than references. Standard-library calls fold into one line of names
-- document_symbols → {total, tree}; `depth` opens nested levels, `raw` keeps everything
-- diagnostics → {total, groups, checked, of}; takes `file`, or `files=$uses.paths` from an earlier ask
-- read_file → {lines, startLine}; `from` and `to`
-- occurrences → {text, subjects, total, any}: exact identifiers resolved to their references, with an honest zero when a name occurs nowhere; takes `query`, and `path`, `limit`, `symbolLimit`. `subjects` are the declarations it resolved, as places, so `each=$found.subjects` asks about each one
-- list_files → {text, files, total, any}: the file tree, for orienting before you know any path; takes `directory`, `glob`, `depth`, `limit`, `changed=true` for the working-tree delta. `files` is workspace-relative, so `each=$tree.files` walks what it found
-- search_code → {text, hits, total, of, any, file, line, character}: find code by what it does when the name is unknown, each hit anchored to a language-server symbol; takes `query`, and `directory`, `limit`, `snippetLines`. `hits` are places, so `each=$found.hits` asks about everything it found, and `file`/`line`/`character` point at the first. `of` is how many matched before anchoring — a hit landing in import statements has no declaration to ask about
-- workspace_symbols → {total, shown, any, answered, projects, hits, file, line, character}: find a declaration by `query` across loaded projects, where `file` only picks which project to search from. `hits` are places and `file`/`line`/`character` point at the first, so the next ask can chain off either. A zero here means absent from the projects loaded this session, not absent from the repository — the text says which, and `answered` is false when the search never ran
+ASKS — further attributes → what it binds besides `text`
 
-An ask can also run once per item of a list an earlier ask bound, instead of once at one place: `each=$found.hits` hovers every candidate a search returned, `each=$uses.paths` outlines every file using a symbol. A string item fills `file`; an object item fills the attributes it has fields for; anything you write on the tag yourself stays fixed. It binds {items, total, of, text}, and each item carries its own answer plus a `title` — so `{% $heads.text %}` is already a titled block per item, and `{% sections items=$heads.items /%}` is that same thing when you want to lay it out yourself. Bounded to 10 items; `of` is how many the list held.
+  inspect_symbol(includeSource?, includeTypeDefinitions?, limit?=20)
+      → { symbol, documentation, mentions, callers, callees, implementations, typeDefinitions }
+  hover()                         → { }
+  subject()                       → { name, kind, file, at }
+  references(tests?: "only" | "exclude", limit?=50)
+      → { total, shown, beyond, any, files, paths, projects, groups }
+  definitions(limit?=50)          → { total, any, files, paths, hits }
+  type_definitions(limit?=50)     → as definitions
+  implementations(limit?=50)      → as definitions      // a zero can mean unsearched; text says which
+  file_references(limit?=50)      → as references       // who imports this module
+  callers() | callees()           → { name, total, any, groups, standardLibrary }   // project-scoped
+  document_symbols(depth?, raw?)  → { total, tree }
+  diagnostics(files?: (path | place)[] <= 5)  → { total, any, checked, of, groups }
+  read_file(from?, to?)           → { lines, startLine }
+  list_files(directory?, glob?: string[], depth?, limit?=500, changed?)  → { files, total, any }
+  search_code(query, directory?, limit?=5, snippetLines?=10)
+      → { hits, of, total, any, file, line, character }
+  occurrences(query, path?, limit?=20, symbolLimit?=5)  → { subjects, total, any }
+  workspace_symbols(query, limit?=20)
+      → { hits, answered, projects, total, shown, any, file, line, character }   // loaded projects only
 
-To guard a section, use the boolean: `{% if $uses.any %}` on its own line, with the heading and body under it. A count does not work — `{% if $uses.total %}` renders on zero, because the engine asks whether the value is there, not whether it is nonzero. Every countable ask binds `any`. Consecutive lines join into one paragraph, as in any Markdown: separate them with a blank line. To get them back onto adjacent lines without the blank line between, wrap the blank-line-separated lines in `{% tight %}`.
+  place = { file, line, character }. `hits` and `subjects` are places, `paths` are strings; both chain into a later ask, and `file`/`line`/`character` point at the first hit.
 
-Every ask that answers with places — references, definitions, type_definitions, implementations, file_references — lists at most `limit` sites (50 by default) and binds {shown, beyond} beside {total}. The text says what it cut, and `tests="only"`/`"exclude"` narrows before the bound applies.
+TAGS
 
-`paths` is a list to hand to another ask, not text to print — interpolating it runs the paths together. The file list is already in `.text`.
+  {% tree entries partial? as?="node" /%}   {% each items as partial tight? /%}   {% sections items level? /%}
+  {% source lines startLine? from? to? /%}  {% section title level? %}  {% tight %}  {% indent by? %}
+  {% table rows columns /%}  {% banner %}  {% divider text? /%}  {% frame source line character /%}
+  {% summary %} / {% row label value /%}  {% truncate value /%}  {% pad value columns /%}
+  {% plural count forms /%}  {% label name /%}  {% counts states /%}  {% severity value /%}
 
-For a layout of your own, use the fields with the shipped tags: {% tree entries=$uses.groups partial="reference-node.mdoc" /%}, {% tree entries=$calledBy.groups partial="call-node.mdoc" /%}, {% tree entries=$shape.tree partial="symbol-node.mdoc" /%}, {% each items=$problems.groups as="group" partial="diagnostic-group.mdoc" /%}, {% source lines=$body.lines startLine=$body.startLine /%}.
+PARTIALS — pass the variable each reads as `as`
 
-Asks fulfil in document order and a later one may read an earlier bind. A failing ask is named in a line under the answer; the rest still render.
+  reference-node.mdoc    $node    groups from references, definitions, file_references
+  call-node.mdoc         $node    groups from callers, callees
+  symbol-node.mdoc       $node    tree from document_symbols
+  location-node.mdoc     $node
+  target.mdoc            $target
+  workspace-symbol.mdoc  $item    hits from workspace_symbols
+  diagnostic-group.mdoc  $group   groups from diagnostics
+
+FUNCTIONS
+
+  any() position() range() symbolKind() list() fraction() markup() breadcrumb() figure() article() slash() time() width()
+
+NOTES
+
+  {% if %} sits on its own line, and guards on `any`, never `total` — a count renders on zero.
+  Consecutive lines fold into one paragraph; blank-line them apart, and {% tight %} closes the gap again.
+  `paths` and `files` are lists to hand on, not text to print.
+  Place asks list at most `limit` and say what they cut.
+  Asks run in document order and may read earlier binds. A failed ask is named below the answer; the rest still render.
 
 ## settlement dossier
 
