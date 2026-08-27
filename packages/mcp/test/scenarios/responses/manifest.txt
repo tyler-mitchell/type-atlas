@@ -70,6 +70,8 @@ impact/weigh-a-change-to-a-shared-type
 file_references/who-imports-money
 document_links/json-schema-reference
 compose/settlement-dossier
+compose/orient-in-a-package
+compose/inspect-every-candidate
 search_code/behavior-with-no-matching-words
 investigate_code/behavioral-question-lands
 investigate_code/absent-concept-stays-absent

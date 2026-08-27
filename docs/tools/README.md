@@ -16,7 +16,7 @@ One page per tool, generated from the scenario suite's captured responses — ev
 
 | [`code_actions`](code_actions.md) | Code actions | 1 |
 
-| [`compose`](compose.md) | Compose | 1 |
+| [`compose`](compose.md) | Compose | 3 |
 
 | [`definitions`](definitions.md) | Definitions | 2 |
 

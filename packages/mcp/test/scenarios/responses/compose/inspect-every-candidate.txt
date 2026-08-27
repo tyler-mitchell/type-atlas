@@ -1,0 +1,52 @@
+# 2 of 2 matches anchored to a declaration
+
+## signedAmount · packages/accounts/src/posting.ts:25
+
+signedAmount [function] · packages/accounts/src/posting.ts:25:14-25:26 · range 25:1-32:3 · packages/accounts/tsconfig.json
+
+```typescript
+const signedAmount: (posting: Posting) => Money
+```
+
+A posting's effect on a debit-normal running balance.
+
+## Callers (4)
+
+post [method] packages/accounts/src/journal.ts:34:3-57:4 · calls 52:12-52:24
+balancesAsOf [variable] packages/reports/src/balance.ts:23:14-23:26 · range 23:14-51:2 · calls 34:57-34:69
+journalTotal [variable] packages/reconcile/src/drift.ts:20:9-20:21 · range 20:9-20:92 · calls 20:37-20:49
+closedPeriodsBalance [variable] packages/rules/src/builtin.ts:22:14-22:34 · range 22:14-35:2 · calls 26:12-26:24
+
+## Calls (1 workspace · 0 dependency/runtime)
+
+Every call site is in packages/accounts/src/posting.ts; each row names where the callee is declared.
+
+negate [function] packages/money/src/money.ts:45:14-45:20 · range 45:23-45:88 · calls 30:14-30:20
+
+## Mentions that are not calls (5 of 10 references · 5 relevant projects searched)
+
+packages/accounts/src/index.ts:12:39-12:51:  export { credit, debit, type Posting, signedAmount } from "./posting.ts";
+packages/accounts/src/journal.ts:3:39-3:51:  import { credit, debit, type Posting, signedAmount } from "./posting.ts";
+packages/reports/src/balance.ts:6:3-6:15:  signedAmount,
+packages/reconcile/src/drift.ts:4:24-4:36:  import { type Posting, signedAmount } from "@ledger/accounts";
+packages/rules/src/builtin.ts:1:10-1:22:  import { signedAmount } from "@ledger/accounts";
+
+references lists all 10, with paging.
+
+## BalanceLine · packages/reports/src/balance.ts:11
+
+BalanceLine [interface] · packages/reports/src/balance.ts:11:18-11:29 · range 11:1-16:2 · packages/reports/tsconfig.json
+
+```typescript
+interface BalanceLine
+```
+
+A point-in-time balance, rolled up through the account hierarchy.
+
+No implementation answered — the walk reaches only files this session has opened, so a declaration realising this in an untouched file reports nothing here. references lists every use, including those declarations.
+
+## Mentions that are not calls (1 of 3 references · 1 relevant project searched)
+
+packages/reports/src/index.ts:1:15-1:26:  export { type BalanceLine, balancesAsOf, type StatementDescription } from "./balance.ts";
+
+references lists all 3, with paging.

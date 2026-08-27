@@ -162,6 +162,51 @@ test("compose renders a dossier from ask declarations", async () => {
       "reads earlier asks only",
     );
 
+    // Naming a declaration is the ergonomic form, and both ways it can be
+    // wrong are sentences a composer can act on rather than holes. Fanning
+    // over something that is not a list is the third: it used to degrade to a
+    // single un-anchored call and answer about nothing.
+    const pointed = await client.callTool({
+      name: "compose",
+      arguments: {
+        workspace: workspaceRoot,
+        document: [
+          '{% ask "hover" as="head" file="packages/core/src/projection.ts" symbol="page" /%}',
+          '{% ask "hover" as="absent" file="packages/core/src/projection.ts" symbol="noSuchThing" /%}',
+          '{% ask "hover" as="fanned" each=$head.nope /%}',
+          "{% $head.text %}",
+        ].join("\n"),
+      },
+    });
+    const pointedText = pointed.content.find((item) => item.type === "text")?.text ?? "";
+    expect(pointedText).toContain("const page");
+    expect(pointedText).toContain('declares no "noSuchThing"');
+    expect(pointedText).toContain("each=$head.nope is not a list");
+
+    // An ask runs once per item of a list an earlier ask bound, and the
+    // places one ask reports are what another ask points at — including
+    // `files=`, where passing the hits straight through once stringified
+    // every place to "[object Object]".
+    const fanned = await client.callTool({
+      name: "compose",
+      arguments: {
+        workspace: workspaceRoot,
+        document: [
+          '{% ask "workspace_symbols" as="q" file="packages/core/src/projection.ts" query="page" /%}',
+          '{% ask "hover" as="each" each=$q.hits /%}',
+          '{% ask "diagnostics" as="health" files=$q.hits /%}',
+          "fanned {% $each.total %} of {% $each.of %} · checked {% $health.checked %}",
+          "",
+          "{% $each.text %}",
+        ].join("\n"),
+      },
+    });
+    const fannedText = fanned.content.find((item) => item.type === "text")?.text ?? "";
+    expect(fannedText).toMatch(/fanned [1-9]\d* of [1-9]\d* · checked [1-9]/u);
+    // Each answer is titled by the place it came from, so repeated blocks are
+    // told apart without the composer restating the list.
+    expect(fannedText).toContain("## page · packages/core/src/projection.ts:");
+
     // The exact presentation, over data stable enough to pin: the syntactic
     // outline and a source window compose exactly as their dedicated tools
     // render them, under headings the composer chose.

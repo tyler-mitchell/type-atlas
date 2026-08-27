@@ -572,6 +572,41 @@ describe("compose", () => {
       ].join("\n"),
     }),
   );
+
+  // Orientation, which is the first move in a package nobody has read: the
+  // listing feeds the outline, so one call answers what is here and what each
+  // file declares.
+  scenarioTest("orient-in-a-package", ({ capture }) =>
+    capture("compose", {
+      document: [
+        '{% ask "list_files" as="tree" directory="packages/money" glob=["src/**/*.ts"] /%}',
+        '{% ask "document_symbols" as="shapes" each=$tree.files depth=0 /%}',
+        "",
+        "# packages/money — {% $tree.total %} source files",
+        "",
+        "{% $tree.text %}",
+        "",
+        "# What each declares",
+        "",
+        "{% $shapes.text %}",
+      ].join("\n"),
+    }),
+  );
+
+  // The shape no single tool can produce: describe code you cannot name, then
+  // inspect every candidate the search anchored.
+  scenarioTest("inspect-every-candidate", ({ capture }) =>
+    capture("compose", {
+      document: [
+        '{% ask "search_code" as="found" query="deciding whether a posting balances" limit=2 /%}',
+        '{% ask "inspect_symbol" as="all" each=$found.hits /%}',
+        "",
+        "# {% $found.total %} of {% $found.of %} matches anchored to a declaration",
+        "",
+        "{% $all.text %}",
+      ].join("\n"),
+    }),
+  );
 });
 
 // ── search_code: find by meaning, anchored to real symbols ─────────────────

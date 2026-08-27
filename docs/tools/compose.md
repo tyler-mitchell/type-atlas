@@ -107,3 +107,142 @@ packages/rules/src/builtin.ts
 └  26:12 — inside closedPeriodsBalance
 ~~~
 
+## orient in a package
+
+**Agent's Input**
+
+```yaml
+tool: Compose
+workspace: fixtures/ledger
+document: {% ask "list_files" as="tree" directory="packages/money" glob=["src/**/*.ts"] /%}
+{% ask "document_symbols" as="shapes" each=$tree.files depth=0 /%}
+
+# packages/money — {% $tree.total %} source files
+
+{% $tree.text %}
+
+# What each declares
+
+{% $shapes.text %}
+
+# answered in 41ms
+```
+
+**Response**
+
+~~~text
+# packages/money — 4 source files
+
+packages/money/
+└  src/
+   ├  currency.ts · 19 loc
+   ├  index.ts · 12 loc
+   ├  money.ts · 58 loc
+   └  rounding-mode.ts · 15 loc
+
+# What each declares
+
+## packages/money/src/currency.ts
+
+Currency [interface] 2:13-2:21 · range 2:1-2:54
+CurrencyProfile [interface] 5:18-5:33 · range 5:1-10:2
+currencyProfiles [variable] 12:14-12:30 · range 12:14-17:2 · 16 entries
+isCurrency [variable] 19:14-19:24 · range 19:14-19:90
+
+## packages/money/src/index.ts
+
+Nothing to report.
+
+## packages/money/src/money.ts
+
+add [variable] 38:14-38:17 · range 38:14-43:2
+brand [variable] 3:15-3:20 · range 3:15-3:35
+CurrencyMismatchError [class] 18:14-18:35 · range 18:1-25:2
+format [variable] 50:14-50:20 · range 50:14-58:2
+isZero [variable] 47:14-47:20 · range 47:14-47:73
+money [variable] 27:14-27:19 · range 27:14-28:58 · 2 entries
+Money [interface] 12:13-12:18 · range 12:1-16:3
+negate [variable] 45:14-45:20 · range 45:14-45:88
+zero [variable] 30:14-30:18 · range 30:14-30:71
+
+## packages/money/src/rounding-mode.ts
+
+bankRounding [variable] 9:7-9:19 · range 9:7-12:2 · 2 entries
+RoundingMode [enum] 2:13-2:25 · range 2:1-6:2
+roundingModeOf [variable] 14:14-14:28 · range 14:14-15:46
+~~~
+
+## inspect every candidate
+
+**Agent's Input**
+
+```yaml
+tool: Compose
+workspace: fixtures/ledger
+document: {% ask "search_code" as="found" query="deciding whether a posting balances" limit=2 /%}
+{% ask "inspect_symbol" as="all" each=$found.hits /%}
+
+# {% $found.total %} of {% $found.of %} matches anchored to a declaration
+
+{% $all.text %}
+
+# answered in 68ms
+```
+
+**Response**
+
+~~~text
+# 2 of 2 matches anchored to a declaration
+
+## signedAmount · packages/accounts/src/posting.ts:25
+
+signedAmount [function] · packages/accounts/src/posting.ts:25:14-25:26 · range 25:1-32:3 · packages/accounts/tsconfig.json
+
+```typescript
+const signedAmount: (posting: Posting) => Money
+```
+
+A posting's effect on a debit-normal running balance.
+
+## Callers (4)
+
+post [method] packages/accounts/src/journal.ts:34:3-57:4 · calls 52:12-52:24
+balancesAsOf [variable] packages/reports/src/balance.ts:23:14-23:26 · range 23:14-51:2 · calls 34:57-34:69
+journalTotal [variable] packages/reconcile/src/drift.ts:20:9-20:21 · range 20:9-20:92 · calls 20:37-20:49
+closedPeriodsBalance [variable] packages/rules/src/builtin.ts:22:14-22:34 · range 22:14-35:2 · calls 26:12-26:24
+
+## Calls (1 workspace · 0 dependency/runtime)
+
+Every call site is in packages/accounts/src/posting.ts; each row names where the callee is declared.
+
+negate [function] packages/money/src/money.ts:45:14-45:20 · range 45:23-45:88 · calls 30:14-30:20
+
+## Mentions that are not calls (5 of 10 references · 5 relevant projects searched)
+
+packages/accounts/src/index.ts:12:39-12:51:  export { credit, debit, type Posting, signedAmount } from "./posting.ts";
+packages/accounts/src/journal.ts:3:39-3:51:  import { credit, debit, type Posting, signedAmount } from "./posting.ts";
+packages/reports/src/balance.ts:6:3-6:15:  signedAmount,
+packages/reconcile/src/drift.ts:4:24-4:36:  import { type Posting, signedAmount } from "@ledger/accounts";
+packages/rules/src/builtin.ts:1:10-1:22:  import { signedAmount } from "@ledger/accounts";
+
+references lists all 10, with paging.
+
+## BalanceLine · packages/reports/src/balance.ts:11
+
+BalanceLine [interface] · packages/reports/src/balance.ts:11:18-11:29 · range 11:1-16:2 · packages/reports/tsconfig.json
+
+```typescript
+interface BalanceLine
+```
+
+A point-in-time balance, rolled up through the account hierarchy.
+
+No implementation answered — the walk reaches only files this session has opened, so a declaration realising this in an untouched file reports nothing here. references lists every use, including those declarations.
+
+## Mentions that are not calls (1 of 3 references · 1 relevant project searched)
+
+packages/reports/src/index.ts:1:15-1:26:  export { type BalanceLine, balancesAsOf, type StatementDescription } from "./balance.ts";
+
+references lists all 3, with paging.
+~~~
+
