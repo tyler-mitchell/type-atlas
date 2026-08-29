@@ -15,7 +15,7 @@
     "required_approving_review_count": 0
   },
   "restrictions": null,
-  "required_conversation_resolution": true,
+  "required_conversation_resolution": false,
   "allow_force_pushes": false,
   "allow_deletions": false
 }
