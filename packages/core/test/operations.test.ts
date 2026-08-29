@@ -1,3 +1,6 @@
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { pathToFileURL } from "node:url";
 import { WorkspaceDeclarationsRequest } from "@type-atlas/language-server/protocol";
 import {
   DocumentLinkRequest,
@@ -6,12 +9,18 @@ import {
   SymbolKind,
 } from "@volar/language-server/protocol.js";
 import { expect, test, vi } from "vite-plus/test";
+import { join } from "pathe";
 import { createTypeAtlas } from "../src/operations.ts";
 import type { VolarWorkspace } from "../src/volar-workspace.ts";
 
 const RANGE = { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } };
 
 test("keeps workspace symbol results within source-code files", async () => {
+  const root = await mkdtemp(join(tmpdir(), "type-atlas-symbols-"));
+  await writeFile(join(root, "source.ts"), "export const source = 1;\n");
+  await writeFile(join(root, "types.d.ts"), "export interface AuthoredDeclaration {}\n");
+  await writeFile(join(root, "tsconfig.json"), JSON.stringify({ include: ["*.ts"] }));
+  const uri = (file: string) => pathToFileURL(join(root, file)).toString();
   const sendRequest = vi.fn(async (request) => {
     if (request === GetMatchTsConfigRequest.type) return null;
     // Not `workspace/symbol`: that request carries no document, so Volar
@@ -22,7 +31,17 @@ test("keeps workspace symbol results within source-code files", async () => {
           {
             name: "TimelineCompositionAtInput",
             kind: SymbolKind.Class,
-            location: { uri: "file:///workspace/source.ts" },
+            location: { uri: uri("source.ts") },
+          },
+          {
+            name: "AuthoredDeclaration",
+            kind: SymbolKind.Interface,
+            location: { uri: uri("types.d.ts") },
+          },
+          {
+            name: "DependencyDeclaration",
+            kind: SymbolKind.Interface,
+            location: { uri: "file:///node_modules/dependency/index.d.ts" },
           },
           {
             name: "## unrelated markdown heading",
@@ -36,18 +55,26 @@ test("keeps workspace symbol results within source-code files", async () => {
     throw new Error("Unexpected request");
   });
   const workspace = {
-    getTextDocument: async () => ({ uri: "file:///workspace/source.ts" }),
+    root,
+    getTextDocument: async () => ({ uri: uri("source.ts") }),
     sendRequest,
   } as unknown as VolarWorkspace;
 
-  const result = await createTypeAtlas(workspace).workspaceSymbols({
-    file: "source.ts",
-    query: "TimelineCompositionAtInput",
-    signal: new AbortController().signal,
-  });
+  try {
+    const result = await createTypeAtlas(workspace).workspaceSymbols({
+      file: "source.ts",
+      query: "TimelineCompositionAtInput",
+      signal: new AbortController().signal,
+    });
 
-  expect(result.symbols?.map(({ name }) => name)).toEqual(["TimelineCompositionAtInput"]);
-  expect(result.projects).toBe(2);
+    expect(result.symbols?.map(({ name }) => name)).toEqual([
+      "TimelineCompositionAtInput",
+      "AuthoredDeclaration",
+    ]);
+    expect(result.projects).toBe(2);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test("recovers the resource behind an editor command document link", async () => {

@@ -97,9 +97,9 @@ const exploreOptions = {
 const input = type.module({
   DependencySearch: type({
     ...fileInput,
-    package: type("(string >= 1)[]").atLeastLength(1).configure(
+    package: type("(string >= 1)[]").atLeastLength(1).atMostLength(10).configure(
       {
-        description: "One or more installed package names, resolved from the importing file.",
+        description: "One to ten installed package names, resolved from the importing file.",
       },
       "self",
     ),

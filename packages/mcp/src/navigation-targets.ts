@@ -18,6 +18,7 @@ export const navigationTargets = async (input: {
   readonly root: string;
   readonly workspace: VolarWorkspace;
   readonly signal: AbortSignal;
+  readonly limit?: number;
   readonly origin?: {
     readonly uri: string;
     readonly position: { line: number; character: number };
@@ -44,7 +45,7 @@ export const navigationTargets = async (input: {
     declaresOrigin,
     total: found.length,
     items: await Promise.all(
-      found.map(async (item) => {
+      found.slice(0, input.limit).map(async (item) => {
         const linked = "targetUri" in item;
         const uri = linked ? item.targetUri : item.uri;
         const selection = linked ? item.targetSelectionRange : item.range;

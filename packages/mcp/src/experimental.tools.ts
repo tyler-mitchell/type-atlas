@@ -9,6 +9,7 @@ import {
 } from "@volar/language-server/protocol.js";
 import {
   createTypeAtlas,
+  declarationAtPosition,
   declarationChainAtPosition,
   declarationsNamed,
   documentSymbols,
@@ -342,24 +343,20 @@ export const registerExperimentalTools = (
             position: await askedPosition(ask),
             signal,
           });
-          return resolved
-            ? {
-                name: resolved.name,
-                kind: resolved.kind,
-                file: displayPath(resolved.declaredAt.uri, root),
-                // As text, one-based, like every position this surface
-                // writes — the raw LSP object rendered as nothing, leaving
-                // `file.ts:` with a dangling colon in the dossier heading.
-                at: positionText(resolved.declaredAt.selection.start),
-              }
-            : {};
+          if (!resolved) return { text: "Nothing to report." };
+          const file = displayPath(resolved.declaredAt.uri, root);
+          const at = positionText(resolved.declaredAt.selection.start);
+          return {
+            name: resolved.name,
+            kind: resolved.kind,
+            file,
+            at,
+            text: await asText("{% $name %} · {% $location %}", {
+              name: resolved.name,
+              location: `${file}:${at}`,
+            }),
+          };
         },
-        // The whole working view of one symbol, as its own tool composes it.
-        // Compose held every part and not the composition, so the question
-        // asked most often — what is this, who uses it, what does it call —
-        // was six asks to write out and six sections to lay out by hand. It
-        // also fans out, which the tool cannot: `each=$found.hits` is a full
-        // dossier for every place a search by meaning landed.
         inspect_symbol: async (ask) => {
           const result = await inspectSymbol({
             workspace,
@@ -752,13 +749,17 @@ export const registerExperimentalTools = (
           // is the obvious thing to write when a search just answered, and it
           // stringified every place to "[object Object]", then reported that back
           // as a percent-encoded URI that named nothing a composer could act on.
-          const named = Array.isArray(ask.attributes.files)
-            ? ask.attributes.files.map((item) =>
-                typeof item === "object" && item !== null
-                  ? String((item as { readonly file?: unknown }).file ?? "")
-                  : String(item),
-              )
-            : [askedFile(ask)];
+          const named = [
+            ...new Set(
+              Array.isArray(ask.attributes.files)
+                ? ask.attributes.files.map((item) =>
+                    typeof item === "object" && item !== null
+                      ? String((item as { readonly file?: unknown }).file ?? "")
+                      : String(item),
+                  )
+                : [askedFile(ask)],
+            ),
+          ].filter(Boolean);
           const checked = named.slice(0, 5);
           const perFile = await Promise.all(
             checked.map(async (file) => {
@@ -837,6 +838,7 @@ export const registerExperimentalTools = (
             async (ask: DocumentAsk) => {
               const position = await askedPosition(ask);
               const uri = workspace.getWorkspaceUri(askedFile(ask));
+              const limit = Number(ask.attributes.limit ?? 50);
               const { result } = await request({
                 file: askedFile(ask),
                 signal,
@@ -847,6 +849,7 @@ export const registerExperimentalTools = (
                 root,
                 workspace,
                 signal,
+                limit,
                 origin: fromOrigin ? { uri, position } : undefined,
               });
               const resolved = await subjectAtPosition({ workspace, uri, position, signal }).catch(
@@ -855,9 +858,16 @@ export const registerExperimentalTools = (
               const subject = subjectFromTargets
                 ? (targets.items.find(({ name: named }) => named)?.name ?? resolved?.name)
                 : resolved?.name;
+              const landedIn =
+                targets.total === 0
+                  ? await declarationAtPosition({ workspace, uri, position }).catch(() => undefined)
+                  : undefined;
               const paths = [...new Set(targets.items.map(({ file }) => file))];
+              const beyond = targets.total - targets.items.length;
               return {
                 total: targets.total,
+                shown: targets.items.length,
+                beyond,
                 any: targets.total > 0,
                 files: paths.length,
                 paths,
@@ -874,17 +884,21 @@ export const registerExperimentalTools = (
                 // tree said nothing at all where the tool spends a paragraph
                 // saying so — silence a composer would read as "there are
                 // none".
-                text: await asDocument(document, {
-                  subject,
-                  kind: resolved?.kind,
-                  root,
-                  ...targets,
-                  // A row naming the subject repeats the line above it; a row
-                  // naming anything else is information.
-                  items: targets.items.map((item) =>
-                    item.name === subject ? { ...item, name: undefined } : item,
-                  ),
-                }),
+                text: withRest(
+                  await asDocument(document, {
+                    subject,
+                    kind: resolved?.kind,
+                    root,
+                    landedIn: landedIn?.name,
+                    landedAt: landedIn?.selectionRange.start,
+                    ...targets,
+                    items: targets.items.map((item) =>
+                      item.name === subject ? { ...item, name: undefined } : item,
+                    ),
+                  }),
+                  beyond,
+                  limit,
+                ),
               };
             },
           ]),

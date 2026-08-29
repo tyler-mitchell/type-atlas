@@ -1,4 +1,5 @@
 import { readdir, stat } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 import * as path from "pathe";
 import {
   ProjectDiagnosticsRequest,
@@ -25,6 +26,7 @@ import {
   WorkspaceSymbolRequest,
 } from "@volar/language-server/protocol.js";
 import type { Location, Range, RequestType } from "vscode-languageserver-protocol";
+import { projectSources } from "./project-graph.ts";
 import { incomingCalls } from "./symbol-inspection.ts";
 import type { VolarWorkspace } from "./volar-workspace.ts";
 
@@ -67,18 +69,6 @@ const projectDocument = async (workspace: VolarWorkspace, project: string) => {
     `${project} holds no TypeScript source to select a project with. Name a file inside the project instead.`,
   );
 };
-
-/**
- * Matches generated declaration files.
- *
- * TypeScript's navigate-to API accepts `excludeDtsFiles`, but
- * `volar-service-typescript` calls `getNavigateToItems(query)` with no further
- * arguments and exposes no setting for them, so the choice cannot be made
- * upstream. Declarations are excluded here instead: a workspace package
- * consumed through its build output otherwise reports the generated
- * declaration next to the source it was generated from.
- */
-const declarationUri = /\.d\.[cm]?ts$/i;
 
 /**
  * Recovers the resource an editor command target encodes.
@@ -479,6 +469,7 @@ export const createTypeAtlas = (workspace: VolarWorkspace) => {
       readonly signal: AbortSignal;
     }) {
       const textDocument = await workspace.getTextDocument(input.file);
+      const sourceFiles = new Set(projectSources(workspace.root).flatMap(({ files }) => files));
       const project = await workspace.sendRequest(
         GetMatchTsConfigRequest.type,
         textDocument,
@@ -498,10 +489,10 @@ export const createTypeAtlas = (workspace: VolarWorkspace) => {
         project,
         projects: answer?.projects ?? 0,
         symbols:
-          answer?.declarations.filter(
-            (symbol) =>
-              sourceCodeUri.test(symbol.location.uri) && !declarationUri.test(symbol.location.uri),
-          ) ?? null,
+          answer?.declarations.filter((symbol) => {
+            const file = fileURLToPath(symbol.location.uri);
+            return sourceCodeUri.test(symbol.location.uri) && sourceFiles.has(path.resolve(file));
+          }) ?? null,
       };
     },
   };
