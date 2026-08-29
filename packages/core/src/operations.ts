@@ -490,8 +490,9 @@ export const createTypeAtlas = (workspace: VolarWorkspace) => {
         projects: answer?.projects ?? 0,
         symbols:
           answer?.declarations.filter((symbol) => {
+            if (!sourceCodeUri.test(symbol.location.uri)) return false;
             const file = fileURLToPath(symbol.location.uri);
-            return sourceCodeUri.test(symbol.location.uri) && sourceFiles.has(path.resolve(file));
+            return sourceFiles.has(path.resolve(file));
           }) ?? null,
       };
     },
