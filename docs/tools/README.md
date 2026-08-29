@@ -78,7 +78,5 @@ One page per tool, generated from the scenario suite's captured responses — ev
 
 | [`type_definitions`](type_definitions.md) | Type definitions | 3 |
 
-| [`verify_edit`](verify_edit.md) | Verify edit | 1 |
-
 | [`workspace_symbols`](workspace_symbols.md) | Workspace symbols | 3 |
 

@@ -731,43 +731,6 @@ describe("the hazard corner", () => {
       "evidence/unowned-document-does-not-poison-typescript.txt",
     );
   });
-
-  // verify_edit lives here too: in this suite's sessions — and only in them,
-  // never live over the same sequence — diagnosing a proposal leaves the
-  // server answering wrong declaration positions for the proposed file
-  // afterwards (positions matching NO real text; callees and explore
-  // equally hit). The Volar cache half is fixed in withTextDocument; the
-  // rest is diagnosed to the layer in docs/issues.md with the reproducer:
-  //   vp run "@type-atlas/mcp#case:run" "proposed-edit-breaks-a-consumer|function-with-similarity-tail"
-  // with this case moved before explore_symbol. Its own capture is sound.
-  scenarioTest("proposed-edit-breaks-a-consumer", ({ capture }) =>
-    capture("verify_edit", {
-      files: [
-        {
-          path: "packages/money/src/money.ts",
-          content: [
-            'import { type Currency, currencyProfiles } from "./currency.ts";',
-            "",
-            "declare const brand: unique symbol;",
-            "",
-            "export type Money = {",
-            "  readonly minorUnits: bigint;",
-            "  readonly currency: Currency;",
-            '  readonly [brand]: "Money";',
-            "};",
-            "",
-            "export const money = (minorUnits: bigint, currency: Currency): Money =>",
-            "  ({ minorUnits, currency }) as Money;",
-            "",
-            "export const zero = (currency: Currency): Money => money(0n, currency);",
-            "",
-            "export const profileOf = (currency: Currency) => currencyProfiles[currency];",
-            "",
-          ].join("\n"),
-        },
-      ],
-    }),
-  );
 });
 
 // These cases mutate watched files. Keep them after semantic captures so a

@@ -237,8 +237,8 @@ test("compose renders a dossier from ask declarations", async () => {
 
       ## The declaration line
 
-      28 | export const page = <Item>(items: readonly Item[], offset: number, limit: number): Page<Item> => {
-      29 |   const end = Math.min(offset + limit, items.length);"
+      28 | 28 | export const page = <Item>(items: readonly Item[], offset: number, limit: number): Page<Item> => {
+      29 | 29 |   const end = Math.min(offset + limit, items.length);"
     `);
   } finally {
     await client.close();

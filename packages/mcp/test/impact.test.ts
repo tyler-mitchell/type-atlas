@@ -28,7 +28,7 @@ test("impact weighs a change without mutating project state", async () => {
       arguments: {
         workspace: workspaceRoot,
         file: "packages/core/src/operations.ts",
-        position: { line: 117, character: 14 },
+        position: { line: 107, character: 14 },
       },
     });
     const text = result.content.find((item) => item.type === "text")?.text ?? "";

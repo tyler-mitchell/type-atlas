@@ -7,7 +7,7 @@ Answer several questions about code in one call, laid out how you want. `{% ask 
     {% ask "references" as="uses" file="src/x.ts" symbol="foo" /%}
     {% $uses.text %}
 
-Every ask takes `as` (required), `file`, and either `symbol` or `line`+`character` (one-based). Add `each=<an earlier bind, or a literal list>` to run it once per item, max 10 → { items, total, of, text }, each item also carrying `title`.
+Every ask takes `as`. Positional asks take `file` and either `symbol` or one-based `line`+`character`. File and workspace asks take only the attributes shown below. Add `each=<an earlier bind, or a literal list>` to run it once per item, max 10 → { items, total, of, failureCount, text }, each item also carrying `title`.
 
 ASKS — further attributes → what it binds besides `text`
 
@@ -17,11 +17,12 @@ ASKS — further attributes → what it binds besides `text`
   subject()                       → { name, kind, file, at }
   references(tests?: "only" | "exclude", limit?=50)
       → { total, shown, beyond, any, files, paths, projects, groups }
-  definitions(limit?=50)          → { total, any, files, paths, hits }
+  definitions(limit?=50)          → { total, shown, beyond, any, files, paths, hits }
   type_definitions(limit?=50)     → as definitions
   implementations(limit?=50)      → as definitions      // a zero can mean unsearched; text says which
   file_references(limit?=50)      → as references       // who imports this module
-  callers() | callees()           → { name, total, any, groups, standardLibrary }   // project-scoped
+  callers()                       → { name, total, any, groups, standardLibrary, projects }   // loaded projects
+  callees()                       → { name, total, any, groups, standardLibrary }   // owning project
   document_symbols(depth?, raw?)  → { total, tree }
   diagnostics(files?: (path | place)[] <= 5)  → { total, any, checked, of, groups }
   read_file(from?, to?)           → { lines, startLine }

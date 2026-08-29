@@ -9,19 +9,27 @@ import {
 } from "@volar/language-server/protocol.js";
 import {
   createTypeAtlas,
+  declarationAtPosition,
   declarationChainAtPosition,
   declarationsNamed,
   documentSymbols,
   foldValueSymbols,
   inspectSymbol,
   projectDocumentSymbols,
+  readSourceView,
   renderComposition,
   renderDocument,
   subjectAtPosition,
   type VolarWorkspacePool,
 } from "@type-atlas/core";
 import { type } from "arktype";
-import { displayPath, markupText, positionText, sameRange } from "@type-atlas/atlascii";
+import {
+  displayPath,
+  foldedSource,
+  markupText,
+  positionText,
+  sameRange,
+} from "@type-atlas/atlascii";
 import { type DocumentAsk, documentAsks, isAskReference } from "@type-atlas/atlascii/document";
 import { composeDescription } from "./compose.description.ts";
 import { textResult } from "./mcp-result.ts";
@@ -60,20 +68,6 @@ const input = type.module({
       "self",
     ),
   }),
-  VerifyEdit: type({
-    workspace: fileInput.workspace,
-    files: type({
-      path: type("string >= 1").describe("Workspace-relative or absolute file path."),
-      content: type("string").describe("The file's complete proposed content."),
-    })
-      .array()
-      .atLeastLength(1)
-      .atMostLength(5)
-      .configure(
-        { description: "Proposed contents to check, before anything is written." },
-        "self",
-      ),
-  }),
   Compose: type({
     workspace: fileInput.workspace,
     document: type("string >= 1").configure({
@@ -81,13 +75,6 @@ const input = type.module({
     }),
   }),
 });
-
-/** One diagnostic's identity across an edit, where ranges shift but meaning holds. */
-const diagnosticKey = (entry: {
-  readonly severity?: number;
-  readonly code?: number | string;
-  readonly message: string;
-}) => `${entry.severity ?? 1}|${entry.code ?? ""}|${entry.message}`;
 
 /** The workspace package a display path belongs to, as a reader names it. */
 const packageOf = (file: string) => {
@@ -109,89 +96,6 @@ export const registerExperimentalTools = (
 ): void => {
   const quorl = createQuorl({ workspaces });
   const retrieval = createRetrievalIntelligence({ semble, workspaces });
-
-  registerTool(
-    server,
-    "verify_edit",
-    {
-      title: "Verify edit",
-      description:
-        "Experimental: the diagnostics a proposed edit would introduce, before anything is written. Each file's complete proposed content is checked in memory against the file as it stands; the answer reports what the change introduces and resolves in those files. A change can also break importers — diagnostics after applying reports those.",
-      inputSchema: input.VerifyEdit,
-      annotations: readOnlyToolAnnotations,
-    },
-    async ({ workspace: root, files }, { mcpReq: { signal } }) => {
-      const workspace = await workspaces.get(root);
-      const checked = await Promise.all(
-        files.map(async ({ path: file, content }) => {
-          const { uri } = await workspace.getTextDocument(file);
-          const report = (result: unknown) =>
-            result && typeof result === "object" && "items" in result
-              ? ((result as { items: readonly Diagnostic[] }).items ?? [])
-              : [];
-          const baseline = report(
-            await workspace.sendRequest(
-              DocumentDiagnosticRequest.type,
-              {
-                textDocument: { uri },
-              },
-              signal,
-            ),
-          ).filter((entry) => (entry.severity ?? 1) <= 2);
-          const proposed = await workspace.withTextDocument({
-            uri,
-            languageId: "typescript",
-            source: content,
-            signal,
-            task: async (textDocument) =>
-              report(
-                await workspace.sendRequest(
-                  DocumentDiagnosticRequest.type,
-                  {
-                    textDocument,
-                  },
-                  signal,
-                ),
-              ).filter((entry) => (entry.severity ?? 1) <= 2),
-          });
-          const standing = new Map<string, number>();
-          for (const entry of baseline) {
-            standing.set(diagnosticKey(entry), (standing.get(diagnosticKey(entry)) ?? 0) + 1);
-          }
-          const introduced = proposed.filter((entry) => {
-            const held = standing.get(diagnosticKey(entry)) ?? 0;
-            if (held === 0) return true;
-            standing.set(diagnosticKey(entry), held - 1);
-            return false;
-          });
-          const resolved = [...standing.values()].reduce((total, count) => total + count, 0);
-          return {
-            file: displayPath(uri, root),
-            introduced: introduced.map((entry) => ({
-              severity: entry.severity,
-              source: entry.source,
-              code: entry.code,
-              range: entry.range,
-              message: entry.message,
-            })),
-            resolvedCount: resolved,
-          };
-        }),
-      );
-      const rendered = await renderDocument({
-        document: "verify-edit.tool.mdoc",
-        variables: {
-          fileCount: checked.length,
-          introducedCount: checked.reduce((total, { introduced }) => total + introduced.length, 0),
-          resolvedCount: checked.reduce((total, { resolvedCount }) => total + resolvedCount, 0),
-          groups: checked
-            .filter(({ introduced }) => introduced.length > 0)
-            .map(({ file, introduced }) => ({ file, problems: introduced })),
-        },
-      });
-      return textResult(rendered.text);
-    },
-  );
 
   registerTool(
     server,
@@ -342,24 +246,20 @@ export const registerExperimentalTools = (
             position: await askedPosition(ask),
             signal,
           });
-          return resolved
-            ? {
-                name: resolved.name,
-                kind: resolved.kind,
-                file: displayPath(resolved.declaredAt.uri, root),
-                // As text, one-based, like every position this surface
-                // writes — the raw LSP object rendered as nothing, leaving
-                // `file.ts:` with a dangling colon in the dossier heading.
-                at: positionText(resolved.declaredAt.selection.start),
-              }
-            : {};
+          if (!resolved) return { text: "Nothing to report." };
+          const file = displayPath(resolved.declaredAt.uri, root);
+          const at = positionText(resolved.declaredAt.selection.start);
+          return {
+            name: resolved.name,
+            kind: resolved.kind,
+            file,
+            at,
+            text: await asText("{% $name %} · {% $location %}", {
+              name: resolved.name,
+              location: `${file}:${at}`,
+            }),
+          };
         },
-        // The whole working view of one symbol, as its own tool composes it.
-        // Compose held every part and not the composition, so the question
-        // asked most often — what is this, who uses it, what does it call —
-        // was six asks to write out and six sections to lay out by hand. It
-        // also fans out, which the tool cannot: `each=$found.hits` is a full
-        // dossier for every place a search by meaning landed.
         inspect_symbol: async (ask) => {
           const result = await inspectSymbol({
             workspace,
@@ -752,13 +652,17 @@ export const registerExperimentalTools = (
           // is the obvious thing to write when a search just answered, and it
           // stringified every place to "[object Object]", then reported that back
           // as a percent-encoded URI that named nothing a composer could act on.
-          const named = Array.isArray(ask.attributes.files)
-            ? ask.attributes.files.map((item) =>
-                typeof item === "object" && item !== null
-                  ? String((item as { readonly file?: unknown }).file ?? "")
-                  : String(item),
-              )
-            : [askedFile(ask)];
+          const named = [
+            ...new Set(
+              Array.isArray(ask.attributes.files)
+                ? ask.attributes.files.map((item) =>
+                    typeof item === "object" && item !== null
+                      ? String((item as { readonly file?: unknown }).file ?? "")
+                      : String(item),
+                  )
+                : [askedFile(ask)],
+            ),
+          ].filter(Boolean);
           const checked = named.slice(0, 5);
           const perFile = await Promise.all(
             checked.map(async (file) => {
@@ -837,6 +741,7 @@ export const registerExperimentalTools = (
             async (ask: DocumentAsk) => {
               const position = await askedPosition(ask);
               const uri = workspace.getWorkspaceUri(askedFile(ask));
+              const limit = Number(ask.attributes.limit ?? 50);
               const { result } = await request({
                 file: askedFile(ask),
                 signal,
@@ -847,6 +752,7 @@ export const registerExperimentalTools = (
                 root,
                 workspace,
                 signal,
+                limit,
                 origin: fromOrigin ? { uri, position } : undefined,
               });
               const resolved = await subjectAtPosition({ workspace, uri, position, signal }).catch(
@@ -855,9 +761,16 @@ export const registerExperimentalTools = (
               const subject = subjectFromTargets
                 ? (targets.items.find(({ name: named }) => named)?.name ?? resolved?.name)
                 : resolved?.name;
+              const landedIn =
+                targets.total === 0
+                  ? await declarationAtPosition({ workspace, uri, position }).catch(() => undefined)
+                  : undefined;
               const paths = [...new Set(targets.items.map(({ file }) => file))];
+              const beyond = targets.total - targets.items.length;
               return {
                 total: targets.total,
+                shown: targets.items.length,
+                beyond,
                 any: targets.total > 0,
                 files: paths.length,
                 paths,
@@ -874,27 +787,54 @@ export const registerExperimentalTools = (
                 // tree said nothing at all where the tool spends a paragraph
                 // saying so — silence a composer would read as "there are
                 // none".
-                text: await asDocument(document, {
-                  subject,
-                  kind: resolved?.kind,
-                  root,
-                  ...targets,
-                  // A row naming the subject repeats the line above it; a row
-                  // naming anything else is information.
-                  items: targets.items.map((item) =>
-                    item.name === subject ? { ...item, name: undefined } : item,
-                  ),
-                }),
+                text: withRest(
+                  await asDocument(document, {
+                    subject,
+                    kind: resolved?.kind,
+                    root,
+                    landedIn: landedIn?.name,
+                    landedAt: landedIn?.selectionRange.start,
+                    ...targets,
+                    items: targets.items.map((item) =>
+                      item.name === subject ? { ...item, name: undefined } : item,
+                    ),
+                  }),
+                  beyond,
+                  limit,
+                ),
               };
             },
           ]),
         ),
         read_file: async (ask) => {
-          const uri = workspace.getWorkspaceUri(askedFile(ask));
-          const { source } = await workspace.readTextDocumentUri(uri, signal);
-          const all = source.split("\n");
           const from = Number(ask.attributes.from ?? 1);
-          const lines = all.slice(from - 1, Number(ask.attributes.to ?? all.length));
+          const view = await readSourceView({
+            workspace,
+            file: askedFile(ask),
+            fold: true,
+            window: { startLine: from, endLine: Number(ask.attributes.to) || undefined },
+            signal,
+          });
+          const requestedEnd = Math.min(
+            Number(ask.attributes.to ?? view.lines.length),
+            view.lines.length,
+            from + 599,
+          );
+          const end = view.lines
+            .slice(from - 1, requestedEnd)
+            .reduce(
+              (walk, line) =>
+                walk.characters > 40_000
+                  ? walk
+                  : { at: walk.at + 1, characters: walk.characters + line.length + 1 },
+              { at: from - 1, characters: 0 },
+            ).at;
+          const text = foldedSource({
+            lines: view.lines,
+            ranges: view.foldingRanges,
+            window: { startLine: from, endLine: end },
+          }).text;
+          const lines = text === "" ? [] : text.split("\n");
           return {
             lines,
             startLine: from,
@@ -939,9 +879,10 @@ export const registerExperimentalTools = (
             const answer = (await operations[ask.operation]!({
               ...ask,
               attributes: { ...fields, ...written },
-            }).catch((cause: unknown) => ({
-              text: `Failed: ${cause instanceof Error ? cause.message : String(cause)}`,
-            }))) as Record<string, unknown>;
+            }).catch((cause: unknown) => {
+              const failed = cause instanceof Error ? cause.message : String(cause);
+              return { failed, text: `Failed: ${failed}` };
+            })) as Record<string, unknown>;
             // What this answer is about. The name alone is not enough to tell
             // the blocks apart — a search for `render` returned four
             // candidates all named `rendered`, which read as one heading
@@ -951,20 +892,24 @@ export const registerExperimentalTools = (
             return {
               ...answer,
               title: [fields.name, at].filter(Boolean).map(String).join(" · ") || String(item),
-              // Not every operation answers with prose — `subject` binds
-              // fields only — and a section with no text is a crash. An empty
-              // one is worse than a crash: `index.ts` re-exports and declares
-              // nothing, and its heading sat blank among six that were full,
-              // reading exactly like an ask that had failed.
               text: String(answer.text ?? "") || "Nothing to report.",
             };
           }),
         );
+        const failures = answers.flatMap((answer) => {
+          const failed = (answer as { readonly failed?: unknown }).failed;
+          return typeof failed === "string" ? [failed] : [];
+        });
         return {
           items: answers,
           total: answers.length,
           any: answers.length > 0,
           of: items.length,
+          failureCount: failures.length,
+          failed:
+            failures.length > 0
+              ? `${String(failures.length)} fanned asks failed: ${failures.join("; ")}`
+              : undefined,
           text: await asText("{% sections items=$items /%}", { items: answers }),
         };
       };
