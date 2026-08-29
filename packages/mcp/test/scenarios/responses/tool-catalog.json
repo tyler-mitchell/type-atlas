@@ -195,11 +195,6 @@
     "description": "Return type-definition locations at a position."
   },
   {
-    "name": "verify_edit",
-    "title": "Verify edit",
-    "description": "Experimental: the diagnostics a proposed edit would introduce, before anything is written. Each file's complete proposed content is checked in memory against the file as it stands; the answer reports what the change introduces and resolves in those files. A change can also break importers — diagnostics after applying reports those."
-  },
-  {
     "name": "workspace_symbols",
     "title": "Workspace symbols",
     "description": "Search symbols across TypeScript projects activated in this workspace session. Potentially expensive in large monorepos: each call may search many project files, and limit only bounds returned output. Use document_symbols when the file is known; avoid parallel or repeated speculative searches."

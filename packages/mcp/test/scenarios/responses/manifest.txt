@@ -90,7 +90,6 @@ document_links/fixture-readme
 find_successor/renamed-method-hunch
 find_successor/close-miss-finds-the-successor
 find_successor/test-residue-is-not-a-capability
-verify_edit/proposed-edit-breaks-a-consumer
 list_files/working-tree-changes
 list_files/staged-and-renamed
 list_files/merge-conflict

@@ -61,20 +61,6 @@ const input = type.module({
       "self",
     ),
   }),
-  VerifyEdit: type({
-    workspace: fileInput.workspace,
-    files: type({
-      path: type("string >= 1").describe("Workspace-relative or absolute file path."),
-      content: type("string").describe("The file's complete proposed content."),
-    })
-      .array()
-      .atLeastLength(1)
-      .atMostLength(5)
-      .configure(
-        { description: "Proposed contents to check, before anything is written." },
-        "self",
-      ),
-  }),
   Compose: type({
     workspace: fileInput.workspace,
     document: type("string >= 1").configure({
@@ -82,13 +68,6 @@ const input = type.module({
     }),
   }),
 });
-
-/** One diagnostic's identity across an edit, where ranges shift but meaning holds. */
-const diagnosticKey = (entry: {
-  readonly severity?: number;
-  readonly code?: number | string;
-  readonly message: string;
-}) => `${entry.severity ?? 1}|${entry.code ?? ""}|${entry.message}`;
 
 /** The workspace package a display path belongs to, as a reader names it. */
 const packageOf = (file: string) => {
@@ -110,89 +89,6 @@ export const registerExperimentalTools = (
 ): void => {
   const quorl = createQuorl({ workspaces });
   const retrieval = createRetrievalIntelligence({ semble, workspaces });
-
-  registerTool(
-    server,
-    "verify_edit",
-    {
-      title: "Verify edit",
-      description:
-        "Experimental: the diagnostics a proposed edit would introduce, before anything is written. Each file's complete proposed content is checked in memory against the file as it stands; the answer reports what the change introduces and resolves in those files. A change can also break importers — diagnostics after applying reports those.",
-      inputSchema: input.VerifyEdit,
-      annotations: readOnlyToolAnnotations,
-    },
-    async ({ workspace: root, files }, { mcpReq: { signal } }) => {
-      const workspace = await workspaces.get(root);
-      const checked = await Promise.all(
-        files.map(async ({ path: file, content }) => {
-          const { uri } = await workspace.getTextDocument(file);
-          const report = (result: unknown) =>
-            result && typeof result === "object" && "items" in result
-              ? ((result as { items: readonly Diagnostic[] }).items ?? [])
-              : [];
-          const baseline = report(
-            await workspace.sendRequest(
-              DocumentDiagnosticRequest.type,
-              {
-                textDocument: { uri },
-              },
-              signal,
-            ),
-          ).filter((entry) => (entry.severity ?? 1) <= 2);
-          const proposed = await workspace.withTextDocument({
-            uri,
-            languageId: "typescript",
-            source: content,
-            signal,
-            task: async (textDocument) =>
-              report(
-                await workspace.sendRequest(
-                  DocumentDiagnosticRequest.type,
-                  {
-                    textDocument,
-                  },
-                  signal,
-                ),
-              ).filter((entry) => (entry.severity ?? 1) <= 2),
-          });
-          const standing = new Map<string, number>();
-          for (const entry of baseline) {
-            standing.set(diagnosticKey(entry), (standing.get(diagnosticKey(entry)) ?? 0) + 1);
-          }
-          const introduced = proposed.filter((entry) => {
-            const held = standing.get(diagnosticKey(entry)) ?? 0;
-            if (held === 0) return true;
-            standing.set(diagnosticKey(entry), held - 1);
-            return false;
-          });
-          const resolved = [...standing.values()].reduce((total, count) => total + count, 0);
-          return {
-            file: displayPath(uri, root),
-            introduced: introduced.map((entry) => ({
-              severity: entry.severity,
-              source: entry.source,
-              code: entry.code,
-              range: entry.range,
-              message: entry.message,
-            })),
-            resolvedCount: resolved,
-          };
-        }),
-      );
-      const rendered = await renderDocument({
-        document: "verify-edit.tool.mdoc",
-        variables: {
-          fileCount: checked.length,
-          introducedCount: checked.reduce((total, { introduced }) => total + introduced.length, 0),
-          resolvedCount: checked.reduce((total, { resolvedCount }) => total + resolvedCount, 0),
-          groups: checked
-            .filter(({ introduced }) => introduced.length > 0)
-            .map(({ file, introduced }) => ({ file, problems: introduced })),
-        },
-      });
-      return textResult(rendered.text);
-    },
-  );
 
   registerTool(
     server,

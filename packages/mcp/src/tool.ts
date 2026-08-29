@@ -72,7 +72,6 @@ export const toolPolicies = {
   selection_ranges: { requireIntent: true },
   signature_help: { requireIntent: true },
   type_definitions: { requireIntent: true },
-  verify_edit: { requireIntent: true },
   workspace_symbols: { requireIntent: true },
 } as const satisfies Readonly<Record<string, ToolPolicy>>;
 

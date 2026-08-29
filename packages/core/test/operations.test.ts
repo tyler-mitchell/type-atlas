@@ -17,9 +17,11 @@ const RANGE = { start: { line: 0, character: 0 }, end: { line: 0, character: 1 }
 
 test("keeps workspace symbol results within source-code files", async () => {
   const root = await mkdtemp(join(tmpdir(), "type-atlas-symbols-"));
+  const dependencyRoot = await mkdtemp(join(tmpdir(), "type-atlas-dependency-"));
   await writeFile(join(root, "source.ts"), "export const source = 1;\n");
   await writeFile(join(root, "types.d.ts"), "export interface AuthoredDeclaration {}\n");
   await writeFile(join(root, "tsconfig.json"), JSON.stringify({ include: ["*.ts"] }));
+  await writeFile(join(dependencyRoot, "index.d.ts"), "export interface Dependency {}\n");
   const uri = (file: string) => pathToFileURL(join(root, file)).toString();
   const sendRequest = vi.fn(async (request) => {
     if (request === GetMatchTsConfigRequest.type) return null;
@@ -41,7 +43,7 @@ test("keeps workspace symbol results within source-code files", async () => {
           {
             name: "DependencyDeclaration",
             kind: SymbolKind.Interface,
-            location: { uri: "file:///node_modules/dependency/index.d.ts" },
+            location: { uri: pathToFileURL(join(dependencyRoot, "index.d.ts")).toString() },
           },
           {
             name: "## unrelated markdown heading",
@@ -74,6 +76,7 @@ test("keeps workspace symbol results within source-code files", async () => {
     expect(result.projects).toBe(2);
   } finally {
     await rm(root, { recursive: true, force: true });
+    await rm(dependencyRoot, { recursive: true, force: true });
   }
 });
 
