@@ -5,6 +5,14 @@
 
 
 
+
+## 1.0.0
+<sub>2026-08-29</sub>
+
+- *(minor)*
+  Expanded Compose with semantic search, navigation, iteration, and bounded parallel results. Removed the unstable experimental `verify_edit` tool.
+- *(major)* Version bump from group with `@type-atlas/mcp` v1.0.0
+
 ## 0.6.3
 <sub>2026-08-23</sub>
 
