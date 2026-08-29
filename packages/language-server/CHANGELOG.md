@@ -5,6 +5,14 @@
 
 
 
+
+## 1.0.0
+<sub>2026-08-29</sub>
+
+- *(patch)*
+  Rebuilt Occurrences with semantic symbol resolution, structural expression matching, and complete cross-project references.
+- *(major)* Version bump from group with `@type-atlas/mcp` v1.0.0
+
 ## 0.6.3
 <sub>2026-08-23</sub>
 

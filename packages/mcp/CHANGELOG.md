@@ -5,6 +5,19 @@
 
 
 
+
+## 1.0.0
+<sub>2026-08-29</sub>
+
+- *(major)*
+  Expanded Compose with semantic search, navigation, iteration, and bounded parallel results. Removed the unstable experimental `verify_edit` tool.
+- *(minor)*
+  Rebuilt Occurrences with semantic symbol resolution, structural expression matching, and complete cross-project references.
+- *(minor)* Added configurable intent requirements for information-gathering tools.
+- *(minor)* Simplified List Files to one hierarchical tree response.
+- *(minor)* Deprecated file-scoped Diagnostics in favor of project checks.
+- *(patch)* Added code-navigation registry metadata.
+
 ## 0.6.3
 <sub>2026-08-23</sub>
 
