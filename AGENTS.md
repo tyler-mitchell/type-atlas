@@ -68,6 +68,9 @@ If the version pull request is behind `release`, run `vp run release:update`
 once. Never version packages, edit generated changelogs, publish locally,
 dispatch release workflows, poll CI, or read successful-job logs.
 
+Automated reviews are advisory. Address valid findings, but never wait for a
+review to complete before release.
+
 After publication, synchronize `main` forward from `release` only with a clean
 worktree and no parallel uncommitted work. Run `vp run release:sync`, then
 `vp run release:sync:push`. If the histories diverged, run
