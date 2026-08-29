@@ -25,6 +25,25 @@ branch and includes every unpushed commit already on it; report that complete
 commit set before pushing. Consumer-visible package changes include one
 maintained Bumpy bump file. Agents never create task branches or worktrees.
 
+### Bump lifecycle
+
+Bumps are authored during change development, never reconstructed just before
+release. The first consumer-visible commit for a logical change creates one
+bump file through `vp run release add`; later commits for that same change
+update the same file. An unrelated logical change gets its own bump file.
+
+Commit the implementation, tests, generated consumer docs, and bump file
+together. Follow `.skills/add-change/SKILL.md` for the exact command, bump
+level, package attribution, and changelog text. Use patch for compatible fixes,
+minor for compatible capabilities, and major for breaking public contracts.
+Name only directly changed packages; Bumpy owns fixed-group and dependency
+propagation. Root shared changes name every affected public package explicitly.
+
+Before every commit, decide whether the task-owned diff changes published
+behavior, API, runtime dependencies, executables, generated artifacts, or
+consumer documentation. If it does, the bump belongs in that commit. A release
+request consumes pending bump files; it never creates them retroactively.
+
 Bump files accumulate on `main`; pushing it does not invoke Bumpy's release
 workflow.
 

@@ -12,6 +12,12 @@ commit its bump file with the implementation on `main`. Bump files accumulate
 until the ordinary `main → release` pull request merges; that push makes Bumpy
 create or update `bumpy/version-packages`.
 
+Create the bump with the first consumer-visible commit for that logical change.
+Update the same bump as the change evolves. Give unrelated logical changes
+separate bump files. Commit implementation, tests, generated consumer docs,
+and the bump together. Never wait for a release request to reconstruct bumps
+from commit history.
+
 An explicit release request authorizes merging `main → release`, followed by:
 
 ```sh
