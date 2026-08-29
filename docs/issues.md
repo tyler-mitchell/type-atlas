@@ -325,6 +325,67 @@ the outline chain), is the investigation. Deferred on arrival per the
 standing rule; the cost trailer that surfaced it is the instrument to
 measure with. Observed 2026-08-19.
 
+### 〈raised〉 `compose` took 9.09s for six semantic searches
+
+This `compose` call ran six independent `search_code` asks against
+`kek-monorepo`. The complete call took 9,090ms. The cause is unknown.
+
+```json
+{
+  "callId": "exec-ea744a22-b1d1-4a76-b821-687555b79b6b",
+  "workspace": "/Users/tylermitchell/Projects/kek-monorepo",
+  "tool": "compose",
+  "durationMs": 9090,
+  "asks": [
+    {
+      "as": "frameRestore",
+      "directory": "packages/core-time",
+      "query": "active frame loop restores an existing recorded project position and external continuation without an application restart or a duplicate replay cursor",
+      "limit": 5,
+      "snippetLines": 18
+    },
+    {
+      "as": "studioOpen",
+      "directory": "apps/core-time-studio/src",
+      "query": "open durable Core Time project restore active branch and expose loading ready error resource without calling transport restart",
+      "limit": 5,
+      "snippetLines": 18
+    },
+    {
+      "as": "generatedPublish",
+      "directory": "packages/core-time",
+      "query": "publish a protected generated composition item with history false after authored edit event and exclude publication from undo redo history",
+      "limit": 6,
+      "snippetLines": 20
+    },
+    {
+      "as": "eventBoundary",
+      "directory": "packages/core-time",
+      "query": "composition edit event consumer transaction ordering and whether an event handler may perform a later composition edit without reentrant mutation",
+      "limit": 6,
+      "snippetLines": 20
+    },
+    {
+      "as": "branchRestore",
+      "directory": "packages/core-time",
+      "query": "switch branch restore authoritative composition materialization and external continuation with generated items",
+      "limit": 6,
+      "snippetLines": 18
+    },
+    {
+      "as": "sharedSnapshot",
+      "directory": "apps/core-time-studio/src",
+      "query": "one immutable composition snapshot drives renderer frame reads WebMCP timeline reads and authored camera state",
+      "limit": 6,
+      "snippetLines": 18
+    }
+  ]
+}
+```
+
+Measure each ask and the complete call on cold and warm servers. Determine how
+`compose` schedules independent asks before changing the implementation.
+
 ### `inspect_symbol` sections vary with server warmth
 
 The same call — `inspect_symbol` on `TimelineExactCoordinate`, kek-monorepo —
