@@ -14,7 +14,7 @@ export const composeDescription = [
   '    {% ask "references" as="uses" file="src/x.ts" symbol="foo" /%}',
   "    {% $uses.text %}",
   "",
-  "Every ask takes `as`. Positional asks take `file` and either `symbol` or one-based `line`+`character`. File and workspace asks take only the attributes shown below. Add `each=<an earlier bind, or a literal list>` to run it once per item, max 10 → { items, total, of, text }, each item also carrying `title`.",
+  "Every ask takes `as`. Positional asks take `file` and either `symbol` or one-based `line`+`character`. File and workspace asks take only the attributes shown below. Add `each=<an earlier bind, or a literal list>` to run it once per item, max 10 → { items, total, of, failureCount, text }, each item also carrying `title`.",
   "",
   "ASKS — further attributes → what it binds besides `text`",
   "",

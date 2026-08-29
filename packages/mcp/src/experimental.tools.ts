@@ -16,13 +16,20 @@ import {
   foldValueSymbols,
   inspectSymbol,
   projectDocumentSymbols,
+  readSourceView,
   renderComposition,
   renderDocument,
   subjectAtPosition,
   type VolarWorkspacePool,
 } from "@type-atlas/core";
 import { type } from "arktype";
-import { displayPath, markupText, positionText, sameRange } from "@type-atlas/atlascii";
+import {
+  displayPath,
+  foldedSource,
+  markupText,
+  positionText,
+  sameRange,
+} from "@type-atlas/atlascii";
 import { type DocumentAsk, documentAsks, isAskReference } from "@type-atlas/atlascii/document";
 import { composeDescription } from "./compose.description.ts";
 import { textResult } from "./mcp-result.ts";
@@ -800,11 +807,34 @@ export const registerExperimentalTools = (
           ]),
         ),
         read_file: async (ask) => {
-          const uri = workspace.getWorkspaceUri(askedFile(ask));
-          const { source } = await workspace.readTextDocumentUri(uri, signal);
-          const all = source.split("\n");
           const from = Number(ask.attributes.from ?? 1);
-          const lines = all.slice(from - 1, Number(ask.attributes.to ?? all.length));
+          const view = await readSourceView({
+            workspace,
+            file: askedFile(ask),
+            fold: true,
+            window: { startLine: from, endLine: Number(ask.attributes.to) || undefined },
+            signal,
+          });
+          const requestedEnd = Math.min(
+            Number(ask.attributes.to ?? view.lines.length),
+            view.lines.length,
+            from + 599,
+          );
+          const end = view.lines
+            .slice(from - 1, requestedEnd)
+            .reduce(
+              (walk, line) =>
+                walk.characters > 40_000
+                  ? walk
+                  : { at: walk.at + 1, characters: walk.characters + line.length + 1 },
+              { at: from - 1, characters: 0 },
+            ).at;
+          const text = foldedSource({
+            lines: view.lines,
+            ranges: view.foldingRanges,
+            window: { startLine: from, endLine: end },
+          }).text;
+          const lines = text === "" ? [] : text.split("\n");
           return {
             lines,
             startLine: from,
@@ -849,9 +879,10 @@ export const registerExperimentalTools = (
             const answer = (await operations[ask.operation]!({
               ...ask,
               attributes: { ...fields, ...written },
-            }).catch((cause: unknown) => ({
-              text: `Failed: ${cause instanceof Error ? cause.message : String(cause)}`,
-            }))) as Record<string, unknown>;
+            }).catch((cause: unknown) => {
+              const failed = cause instanceof Error ? cause.message : String(cause);
+              return { failed, text: `Failed: ${failed}` };
+            })) as Record<string, unknown>;
             // What this answer is about. The name alone is not enough to tell
             // the blocks apart — a search for `render` returned four
             // candidates all named `rendered`, which read as one heading
@@ -861,20 +892,24 @@ export const registerExperimentalTools = (
             return {
               ...answer,
               title: [fields.name, at].filter(Boolean).map(String).join(" · ") || String(item),
-              // Not every operation answers with prose — `subject` binds
-              // fields only — and a section with no text is a crash. An empty
-              // one is worse than a crash: `index.ts` re-exports and declares
-              // nothing, and its heading sat blank among six that were full,
-              // reading exactly like an ask that had failed.
               text: String(answer.text ?? "") || "Nothing to report.",
             };
           }),
         );
+        const failures = answers.flatMap((answer) => {
+          const failed = (answer as { readonly failed?: unknown }).failed;
+          return typeof failed === "string" ? [failed] : [];
+        });
         return {
           items: answers,
           total: answers.length,
           any: answers.length > 0,
           of: items.length,
+          failureCount: failures.length,
+          failed:
+            failures.length > 0
+              ? `${String(failures.length)} fanned asks failed: ${failures.join("; ")}`
+              : undefined,
           text: await asText("{% sections items=$items /%}", { items: answers }),
         };
       };
