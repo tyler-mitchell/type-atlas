@@ -1008,9 +1008,10 @@ export const registerExperimentalTools = (
         };
         // One ask's failure is that ask's sentence, never the composition's:
         // a dossier missing one section it names honestly beats no dossier.
-        bound[ask.bind] = await (ask.attributes.each === undefined
-          ? operations[ask.operation]!(resolved)
-          : fanned(resolved, resolved.attributes.each, ask.attributes.each)
+        bound[ask.bind] = await (
+          ask.attributes.each === undefined
+            ? operations[ask.operation]!(resolved)
+            : fanned(resolved, resolved.attributes.each, ask.attributes.each)
         ).catch((cause: unknown) => ({
           failed: cause instanceof Error ? cause.message : String(cause),
         }));

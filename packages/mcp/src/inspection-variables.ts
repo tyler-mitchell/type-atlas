@@ -126,7 +126,9 @@ const callGroups = (calls: readonly CallSite[], root: string, sharedSiteUri?: st
  * directions, and shaping them a second way would have answered the same
  * question in a different voice.
  */
-export const callHierarchyVariables = <Call extends { readonly fromRanges: readonly Range[] }>(input: {
+export const callHierarchyVariables = <
+  Call extends { readonly fromRanges: readonly Range[] },
+>(input: {
   readonly items: readonly CallHierarchyItem[] | null;
   readonly calls: readonly (readonly Call[] | null)[] | null;
   readonly root: string;
