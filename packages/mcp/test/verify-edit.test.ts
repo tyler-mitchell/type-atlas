@@ -42,7 +42,7 @@ test("verify_edit reports what a proposal would introduce, without writing", asy
       },
     });
     const brokenText = broken.content.find((item) => item.type === "text")?.text ?? "";
-    expect(brokenText).toContain("introduces 1 problem");
+    if (!brokenText.includes("introduces 1 problem")) throw new Error(brokenText);
     expect(brokenText).toContain("2322");
   } finally {
     await client.close();
