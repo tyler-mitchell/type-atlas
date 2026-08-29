@@ -22,6 +22,7 @@ An explicit release request authorizes this sequence:
 
 ```sh
 vp run dependencies:list
+vp run dependencies:sync # after a dependency pull request merges
 vp run release:push
 vp run release:promote:pr
 vp run release:promote:create # only when no promotion pull request exists

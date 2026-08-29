@@ -55,7 +55,7 @@ Only an explicit `release` request authorizes integrating `main` into `release`
 and merging the generated version pull request.
 
 1. Run `vp run dependencies:list` once. Resolve each open Dependabot pull
-   request before promotion.
+   request before promotion. After a merge, run `vp run dependencies:sync`.
 2. Run `vp run release:push`.
 3. Run `vp run release:promote:pr` once. If no pull request exists, run
    `vp run release:promote:create` once.
