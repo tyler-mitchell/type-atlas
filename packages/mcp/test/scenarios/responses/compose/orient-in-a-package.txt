@@ -1,0 +1,39 @@
+# packages/money — 4 source files
+
+packages/money/
+└  src/
+   ├  currency.ts · 19 loc
+   ├  index.ts · 12 loc
+   ├  money.ts · 58 loc
+   └  rounding-mode.ts · 15 loc
+
+# What each declares
+
+## packages/money/src/currency.ts
+
+Currency [interface] 2:13-2:21 · range 2:1-2:54
+CurrencyProfile [interface] 5:18-5:33 · range 5:1-10:2
+currencyProfiles [variable] 12:14-12:30 · range 12:14-17:2 · 16 entries
+isCurrency [variable] 19:14-19:24 · range 19:14-19:90
+
+## packages/money/src/index.ts
+
+Nothing to report.
+
+## packages/money/src/money.ts
+
+add [variable] 38:14-38:17 · range 38:14-43:2
+brand [variable] 3:15-3:20 · range 3:15-3:35
+CurrencyMismatchError [class] 18:14-18:35 · range 18:1-25:2
+format [variable] 50:14-50:20 · range 50:14-58:2
+isZero [variable] 47:14-47:20 · range 47:14-47:73
+money [variable] 27:14-27:19 · range 27:14-28:58 · 2 entries
+Money [interface] 12:13-12:18 · range 12:1-16:3
+negate [variable] 45:14-45:20 · range 45:14-45:88
+zero [variable] 30:14-30:18 · range 30:14-30:71
+
+## packages/money/src/rounding-mode.ts
+
+bankRounding [variable] 9:7-9:19 · range 9:7-12:2 · 2 entries
+RoundingMode [enum] 2:13-2:25 · range 2:1-6:2
+roundingModeOf [variable] 14:14-14:28 · range 14:14-15:46

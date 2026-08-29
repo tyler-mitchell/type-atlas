@@ -1,0 +1,7 @@
+{
+  "tool": "compose",
+  "arguments": {
+    "document": "{% ask \"list_files\" as=\"tree\" directory=\"packages/money\" glob=[\"src/**/*.ts\"] /%}\n{% ask \"document_symbols\" as=\"shapes\" each=$tree.files depth=0 /%}\n\n# packages/money — {% $tree.total %} source files\n\n{% $tree.text %}\n\n# What each declares\n\n{% $shapes.text %}"
+  },
+  "elapsed": "41ms"
+}

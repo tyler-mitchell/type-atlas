@@ -33,8 +33,8 @@ test("compose renders a dossier from ask declarations", async () => {
         document: [
           '{% ask "hover" as="head" file="packages/core/src/projection.ts" line=28 character=14 /%}',
           '{% ask "references" as="uses" file="packages/core/src/projection.ts" line=28 character=14 /%}',
-          '{% ask "outline" as="shape" file="packages/core/src/projection.ts" /%}',
-          '{% ask "source" as="body" file="packages/core/src/projection.ts" from=28 to=30 /%}',
+          '{% ask "document_symbols" as="shape" file="packages/core/src/projection.ts" /%}',
+          '{% ask "read_file" as="body" file="packages/core/src/projection.ts" from=28 to=30 /%}',
           "",
           "## page, before the edit",
           "",
@@ -83,7 +83,7 @@ test("compose renders a dossier from ask declarations", async () => {
       arguments: {
         workspace: workspaceRoot,
         document:
-          '{% ask "outline" as="shape" file="packages/core/src/projection.ts" /%}\nTotal: {% $shpae.total %}',
+          '{% ask "document_symbols" as="shape" file="packages/core/src/projection.ts" /%}\nTotal: {% $shpae.total %}',
       },
     });
     const holedText = holed.content.find((item) => item.type === "text")?.text ?? "";
@@ -134,7 +134,7 @@ test("compose renders a dossier from ask declarations", async () => {
         document: [
           '{% ask "subject" as="what" file="packages/core/src/projection.ts" line=28 character=14 /%}',
           '{% ask "callers" as="calledBy" file="packages/core/src/markdoc/render.ts" line=69 character=14 /%}',
-          '{% ask "outline" as="broken" file="packages/core/src/does-not-exist.ts" /%}',
+          '{% ask "document_symbols" as="broken" file="packages/core/src/does-not-exist.ts" /%}',
           "",
           "## {% $what.name %}",
           "",
@@ -149,7 +149,7 @@ test("compose renders a dossier from ask declarations", async () => {
     expect(fleshedText).toContain("page [");
     expect(fleshedText).toContain("packages/core/src/projection.ts:28:14");
     expect(fleshedText).toMatch(/renderDocument is called from \d+ places\./u);
-    expect(fleshedText).toContain("The outline ask binding broken failed:");
+    expect(fleshedText).toContain("The document_symbols ask binding broken failed:");
     const reversed = await client.callTool({
       name: "compose",
       arguments: {
@@ -162,6 +162,51 @@ test("compose renders a dossier from ask declarations", async () => {
       "reads earlier asks only",
     );
 
+    // Naming a declaration is the ergonomic form, and both ways it can be
+    // wrong are sentences a composer can act on rather than holes. Fanning
+    // over something that is not a list is the third: it used to degrade to a
+    // single un-anchored call and answer about nothing.
+    const pointed = await client.callTool({
+      name: "compose",
+      arguments: {
+        workspace: workspaceRoot,
+        document: [
+          '{% ask "hover" as="head" file="packages/core/src/projection.ts" symbol="page" /%}',
+          '{% ask "hover" as="absent" file="packages/core/src/projection.ts" symbol="noSuchThing" /%}',
+          '{% ask "hover" as="fanned" each=$head.nope /%}',
+          "{% $head.text %}",
+        ].join("\n"),
+      },
+    });
+    const pointedText = pointed.content.find((item) => item.type === "text")?.text ?? "";
+    expect(pointedText).toContain("const page");
+    expect(pointedText).toContain('declares no "noSuchThing"');
+    expect(pointedText).toContain("each=$head.nope is not a list");
+
+    // An ask runs once per item of a list an earlier ask bound, and the
+    // places one ask reports are what another ask points at — including
+    // `files=`, where passing the hits straight through once stringified
+    // every place to "[object Object]".
+    const fanned = await client.callTool({
+      name: "compose",
+      arguments: {
+        workspace: workspaceRoot,
+        document: [
+          '{% ask "workspace_symbols" as="q" file="packages/core/src/projection.ts" query="page" /%}',
+          '{% ask "hover" as="each" each=$q.hits /%}',
+          '{% ask "diagnostics" as="health" files=$q.hits /%}',
+          "fanned {% $each.total %} of {% $each.of %} · checked {% $health.checked %}",
+          "",
+          "{% $each.text %}",
+        ].join("\n"),
+      },
+    });
+    const fannedText = fanned.content.find((item) => item.type === "text")?.text ?? "";
+    expect(fannedText).toMatch(/fanned [1-9]\d* of [1-9]\d* · checked [1-9]/u);
+    // Each answer is titled by the place it came from, so repeated blocks are
+    // told apart without the composer restating the list.
+    expect(fannedText).toContain("## page · packages/core/src/projection.ts:");
+
     // The exact presentation, over data stable enough to pin: the syntactic
     // outline and a source window compose exactly as their dedicated tools
     // render them, under headings the composer chose.
@@ -170,8 +215,8 @@ test("compose renders a dossier from ask declarations", async () => {
       arguments: {
         workspace: workspaceRoot,
         document: [
-          '{% ask "outline" as="o" file="packages/core/src/projection.ts" /%}',
-          '{% ask "source" as="body" file="packages/core/src/projection.ts" from=28 to=29 /%}',
+          '{% ask "document_symbols" as="o" file="packages/core/src/projection.ts" /%}',
+          '{% ask "read_file" as="body" file="packages/core/src/projection.ts" from=28 to=29 /%}',
           "## Declared here",
           '{% tree entries=$o.tree partial="symbol-node.mdoc" /%}',
           "## The declaration line",
@@ -186,20 +231,9 @@ test("compose renders a dossier from ask declarations", async () => {
       "## Declared here
 
       page [variable] 28:14-28:18 · range 28:14-36:2
-      ├  ...(end < items.length ? { nextOffset: … [property] 34:5-34:55
-      ├  end [variable] 29:9-29:12 · range 29:9-29:53
-      ├  items [property] 33:5-33:10 · range 33:5-33:36
-      ├  offset [property] 32:5-32:11
-      └  total [property] 31:5-31:10 · range 31:5-31:24
       Page [interface] 4:13-4:17 · range 4:1-9:3
       projectDocumentSymbol [variable] 11:7-11:28 · range 11:7-19:2
-      ├  item [property] 15:12-15:16 · range 15:9-15:16
-      ├  children [variable] 12:11-12:19
-      ├  children [property] 16:9-16:17 · range 16:9-16:83
-      │  └  children.map() callback [function] 16:32-16:82
-      └  item [variable] 12:24-12:28 · range 12:21-12:28
       projectDocumentSymbols [variable] 22:14-22:36 · range 22:14-25:98
-      └  symbols.map() callback [function] 25:18-25:97
 
       ## The declaration line
 

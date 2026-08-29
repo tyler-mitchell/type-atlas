@@ -1,4 +1,8 @@
-import type { DocumentSymbol, FoldingRange } from "@volar/language-server/protocol.js";
+import {
+  type DocumentSymbol,
+  type FoldingRange,
+  SymbolKind,
+} from "@volar/language-server/protocol.js";
 import ts from "typescript";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import { getLanguageServiceByDocument } from "volar-service-typescript/lib/plugins/syntactic.js";
@@ -53,6 +57,48 @@ export type SourceWindow = {
   readonly startLine?: number;
   readonly endLine?: number;
 };
+
+/**
+ * An outline with value insides folded to a count.
+ *
+ * A value's insides are data, not declarations: an object literal's properties
+ * flooded a config file's outline with 136 rows for 3 real declarations. A
+ * literal-valued symbol keeps its row and prices what it holds. The kind alone
+ * cannot decide — a const arrow function is a Variable too — so a symbol folds
+ * only when every child is member-shaped: properties and literals fold, a body
+ * holding locals or callbacks stays a declaration tree.
+ */
+const valueShaped = new Set<SymbolKind>([
+  SymbolKind.Property,
+  SymbolKind.Field,
+  SymbolKind.Variable,
+  SymbolKind.Constant,
+  SymbolKind.Array,
+  SymbolKind.Object,
+]);
+
+const memberShaped = new Set<SymbolKind>([
+  SymbolKind.Property,
+  SymbolKind.Field,
+  SymbolKind.Object,
+  SymbolKind.Array,
+  SymbolKind.String,
+  SymbolKind.Number,
+  SymbolKind.Boolean,
+  SymbolKind.Key,
+]);
+
+const entryCount = (entry: DocumentSymbol): number =>
+  (entry.children ?? []).reduce((held, child) => held + 1 + entryCount(child), 0);
+
+export type FoldedSymbol = DocumentSymbol & { readonly folded?: number };
+
+export const foldValueSymbols = (entry: DocumentSymbol): FoldedSymbol =>
+  valueShaped.has(entry.kind) &&
+  (entry.children?.length ?? 0) > 0 &&
+  (entry.children ?? []).every((child) => memberShaped.has(child.kind))
+    ? { ...entry, children: [], folded: entryCount(entry) }
+    : { ...entry, children: (entry.children ?? []).map(foldValueSymbols) };
 
 export type SourceView = {
   readonly uri: string;

@@ -3,26 +3,39 @@ import {
   type Diagnostic,
   type DocumentSymbol,
   DocumentDiagnosticRequest,
+  type Range,
   type SymbolInformation,
+  GetMatchTsConfigRequest,
 } from "@volar/language-server/protocol.js";
 import {
   createTypeAtlas,
   declarationChainAtPosition,
+  declarationsNamed,
   documentSymbols,
+  foldValueSymbols,
+  inspectSymbol,
+  projectDocumentSymbols,
   renderComposition,
   renderDocument,
   subjectAtPosition,
   type VolarWorkspacePool,
 } from "@type-atlas/core";
 import { type } from "arktype";
-import { displayPath, markupText, positionText, rangeText, sameRange } from "@type-atlas/atlascii";
+import { displayPath, markupText, positionText, sameRange } from "@type-atlas/atlascii";
 import { type DocumentAsk, documentAsks, isAskReference } from "@type-atlas/atlascii/document";
+import { composeDescription } from "./compose.description.ts";
 import { textResult } from "./mcp-result.ts";
 import { readOnlyToolAnnotations } from "./metadata.ts";
 import { createQuorl } from "./quorl.ts";
+import { callHierarchyVariables, inspectionVariables } from "./inspection-variables.ts";
+import { navigationTargets } from "./navigation-targets.ts";
+import { createRetrievalIntelligence } from "./intelligence.ts";
+import { semanticOccurrences } from "./occurrences.tool.ts";
+import type { Semble } from "./semble.ts";
 import { enclosingDeclaration, referenceGroups } from "./reference-groups.ts";
 import { registerTool } from "./tool.ts";
 import { fileInput, positionInput } from "./tool-input.ts";
+import { workspaceTree } from "./workspace-tree.ts";
 
 const input = type.module({
   Quorl: type({
@@ -92,8 +105,10 @@ const isTestSite = (file: string) => /(^|\/)tests?\/|\.(test|spec|check)\./u.tes
 export const registerExperimentalTools = (
   server: McpServer,
   workspaces: VolarWorkspacePool,
+  semble: Semble,
 ): void => {
   const quorl = createQuorl({ workspaces });
+  const retrieval = createRetrievalIntelligence({ semble, workspaces });
 
   registerTool(
     server,
@@ -183,8 +198,7 @@ export const registerExperimentalTools = (
     "compose",
     {
       title: "Compose",
-      description:
-        'Experimental: author your own code-intelligence answer as one markup document. You define all of it: self-closing ask tags declare the data and render nothing; the body you write is the entire answer, composing what the asks bind with the shipped tags and partials — {% $uses.total %}, {% tree entries=$uses.groups partial="reference-node.mdoc" /%}, headings, prose. Asks chain: a later ask reads an earlier answer, e.g. {% ask "diagnostics" as="health" files=$uses.paths /%} checks the files the reference search found. A document with no body renders nothing — the markup is yours, not the tool\'s.\n\nOperations and what each binds:\n- {% ask "hover" as="head" file="src/x.ts" line=5 character=10 /%} (one-based, on the symbol\'s name) → {text}: the signature and documentation, rendered with {% $head.text %}\n- {% ask "references" as="uses" file="src/x.ts" line=5 character=10 /%} → {total, files, paths, projects, groups}; render sites with {% tree entries=$uses.groups partial="reference-node.mdoc" /%}\n- {% ask "outline" as="shape" file="src/x.ts" /%} → {total, tree}; render with {% tree entries=$shape.tree partial="symbol-node.mdoc" /%}\n- {% ask "diagnostics" as="problems" file="src/x.ts" /%} → {total, groups}; render with {% each items=$problems.groups as="group" partial="diagnostic-group.mdoc" /%}\n- {% ask "source" as="body" file="src/x.ts" from=10 to=40 /%} → {lines, startLine}; render with {% source lines=$body.lines startLine=$body.startLine /%}\n- {% ask "subject" as="what" file="src/x.ts" line=5 character=10 /%} → {name, kind, file, at}: what the position resolves to, and where it is declared\n- {% ask "callers" as="calledBy" file="src/x.ts" line=5 character=10 /%} → {name, total, projects, groups}; render with {% tree entries=$calledBy.groups partial="call-node.mdoc" /%}\n\nOne ask failing binds {failed} and is stated in a feedback line under your answer; the rest of the composition still answers.',
+      description: composeDescription,
       inputSchema: input.Compose,
       annotations: readOnlyToolAnnotations,
     },
@@ -197,11 +211,119 @@ export const registerExperimentalTools = (
       const attributeText = (value: unknown): string =>
         typeof value === "string" || typeof value === "number" ? String(value) : "";
       const askedFile = (ask: DocumentAsk) => attributeText(ask.attributes.file);
-      // Ask positions are one-based, like every position this surface accepts.
-      const askedPosition = (ask: DocumentAsk) => ({
-        line: Number(ask.attributes.line ?? 1) - 1,
-        character: Number(ask.attributes.character ?? 1) - 1,
-      });
+      // Where an ask points: a name in the file, or a one-based position.
+      // Naming the symbol is the ergonomic form — a composer that had to supply
+      // line and character first ran another tool to find them, which is the
+      // round trip a composition exists to remove.
+      const askedPosition = async (ask: DocumentAsk) => {
+        const symbol = attributeText(ask.attributes.symbol);
+        if (!symbol) {
+          return {
+            line: Number(ask.attributes.line ?? 1) - 1,
+            character: Number(ask.attributes.character ?? 1) - 1,
+          };
+        }
+        const uri = workspace.getWorkspaceUri(askedFile(ask));
+        const { source } = await workspace.readTextDocumentUri(uri, signal);
+        const matches = declarationsNamed(documentSymbols({ uri, source }) ?? [], uri, symbol);
+        const only = matches.length === 1 ? matches[0] : undefined;
+        if (!only) {
+          throw new Error(
+            matches.length === 0
+              ? `${askedFile(ask)} declares no "${symbol}".`
+              : `${askedFile(ask)} declares "${symbol}" ${String(matches.length)} times; ask by line and character instead.`,
+          );
+        }
+        return only.selectionRange.start;
+      };
+      // An ask renders its own text through the same partial an author would
+      // reach for, so the two forms cannot drift: `{% $uses.text %}` and the
+      // hand-written tree produce the same lines.
+      const asText = async (source: string, variables: Record<string, unknown>) =>
+        (await renderComposition({ source, variables })).text;
+      // A dedicated tool's own document, so an ask that stands in for a tool
+      // answers exactly as that tool does — scope disclosures included.
+      const asDocument = async (document: string, variables: Record<string, unknown>) =>
+        (await renderDocument({ document, variables })).text;
+      // Every ask that answers with places binds this one shape, so a composer
+      // learns it once: references, definitions, types, and implementations all
+      // render through `reference-node.mdoc`.
+      // Narrowing what an ask already fetched, the way a shell pipeline
+      // narrows a result set — but over a fact the surface knows rather than
+      // text. `tests="only"` reads as "which tests cover this", `"exclude"` as
+      // "what actually breaks if I change it", and a symbol with sixty uses is
+      // unreadable without one of them.
+      const testFilter = (ask: DocumentAsk) => {
+        const wanted = attributeText(ask.attributes.tests);
+        return (file: string) =>
+          wanted === "only" ? isTestSite(file) : wanted === "exclude" ? !isTestSite(file) : true;
+      };
+      // A cut list that says nothing about the cut reads as the whole answer.
+      const withRest = (text: string, beyond: number, limit: number) =>
+        beyond > 0 ? `${text}\n\n… ${String(beyond)} more, past limit ${String(limit)}.` : text;
+      const places = async (
+        locations: readonly { uri: string; range: Range }[],
+        ask: DocumentAsk,
+      ) => {
+        const keep = testFilter(ask);
+        const kept = locations.filter(({ uri }) => keep(displayPath(uri, root)));
+        // Bounded, and concurrent inside the bound. Naming the declaration
+        // that holds each site costs a language-server round trip, and these
+        // ran one after another over everything found — a symbol with five
+        // hundred uses was five hundred serial requests for one answer.
+        const limit = Number(ask.attributes.limit ?? 50);
+        const sites = await Promise.all(
+          kept.slice(0, limit).map(async ({ uri, range }) => {
+            const chain = await declarationChainAtPosition({
+              workspace,
+              uri,
+              position: range.start,
+            }).catch(() => []);
+            return {
+              file: displayPath(uri, root),
+              line: range.start.line + 1,
+              character: range.start.character + 1,
+              within: enclosingDeclaration(chain, range)?.name,
+            };
+          }),
+        );
+        const ordered = [...sites].sort(
+          (left, right) =>
+            left.file.localeCompare(right.file) ||
+            left.line - right.line ||
+            left.character - right.character,
+        );
+        // Over everything kept, not only what is listed: this is the list a
+        // later ask reads, and a file holding a use past the bound still
+        // holds one.
+        const paths = [...new Set(kept.map(({ uri }) => displayPath(uri, root)))];
+        const groups = referenceGroups(ordered);
+        const beyond = kept.length - ordered.length;
+        return {
+          beyond,
+          limit,
+          shown: ordered.length,
+          total: kept.length,
+          // A count cannot guard a section: `{% if $uses.total %}` renders on
+          // zero, because the engine asks whether the value is there rather
+          // than whether it is nonzero. Every countable ask binds this so a
+          // composer can write `{% if $uses.any %}` and mean it.
+          any: kept.length > 0,
+          files: paths.length,
+          // The list behind the count, so a later ask can compose over it:
+          // {% ask "diagnostics" files=$uses.paths /%}.
+          paths,
+          groups,
+          // Rendered here so the shortest useful composition is `{% $uses.text %}`
+          // — a composer who wants their own layout still has the fields, but
+          // nobody has to learn a partial's filename to get an answer out.
+          text: withRest(
+            await asText('{% tree entries=$groups partial="reference-node.mdoc" /%}', { groups }),
+            beyond,
+            limit,
+          ),
+        };
+      };
       // The operations a composition can ask for, each binding the shape its
       // partial reads — the same shapes the dedicated tools compose from.
       const operations: Record<string, (ask: DocumentAsk) => Promise<unknown>> = {
@@ -209,7 +331,7 @@ export const registerExperimentalTools = (
           const { result } = await intelligence.hover({
             file: askedFile(ask),
             signal,
-            params: { position: askedPosition(ask) },
+            params: { position: await askedPosition(ask) },
           });
           return { text: markupText(result?.contents) ?? "" };
         },
@@ -217,7 +339,7 @@ export const registerExperimentalTools = (
           const resolved = await subjectAtPosition({
             workspace,
             uri: workspace.getWorkspaceUri(askedFile(ask)),
-            position: askedPosition(ask),
+            position: await askedPosition(ask),
             signal,
           });
           return resolved
@@ -232,77 +354,372 @@ export const registerExperimentalTools = (
               }
             : {};
         },
+        // The whole working view of one symbol, as its own tool composes it.
+        // Compose held every part and not the composition, so the question
+        // asked most often — what is this, who uses it, what does it call —
+        // was six asks to write out and six sections to lay out by hand. It
+        // also fans out, which the tool cannot: `each=$found.hits` is a full
+        // dossier for every place a search by meaning landed.
+        inspect_symbol: async (ask) => {
+          const result = await inspectSymbol({
+            workspace,
+            root,
+            file: askedFile(ask),
+            // Always a position, because compose resolves `symbol=` itself and
+            // reports ambiguity in its own words — two resolvers for one job
+            // would answer the same question differently.
+            target: { position: await askedPosition(ask) },
+            options: {
+              compactExternalCalls: true,
+              scope: "workspace",
+              includeSource: ask.attributes.includeSource === true,
+              // Off, as the tool itself decides it. Forcing it on answered a
+              // local `readonly DocumentSymbol[]` with eleven rows of
+              // ReadonlyArray from lib.es5.d.ts — the built-in type of a
+              // variable is almost never the question, and it buried the
+              // dossier that was.
+              includeTypeDefinitions: ask.attributes.includeTypeDefinitions === true,
+              limit: Number(ask.attributes.limit ?? 20),
+            },
+            signal,
+          });
+          const variables = inspectionVariables({ result, root });
+          return { ...variables, text: await asDocument("inspect-symbol.tool.mdoc", variables) };
+        },
+        // Both directions answer through their own tool documents, which is
+        // where the two facts a bare tree left out live: a call hierarchy is
+        // bounded to the project owning the file, and `displayPath` reported
+        // thirteen callers — every one of them a test in its own package —
+        // with nothing saying the rest of the repository was never searched.
+        // The library calls it folds to one line also come back; a composer
+        // printing `dependencies` got an empty string, because a list is not
+        // text.
         callers: async (ask) => {
           const { items, calls, projects } = await intelligence.callers({
             file: askedFile(ask),
-            position: askedPosition(ask),
+            position: await askedPosition(ask),
             signal,
           });
-          const flat = (calls ?? []).flatMap((group) => group ?? []);
-          const grouped = Map.groupBy(flat, (call) => displayPath(call.from.uri, root));
-          return {
-            name: items?.[0]?.name,
-            total: flat.length,
+          const variables = {
+            ...callHierarchyVariables({ items, calls, root, callable: (call) => call.from }),
             projects,
-            groups: [...grouped].map(([file, entries]) => ({
-              file,
-              children: entries.map((call) => ({
-                name: call.from.name,
-                kind: call.from.kind,
-                selection: call.from.selectionRange,
-                extent: sameRange(call.from.range, call.from.selectionRange)
-                  ? undefined
-                  : call.from.range,
-                sites: [...new Set(call.fromRanges.map((site) => rangeText(site)))],
-              })),
-            })),
+          };
+          return {
+            ...variables,
+            any: variables.total > 0,
+            text: await asDocument("callers.tool.mdoc", variables),
+          };
+        },
+        callees: async (ask) => {
+          const { items, calls } = await intelligence.callees({
+            file: askedFile(ask),
+            position: await askedPosition(ask),
+            signal,
+          });
+          const variables = callHierarchyVariables({
+            items,
+            calls,
+            root,
+            callable: (call) => call.to,
+          });
+          return {
+            ...variables,
+            any: variables.total > 0,
+            text: await asDocument("callees.tool.mdoc", variables),
           };
         },
         references: async (ask) => {
+          const position = await askedPosition(ask);
+          const uri = workspace.getWorkspaceUri(askedFile(ask));
           const { result, projects } = await intelligence.references({
             file: askedFile(ask),
             signal,
-            params: {
-              position: askedPosition(ask),
-              context: { includeDeclaration: false },
-              scope: "workspace",
-            },
+            params: { position, context: { includeDeclaration: false }, scope: "workspace" },
           });
-          const sites = [];
-          for (const { uri, range } of result ?? []) {
-            const chain = await declarationChainAtPosition({
-              workspace,
-              uri,
-              position: range.start,
-            }).catch(() => []);
-            sites.push({
-              file: displayPath(uri, root),
-              line: range.start.line + 1,
-              character: range.start.character + 1,
-              within: enclosingDeclaration(chain, range)?.name,
-            });
-          }
-          const ordered = [...sites].sort(
-            (left, right) =>
-              left.file.localeCompare(right.file) ||
-              left.line - right.line ||
-              left.character - right.character,
+          // Which tsconfig answered, because "widen this search" means opening
+          // a file in a project this one did not cover.
+          const matched = (await workspace
+            .sendRequest(GetMatchTsConfigRequest.type, { uri }, signal)
+            .catch(() => undefined)) as { uri?: string } | undefined;
+          const resolved = await subjectAtPosition({ workspace, uri, position, signal }).catch(
+            () => undefined,
           );
-          const paths = [...new Set(ordered.map(({ file }) => file))];
+          // The declaration is not a use of itself. `includeDeclaration: false`
+          // asks the server to leave it out and the server returns it anyway,
+          // which reported one more reference than the `references` tool for
+          // the same symbol.
+          const declaredAt = resolved?.declaredAt;
+          const found = await places(
+            (result ?? []).filter(
+              (site) =>
+                !declaredAt ||
+                site.uri !== declaredAt.uri ||
+                site.range.start.line !== declaredAt.selection.start.line ||
+                site.range.start.character !== declaredAt.selection.start.character,
+            ),
+            ask,
+          );
+          // Rendered through the `references` tool's own document, so composing
+          // is never less honest than calling it. A reference count without the
+          // scope it covered reads as complete when it is not — and the tree
+          // alone said "3 uses" for a symbol whose other users live in a
+          // project this session had not loaded.
           return {
-            total: ordered.length,
-            files: paths.length,
-            // The list behind the count, so a later ask can compose over it:
-            // {% ask "diagnostics" files=$uses.paths /%}.
-            paths,
+            ...found,
             projects,
-            groups: referenceGroups(ordered),
+            // The document renders the sites it was given and states the
+            // scope it covered; it cannot know a bound cut the list first.
+            text: withRest(
+              await asDocument("references.tool.mdoc", {
+                subject: resolved?.name,
+                kind: resolved?.kind,
+                found: resolved !== undefined || found.total > 0,
+                declaredAt: resolved
+                  ? {
+                      file: displayPath(resolved.declaredAt.uri, root),
+                      at: positionText(resolved.declaredAt.selection.start),
+                    }
+                  : undefined,
+                everyProject: true,
+                projects,
+                anchor: matched?.uri ? displayPath(matched.uri, root) : undefined,
+                total: found.total,
+                noUses: found.total === 0,
+                groups: found.groups,
+              }),
+              found.beyond,
+              found.limit,
+            ),
           };
         },
-        outline: async (ask) => {
+        // Who imports this module, which is not what any symbol's references
+        // answer: a barrel re-exporting everything has importers and no uses
+        // of its own, and "what depends on this file" is the question asked
+        // before moving or deleting one.
+        file_references: async (ask) => {
+          const file = askedFile(ask);
+          const uri = workspace.getWorkspaceUri(file);
+          const { result, projects } = await intelligence.fileReferences({ file, signal });
+          const found = await places(result ?? [], ask);
+          // Which tsconfig answered. "Nothing imports this" is a decision to
+          // move or delete a file, and it is only as true as the reach behind
+          // it — a bare list of importers states no reach at all.
+          const matched = (await workspace
+            .sendRequest(GetMatchTsConfigRequest.type, { uri }, signal)
+            .catch(() => undefined)) as { uri?: string } | undefined;
+          return {
+            ...found,
+            projects,
+            text: withRest(
+              await asDocument("file-references.tool.mdoc", {
+                file: displayPath(uri, root),
+                anchor: matched?.uri ? displayPath(matched.uri, root) : undefined,
+                projects,
+                total: found.total,
+                groups: found.groups,
+              }),
+              found.beyond,
+              found.limit,
+            ),
+          };
+        },
+        // Whether a dossier wants literal proof is the composer's call, not
+        // this tool's. Answers as `occurrences` does, through its own document.
+        occurrences: async (ask) => {
+          const result = await semanticOccurrences({
+            root,
+            workspace,
+            queries: [attributeText(ask.attributes.query)],
+            paths: [attributeText(ask.attributes.path) || "."],
+            symbolLimit: Number(ask.attributes.symbolLimit ?? 5),
+            offset: 0,
+            limit: Number(ask.attributes.limit ?? 20),
+            signal,
+          });
+          // Every name the search resolved, flattened into places. The
+          // answer nests declarations under the query that found them, which
+          // reads well and composes badly: an exact-name search is the other
+          // way in when you know what something is called, and it ended
+          // where `search_code` used to — rendering prose, pointing nowhere.
+          const subjects = result.queries.flatMap((query) =>
+            query.subjects.map(({ name, kind, file, line, character }) => ({
+              name,
+              kind,
+              file,
+              line,
+              character,
+            })),
+          );
+          return {
+            ...result,
+            subjects,
+            total: subjects.length,
+            any: subjects.length > 0,
+            text: await asDocument("occurrences.tool.mdoc", result),
+          };
+        },
+        // The first move in an unfamiliar repository, and the one thing a
+        // composition could not do: every other ask needs a path the composer
+        // already has. Orientation stayed outside compose, so the first call
+        // was always a plain listing and the composition began at call two.
+        // Binds `files` as well as the tree, so a listing can feed a fan-out
+        // — `each=$tree.files` reads every file it found.
+        list_files: async (ask) => {
+          const glob = Array.isArray(ask.attributes.glob)
+            ? ask.attributes.glob.map(String)
+            : undefined;
+          const listing = await workspaceTree({
+            workspace: root,
+            directory: attributeText(ask.attributes.directory) || ".",
+            // A glob is already a narrowing, so it walks deep; a bare listing
+            // opens one level, exactly as `list_files` decides it.
+            depth: Number(ask.attributes.depth ?? (glob ? 10 : 1)),
+            glob,
+            includeHidden: false,
+            includeIgnored: false,
+            includeSubmodules: false,
+            limit: Number(ask.attributes.limit ?? 500),
+            loc: true,
+            git: true,
+            changed: ask.attributes.changed === true,
+            signal,
+          });
+          return {
+            ...listing,
+            total: listing.files.length,
+            any: listing.files.length > 0,
+            text: await asDocument("list-files.tool.mdoc", listing),
+          };
+        },
+        // Find code by what it does, for when the name is unknown — the other
+        // half of orientation, where `symbols` needs a name to search for.
+        search_code: async (ask) => {
+          const { text, matches } = await retrieval.search({
+            root,
+            directory: attributeText(ask.attributes.directory) || undefined,
+            includeTypes: false,
+            query: attributeText(ask.attributes.query),
+            limit: Number(ask.attributes.limit ?? 5),
+            snippetLines: Number(ask.attributes.snippetLines ?? 10),
+            signal,
+          });
+          // The entry point when no name is known was a dead end: it rendered
+          // prose and bound nothing to point at, so a composition that found
+          // the right code by meaning still could not ask anything about it.
+          // Every hit the search anchored to a real declaration becomes a
+          // place, in the shape the position asks already read.
+          const hits = matches.flatMap((match) => {
+            // The declaration the snippet shows, exactly as the page labels
+            // it. Anchoring on the matched chunk instead named the enclosing
+            // declaration — a hit on `warmProject` bound the position of the
+            // function containing it, so the next ask asked about the wrong
+            // symbol while the page said the right one.
+            const at = match.shown ?? match.selected;
+            return at === undefined
+              ? []
+              : [
+                  {
+                    name: at.symbol.name,
+                    kind: at.symbol.kind,
+                    file: match.displayFile,
+                    line: at.selection.start.line + 1,
+                    character: at.selection.start.character + 1,
+                  },
+                ];
+          });
+          const [first] = hits;
+          return {
+            total: hits.length,
+            any: hits.length > 0,
+            // What the search returned, against what it could anchor: a hit
+            // landing in import statements has no declaration to ask about,
+            // and a silent drop would read as the search finding less.
+            of: matches.length,
+            hits,
+            file: first?.file,
+            line: first?.line,
+            character: first?.character,
+            text,
+          };
+        },
+        // Find a declaration by name before anything can be asked about it.
+        // Without this a composition could only ever explain a symbol whose
+        // file the composer already knew, so orientation stayed a separate
+        // call and the first move in an unfamiliar repository was never
+        // composable. Binds `file`, `line`, and `character` of the first hit,
+        // so a later ask can point at it: file=$found.file line=$found.line.
+        workspace_symbols: async (ask) => {
+          const query = attributeText(ask.attributes.query);
+          const { project, projects, symbols } = await intelligence.workspaceSymbols({
+            file: askedFile(ask),
+            query,
+            signal,
+          });
+          const limit = Number(ask.attributes.limit ?? 20);
+          const all = (symbols ?? []).map((symbol) => {
+            const range =
+              "range" in symbol.location && symbol.location.range
+                ? symbol.location.range
+                : undefined;
+            return {
+              name: symbol.name,
+              kind: symbol.kind,
+              // TypeScript's own word when the server carried it — the number
+              // cannot say "type".
+              word: "word" in symbol ? (symbol as { word?: string }).word : undefined,
+              file: displayPath(symbol.location.uri, root),
+              range,
+              container: symbol.containerName || undefined,
+              line: (range?.start.line ?? 0) + 1,
+              character: (range?.start.character ?? 0) + 1,
+            };
+          });
+          const hits = all.slice(0, limit);
+          const [first] = hits;
+          return {
+            total: all.length,
+            shown: hits.length,
+            any: all.length > 0,
+            // A provider that did not answer and one that searched and found
+            // nothing both arrive as zero and mean opposite things — the
+            // second says the name is absent, the first says nothing at all.
+            // Collapsing them is how a cold session reports an empty
+            // workspace as fact.
+            answered: symbols !== null,
+            projects,
+            file: first?.file,
+            line: first?.line,
+            character: first?.character,
+            hits,
+            text: withRest(
+              await asDocument("workspace-symbols.tool.mdoc", {
+                query,
+                anchor: project ? displayPath(project.uri, root) : undefined,
+                answered: symbols !== null,
+                projects,
+                total: all.length,
+                items: hits,
+              }),
+              all.length - hits.length,
+              limit,
+            ),
+          };
+        },
+        document_symbols: async (ask) => {
           const uri = workspace.getWorkspaceUri(askedFile(ask));
           const { source } = await workspace.readTextDocumentUri(uri, signal);
-          const parsed = documentSymbols({ uri, source }) ?? [];
+          // Folded and depth-limited exactly like `document_symbols`: an
+          // outline that prints every local and callback answers a question
+          // nobody asked — this file alone rendered 14 declarations as 90
+          // rows. `depth` opens it a level at a time; `raw=true` keeps
+          // everything.
+          const raw = ask.attributes.raw === true;
+          const folded = (documentSymbols({ uri, source }) ?? []).map((entry) =>
+            raw ? entry : foldValueSymbols(entry),
+          );
+          const parsed = raw
+            ? folded
+            : projectDocumentSymbols([...folded], Number(ask.attributes.depth ?? 0));
           const nest = (
             entries: readonly (DocumentSymbol | SymbolInformation)[],
           ): readonly Record<string, unknown>[] =>
@@ -315,16 +732,32 @@ export const registerExperimentalTools = (
                 selection,
                 extent: sameRange(extent, selection) ? undefined : extent,
                 detail: "detail" in entry ? entry.detail : undefined,
+                // What folding collapsed, so a folded row still prices itself
+                // — `· 4 entries` rather than a row that looks childless.
+                folded: (entry as { readonly folded?: number }).folded,
                 children: "range" in entry ? nest(entry.children ?? []) : [],
               };
             });
-          return { total: parsed.length, tree: nest(parsed) };
+          const tree = nest(parsed);
+          return {
+            total: parsed.length,
+            tree,
+            text: await asText('{% tree entries=$tree partial="symbol-node.mdoc" /%}', { tree }),
+          };
         },
         diagnostics: async (ask) => {
           // One file named directly, or the files an earlier ask answered
           // with — bounded, because each file is a whole document check.
+          // Paths or places, the same rule `each` reads items by. `files=$found.hits`
+          // is the obvious thing to write when a search just answered, and it
+          // stringified every place to "[object Object]", then reported that back
+          // as a percent-encoded URI that named nothing a composer could act on.
           const named = Array.isArray(ask.attributes.files)
-            ? ask.attributes.files.map(String)
+            ? ask.attributes.files.map((item) =>
+                typeof item === "object" && item !== null
+                  ? String((item as { readonly file?: unknown }).file ?? "")
+                  : String(item),
+              )
             : [askedFile(ask)];
           const checked = named.slice(0, 5);
           const perFile = await Promise.all(
@@ -349,23 +782,191 @@ export const registerExperimentalTools = (
               return { file: displayPath(uri, root), problems };
             }),
           );
+          const groups = perFile.filter(({ problems }) => problems.length > 0);
+          const total = perFile.reduce((sum, { problems }) => sum + problems.length, 0);
           return {
-            total: perFile.reduce((sum, { problems }) => sum + problems.length, 0),
-            groups: perFile.filter(({ problems }) => problems.length > 0),
+            total,
+            any: total > 0,
+            groups,
             checked: checked.length,
             of: named.length,
+            text: await asText(
+              '{% each items=$groups as="group" partial="diagnostic-group.mdoc" /%}',
+              { groups },
+            ),
           };
         },
-        source: async (ask) => {
+        // Definitions, types, and implementations answer the same shape — a
+        // list of places — so they share one binding rather than three that
+        // differ only in which request they send.
+        ...Object.fromEntries(
+          (
+            [
+              {
+                name: "definitions",
+                request: intelligence.definitions,
+                document: "definitions.tool.mdoc",
+                // The implementation request answers with the declaration
+                // itself for anything nothing overrides, so a lone target
+                // covering the asked position means none — counting it would
+                // report every plain function as implementing itself.
+                fromOrigin: false,
+                // Where the answer's subject is a target's own identifier
+                // rather than the symbol asked about. A type definition's
+                // subject is the value you asked about, not the type it
+                // resolved to, so only definitions reads it off the targets.
+                subjectFromTargets: true,
+              },
+              {
+                name: "type_definitions",
+                request: intelligence.typeDefinitions,
+                document: "type-definitions.tool.mdoc",
+                fromOrigin: false,
+                subjectFromTargets: false,
+              },
+              {
+                name: "implementations",
+                request: intelligence.implementations,
+                document: "implementations.tool.mdoc",
+                fromOrigin: true,
+                subjectFromTargets: false,
+              },
+            ] as const
+          ).map(({ name, request, document, fromOrigin, subjectFromTargets }) => [
+            name,
+            async (ask: DocumentAsk) => {
+              const position = await askedPosition(ask);
+              const uri = workspace.getWorkspaceUri(askedFile(ask));
+              const { result } = await request({
+                file: askedFile(ask),
+                signal,
+                params: { position },
+              });
+              const targets = await navigationTargets({
+                result,
+                root,
+                workspace,
+                signal,
+                origin: fromOrigin ? { uri, position } : undefined,
+              });
+              const resolved = await subjectAtPosition({ workspace, uri, position, signal }).catch(
+                () => undefined,
+              );
+              const subject = subjectFromTargets
+                ? (targets.items.find(({ name: named }) => named)?.name ?? resolved?.name)
+                : resolved?.name;
+              const paths = [...new Set(targets.items.map(({ file }) => file))];
+              return {
+                total: targets.total,
+                any: targets.total > 0,
+                files: paths.length,
+                paths,
+                // Places, so a composition can ask about each target it found.
+                hits: targets.items.map((item) => ({
+                  name: item.name,
+                  file: item.file,
+                  line: item.selection.start.line + 1,
+                  character: item.selection.start.character + 1,
+                })),
+                // Through the tool's own document, because the empty case is
+                // where these three carry their weight: an implementation
+                // walk reaches only files this session has opened, and a bare
+                // tree said nothing at all where the tool spends a paragraph
+                // saying so — silence a composer would read as "there are
+                // none".
+                text: await asDocument(document, {
+                  subject,
+                  kind: resolved?.kind,
+                  root,
+                  ...targets,
+                  // A row naming the subject repeats the line above it; a row
+                  // naming anything else is information.
+                  items: targets.items.map((item) =>
+                    item.name === subject ? { ...item, name: undefined } : item,
+                  ),
+                }),
+              };
+            },
+          ]),
+        ),
+        read_file: async (ask) => {
           const uri = workspace.getWorkspaceUri(askedFile(ask));
           const { source } = await workspace.readTextDocumentUri(uri, signal);
-          const lines = source.split("\n");
+          const all = source.split("\n");
           const from = Number(ask.attributes.from ?? 1);
+          const lines = all.slice(from - 1, Number(ask.attributes.to ?? all.length));
           return {
-            lines: lines.slice(from - 1, Number(ask.attributes.to ?? lines.length)),
+            lines,
             startLine: from,
+            text: await asText("{% source lines=$lines startLine=$startLine /%}", {
+              lines,
+              startLine: from,
+            }),
           };
         },
+      };
+      // An ask pointed at a list runs once per item of it. Every ask above
+      // anchors on one place, so "hover each candidate that search returned"
+      // or "outline every file using this" could only be spelled as N calls —
+      // the round trip a composition exists to remove. The answers land as
+      // `{title, text}`, which is what `sections` already renders.
+      const fanned = async (ask: DocumentAsk, items: unknown, asked: unknown) => {
+        // Fanning over something that is not a list is a broken composition,
+        // never a reason to answer about nothing. Degrading to a single call
+        // ran the operation with no anchor at all and reported "File is
+        // outside the workspace: " — a hole wearing an answer's clothes.
+        if (!Array.isArray(items)) {
+          throw new Error(
+            `each=${
+              isAskReference(asked) ? `$${asked.reference.join(".")}` : "…"
+            } is not a list — the ask it reads either failed above or binds no such field.`,
+          );
+        }
+        // A language-server request per item, so the list is bounded — and
+        // says how much of it it covered, because a silent cut reads as the
+        // whole answer.
+        const taken = items.slice(0, 10);
+        const answers = await Promise.all(
+          taken.map(async (item) => {
+            // A string is a path; an object supplies its own fields. What the
+            // composer wrote stays fixed — those attributes are the part that
+            // is deliberately not varying.
+            const { each, ...written } = ask.attributes;
+            const fields =
+              typeof item === "object" && item !== null
+                ? (item as Record<string, unknown>)
+                : { file: String(item) };
+            const answer = (await operations[ask.operation]!({
+              ...ask,
+              attributes: { ...fields, ...written },
+            }).catch((cause: unknown) => ({
+              text: `Failed: ${cause instanceof Error ? cause.message : String(cause)}`,
+            }))) as Record<string, unknown>;
+            // What this answer is about. The name alone is not enough to tell
+            // the blocks apart — a search for `render` returned four
+            // candidates all named `rendered`, which read as one heading
+            // repeated four times until the place each was found came with it.
+            const file = fields.file === undefined ? "" : String(fields.file);
+            const at = file && fields.line !== undefined ? `${file}:${String(fields.line)}` : file;
+            return {
+              ...answer,
+              title: [fields.name, at].filter(Boolean).map(String).join(" · ") || String(item),
+              // Not every operation answers with prose — `subject` binds
+              // fields only — and a section with no text is a crash. An empty
+              // one is worse than a crash: `index.ts` re-exports and declares
+              // nothing, and its heading sat blank among six that were full,
+              // reading exactly like an ask that had failed.
+              text: String(answer.text ?? "") || "Nothing to report.",
+            };
+          }),
+        );
+        return {
+          items: answers,
+          total: answers.length,
+          any: answers.length > 0,
+          of: items.length,
+          text: await asText("{% sections items=$items /%}", { items: answers }),
+        };
       };
       const asks = documentAsks(document);
       const unfulfillable = asks.filter(({ operation }) => !(operation in operations));
@@ -407,7 +1008,11 @@ export const registerExperimentalTools = (
         };
         // One ask's failure is that ask's sentence, never the composition's:
         // a dossier missing one section it names honestly beats no dossier.
-        bound[ask.bind] = await operations[ask.operation]!(resolved).catch((cause: unknown) => ({
+        bound[ask.bind] = await (
+          ask.attributes.each === undefined
+            ? operations[ask.operation]!(resolved)
+            : fanned(resolved, resolved.attributes.each, ask.attributes.each)
+        ).catch((cause: unknown) => ({
           failed: cause instanceof Error ? cause.message : String(cause),
         }));
       }

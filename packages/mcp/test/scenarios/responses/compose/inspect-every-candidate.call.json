@@ -1,0 +1,7 @@
+{
+  "tool": "compose",
+  "arguments": {
+    "document": "{% ask \"search_code\" as=\"found\" query=\"deciding whether a posting balances\" limit=2 /%}\n{% ask \"inspect_symbol\" as=\"all\" each=$found.hits /%}\n\n# {% $found.total %} of {% $found.of %} matches anchored to a declaration\n\n{% $all.text %}"
+  },
+  "elapsed": "68ms"
+}

@@ -25,6 +25,25 @@ branch and includes every unpushed commit already on it; report that complete
 commit set before pushing. Consumer-visible package changes include one
 maintained Bumpy bump file. Agents never create task branches or worktrees.
 
+### Bump lifecycle
+
+Bumps are authored during change development, never reconstructed just before
+release. The first consumer-visible commit for a logical change creates one
+bump file through `vp run release add`; later commits for that same change
+update the same file. An unrelated logical change gets its own bump file.
+
+Commit the implementation, tests, generated consumer docs, and bump file
+together. Follow `.skills/add-change/SKILL.md` for the exact command, bump
+level, package attribution, and changelog text. Use patch for compatible fixes,
+minor for compatible capabilities, and major for breaking public contracts.
+Name only directly changed packages; Bumpy owns fixed-group and dependency
+propagation. Root shared changes name every affected public package explicitly.
+
+Before every commit, decide whether the task-owned diff changes published
+behavior, API, runtime dependencies, executables, generated artifacts, or
+consumer documentation. If it does, the bump belongs in that commit. A release
+request consumes pending bump files; it never creates them retroactively.
+
 Bump files accumulate on `main`; pushing it does not invoke Bumpy's release
 workflow.
 
@@ -32,19 +51,28 @@ If the push is rejected because the remote advanced, never force-push or rebase.
 When the worktree is clean and no parallel agent has uncommitted work, merge
 `origin/main` into the checked-out `main`, then push once.
 
-Only an explicit `release` request authorizes merging `main → release`, then
-queuing `bumpy/version-packages` with `vp run release:merge`. GitHub owns
-publication and public verification.
-Never version packages, edit generated changelogs, publish locally, dispatch
-release workflows, poll CI, or read successful-job logs.
+Only an explicit `release` request authorizes integrating `main` into `release`
+and merging the generated version pull request.
 
-Run `vp run release:pr` once. If the PR is absent, return to useful work; GitHub
-owns the pending workflow. If it is behind `release`, run `vp run release:update`
-once and let required checks rerun.
+1. Run `vp run dependencies:list` once. Resolve each open Dependabot pull
+   request before promotion.
+2. Run `vp run release:push`.
+3. Run `vp run release:promote:pr` once. If no pull request exists, run
+   `vp run release:promote:create` once.
+4. Run `vp run release:promote:merge` once. Return to useful work.
+5. After GitHub reports the promotion merge, run `vp run release:pr` once.
+6. If the version pull request exists, run `vp run release:merge` once.
+7. Return to useful work. GitHub owns publication and public verification.
+
+If the version pull request is behind `release`, run `vp run release:update`
+once. Never version packages, edit generated changelogs, publish locally,
+dispatch release workflows, poll CI, or read successful-job logs.
 
 After publication, synchronize `main` forward from `release` only with a clean
-worktree and no parallel uncommitted work. Never rebase or force-push shared
-commits.
+worktree and no parallel uncommitted work. Run `vp run release:sync`, then
+`vp run release:sync:push`. If the histories diverged, run
+`vp run release:sync:merge`, then `vp run release:sync:push`. Never rebase or
+force-push shared commits.
 
 Complete that synchronization before the next daily change and confirm Bumpy's
 consumed bump files are absent. Address review findings in code; resolve the

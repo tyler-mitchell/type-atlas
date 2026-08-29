@@ -1,6 +1,6 @@
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { join } from "pathe";
 import { expect, test } from "vite-plus/test";
 import { projectSources } from "../src/project-graph.ts";
 

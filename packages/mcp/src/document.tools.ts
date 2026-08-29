@@ -13,6 +13,7 @@ import {
   createTypeAtlas,
   declarationChainAtPosition,
   documentSymbols,
+  foldValueSymbols,
   type Row,
   page,
   truncate,
@@ -418,43 +419,11 @@ export const registerDocumentTools = (server: McpServer, workspaces: VolarWorksp
         signal,
       );
       const parsed = symbols ?? [];
-      // A value's insides are data, not declarations: an object literal's
-      // properties flooded a config file's outline with 136 rows for 3 real
-      // declarations. A literal-valued symbol keeps its row and prices what
-      // it holds — `· N entries` — and `raw` remains the complete hierarchy.
-      // The kind alone cannot decide (a const arrow function is a Variable
-      // too), so a symbol folds only when every child is member-shaped:
-      // properties and literals fold, a body holding locals or callbacks
-      // stays a declaration tree.
-      const valueShaped = new Set<SymbolKind>([
-        SymbolKind.Property,
-        SymbolKind.Field,
-        SymbolKind.Variable,
-        SymbolKind.Constant,
-        SymbolKind.Array,
-        SymbolKind.Object,
-      ]);
-      const memberShaped = new Set<SymbolKind>([
-        SymbolKind.Property,
-        SymbolKind.Field,
-        SymbolKind.Object,
-        SymbolKind.Array,
-        SymbolKind.String,
-        SymbolKind.Number,
-        SymbolKind.Boolean,
-        SymbolKind.Key,
-      ]);
-      const entryCount = (entry: DocumentSymbol): number =>
-        (entry.children ?? []).reduce((held, child) => held + 1 + entryCount(child), 0);
-      const foldValues = (entry: DocumentSymbol): DocumentSymbol & { readonly folded?: number } =>
-        valueShaped.has(entry.kind) &&
-        (entry.children?.length ?? 0) > 0 &&
-        (entry.children ?? []).every((child) => memberShaped.has(child.kind))
-          ? { ...entry, children: [], folded: entryCount(entry) }
-          : { ...entry, children: (entry.children ?? []).map(foldValues) };
+      // `raw` remains the complete hierarchy; folding is shared with compose's
+      // outline ask so the two cannot answer the same file differently.
       const folded = raw
         ? parsed
-        : parsed.map((entry) => ("range" in entry ? foldValues(entry) : entry));
+        : parsed.map((entry) => ("range" in entry ? foldValueSymbols(entry) : entry));
       const output = raw ? folded : projectDocumentSymbols([...folded], depth);
       // An outline is already a tree, so it is handed over as one: a document
       // states what a row says and the guide draws how deep it sits, and

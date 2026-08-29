@@ -26,6 +26,12 @@ const buildOutput = new Set(["dist", "build", "out", "coverage"]);
  */
 export type WorkspaceListing = {
   readonly entries: readonly Row[];
+  /**
+   * Every file the tree rendered, workspace-relative — the same listing as a
+   * list, so a caller can hand it straight to another tool rather than parsing
+   * paths back out of drawn rows.
+   */
+  readonly files: readonly string[];
   readonly filtered: boolean;
   /** The listing was the working-tree delta, so an empty answer means clean. */
   readonly changedOnly: boolean;
@@ -421,6 +427,10 @@ export const workspaceTree = async (input: {
     ).length;
     return count === 0 ? "" : ` · ${count} changed`;
   };
+  // The crawl works relative to the listed directory; every other tool takes
+  // workspace-relative paths, so the list this reports speaks that language.
+  const workspaceRelative = (relative: string) =>
+    input.directory === "." ? relative : path.join(input.directory, relative);
 
   if (input.changed) {
     // The working-tree delta as one tree: exactly the changed paths, at any
@@ -443,6 +453,7 @@ export const workspaceTree = async (input: {
       new Map([...elided].map(([parent, count]) => [parent, `… ${count} more`] as const)),
     );
     return {
+      files: renderedFiles.map(workspaceRelative),
       entries:
         treeRows.length === 0
           ? []
@@ -682,6 +693,7 @@ export const workspaceTree = async (input: {
     elisionRows,
   );
   return {
+    files: renderedFiles.map(workspaceRelative),
     entries:
       treeRows.length === 0
         ? []

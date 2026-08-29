@@ -10,9 +10,24 @@ const identifierKinds = [
   "shorthand_property_identifier_pattern",
 ] as const;
 
-const identifierMatcher: NapiConfig = {
-  rule: { any: identifierKinds.map((kind) => ({ kind })) },
-};
+const matcherOf = (kinds: readonly string[]): NapiConfig => ({
+  rule: { any: kinds.map((kind) => ({ kind })) },
+});
+
+const identifierMatcher = matcherOf(identifierKinds);
+
+/**
+ * The same names, plus the kind a name in type position wears.
+ *
+ * Without `type_identifier` every interface, type alias, and type reference
+ * was invisible: `Services` was declared on one line and used on the next,
+ * and the search reported no exact identifier for it. Half of TypeScript is
+ * written in type position.
+ *
+ * Only the TypeScript grammars have that kind. Asking JavaScript for it is a
+ * rule error rather than an empty result, so the two cannot share one matcher.
+ */
+const typedIdentifierMatcher = matcherOf([...identifierKinds, "type_identifier"]);
 
 type CandidatePosition = {
   readonly file: string;
@@ -37,7 +52,7 @@ export const findOccurrenceCandidates = async (input: {
   const { Lang, parse, pattern } = await import("@ast-grep/napi");
   const queryIndexes = new Map(input.queries.map((query, index) => [query, index]));
   const definitions = input.queries.map((query) => {
-    const identifier = parse(Lang.TypeScript, query).root().find(identifierMatcher);
+    const identifier = parse(Lang.TypeScript, query).root().find(typedIdentifierMatcher);
     return {
       query,
       anchor: identifier?.text() ?? query,
@@ -45,12 +60,13 @@ export const findOccurrenceCandidates = async (input: {
     };
   });
   const languages = [
-    { lang: Lang.TypeScript, extensions: new Set([".ts", ".mts", ".cts"]) },
-    { lang: Lang.Tsx, extensions: new Set([".tsx", ".jsx"]) },
-    { lang: Lang.JavaScript, extensions: new Set([".js", ".mjs", ".cjs"]) },
-  ].map(({ lang, extensions }) => ({
+    { lang: Lang.TypeScript, extensions: new Set([".ts", ".mts", ".cts"]), typed: true },
+    { lang: Lang.Tsx, extensions: new Set([".tsx", ".jsx"]), typed: true },
+    { lang: Lang.JavaScript, extensions: new Set([".js", ".mjs", ".cjs"]), typed: false },
+  ].map(({ lang, extensions, typed }) => ({
     lang,
     extensions,
+    identifiers: typed ? typedIdentifierMatcher : identifierMatcher,
     matchers: definitions.map((definition) =>
       definition.kind === "expression" ? pattern(lang, definition.query) : undefined,
     ),
@@ -88,14 +104,14 @@ export const findOccurrenceCandidates = async (input: {
     if (!language) continue;
     const tree = parse(language.lang, source).root();
     const lines = source.split("\n");
-    for (const node of tree.findAll(identifierMatcher)) {
+    for (const node of tree.findAll(language.identifiers)) {
       const index = queryIndexes.get(node.text());
       if (index !== undefined) record({ index, file, lines, node });
     }
     for (const [index, matcher] of language.matchers.entries()) {
       if (!matcher) continue;
       for (const node of tree.findAll(matcher)) {
-        record({ index, file, lines, node: node.find(identifierMatcher) ?? node });
+        record({ index, file, lines, node: node.find(language.identifiers) ?? node });
       }
     }
   }

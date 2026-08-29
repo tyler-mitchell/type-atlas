@@ -267,15 +267,17 @@ export const registerIntelligenceTools = (
       { mcpReq: { signal } },
     ) =>
       textResult(
-        await intelligence.search({
-          root: workspace,
-          directory,
-          includeTypes,
-          query,
-          limit,
-          snippetLines,
-          signal,
-        }),
+        (
+          await intelligence.search({
+            root: workspace,
+            directory,
+            includeTypes,
+            query,
+            limit,
+            snippetLines,
+            signal,
+          })
+        ).text,
       ),
   );
 

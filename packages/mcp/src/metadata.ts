@@ -42,6 +42,8 @@ export const serverInstructions = [
   "",
   "Start with `inspect_symbol`. It composes definitions, types, implementations, callers, calls, and remaining references into one call, and its reference list shows only what is not already explained as a call or definition. Prefer it over separate `definitions`, `references`, and `callers` calls; reach for those individually when you need one relationship in full. Select the symbol with either `symbol` (its exact name in the file) or `position`, not both.",
   "",
+  "`compose` answers several of these in one call, laid out how you ask, and can run one ask over every result of another. Its description carries the vocabulary.",
+  "",
   "Reference scope: `references`, and the reference section of `inspect_symbol`, answer from every TypeScript project loaded so far, so usages in sibling packages are included once those packages have been loaded. A project nothing has opened yet cannot contribute, and each result names its anchor, so widen an answer by touching a file in the package you expect to hear from. `callers`, `callees`, `implementations`, and `file_references` remain bounded to the project owning `file`.",
   "",
   "Retrieval tools (`search_code`, `investigate_code`, `related_code`, `search_dependency_code`) match meaning, not text. They will not reliably locate an exact string, error message, or comment. Use `workspace_symbols` for an exact declaration name, and your client's own text search for exact text. Their relevance percentages are relative to the top result shown, not absolute confidence, and the first result is always 100%.",

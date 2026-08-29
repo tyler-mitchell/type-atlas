@@ -97,8 +97,32 @@ export const tags: Config["tags"] = {
       file: { type: String },
       /** Files from an earlier ask's answer: `files=$uses.paths`. */
       files: { type: Array },
+      /** A list from an earlier ask: the ask runs once per item of it. */
+      each: { type: Array },
       line: { type: Number },
       character: { type: Number },
+      /** A declaration by name, for an ask that would otherwise need a position. */
+      symbol: { type: String },
+      /** Keeps an outline's full hierarchy instead of folding value insides. */
+      raw: { type: Boolean },
+      /** Includes a symbol's own source in its inspection. */
+      includeSource: { type: Boolean },
+      /** Includes where a symbol's type is declared, built-ins included. */
+      includeTypeDefinitions: { type: Boolean },
+      /** How many levels of nested declarations an outline opens. */
+      depth: { type: Number },
+      /** Narrows located results to or away from test files: "only", "exclude". */
+      tests: { type: String },
+      /** Picomatch patterns a listing is narrowed to. */
+      glob: { type: Array },
+      /** Lists only what git reports changed. */
+      changed: { type: Boolean },
+      /** Where a search looks, and how much it returns. */
+      directory: { type: String },
+      path: { type: String },
+      limit: { type: Number },
+      symbolLimit: { type: Number },
+      snippetLines: { type: Number },
       query: { type: String },
       /** Exact text for a literal ask, as distinct from a query by meaning. */
       text: { type: String },

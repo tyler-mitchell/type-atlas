@@ -44,7 +44,7 @@ export const registerTools = (
   registerEditingTools(server, workspaces);
   registerCodeActionTools(server, workspaces);
   registerIntelligenceTools(server, workspaces, semble);
-  registerExperimentalTools(server, workspaces);
+  registerExperimentalTools(server, workspaces, semble);
   // A client pins tool schemas at connect, so a tool or parameter born after
   // that is stripped or refused before the server sees it — which blocks the
   // edit → reload → use loop this repository develops by. This door is the
